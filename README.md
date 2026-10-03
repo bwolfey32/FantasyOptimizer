@@ -2,7 +2,7 @@
 
 A free weekly lineup optimizer for ESPN fantasy football. It sets your best lineup, makes the close start/sit calls for you, and finds the waiver moves that add the most points, all from live data.
 
-**Use it:** https://bwolfey32.github.io/FantasyOptimizer/
+**Use it:** https://bennyspicks.us/
 
 ![Benny's Picks](assets/social-preview.jpg)
 

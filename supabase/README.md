@@ -13,8 +13,8 @@ You only do this once. It takes about 20 minutes.
 
 **Authentication → URL Configuration:**
 
-- **Site URL:** `https://bwolfey32.github.io/FantasyOptimizer/`
-- **Redirect URLs:** add `https://bwolfey32.github.io/FantasyOptimizer/` and, for local testing, `http://localhost:8000/**`
+- **Site URL:** `https://bennyspicks.us/`
+- **Redirect URLs:** add `https://bennyspicks.us/` and, for local testing, `http://localhost:8000/**`
 
 ## 3. Send a code instead of a link
 
@@ -36,7 +36,7 @@ New users get **Confirm signup** and returning users get **Magic link**, so both
 1. In [Google Cloud Console](https://console.cloud.google.com/), create a project (or use an existing one).
 2. Go to **APIs & Services → OAuth consent screen**. Choose **External** and fill in the app name (Benny's Picks), your support email and the site's address, then publish it.
 3. Go to **APIs & Services → Credentials → Create credentials → OAuth client ID** and choose **Web application**.
-   - **Authorized JavaScript origins:** `https://bwolfey32.github.io`
+   - **Authorized JavaScript origins:** `https://bennyspicks.us`
    - **Authorized redirect URIs:** `https://<your-project-ref>.supabase.co/auth/v1/callback`. The exact address is shown in Supabase under **Authentication → Sign In / Providers → Google**.
 4. Copy the client ID and client secret into Supabase (**Authentication → Sign In / Providers → Google**), turn the provider on, and save.
 
