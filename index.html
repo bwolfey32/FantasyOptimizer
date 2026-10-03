@@ -128,10 +128,11 @@ a { color: var(--accent); }
 /* Fantasy team headers */
 .teambar { display: flex; flex-direction: column; gap: 8px; min-width: 0; }
 .tteams { display: flex; gap: 6px; overflow-x: auto; scrollbar-width: thin; padding-bottom: 2px; }
-.tteam { flex: 0 0 auto; display: flex; flex-direction: column; align-items: flex-start; gap: 1px; min-width: 128px; max-width: 220px; padding: 8px 14px 9px; background: var(--surface); border: 1px solid var(--line); border-radius: 8px; text-align: left; }
+.tteam { flex: 0 0 auto; display: flex; flex-direction: column; align-items: flex-start; gap: 1px; min-width: 128px; max-width: 260px; padding: 8px 14px 9px; background: var(--surface); border: 1px solid var(--line); border-radius: 8px; text-align: left; }
 .tteam:hover { border-color: var(--accent); }
 .tteam .tn { font-family: var(--font-display); font-weight: 700; font-size: 17px; line-height: 1.15; text-transform: uppercase; letter-spacing: .02em; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 100%; }
-.tteam .tm { font-size: 12.5px; color: var(--muted); white-space: nowrap; }
+.tteam .tm { font-size: 12.5px; color: var(--muted); white-space: normal; line-height: 1.4; }
+.tteam .tb { white-space: nowrap; }
 .tteam .tm .num { color: var(--ink); }
 .tteam[aria-pressed="true"] { border-color: var(--accent); background: color-mix(in srgb, var(--accent) 9%, var(--surface)); box-shadow: inset 0 -3px 0 var(--accent); }
 .tteam.add { min-width: 0; justify-content: center; align-items: center; border-style: dashed; color: var(--accent); font-weight: 600; }
@@ -1628,7 +1629,9 @@ function teamBar(manage) {
     // projections are built for the active team's scoring, so only show totals for teams that score the same way
     const fmt = SCORING[t.scoring] ? t.scoring : 'ppr', n = (t.roster || []).length, on = t.id === state.activeTeam;
     const pts = n && !D.loading && fmt === state.scoring ? teamProjection(t) : null;
-    return `<button type="button" class="tteam" data-fteam="${esc(t.id)}" aria-pressed="${on}"><span class="tn">${esc(t.name)}</span><span class="tm">${n ? `${n} players${pts != null ? ` · <span class="num">${f1(pts)}</span> proj` : ''}` : 'No players yet'} · ${SCORING[fmt][0]}${t.example ? ' · example' : ''}</span></button>`;
+    // each piece stays whole; the line wraps only between pieces
+    const bits = [n ? `${n} players` : 'No players yet', pts != null ? `<span class="num">${f1(pts)}</span> proj` : '', SCORING[fmt][0], t.example ? 'example' : ''].filter(Boolean);
+    return `<button type="button" class="tteam" data-fteam="${esc(t.id)}" aria-pressed="${on}" title="${esc(t.name)}"><span class="tn">${esc(t.name)}</span><span class="tm">${bits.map(b => `<span class="tb">${b}</span>`).join(' · ')}</span></button>`;
   }).join('');
   return `<div class="teambar"><div class="tteams" role="group" aria-label="Your teams">${heads}<button type="button" class="tteam add" data-act="addteam">+ Add team</button></div>
   ${manage ? `<div class="tmanage"><label class="small muted" for="teamName">Team name</label><input class="inp" id="teamName" type="text" maxlength="40" value="${esc(ct.name)}">${scoringSelect('teamScoring')}${state.teams.length > 1 ? `<button type="button" class="btn sm danger" data-act="delteam">${D.delArm ? `Press again to delete ${esc(ct.name)}` : 'Delete team'}</button>` : ''}<button type="button" class="btn sm" data-act="toggleio" aria-expanded="${!!D.ioOpen}">Import / export</button><span class="small muted">Each team keeps its own roster, lineup slots, ESPN league and waiver list.</span></div>` : ''}</div>`;
