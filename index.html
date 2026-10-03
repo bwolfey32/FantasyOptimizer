@@ -354,6 +354,8 @@ td .wks { flex-wrap: nowrap; }
   .slider { grid-template-columns: minmax(0, 1fr) 110px 40px; }
 }
 @media (prefers-reduced-motion: reduce) { * { transition: none !important; } }
+/* iOS zooms into any focused text box whose text is under 16px, then stays zoomed; touch screens get 16px boxes */
+@media (pointer: coarse) { input, select, textarea, input.inp, select.sel, textarea.inp { font-size: 16px !important; } }
 </style>
 
 <div class="wrap">
@@ -452,6 +454,8 @@ const FACTOR_KEYS = [['dvp','Defense vs. position'],['cover','Secondary / run de
 
 /* ---------- helpers ---------- */
 const $ = (s, r = document) => r.querySelector(s);
+// focus a field for mouse-and-keyboard users only; on phones it pops the keyboard up uninvited
+const deskFocus = (s, select) => { try { if (!matchMedia('(pointer: fine)').matches) return; const el = $(s); if (el) { el.focus(); if (select) el.select(); } } catch {} };
 const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const clamp = (x, a, b) => Math.max(a, Math.min(b, x));
 const ok = x => x != null && isFinite(x);
@@ -2177,9 +2181,9 @@ document.addEventListener('click', e => {
   else if (a === 'slunlink') { state.sleeper = null; if (state.waivers.source === 'sleeper') state.waivers.source = 'own'; D.wCache = null; save(); render(); }
   else if (a === 'applycsv') applyCsv();
   else if (a === 'pasteroster') { pasteRoster(); if (state.roster.length && !state.example) { D.setupOpen = false; render(); } }
-  else if (a === 'setup') { D.setupOpen = !D.setupOpen; D.ioOpen = false; D.ioInMsg = ''; state.tab = 'lineup'; save(); render(); if (D.setupOpen) { window.scrollTo(0, 0); $('#rosterPaste')?.focus(); } }
+  else if (a === 'setup') { D.setupOpen = !D.setupOpen; D.ioOpen = false; D.ioInMsg = ''; state.tab = 'lineup'; save(); render(); if (D.setupOpen) { window.scrollTo(0, 0); deskFocus('#slQuery'); } }
   else if (a === 'fresh') { D.freshOpen = !D.freshOpen; renderFresh(); }
-  else if (a === 'toggleFa') { D.faOpen = !D.faOpen; render(); if (D.faOpen) $('#faPaste')?.focus(); }
+  else if (a === 'toggleFa') { D.faOpen = !D.faOpen; render(); if (D.faOpen) deskFocus('#faPaste'); }
   else if (a === 'toggleio') { D.ioOpen = !D.ioOpen; D.setupOpen = false; D.ioOutMsg = ''; D.ioInMsg = ''; render(); }
   else if (a === 'iocopy') {
     const out = $('#ioOut'), code = out?.value || '', msg = $('#ioOutMsg');
@@ -2205,7 +2209,7 @@ document.addEventListener('click', e => {
     state.teams.push({ id, name: 'Team ' + n }); state.activeTeam = id; applyTeam({}); syncScoring();
     D.open.clear(); D.wCache = null; D.rosterMsg = ''; D.faMsg = ''; D.espnMsg = null; D.espnTeams = null; D.delArm = false;
     state.tab = 'lineup'; save(); render();
-    const nm = $('#teamName'); if (nm) { nm.focus(); nm.select(); }
+    deskFocus('#teamName', true);
   }
   else if (a === 'delteam') {
     if (!D.delArm) { D.delArm = true; render(); setTimeout(() => { if (D.delArm) { D.delArm = false; if (state.tab === 'lineup') render(); } }, 4000); return; }
