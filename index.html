@@ -138,8 +138,8 @@ a { color: var(--accent); }
 /* Panels: setup flow, team settings, share */
 #panels:empty { display: none; }
 .flow, .tsp, .io { scroll-margin-top: 12px; border: 1px solid color-mix(in srgb, var(--accent) 40%, var(--line)); }
-.seg.wrap { display: grid; grid-template-columns: repeat(4, auto); max-width: 100%; }
-@media (max-width: 600px) { .seg.wrap { grid-template-columns: repeat(2, minmax(0, 1fr)); align-self: stretch; } }
+.seg.methods { display: grid; grid-template-columns: repeat(4, auto); max-width: 100%; }
+@media (max-width: 600px) { .seg.methods { grid-template-columns: repeat(2, minmax(0, 1fr)); align-self: stretch; } }
 .flow .seg, .tsp .seg { align-self: flex-start; }
 .seg a { padding: 6px 14px; font-weight: 500; font-size: 14px; text-decoration: none; color: var(--ink); }
 .seg a[aria-current="page"] { background: var(--accent); color: var(--accent-ink); }
@@ -2068,7 +2068,7 @@ function flowPanel() {
   const title = F.step === 'review' ? 'Review and save' : F.dest === 'new' ? 'Add a team' : `Import into ${esc(curTeam().name)}`;
   const head = `<div class="row-head"><h2>${title}</h2><button type="button" class="btn sm" data-act="flowclose">Cancel</button></div>`;
   if (F.step === 'review') return `<div class="card panel flow">${head}${reviewHTML()}</div>`;
-  const methods = `<div class="seg wrap" role="group" aria-label="How to bring in your team">${FLOW_METHODS.map(([k, l]) => `<button type="button" data-flowmethod="${k}" aria-pressed="${F.method === k}">${l}</button>`).join('')}</div>`;
+  const methods = `<div class="seg methods" role="group" aria-label="How to bring in your team">${FLOW_METHODS.map(([k, l]) => `<button type="button" data-flowmethod="${k}" aria-pressed="${F.method === k}">${l}</button>`).join('')}</div>`;
   const body = { sleeper: flowSleeper, espn: flowEspn, manual: flowManual, restore: flowRestore }[F.method]();
   return `<div class="card panel flow">${head}${methods}<div class="flow-body">${body}</div>${F.msg ? `<div class="banner ${F.msg[0]} small">${esc(F.msg[1])}</div>` : ''}</div>`;
 }
