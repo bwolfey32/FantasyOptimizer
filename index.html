@@ -235,7 +235,7 @@ tr.click:hover td { background: color-mix(in srgb, var(--accent) 5%, transparent
 .cmp { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 14px; }
 .cmp .card { padding: 14px; display: flex; flex-direction: column; gap: 12px; min-width: 0; }
 /* Waiver Optimizer headline */
-.setup { gap: 14px; border: 1px solid color-mix(in srgb, var(--accent) 40%, var(--line)); }
+.setup { scroll-margin-top: 12px; gap: 14px; border: 1px solid color-mix(in srgb, var(--accent) 40%, var(--line)); }
 .setup-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 18px 20px; }
 .setup .opt { display: flex; flex-direction: column; gap: 8px; min-width: 0; }
 .setup .opt p { margin: 0; }
@@ -1937,7 +1937,7 @@ function importControls() {
 /* Import your team: every way to get a roster in, in one place. Opens by itself for a team with no players. */
 function setupPanel() {
   const ct = curTeam(), empty = !state.roster.length;
-  return `<div class="card panel setup"><div class="row-head"><h2>Import your team <span class="small muted" style="font-family:var(--font-body);text-transform:none;font-weight:400">for ${esc(ct.name)}</span></h2>${empty ? '' : '<button type="button" class="btn sm" data-act="setup">Close</button>'}</div>
+  return `<div class="card panel setup"><div class="row-head"><h2>Import your team <span class="small muted" style="font-family:var(--font-body);text-transform:none;font-weight:400">for ${esc(ct.name)}</span></h2>${empty ? '' : '<button type="button" class="btn sm" data-act="setupclose">Close</button>'}</div>
   <div class="setup-grid">
     <section class="opt main"><h3>Sync your Sleeper league</h3><p class="small muted">Enter your Sleeper username or a league ID. Benny copies your roster, lineup slots and scoring, keeps them in sync, and finds your league’s real free agents.</p>${sleeperControls()}</section>
     <section class="opt"><h3>Paste your ESPN roster</h3><p class="small muted">Works for any league. On ESPN, open <strong>My Team</strong>, select the roster table, copy it, and paste it here. A list of names, one per line, works too.</p>
@@ -2181,7 +2181,9 @@ document.addEventListener('click', e => {
   else if (a === 'slunlink') { state.sleeper = null; if (state.waivers.source === 'sleeper') state.waivers.source = 'own'; D.wCache = null; save(); render(); }
   else if (a === 'applycsv') applyCsv();
   else if (a === 'pasteroster') { pasteRoster(); if (state.roster.length && !state.example) { D.setupOpen = false; render(); } }
-  else if (a === 'setup') { D.setupOpen = !D.setupOpen; D.ioOpen = false; D.ioInMsg = ''; state.tab = 'lineup'; save(); render(); if (D.setupOpen) { window.scrollTo(0, 0); deskFocus('#slQuery'); } }
+  // always opens (a second press shouldn't hide it) and brings the panel into view; on phones it sits well below the header
+  else if (a === 'setup') { D.setupOpen = true; D.ioOpen = false; D.ioInMsg = ''; state.tab = 'lineup'; save(); render(); const p = $('.setup'); if (p) p.scrollIntoView({ behavior: matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth', block: 'start' }); deskFocus('#slQuery'); }
+  else if (a === 'setupclose') { D.setupOpen = false; render(); }
   else if (a === 'fresh') { D.freshOpen = !D.freshOpen; renderFresh(); }
   else if (a === 'toggleFa') { D.faOpen = !D.faOpen; render(); if (D.faOpen) deskFocus('#faPaste'); }
   else if (a === 'toggleio') { D.ioOpen = !D.ioOpen; D.setupOpen = false; D.ioOutMsg = ''; D.ioInMsg = ''; render(); }
