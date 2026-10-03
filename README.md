@@ -4,7 +4,7 @@ A free weekly lineup optimizer for ESPN fantasy football. It sets your best line
 
 **Use it:** https://bwolfey32.github.io/FantasyOptimizer/
 
-![Benny's Picks](og-image.png)
+![Benny's Picks](assets/social-preview.jpg)
 
 ## What it does
 

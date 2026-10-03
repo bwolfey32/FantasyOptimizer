@@ -4,19 +4,21 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>Benny’s Picks — Fantasy Optimizer</title>
 <meta name="description" content="Free weekly lineup optimizer for ESPN fantasy football: start/sit calls, matchup and scheme breakdowns, and waiver pickups, with live data.">
-<meta name="theme-color" content="#176a49">
+<meta name="theme-color" content="#075b37">
 <meta property="og:type" content="website">
 <meta property="og:site_name" content="Benny’s Picks">
 <meta property="og:title" content="Benny’s Picks — Fantasy Optimizer">
 <meta property="og:description" content="Free weekly lineup optimizer for ESPN fantasy football: start/sit calls, matchup and scheme breakdowns, and waiver pickups, with live data.">
 <meta property="og:url" content="https://bwolfey32.github.io/FantasyOptimizer/">
-<meta property="og:image" content="https://bwolfey32.github.io/FantasyOptimizer/og-image.png">
+<meta property="og:image" content="https://bwolfey32.github.io/FantasyOptimizer/assets/social-preview.jpg">
 <meta property="og:image:width" content="1200">
 <meta property="og:image:height" content="630">
-<meta property="og:image:alt" content="Benny’s Picks: fantasy football lineup and waiver optimizer">
+<meta property="og:image:alt" content="Benny’s Picks logo: Benny in a green jersey with cats celebrating on a football field">
 <meta name="twitter:card" content="summary_large_image">
-<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='14' fill='%23176a49'/%3E%3Cpath d='M12 20h40M12 32h40M12 44h40' stroke='%23fff' stroke-width='4' stroke-linecap='round'/%3E%3Cpath d='M22 26v12M32 26v12M42 26v12' stroke='%23fff' stroke-opacity='.55' stroke-width='3' stroke-linecap='round'/%3E%3C/svg%3E">
-<link rel="apple-touch-icon" href="https://bwolfey32.github.io/FantasyOptimizer/apple-touch-icon.png">
+<link rel="icon" href="assets/favicon.ico" sizes="any">
+<link rel="icon" href="assets/favicon-32.png" type="image/png" sizes="32x32">
+<link rel="apple-touch-icon" href="assets/apple-touch-icon.png">
+<link rel="manifest" href="assets/site.webmanifest">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600&family=Saira+Condensed:wght@500;600;700&display=swap">
@@ -29,7 +31,8 @@
   --ink: #13201a;
   --muted: #56655d;
   --line: #cfd8d1;
-  --accent: #176a49;
+  --accent: #075b37;
+  --gold: #8a6510;
   --accent-ink: #ffffff;
   --good: #1b7a4b;
   --bad: #b23a30;
@@ -41,13 +44,13 @@
 @media (prefers-color-scheme: dark) {
   :root:not([data-theme="light"]) {
     --bg: #0e1512; --surface: #151e1a; --surface-2: #1c2722; --ink: #e4ebe6; --muted: #91a198;
-    --line: #29352f; --accent: #4fc38e; --accent-ink: #07130d; --good: #4fc38e; --bad: #f07a6e; --warn: #e3b052;
+    --line: #29352f; --accent: #4fc38e; --accent-ink: #07130d; --good: #4fc38e; --bad: #f07a6e; --warn: #e3b052; --gold: #e2bb52;
     color-scheme: dark;
   }
 }
 :root[data-theme="dark"] {
   --bg: #0e1512; --surface: #151e1a; --surface-2: #1c2722; --ink: #e4ebe6; --muted: #91a198;
-  --line: #29352f; --accent: #4fc38e; --accent-ink: #07130d; --good: #4fc38e; --bad: #f07a6e; --warn: #e3b052;
+  --line: #29352f; --accent: #4fc38e; --accent-ink: #07130d; --good: #4fc38e; --bad: #f07a6e; --warn: #e3b052; --gold: #e2bb52;
   color-scheme: dark;
 }
 * { box-sizing: border-box; }
@@ -70,7 +73,7 @@ a { color: var(--accent); }
 .top { display: flex; flex-wrap: wrap; align-items: end; justify-content: space-between; gap: 12px; }
 .brand { display: flex; align-items: center; gap: 12px; min-width: 0; }
 .brand .mark { flex: 0 0 auto; width: 52px; height: 52px; border-radius: 12px; display: grid; place-items: center; background: var(--accent); color: var(--accent-ink); font-family: var(--font-display); font-weight: 700; font-size: 26px; letter-spacing: .02em; }
-.brand .logo { flex: 0 0 auto; width: 52px; height: 52px; border-radius: 12px; object-fit: contain; }
+.brand .logo { flex: 0 0 auto; width: 56px; height: 56px; object-fit: contain; }
 .wordmark { display: flex; flex-direction: column; min-width: 0; }
 .wordmark h1 { font-size: 32px; }
 .tagline { font-size: 12px; font-weight: 600; letter-spacing: .14em; text-transform: uppercase; color: var(--muted); }
@@ -215,7 +218,7 @@ tr.click:hover td { background: color-mix(in srgb, var(--accent) 5%, transparent
 .cmp .card { padding: 14px; display: flex; flex-direction: column; gap: 12px; min-width: 0; }
 /* Waiver Optimizer headline */
 .wbest { padding: 16px 20px; display: flex; flex-direction: column; gap: 10px; border: 1px solid color-mix(in srgb, var(--accent) 45%, var(--line)); border-left: 5px solid var(--accent); }
-.wbest .label { color: var(--accent); font-size: 13px; }
+.wbest .label { color: var(--gold); font-size: 13px; }
 .wb-row { display: flex; flex-wrap: wrap; align-items: center; gap: 12px 28px; }
 .wb-side { display: flex; flex-direction: column; min-width: 0; flex: 1 1 180px; }
 .wb-kind { font-family: var(--font-display); font-weight: 700; font-size: 15px; letter-spacing: .08em; text-transform: uppercase; }
@@ -228,7 +231,7 @@ tr.click:hover td { background: color-mix(in srgb, var(--accent) 5%, transparent
 /* Benny's Pick */
 .pick { padding: 18px 20px; display: flex; flex-direction: column; gap: 12px; border: 1px solid color-mix(in srgb, var(--accent) 45%, var(--line)); border-left: 5px solid var(--accent); }
 .pick-head { display: flex; align-items: center; gap: 10px; }
-.pick-head .label { color: var(--accent); font-size: 13px; }
+.pick-head .label { color: var(--gold); font-size: 13px; }
 .pick-main { display: flex; flex-wrap: wrap; align-items: flex-end; gap: 12px 32px; }
 .pick-who { flex: 1 1 260px; min-width: 0; }
 .pick-name { font-family: var(--font-display); font-weight: 700; font-size: 34px; line-height: 1.05; text-transform: uppercase; text-wrap: balance; }
@@ -324,7 +327,7 @@ td .wks { flex-wrap: nowrap; }
 <div class="wrap">
   <header class="top">
     <div class="brand">
-      <div class="mark" aria-hidden="true">BP</div>
+      <img class="logo" src="assets/icon-192.png" width="52" height="52" alt="">
       <div class="wordmark">
         <h1>Benny’s Picks</h1>
         <div class="tagline">Fantasy Optimizer</div>

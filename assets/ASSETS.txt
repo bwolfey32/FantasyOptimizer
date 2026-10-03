@@ -1,0 +1,21 @@
+Benny's Picks website assets
+============================
+
+Copy the contents of this archive into the site's /assets/ directory. All paths below assume that location.
+
+In <head>:
+<link rel="icon" href="/assets/favicon.ico" sizes="any">
+<link rel="icon" href="/assets/favicon-32.png" type="image/png" sizes="32x32">
+<link rel="apple-touch-icon" href="/assets/apple-touch-icon.png">
+<link rel="manifest" href="/assets/site.webmanifest">
+<meta name="theme-color" content="#075b37">
+<meta property="og:image" content="https://YOUR-DOMAIN/assets/social-preview.jpg">
+<meta name="twitter:card" content="summary_large_image">
+
+On the page (change width and sizes to match your layout):
+<picture>
+  <source type="image/webp" srcset="/assets/bennys-picks-256.webp 256w, /assets/bennys-picks-512.webp 512w, /assets/bennys-picks-1024.webp 1024w" sizes="(max-width: 600px) 256px, 512px">
+  <img src="/assets/bennys-picks-512.png" width="512" height="512" alt="Benny's Picks fantasy football optimizer" decoding="async">
+</picture>
+
+Use bennys-picks-master.png for archiving/editing. The full logo has an opaque stadium background; the BP icons have transparent corners. Replace YOUR-DOMAIN with the live site origin before publishing.
