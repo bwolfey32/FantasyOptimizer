@@ -1,18 +1,19 @@
 <!doctype html>
+<html lang="en">
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<title>Start/Sit Board</title>
+<title>Benny’s Picks — Fantasy Optimizer</title>
 <meta name="description" content="Free weekly lineup optimizer for ESPN fantasy football: start/sit calls, matchup and scheme breakdowns, and waiver pickups, with live data.">
 <meta name="theme-color" content="#176a49">
 <meta property="og:type" content="website">
-<meta property="og:site_name" content="Start/Sit Board">
-<meta property="og:title" content="Start/Sit Board">
+<meta property="og:site_name" content="Benny’s Picks">
+<meta property="og:title" content="Benny’s Picks — Fantasy Optimizer">
 <meta property="og:description" content="Free weekly lineup optimizer for ESPN fantasy football: start/sit calls, matchup and scheme breakdowns, and waiver pickups, with live data.">
 <meta property="og:url" content="https://bwolfey32.github.io/FantasyOptimizer/">
 <meta property="og:image" content="https://bwolfey32.github.io/FantasyOptimizer/og-image.png">
 <meta property="og:image:width" content="1200">
 <meta property="og:image:height" content="630">
-<meta property="og:image:alt" content="Start/Sit Board: a lineup with matchup grades and projected points">
+<meta property="og:image:alt" content="Benny’s Picks: fantasy football lineup and waiver optimizer">
 <meta name="twitter:card" content="summary_large_image">
 <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='14' fill='%23176a49'/%3E%3Cpath d='M12 20h40M12 32h40M12 44h40' stroke='%23fff' stroke-width='4' stroke-linecap='round'/%3E%3Cpath d='M22 26v12M32 26v12M42 26v12' stroke='%23fff' stroke-opacity='.55' stroke-width='3' stroke-linecap='round'/%3E%3C/svg%3E">
 <link rel="apple-touch-icon" href="https://bwolfey32.github.io/FantasyOptimizer/apple-touch-icon.png">
@@ -67,10 +68,28 @@ a { color: var(--accent); }
 
 /* Header */
 .top { display: flex; flex-wrap: wrap; align-items: end; justify-content: space-between; gap: 12px; }
-.brand { display: flex; flex-direction: column; gap: 2px; }
-.brand .hash { display: flex; gap: 5px; margin-bottom: 4px; }
-.brand .hash i { width: 14px; height: 3px; background: var(--accent); border-radius: 1px; }
-.brand .hash i:nth-child(n+2) { opacity: .45; }
+.brand { display: flex; align-items: center; gap: 12px; min-width: 0; }
+.brand .mark { flex: 0 0 auto; width: 52px; height: 52px; border-radius: 12px; display: grid; place-items: center; background: var(--accent); color: var(--accent-ink); font-family: var(--font-display); font-weight: 700; font-size: 26px; letter-spacing: .02em; }
+.brand .logo { flex: 0 0 auto; width: 52px; height: 52px; border-radius: 12px; object-fit: contain; }
+.wordmark { display: flex; flex-direction: column; min-width: 0; }
+.wordmark h1 { font-size: 32px; }
+.tagline { font-size: 12px; font-weight: 600; letter-spacing: .14em; text-transform: uppercase; color: var(--muted); }
+.status { display: inline-flex; align-items: center; gap: 6px; font-size: 13px; color: var(--muted); margin-right: 4px; }
+.status i { width: 8px; height: 8px; border-radius: 50%; background: var(--muted); }
+.status.live i { background: var(--good); }
+.status.busy i { background: var(--accent); animation: pulse 1.2s ease-in-out infinite; }
+.status.old i { background: var(--warn); }
+@keyframes pulse { 50% { opacity: .3; } }
+
+/* This week at a glance */
+.brief { background: var(--surface); border: 1px solid var(--line); border-left: 4px solid var(--accent); border-radius: var(--radius); padding: 12px 16px; font-size: 16px; line-height: 1.6; }
+.brief:empty { display: none; }
+.brief .bteam { font-weight: 600; }
+.brief .sep { color: var(--muted); margin: 0 6px; }
+.blink { background: none; border: 0; padding: 0; font: inherit; color: inherit; cursor: pointer; border-bottom: 2px solid color-mix(in srgb, var(--accent) 45%, transparent); }
+.blink:hover { border-bottom-color: var(--accent); }
+.blink .n { font-family: var(--font-display); font-weight: 700; font-size: 21px; font-variant-numeric: tabular-nums; }
+.blink .n.up { color: var(--good); }
 .controls { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
 .sel, .inp { background: var(--surface); border: 1px solid var(--line); border-radius: 8px; padding: 7px 10px; min-width: 0; }
 .inp:focus, .sel:focus { border-color: var(--accent); outline: none; }
@@ -194,8 +213,34 @@ tr.click:hover td { background: color-mix(in srgb, var(--accent) 5%, transparent
 /* Compare */
 .cmp { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 14px; }
 .cmp .card { padding: 14px; display: flex; flex-direction: column; gap: 12px; min-width: 0; }
-.verdict { padding: 14px 16px; display: flex; flex-wrap: wrap; align-items: center; gap: 14px; }
-.verdict .num { font-size: 40px; line-height: 1; color: var(--accent); }
+/* Waiver Optimizer headline */
+.wbest { padding: 16px 20px; display: flex; flex-direction: column; gap: 10px; border: 1px solid color-mix(in srgb, var(--accent) 45%, var(--line)); border-left: 5px solid var(--accent); }
+.wbest .label { color: var(--accent); font-size: 13px; }
+.wb-row { display: flex; flex-wrap: wrap; align-items: center; gap: 12px 28px; }
+.wb-side { display: flex; flex-direction: column; min-width: 0; flex: 1 1 180px; }
+.wb-kind { font-family: var(--font-display); font-weight: 700; font-size: 15px; letter-spacing: .08em; text-transform: uppercase; }
+.wb-kind.add { color: var(--good); } .wb-kind.drop { color: var(--bad); } .wb-kind.keep { color: var(--muted); }
+.wb-name { font-family: var(--font-display); font-weight: 700; font-size: 28px; line-height: 1.05; text-transform: uppercase; }
+.wb-gain { display: flex; flex-direction: column; align-items: flex-end; text-align: right; margin-left: auto; }
+.wb-gain .num { font-size: 44px; line-height: 1; color: var(--good); }
+.wb-none { font-size: 15px; }
+@media (max-width: 780px) { .wb-gain { align-items: flex-start; text-align: left; margin-left: 0; } .wordmark h1 { font-size: 26px; } .pick-name { font-size: 28px; } }
+/* Benny's Pick */
+.pick { padding: 18px 20px; display: flex; flex-direction: column; gap: 12px; border: 1px solid color-mix(in srgb, var(--accent) 45%, var(--line)); border-left: 5px solid var(--accent); }
+.pick-head { display: flex; align-items: center; gap: 10px; }
+.pick-head .label { color: var(--accent); font-size: 13px; }
+.pick-main { display: flex; flex-wrap: wrap; align-items: flex-end; gap: 12px 32px; }
+.pick-who { flex: 1 1 260px; min-width: 0; }
+.pick-name { font-family: var(--font-display); font-weight: 700; font-size: 34px; line-height: 1.05; text-transform: uppercase; text-wrap: balance; }
+.pick-stat { display: flex; flex-direction: column; }
+.pick-stat .num { font-size: 36px; line-height: 1; color: var(--accent); }
+.pick .meter { flex: none; height: 10px; }
+.pick-why { margin: 0; padding-left: 20px; display: flex; flex-direction: column; gap: 4px; font-size: 15px; }
+.pick-why li::marker { color: var(--accent); }
+.decisions { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 8px; }
+.decisions .label { margin-right: 4px; }
+.dchip { border: 1px solid var(--line); cursor: pointer; font: inherit; font-size: 13px; padding: 3px 10px; }
+.dchip[aria-pressed="true"] { border-color: var(--accent); background: color-mix(in srgb, var(--accent) 14%, var(--surface)); }
 .meter { height: 10px; border-radius: 5px; background: var(--surface-2); overflow: hidden; display: flex; flex: 1 1 200px; }
 .meter span { background: var(--accent); }
 
@@ -279,16 +324,20 @@ td .wks { flex-wrap: nowrap; }
 <div class="wrap">
   <header class="top">
     <div class="brand">
-      <div class="hash" aria-hidden="true"><i></i><i></i><i></i><i></i><i></i></div>
-      <h1>Start/Sit Board</h1>
-      <div class="small muted" id="asof">Loading data…</div>
+      <div class="mark" aria-hidden="true">BP</div>
+      <div class="wordmark">
+        <h1>Benny’s Picks</h1>
+        <div class="tagline">Fantasy Optimizer</div>
+      </div>
     </div>
     <div class="controls">
+      <span class="status" id="status" aria-live="polite"><i></i><span>Loading…</span></span>
       <label class="small muted" for="weekSel">Week</label>
       <select id="weekSel" class="sel"></select>
-      <button class="btn" data-act="reload" type="button">Refresh data</button>
+      <button class="btn" data-act="reload" type="button">Refresh</button>
     </div>
   </header>
+  <section class="brief" id="brief" aria-label="This week at a glance"></section>
   <nav class="tabs" role="tablist" id="tabs"></nav>
   <div id="msgs" class="section"></div>
   <main id="main"></main>
@@ -695,17 +744,25 @@ function ingest(inp) {
   D.wCache = null; D.usage = null;
   computeAll();
 }
-async function load() {
-  D.loading = true; D.failed = false; D.errors = []; D.progress = 0; D.snapshot = null; render();
-  const err = (what, e) => D.errors.push(`${what}: ${e.status === 404 ? 'not published yet' : (e.message || 'request failed')}.`);
-  let inp = await gatherLive(err);
-  if (!inp) {
-    const snap = await fetchJSON('snapshot.json').catch(() => null);
-    if (snap?.v === 1) { inp = snap; D.snapshot = snap; D.errors = []; D.coaches = snap.coaches || null; }
+/* Loading order: the saved copy (snapshot.json, refreshed every few hours by a GitHub Action) paints the board
+   right away, then live data from Sleeper and ESPN replaces it in the background. If live data can't be reached,
+   the saved copy stays and the status line shows its age. `fresh` (a week or season change) skips the saved copy. */
+async function load(opts = {}) {
+  const exporting = location.hash === '#export';
+  if (opts.fresh) D.inp = null;
+  D.failed = false; D.errors = []; D.progress = 0;
+  const useSaved = snap => { D.snapshot = snap; D.coaches = snap.coaches || D.coaches; ingest(snap); if (!state.roster.length && state.teams.length === 1 && D.U.size) makeExampleRoster(); };
+  if (!exporting && !opts.fresh && !D.inp && !state.settings.season && !state.settings.week) {
+    const snap = await fetchJSON('snapshot.json', 8000).catch(() => null);
+    if (snap?.v === 1) { useSaved(snap); D.loading = false; }
   }
-  if (!inp) { D.loading = false; D.failed = true; render(); return; }
-  ingest(inp);
-  if (!state.roster.length && state.teams.length === 1 && D.U.size) makeExampleRoster();
+  D.loading = !D.inp; D.refreshing = !!D.inp; render();
+  const err = (what, e) => D.errors.push(`${what}: ${e.status === 404 ? 'not published yet' : (e.message || 'request failed')}.`);
+  const inp = await gatherLive(err);
+  D.refreshing = false;
+  if (inp) { D.snapshot = null; ingest(inp); if (!state.roster.length && state.teams.length === 1 && D.U.size) makeExampleRoster(); }
+  else if (!D.inp) { const snap = await fetchJSON('snapshot.json').catch(() => null); if (snap?.v === 1) useSaved(snap); }
+  if (!D.inp) { D.loading = false; D.failed = true; render(); return; }
   D.loading = false; render();
   if (D.snapshot) return;
   if (location.hash === '#export') {
@@ -1298,7 +1355,7 @@ function teamNeeds(roster, V, weeks, H, slots, base) {
     const st = mine.slice(0, need); let ms = [];
     for (const id of st) for (let wi = 1; wi < H; wi++) { const s = schedOpp(D.U.get(id).team, weeks[wi]); if (s.opp) ms.push(matchupMult(P, s.opp, weeks[wi])); }
     const sm = mean(ms), sched = sm == null ? null : sm >= 1.03 ? 'Easy' : sm <= 0.97 ? 'Hard' : 'Average';
-    const byes = []; for (const id of st) for (let wi = 0; wi < H; wi++) if (schedOpp(D.U.get(id).team, weeks[wi]).bye) byes.push(`wk ${weeks[wi]} ${D.U.get(id).name.split(' ').slice(-1)[0]}`);
+    const byes = []; for (const id of st) for (let wi = 0; wi < H; wi++) if (schedOpp(D.U.get(id).team, weeks[wi]).bye) byes.push(`wk ${weeks[wi]} ${shortName(id)}`);
     out.push({ P, level, rows, sched, byes, worst });
   }
   const holes = []; for (let wi = 0; wi < H; wi++) { const miss = slots.length - base[wi].starters.length; if (miss > 0) holes.push(`Week ${weeks[wi]}: ${miss} empty slot${miss > 1 ? 's' : ''}`); }
@@ -1315,6 +1372,15 @@ function persNote(T, pos) {
 function schedStrip(id, weeks, H) {
   const u = D.U.get(id); if (!u) return '';
   return `<span class="wks">${weeks.slice(0, H).map(w => { const s = schedOpp(u.team, w); if (s.bye) return `<span class="wk bye" title="Bye week">${w} BYE</span>`; if (!s.opp) return `<span class="wk">${w}</span>`; const m = matchupMult(u.pos, s.opp, w), d = m - 1, a = Math.min(36, Math.abs(d) * 220), note = persNote(s.opp, u.pos); return `<span class="wk" title="Week ${w}: ${s.home ? 'vs' : 'at'} ${s.opp}, matchup ${spct(d)}${note ? '. ' + esc(note) : ''}" style="background:color-mix(in srgb, var(${d >= 0 ? '--good' : '--bad'}) ${a.toFixed(0)}%, transparent)">${w} ${s.home ? '' : '@'}${s.opp}${note ? '<i class="pmark" aria-hidden="true">•</i>' : ''}</span>`; }).join('')}</span>`;
+}
+/* The headline of the Waiver Optimizer: ADD X / DROP Y / +n expected lineup points. */
+function bestMoveCard(m, weeks, H, ownTxt) {
+  if (!m) return `<div class="card wbest"><span class="label">Best move</span><div class="wb-none">Your roster is already the best Benny can build from these free agents. Check back after this week’s games.</div></div>`;
+  const side = (kind, id) => { const u = D.U.get(id); return `<div class="wb-side"><span class="wb-kind ${kind}">${kind === 'add' ? 'Add' : 'Drop'}</span><span class="wb-name">${esc(u.name)}</span><span class="small muted">${u.pos === 'DEF' ? 'D/ST' : u.pos} · ${u.team || 'FA'}${kind === 'add' ? ' · ' + ownTxt(id) : ''}</span></div>`; };
+  return `<div class="card wbest"><span class="label">Best move</span>
+    <div class="wb-row">${side('add', m.f)}${m.d ? side('drop', m.d) : `<div class="wb-side"><span class="wb-kind keep">No drop</span><span class="small muted">You have an open roster spot</span></div>`}
+      <div class="wb-gain"><span class="num">+${f1(m.hz)}</span><span class="small muted">expected lineup pts over the next ${H} week${H > 1 ? 's' : ''}</span></div></div>
+    ${m.whyText ? `<div class="small">${esc(m.whyText)}.</div>` : ''}</div>`;
 }
 /* Waivers section: every defense whose personnel changed enough to matter, teams you face first. */
 function persSection(weeks, H) {
@@ -1372,10 +1438,11 @@ function waiversBody() {
       const [om, st] = persOwn(fu.team), net = om - 1 + st / 8, t = D.pers[fu.team], mv = t.moves.find(x => (net > 0 ? x.val > 0 : x.val < 0)) || t.stMoves.find(x => (net > 0 ? x.val > 0 : x.val < 0));
       if (Math.abs(net) >= 0.02) why.push(`${fu.team} defense ${net > 0 ? 'improved' : 'weakened'} (${spct(om - 1)}${mv ? ', ' + moveText(mv) : ''})`);
     }
+    m.whyText = why.join("; ").replace(/^./, c => c.toUpperCase());
     return `<div class="item move"><div class="mrank num">${i + 1}</div>
       <div class="mside"><span class="pill n">Add</span> <div>${pl(m.f)}<span class="psub">${ownTxt(m.f)}</span></div>${schedStrip(m.f, weeks, H)}</div>
       <div class="mside">${m.d ? `<span class="pill o">Drop</span> <div>${pl(m.d)}</div>${schedStrip(m.d, weeks, H)}` : `<span class="pill m">No drop</span> <div class="small muted">You have an open roster spot</div>`}</div>
-      <div class="mgain"><span class="num">+${f1(m.hz)}</span><span class="small muted">lineup pts, next ${H} wk${H > 1 ? 's' : ''}</span>${H < weeks.length ? `<span class="small ${m.later >= 0 ? 'trend-up' : 'trend-down'}">${m.later >= 0 ? '+' : ''}${f1(m.later)} after that</span>` : ''}</div>
+      <div class="mgain"><span class="num">+${f1(m.hz)}</span><span class="small muted">expected lineup pts, next ${H} wk${H > 1 ? 's' : ''}</span>${H < weeks.length ? `<span class="small ${m.later >= 0 ? 'trend-up' : 'trend-down'}">${m.later >= 0 ? '+' : ''}${f1(m.later)} after that</span>` : ''}</div>
       <div class="mwhy small">${esc(why.join('; ').replace(/^./, c => c.toUpperCase()))}. <button type="button" class="btn sm" data-taken="${esc(m.f)}">Taken in my league</button></div></div>`;
   }).join('') : `<div class="item" style="padding:14px"><span class="muted">No free agent improves your lineup over ${hLab}. Try a longer window or a higher ownership limit.</span></div>`;
   const posBest = POS.map(p => { const top = R.byH.filter(id => D.U.get(id).pos === p).slice(0, 4); return top.map(id => `<tr><td><strong>${esc(D.U.get(id).name)}</strong> <span class="small muted">${p} · ${D.U.get(id).team}</span></td><td>${ownTxt(id)}</td><td>${f1(rosBase(id))}</td><td>${f1(R.sumH(id))}</td><td class="l">${schedStrip(id, weeks, Math.min(H, 6))}</td><td><button type="button" class="btn sm" data-taken="${esc(id)}">Taken</button></td></tr>`).join(''); }).join('');
@@ -1399,17 +1466,18 @@ function waiversBody() {
   }).join('')}</div>` : '';
   const nTaken = Object.keys(W.taken).length;
   return `<div class="section">
-  <div class="row-head"><h2>Waivers</h2><span class="small muted">Free agents from ${src}</span></div>
+  <div class="row-head"><h2>Waiver Optimizer</h2><span class="small muted">Add/drop moves ranked by expected lineup points gained. Free agents from ${src}</span></div>
   <div class="toolbar"><div class="seg" role="group" aria-label="Time window">${[[2, 'Next 2'], [4, 'Next 4'], [6, 'Next 6'], ['ros', 'Rest of season']].map(([k, l]) => `<button type="button" data-wh="${k}" aria-pressed="${W.horizon === k}">${l}</button>`).join('')}</div>
     <label class="small muted" for="wTeams">League size</label><select class="sel" id="wTeams">${[8, 10, 12, 14, 16].map(n => `<option ${W.teams === n ? 'selected' : ''}>${n}</option>`).join('')}</select>
     ${W.source === 'list' && W.faList.length ? `<button type="button" class="btn sm" data-wsrc="own">Use ESPN ownership instead</button>` : `<label class="small muted" for="wOwn">Owned under</label><input type="range" id="wOwn" min="5" max="90" step="5" value="${W.ownMax}" style="accent-color:var(--accent)"><span class="num" id="wOwn-v">${W.ownMax}%</span>`}
     ${nTaken ? `<button type="button" class="btn sm" data-act="untake">Show ${nTaken} hidden</button>` : ''}</div>
   ${warn.map(w => `<div class="banner small">${esc(w)}</div>`).join('')}
+  ${bestMoveCard(moves[0], weeks, H, ownTxt)}
   <h3>Your team, ${hLab}</h3>
   <div class="needs">${needCards}</div>
   ${needs.holes.length ? `<div class="banner small"><strong>Lineup holes:</strong> ${esc(needs.holes.join(' · '))}. A pickup at that position is worth more than usual.</div>` : ''}
   ${stashCard}
-  <div class="row-head"><h2>Best moves</h2><span class="small muted">Gain = extra points your best lineup scores with the swap, counting bench players as injury cover. Ranked by that gain plus a third of the gain after the window. Week chips: green is a soft matchup, red is tough, • means the defense changed (see below).</span></div>
+  <div class="row-head"><h2>All moves, ranked</h2><span class="small muted">Gain = extra points your best lineup scores with the swap, counting bench players as injury cover. Ranked by that gain plus a third of the gain after the window. Week chips: green is a soft matchup, red is tough, • means the defense changed (see below).</span></div>
   <div class="card list">${moveRows}</div>
   ${persSection(weeks, H)}
   <div class="row-head"><h2>Top free agents by position</h2><span class="small muted">Projected points over ${hLab}</span></div>
@@ -1421,21 +1489,75 @@ function waiversBody() {
 }
 
 /* ---------- rendering ---------- */
-const TABS = [['lineup','Lineup'],['compare','Compare'],['waivers','Waivers'],['defenses','Defenses'],['teams','Teams & Schemes'],['players','Players'],['settings','Settings']];
+/* Start/sit calls worth a second look: a starter whose best eligible bench player has at least a 38% chance of
+   outscoring him, or a starter tagged questionable or doubtful. Closest calls first. */
+const shortName = id => { const u = D.U.get(id); return !u ? '' : u.pos === 'DEF' ? (TEAMS[u.team]?.[1] || u.team) : u.name.split(' ').slice(-1)[0]; };
+const pBeats = (a, b) => (a.sd || b.sd) ? Phi((a.mean - b.mean) / Math.sqrt(a.sd ** 2 + b.sd ** 2)) : (a.mean >= b.mean ? 1 : 0);
+function reviewDecisions() {
+  if (!state.roster.length || !D.M) return [];
+  const { starters, bench } = optimize(), out = [];
+  const alts = bench.filter(r => r.status === 'ok' && !r.locked);
+  for (const s of starters) {
+    const st = s.r; if (!st || st.locked) continue;
+    const alt = alts.filter(b => s.slot.elig.includes(b.pos)).sort((x, y) => y.mean - x.mean)[0];
+    const tagged = /^(questionable|doubtful)/i.test(st.inj || '');
+    if (!alt) continue;
+    const p = pBeats(alt, st);
+    if (p >= 0.38 || tagged) out.push({ start: st.id, alt: alt.id, slot: s.slot.label || s.slot.k, p, tagged });
+  }
+  const seen = new Set();
+  return out.filter(d => !seen.has(d.alt) && seen.add(d.alt)).sort((a, b) => b.p - a.p);
+}
+/* The one-line briefing under the header: lineup total, calls to review, best waiver move. */
+function renderBrief() {
+  const el = $('#brief'); if (!el) return;
+  if (D.loading || D.failed) { el.innerHTML = ''; return; }
+  const team = esc(curTeam().name);
+  if (!state.roster.length) { el.innerHTML = `<span class="bteam">${team}:</span> add your roster to get Benny’s picks. <button type="button" class="blink" data-tab="players">Add players</button>`; return; }
+  const { starters } = optimize(), proj = starters.reduce((s, x) => s + (x.r ? x.r.mean : 0), 0);
+  const dec = reviewDecisions(), W = computeWaivers(), best = W.moves[0];
+  const decTxt = dec.length ? `<button type="button" class="blink" data-brief="decide"><span class="n">${dec.length}</span> decision${dec.length === 1 ? '' : 's'} to review</button>` : `<span>no close calls</span>`;
+  const bestTxt = best ? `<button type="button" class="blink" data-tab="waivers">best waiver move <span class="n up">+${f1(best.hz)}</span> pts</button>` : `<span>no waiver move worth making</span>`;
+  el.innerHTML = `<span class="bteam">${state.example ? 'Example roster' : team}:</span> your optimal lineup projects for <button type="button" class="blink" data-tab="lineup"><span class="n">${f1(proj)}</span> points</button><span class="sep">·</span>${decTxt}<span class="sep">·</span>${bestTxt}`;
+}
+/* Freshness: "Updated 12 minutes ago", refreshed every minute. Live data is just-now; a saved copy shows its age. */
+function ago(t) {
+  const m = Math.max(0, Math.round((Date.now() - t) / 60000));
+  if (m < 2) return 'just now'; if (m < 60) return `${m} minutes ago`;
+  const h = Math.round(m / 60); if (h < 24) return `${h} hour${h === 1 ? '' : 's'} ago`;
+  return 'on ' + new Date(t).toLocaleDateString([], { weekday: 'short', month: 'short', day: 'numeric' });
+}
+function renderStatus() {
+  const el = $('#status'); if (!el) return;
+  let cls = '', txt = 'Loading…';
+  if (D.failed) { cls = 'old'; txt = 'Data unavailable'; }
+  else if (D.loadedAt && !D.loading) {
+    const age = Date.now() - D.loadedAt.getTime();
+    txt = `${fmtName()} · Updated ${ago(D.loadedAt.getTime())}`;
+    cls = D.refreshing ? 'busy' : age > 36e5 * 12 ? 'old' : 'live';
+    if (D.refreshing) txt = `${fmtName()} · Updated ${ago(D.loadedAt.getTime())} · refreshing…`;
+  } else if (D.loading) cls = 'busy';
+  el.className = 'status ' + cls; el.lastElementChild.textContent = txt;
+}
+setInterval(renderStatus, 60000);
+const TABS = [['lineup','Lineup'],['compare','Benny’s Pick'],['waivers','Waiver Optimizer'],['defenses','Defenses'],['teams','Teams & Schemes'],['players','Players'],['settings','Settings']];
 function render() {
   $('#tabs').innerHTML = TABS.map(([k, l]) => `<button role="tab" type="button" data-tab="${k}" aria-selected="${state.tab === k}">${l}</button>`).join('');
   const ws = $('#weekSel');
   ws.disabled = !!D.snapshot;
   ws.innerHTML = D.snapshot ? `<option selected>${D.week}</option>` : Array.from({ length: 18 }, (_, i) => `<option value="${i + 1}" ${D.week === i + 1 ? 'selected' : ''}>${i + 1}${D.detWeek === i + 1 && D.season === D.detSeason ? ' (now)' : ''}</option>`).join('');
-  $('#asof').textContent = D.loadedAt && !D.loading ? `${D.season} season · ${fmtName()} scoring · ${D.snapshot ? 'snapshot saved' : 'data as of'} ${D.loadedAt.toLocaleString([], { weekday: 'short', month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' })}` : 'Loading data…';
+  renderStatus();
   const msgs = [];
-  if (D.snapshot && !D.loading) msgs.push(`<div class="banner info"><strong>Saved snapshot for week ${D.week}.</strong> This published copy can’t reach Sleeper or ESPN, so it shows data saved ${esc(D.loadedAt.toLocaleString([], { weekday: 'short', month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' }))}. Injury news after that time isn’t included. For live data, open <code>index.html</code> from the FantasyOptimizer folder on your computer.</div>`);
-  if (D.errors.length) msgs.push(`<div class="banner err"><strong>Some data didn’t load.</strong> ${esc(D.errors.slice(0, 4).join(' '))}${D.errors.length > 4 ? ` (+${D.errors.length - 4} more)` : ''} The board uses whatever did load. Press Refresh data to try again.</div>`);
-  if (!D.loading && state.example && state.tab === 'lineup') msgs.push(`<div class="banner info"><strong>This is an example roster.</strong> ${D.snapshot ? `Paste your ESPN roster in <a href="#" data-tab="players">Players</a> to see your own lineup.` : `Import your ESPN team in <a href="#" data-tab="settings">Settings</a>, or paste your roster in <a href="#" data-tab="players">Players</a>.`}</div>`);
+  // Only interrupt for problems that change the picks: missing projections or schedule, or data that's gone stale.
+  const age = D.loadedAt ? Date.now() - D.loadedAt.getTime() : 0;
+  if (!D.loading && !D.failed && D.snapshot && !D.refreshing && age > 36e5 * 36) msgs.push(`<div class="banner">These numbers are from ${esc(D.loadedAt.toLocaleDateString([], { weekday: 'long', month: 'short', day: 'numeric' }))}, so injury news since then isn’t included. Press Refresh to try for newer data.</div>`);
+  if (!D.loading && !D.snapshot && D.errors.some(e => /projections|schedule/i.test(e))) msgs.push(`<div class="banner err"><strong>Some of this week’s data didn’t load.</strong> Picks may be incomplete. Press Refresh to try again.</div>`);
+  if (!D.loading && state.example && state.tab === 'lineup') msgs.push(`<div class="banner info"><strong>This is an example roster.</strong> Paste your ESPN roster in <a href="#" data-tab="players">Players</a> to see your own lineup, or bring in a team with <strong>Import / export</strong> below.</div>`);
   $('#msgs').innerHTML = msgs.join('');
   const main = $('#main');
-  if (D.failed) { main.innerHTML = `<div class="card panel"><h2>No data loaded</h2><p style="margin:0">The board couldn’t reach Sleeper or ESPN and has no saved snapshot. Check your connection and press Refresh data. If you’re viewing the published copy, open <code>index.html</code> from the FantasyOptimizer folder on your computer instead.</p></div>`; return; }
-  if (D.loading) { main.innerHTML = `<div class="card loading"><h3>Loading week ${D.week || ''} data</h3><div class="small">Projections, weekly stats and schedules from Sleeper and ESPN. Past seasons are saved after the first load.</div><div class="bar"><span id="lbar" style="width:${Math.round(D.progress * 100)}%"></span></div></div>`; return; }
+  if (D.failed) { renderBrief(); main.innerHTML = `<div class="card panel"><h2>Couldn’t load this week’s data</h2><p style="margin:0">Sleeper and ESPN didn’t respond. Check your connection and press Refresh.</p></div>`; return; }
+  if (D.loading) { renderBrief(); main.innerHTML = `<div class="card loading"><h3>Loading week ${D.week || ''}</h3><div class="small">Projections, stats and schedules. Past seasons are saved after your first visit.</div><div class="bar"><span id="lbar" style="width:${Math.round(D.progress * 100)}%"></span></div></div>`; return; }
+  renderBrief();
   main.innerHTML = ({ lineup: viewLineup, compare: viewCompare, waivers: viewWaivers, defenses: viewDefenses, teams: viewTeams, players: viewPlayers, settings: viewSettings })[state.tab]();
 }
 function injPill(r) {
@@ -1515,8 +1637,8 @@ function rosterPasteBox() {
 /* ---------- team import / export ----------
    A team travels as JSON: its name, roster (Sleeper ids plus name and position, so players can be re-matched by name
    if an id is ever unknown), lineup slots, ESPN league, waiver settings, and your overrides and return weeks for its
-   players. The share code is that JSON in base64 behind an "SSB1:" tag, so it survives chat apps and email. */
-const IO_APP = 'start-sit-board';
+   players. The share code is that JSON in base64 behind a "BP1:" tag (older "SSB1:" codes still import), so it survives chat apps and email. */
+const IO_APP = 'bennys-picks', IO_APPS = [IO_APP, 'start-sit-board'];
 function exportBundle(ids) {
   stashTeam();
   const teams = state.teams.filter(t => ids.includes(t.id) && (t.roster || []).length);
@@ -1528,15 +1650,15 @@ function exportBundle(ids) {
       slots: t.slots, espn: { leagueId: t.espn?.leagueId || '', teamId: t.espn?.teamId ?? null }, waivers: wv(t.waivers || {}), scoring: t.scoring || 'ppr' })),
     overrides: mine(state.overrides), returnWeek: mine(state.returnWeek) };
 }
-function toCode(obj) { let s = ''; for (const b of new TextEncoder().encode(JSON.stringify(obj))) s += String.fromCharCode(b); return 'SSB1:' + btoa(s); }
+function toCode(obj) { let s = ''; for (const b of new TextEncoder().encode(JSON.stringify(obj))) s += String.fromCharCode(b); return 'BP1:' + btoa(s); }
 function parseBundle(text) {
   const t = (text || '').trim(); if (!t) throw new Error('Paste a team code or choose a file first.');
   let obj;
   try {
     if (t.startsWith('{')) obj = JSON.parse(t);
-    else { const raw = atob(t.replace(/^SSB1:/i, '').replace(/\s+/g, '')); obj = JSON.parse(new TextDecoder().decode(Uint8Array.from(raw, c => c.charCodeAt(0)))); }
-  } catch { throw new Error('That code is incomplete or damaged. Copy the whole code, starting with SSB1:, and try again.'); }
-  if (obj?.app !== IO_APP || !Array.isArray(obj.teams) || !obj.teams.length) throw new Error('That isn’t a team code from this tool.');
+    else { const raw = atob(t.replace(/^(BP1|SSB1):/i, '').replace(/\s+/g, '')); obj = JSON.parse(new TextDecoder().decode(Uint8Array.from(raw, c => c.charCodeAt(0)))); }
+  } catch { throw new Error('That code is incomplete or damaged. Copy the whole code, starting with BP1:, and try again.'); }
+  if (!IO_APPS.includes(obj?.app) || !Array.isArray(obj.teams) || !obj.teams.length) throw new Error('That isn’t a Benny’s Picks team code.');
   return obj;
 }
 function importBundle(obj, replace) {
@@ -1582,8 +1704,8 @@ function ioPanel() {
       ${exportable.length ? `<div class="iochecks">${exportable.map(t => `<label><input type="checkbox" data-iosel="${esc(t.id)}" ${sel.includes(t.id) ? 'checked' : ''}> ${esc(t.name)} <span class="muted">${t.roster.length} players${t.example ? ', example' : ''}</span></label>`).join('')}</div>
       <div class="toolbar"><button type="button" class="btn primary" data-act="iocopy" ${sel.length ? '' : 'disabled'}>Copy code</button>${canDownload ? `<button type="button" class="btn" data-act="iodownload" ${sel.length ? '' : 'disabled'}>Download file</button>` : ''}<span class="small muted" id="ioOutMsg">${esc(D.ioOutMsg || '')}</span></div>
       <textarea class="inp iocode" id="ioOut" readonly aria-label="Team code">${esc(code)}</textarea>` : '<p class="small muted" style="margin:0">Add players to a team first.</p>'}</div>
-    <div class="section"><h3>Import</h3><p class="small muted" style="margin:0">Paste a team code, or open a file exported from this tool. Imported teams are added next to yours.</p>
-      <textarea class="inp iocode" id="ioIn" placeholder="SSB1:…"></textarea>
+    <div class="section"><h3>Import</h3><p class="small muted" style="margin:0">Paste a team code, or open a file exported from Benny’s Picks. Imported teams are added next to yours.</p>
+      <textarea class="inp iocode" id="ioIn" placeholder="BP1:…"></textarea>
       <div class="toolbar"><label class="btn sm" for="ioFile">Open file…</label><input class="vh" type="file" id="ioFile" accept=".json,.txt,application/json,text/plain">
         <label class="small"><input type="checkbox" id="ioReplace" ${D.ioReplace ? 'checked' : ''}> Replace teams with the same name</label></div>
       <div class="toolbar"><button type="button" class="btn primary" data-act="ioimport">Import teams</button><span class="small muted">${esc(D.ioInMsg || '')}</span></div></div>
@@ -1621,16 +1743,57 @@ function playerOptions() {
 function resolvePick(v) { const m = /^(.*) · (\w+) (\w+)$/.exec(v || ''); const nm = norm(m ? m[1] : v); const c = D.nameIdx.get(nm) || []; return c.find(id => !m || (D.U.get(id).pos === m[2])) || null; }
 function viewCompare() {
   let [a, b] = state.compare;
+  // open on the closest start/sit call when nothing is picked yet
+  if (!a || !D.M[a] || !b || !D.M[b]) { const d = reviewDecisions()[0]; if (d) { a = d.start; b = d.alt; } }
   if (!a || !D.M[a] || !b || !D.M[b]) { const ros = state.roster.map(id => D.M[id]).filter(r => r && r.status === 'ok'); const { bench } = optimize(); const nb = bench.find(r => r.status === 'ok'); if (nb) { const { starters } = optimize(); const st = starters.find(s => s.r && s.slot.elig.includes(nb.pos)); a = a && D.M[a] ? a : st?.r.id; b = b && D.M[b] ? b : nb.id; } else if (ros.length > 1) { a = a || ros[0].id; b = b || ros[1].id; } }
   const A = D.M[a], Bp = D.M[b];
   const pick = (k, r) => `<input class="inp" list="plist" id="cmp${k}" data-cmp="${k}" value="${r ? esc(r.u.name + ' · ' + r.pos + ' ' + (r.T || 'FA')) : ''}" placeholder="Search a player" style="width:100%">`;
   let verdict = '';
   if (A && Bp) {
-    const pA = A.sd || Bp.sd ? Phi((A.mean - Bp.mean) / Math.sqrt(A.sd ** 2 + Bp.sd ** 2)) : 0.5, w = pA >= 0.5 ? A : Bp, pw = Math.max(pA, 1 - pA);
-    verdict = `<div class="card verdict"><span class="num">${pct(pw)}</span><div style="flex:1 1 220px;min-width:0"><h3>Start ${esc(w.u.name)}</h3><div class="small muted">${pw < 0.55 ? 'Close call. Use the Safe or Boom view, or late injury news, to break the tie.' : `${esc(w.u.name)} outscores the other player in about ${Math.round(pw * 10)} of 10 simulated weeks.`}</div></div><div class="meter" aria-label="Win share"><span style="width:${pA * 100}%"></span></div></div>`;
+    const pA = pBeats(A, Bp), w = pA >= 0.5 ? A : Bp, l = w === A ? Bp : A, pw = Math.max(pA, 1 - pA), edge = w.mean - l.mean;
+    const call = pw < 0.55 ? 'Toss-up' : pw < 0.65 ? 'Lean' : pw < 0.8 ? 'Start' : 'Easy call';
+    const why = pickReasons(w, l);
+    verdict = `<div class="card pick"><div class="pick-head"><span class="label">Benny’s Pick</span><span class="pill ${pw < 0.55 ? 'm' : 'n'}">${call}</span></div>
+      <div class="pick-main"><div class="pick-who"><div class="pick-name">Start ${esc(w.u.name)}</div><div class="small muted">over ${esc(l.u.name)} · ${w.pos} · ${w.T || 'FA'}</div></div>
+        <div class="pick-stat"><span class="num">${pct(pw)}</span><span class="small muted">chance to outscore</span></div>
+        <div class="pick-stat"><span class="num">${edge >= 0.05 ? '+' : ''}${f1(edge)}</span><span class="small muted">projected pts edge</span></div></div>
+      <div class="meter" aria-label="${esc(A.u.name)} ${pct(pA)}, ${esc(Bp.u.name)} ${pct(1 - pA)}"><span style="width:${pA * 100}%"></span></div>
+      <div class="small muted pick-odds">${esc(shortName(A.id))} ${pct(pA)} · ${esc(shortName(Bp.id))} ${pct(1 - pA)}. ${pw < 0.55 ? 'Too close to call on projections alone; Benny leans this way. Check late injury news, or use Safe or Boom on the Lineup tab to break the tie.' : `${esc(w.u.name)} comes out ahead in roughly ${Math.round(pw * 10)} of 10 comparable outcomes.`}</div>
+      ${why.length ? `<ul class="pick-why">${why.map(x => `<li>${esc(x)}</li>`).join('')}</ul>` : ''}</div>`;
   }
+  const dec = reviewDecisions();
+  const decBar = dec.length ? `<div class="decisions"><span class="label">Decisions to review</span>${dec.map(d => { const s = D.M[d.start], b = D.M[d.alt], on = a === d.start && Bp?.id === d.alt; return `<button type="button" class="chip dchip" data-decide="${esc(d.start)}|${esc(d.alt)}" aria-pressed="${on}">${esc(d.slot)}: ${esc(shortName(s.id))} or ${esc(shortName(b.id))}${d.tagged ? ` <span class="pill q">${esc(s.inj === 'Questionable' ? 'Q' : 'D')}</span>` : ''}</button>`; }).join('')}</div>` : '';
   const col = r => r ? `<div class="card"><div><div class="pname" style="font-size:18px">${esc(r.u.name)}</div><div class="psub">${r.pos} · ${r.T} ${injPill(r)}</div></div>${matchCell(r)}<div class="probs"><div><span class="label">Projection</span><span class="num">${r.status === 'bye' ? 'Bye' : f1(r.mean)}</span></div><div><span class="label">Floor / ceiling</span><span class="num">${f1(r.floor)} / ${f1(r.ceil)}</span></div><div><span class="label">Beats avg</span><span class="num">${pct(r.pAvg)}</span></div><div><span class="label">Grade</span><span class="num">${r.grade}</span></div></div>${factorList(r)}${r.scheme ? `<div class="scheme"><strong>Scheme:</strong> ${esc(r.scheme)}</div>` : ''}<h3>Scheme matchup</h3>${schemeBlock(r)}</div>` : `<div class="card small muted">Pick a player.</div>`;
-  return `<div class="section"><datalist id="plist">${playerOptions()}</datalist><div class="cmp"><div class="field"><label class="label" for="cmp0">Player A</label>${pick(0, A)}</div><div class="field"><label class="label" for="cmp1">Player B</label>${pick(1, Bp)}</div></div>${verdict}<div class="cmp">${col(A)}${col(Bp)}</div></div>`;
+  return `<div class="section"><datalist id="plist">${playerOptions()}</datalist>${decBar}<div class="cmp"><div class="field"><label class="label" for="cmp0">Player A</label>${pick(0, A)}</div><div class="field"><label class="label" for="cmp1">Player B</label>${pick(1, Bp)}</div></div>${verdict}<h2>Side by side</h2><div class="cmp">${col(A)}${col(Bp)}</div></div>`;
+}
+/* Two or three plain reasons for a pick: the projection gap, then the biggest matchup factors in the winner's favor
+   or against the other player, an injury tag, or a safer floor. */
+function factorReason(r, f) {
+  const O = r.O, T = r.T, pos = r.pos, P = pos === 'DEF' ? 'D/ST' : pos, B = D.B, L = D.L;
+  switch (f.key) {
+    case 'dvp': {
+      const k = pos === 'DEF' ? 'fpaDEF' : 'fpa' + pos, rank = D.ranks[k]?.[O]; if (!rank) break;
+      if (pos === 'DEF') return f.pct > 0 ? `${O}’s offense gives up the ${ord(rank)}-most D/ST points` : `${O}’s offense gives up the ${ord(33 - rank)}-fewest D/ST points`;
+      return f.pct > 0 ? `${O} allows the ${ord(rank)}-most points to ${P}s` : `${O} allows the ${ord(33 - rank)}-fewest points to ${P}s`;
+    }
+    case 'cover': return pos === 'RB' ? `${O} allows ${f1(B[O]?.ypcA)} yards per carry (avg ${f1(L.ypcA)})` : `${O} allows ${f0(B[O]?.passYdA)} passing yards a game (avg ${f0(L.passYdA)})`;
+    case 'protect': return pos === 'DEF' ? `${O} gives up ${f1(B[O]?.sacksTaken)} sacks a game` : f.pct > 0 ? `${T}’s line should keep the pocket clean against ${O}` : `${O} brings a heavy pass rush (${f1(B[O]?.sacks)} sacks a game)`;
+    case 'script': { const it = r.game ? implied(r.game, pos === 'DEF' ? O : T) : null; if (it == null) break; return pos === 'DEF' ? `${O} is projected for only ${f1(it)} points` : f.pct > 0 ? `${T} is projected to score ${f1(it)} points` : `${T} is projected for only ${f1(it)} points`; }
+    case 'style': return pos === 'RB' ? `${T} runs on ${pct(1 - (B[T]?.passRate ?? 0))} of plays` : pos === 'K' || pos === 'DEF' ? null : `${T} throws on ${pct(B[T]?.passRate)} of plays`;
+    case 'pers': { const m = /:\s(.+)$/.exec(f.note); return m ? `${pos === 'DEF' ? T : O} defense ${f.pct > 0 ? (pos === 'DEF' ? 'improved' : 'weakened') : (pos === 'DEF' ? 'weakened' : 'improved')}: ${m[1]}` : null; }
+  }
+  return null;
+}
+function pickReasons(w, l) {
+  const last = r => shortName(r.id), out = [];
+  const edge = w.mean - l.mean;
+  if (edge >= 0.5) out.push({ s: 1, t: `Projects ${f1(w.mean)} points to ${last(l)}’s ${f1(l.mean)}` });
+  for (const f of w.factors) if (f.pct >= 0.03) { const t = factorReason(w, f); if (t) out.push({ s: f.pct, t }); }
+  for (const f of l.factors) if (f.pct <= -0.03) { const t = factorReason(l, f); if (t) out.push({ s: -f.pct, t: `${last(l)}: ${t}` }); }
+  if (/^(questionable|doubtful)/i.test(l.inj || '')) out.push({ s: 0.2, t: `${l.u.name} is ${l.inj.toLowerCase()} for this week` });
+  if (w.floor > l.floor + 2) out.push({ s: 0.035, t: `Safer floor: ${f1(w.floor)} points on a bad day, vs ${f1(l.floor)}` });
+  const first = out.find(x => x.s === 1), rest = out.filter(x => x !== first).sort((a, b) => b.s - a.s);
+  return [...(first ? [first] : []), ...rest].slice(0, 3).map(x => x.t);
 }
 function heat(v, avg, invert) {
   if (!ok(v) || !ok(avg) || !avg) return ''; let d = v / avg - 1; if (invert) d = -d;
@@ -1731,7 +1894,9 @@ function viewSettings() {
 
 /* ---------- events ---------- */
 document.addEventListener('click', e => {
-  const t = e.target.closest('[data-tab],[data-expand],[data-add],[data-remove],[data-strategy],[data-act],[data-sort],[data-team],[data-fteam],[data-clearovr],[data-wh],[data-wsrc],[data-taken],[data-keepmode]'); if (!t) return;
+  const t = e.target.closest('[data-tab],[data-expand],[data-add],[data-remove],[data-strategy],[data-act],[data-sort],[data-team],[data-fteam],[data-clearovr],[data-wh],[data-wsrc],[data-taken],[data-keepmode],[data-decide],[data-brief]'); if (!t) return;
+  if (t.dataset.decide) { state.compare = t.dataset.decide.split('|'); save(); render(); return; }
+  if (t.dataset.brief === 'decide') { const d = reviewDecisions()[0]; if (d) state.compare = [d.start, d.alt]; state.tab = 'compare'; save(); render(); window.scrollTo(0, 0); return; }
   if (t.dataset.fteam) { switchTeam(t.dataset.fteam); return; }
   if (t.dataset.wh) { state.waivers.horizon = t.dataset.wh === 'ros' ? 'ros' : +t.dataset.wh; save(); render(); return; }
   if (t.dataset.wsrc) { state.waivers.source = t.dataset.wsrc; save(); render(); return; }
@@ -1764,7 +1929,7 @@ document.addEventListener('click', e => {
   else if (a === 'iodownload') {
     const sel = ioSelected(); if (!sel.length) return;
     const blob = new Blob([JSON.stringify(exportBundle(sel), null, 2)], { type: 'application/json' }), url = URL.createObjectURL(blob);
-    const link = document.createElement('a'); link.href = url; link.download = `start-sit-teams-${new Date().toISOString().slice(0, 10)}.json`;
+    const link = document.createElement('a'); link.href = url; link.download = `bennys-picks-teams-${new Date().toISOString().slice(0, 10)}.json`;
     document.body.appendChild(link); link.click(); link.remove(); setTimeout(() => URL.revokeObjectURL(url), 2000);
     const msg = $('#ioOutMsg'); if (msg) msg.textContent = 'Downloaded. Open it from Import on another device.';
   }
@@ -1803,7 +1968,7 @@ document.addEventListener('click', e => {
   else if (a === 'reset') {
     if (!D.resetArm) { D.resetArm = true; render(); setTimeout(() => { D.resetArm = false; if (state.tab === 'settings') render(); }, 4000); return; }
     try { Object.keys(localStorage).filter(k => k.startsWith('fo1:')).forEach(k => localStorage.removeItem(k)); } catch {}
-    state = ensureTeams(JSON.parse(JSON.stringify(DEFAULT_STATE))); D.resetArm = false; D.open.clear(); load();
+    state = ensureTeams(JSON.parse(JSON.stringify(DEFAULT_STATE))); D.resetArm = false; D.open.clear(); load({ fresh: true });
   }
 });
 document.addEventListener('keydown', e => { if (e.key === 'Enter' && e.target.id === 'teamName') e.target.blur(); });
@@ -1816,7 +1981,7 @@ document.addEventListener('input', e => {
 });
 document.addEventListener('change', e => {
   const t = e.target;
-  if (t.id === 'weekSel') { state.settings.week = +t.value; if (state.settings.week === D.detWeek && D.season === D.detSeason) state.settings.week = null; save(); D.open.clear(); load(); return; }
+  if (t.id === 'weekSel') { state.settings.week = +t.value; if (state.settings.week === D.detWeek && D.season === D.detSeason) state.settings.week = null; save(); D.open.clear(); load({ fresh: true }); return; }
   if (t.dataset.iosel) { const s = D.ioSkip || (D.ioSkip = new Set()); t.checked ? s.delete(t.dataset.iosel) : s.add(t.dataset.iosel); D.ioOutMsg = ''; render(); return; }
   if (t.id === 'ioReplace') { D.ioReplace = t.checked; return; }
   if (t.id === 'ioFile') {
@@ -1836,7 +2001,7 @@ document.addEventListener('change', e => {
   if (t.dataset.ovr != null && t.dataset.ovr !== undefined && t.hasAttribute('data-ovr')) { const id = t.dataset.ovr; if (t.value === '') delete state.overrides[id]; else state.overrides[id] = +t.value; save(); computeAll(); state.tab === 'players' ? refreshPlayers() : render(); return; }
   if (t.dataset.cmp) { const id = resolvePick(t.value); if (id) { state.compare[+t.dataset.cmp] = id; save(); render(); } return; }
   if (t.dataset.slot) { state.slots[t.dataset.slot] = clamp(Math.round(+t.value || 0), 0, 5); save(); return; }
-  if (t.hasAttribute('data-season')) { const s = Math.round(+t.value); if (s >= 2019 && s <= D.detSeason) { state.settings.season = s === D.detSeason ? null : s; state.settings.week = null; save(); load(); } return; }
+  if (t.hasAttribute('data-season')) { const s = Math.round(+t.value); if (s >= 2019 && s <= D.detSeason) { state.settings.season = s === D.detSeason ? null : s; state.settings.week = null; save(); load({ fresh: true }); } return; }
   if (t.dataset.espn) { state.espn[t.dataset.espn] = t.value; save(); return; }
   if (t.dataset.staff) { const [T, f] = t.dataset.staff.split('.'); const v = t.type === 'checkbox' ? t.checked : (f.endsWith('Prev') ? fixAbbr(t.value.trim().toUpperCase()) || '' : t.value); state.staffEdits[T] = Object.assign({}, state.staffEdits[T], { [f]: v }); save(); computeAll(); return; }
 });
