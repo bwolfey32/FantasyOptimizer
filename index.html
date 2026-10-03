@@ -236,13 +236,17 @@ tr.click:hover td { background: color-mix(in srgb, var(--accent) 5%, transparent
 .cmp .card { padding: 14px; display: flex; flex-direction: column; gap: 12px; min-width: 0; }
 /* Waiver Optimizer headline */
 .setup { gap: 14px; border: 1px solid color-mix(in srgb, var(--accent) 40%, var(--line)); }
-.setup-grid { display: grid; grid-template-columns: minmax(0, 1.3fr) minmax(0, 1fr) minmax(0, 1fr); gap: 16px; }
+.setup-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 18px 20px; }
 .setup .opt { display: flex; flex-direction: column; gap: 8px; min-width: 0; }
 .setup .opt p { margin: 0; }
-.setup .opt + .opt { border-left: 1px solid var(--line); padding-left: 16px; }
+.setup .opt { border-top: 1px solid var(--line); padding-top: 12px; }
+.setup .opt:nth-child(-n+2) { border-top: 0; padding-top: 0; }
+.slsync { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 10px; }
+.sl-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--good); }
+.slsync .muted { flex-basis: 100%; }
 .setup textarea.inp { min-height: 110px; }
 .exban { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 8px 14px; }
-@media (max-width: 780px) { .setup-grid { grid-template-columns: minmax(0, 1fr); } .setup .opt + .opt { border-left: 0; padding-left: 0; border-top: 1px solid var(--line); padding-top: 12px; } }
+@media (max-width: 780px) { .setup-grid { grid-template-columns: minmax(0, 1fr); } .setup .opt:nth-child(2) { border-top: 1px solid var(--line); padding-top: 12px; } }
 .fasetup { padding: 10px 14px; display: flex; flex-direction: column; gap: 8px; }
 .fa-line { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 8px 14px; font-size: 14.5px; }
 .wbest { padding: 16px 20px; display: flex; flex-direction: column; gap: 10px; border: 1px solid color-mix(in srgb, var(--accent) 45%, var(--line)); border-left: 5px solid var(--accent); }
@@ -486,12 +490,12 @@ const DEFAULT_STATE = {
   slots: { QB:1, RB:2, WR:2, TE:1, FLEX:1, 'RB/WR':0, 'WR/TE':0, OP:0, 'D/ST':1, K:1 },
   espn: { leagueId: '', teamId: null, slotOf: {} },
   waivers: { horizon: 4, teams: 12, ownMax: 50, source: 'own', faList: [], faListAt: null, taken: {}, allowDrop: {}, forceKeep: {}, rank: 'window' },
-  teams: [], activeTeam: null, returnWeek: {}, scoring: 'ppr',
+  teams: [], activeTeam: null, returnWeek: {}, scoring: 'ppr', tePrem: 0, sleeper: null,
 };
 /* Fantasy teams. The active team's fields live on `state` itself (state.roster, state.slots, ...) so the rest of the
    app reads one team at a time; save() copies them back into state.teams, and switching loads another team's copy.
    Overrides, model weights and coaching edits stay shared across teams. */
-const TEAM_FIELDS = ['roster', 'example', 'slots', 'espn', 'waivers', 'compare', 'scoring'];
+const TEAM_FIELDS = ['roster', 'example', 'slots', 'espn', 'waivers', 'compare', 'scoring', 'tePrem', 'sleeper'];
 const curTeam = () => state.teams.find(t => t.id === state.activeTeam);
 function stashTeam() { const t = curTeam(); if (t) for (const k of TEAM_FIELDS) t[k] = state[k]; }
 function ensureTeams(st) {
@@ -507,9 +511,10 @@ function applyTeam(t) {
   state.waivers = Object.assign(JSON.parse(JSON.stringify(DEFAULT_STATE.waivers)), t.waivers || {});
   state.compare = Array.isArray(t.compare) ? t.compare.slice() : [null, null];
   state.scoring = SCORING[t.scoring] ? t.scoring : 'ppr';
+  state.tePrem = +t.tePrem || 0; state.sleeper = t.sleeper || null;
 }
 /* Projections are built for one scoring format at a time; rebuild them when the active team uses another. */
-function syncScoring() { if (D.inp && D.fmtLoaded !== state.scoring) ingest(D.inp); }
+function syncScoring() { if (D.inp && D.fmtLoaded !== fmtKey()) ingest(D.inp); }
 function switchTeam(id) {
   if (id === state.activeTeam || !state.teams.some(t => t.id === id)) return;
   stashTeam(); state.activeTeam = id; applyTeam(curTeam());
@@ -624,8 +629,10 @@ function returnersPrev(rows) {
 /* Scoring formats. Sleeper's numbers are PPR; half-PPR and standard are the same minus 0.5 or 1 point per catch. */
 const SCORING = { ppr: ['PPR', 'PPR', 0], half: ['Half-PPR', 'half-PPR', 0.5], std: ['Standard', 'standard', 1] };
 const fmtCut = () => SCORING[state.scoring]?.[2] ?? 0;          // points removed per catch
-const fmtName = (lower) => (SCORING[state.scoring] || SCORING.ppr)[lower ? 1 : 0];
-const fmtPts = (ppr, rec) => ppr - fmtCut() * (rec || 0);
+const tePrem = () => +state.tePrem || 0;                          // extra points per TE catch (TE premium)
+const fmtKey = () => state.scoring + '|' + tePrem();
+const fmtName = (lower) => (SCORING[state.scoring] || SCORING.ppr)[lower ? 1 : 0] + (tePrem() ? (lower ? ' (TE premium)' : ' + TE prem') : '');
+const fmtPts = (ppr, rec, pos) => ppr - fmtCut() * (rec || 0) + (pos === 'TE' ? tePrem() * (rec || 0) : 0);
 function aggWeeks(weeks) {
   const A = {}; const ga = T => A[T] || (A[T] = Object.assign(blankAgg(), { recA: { QB: 0, RB: 0, WR: 0, TE: 0 } }));
   for (const wk of weeks) {
@@ -640,13 +647,14 @@ function aggWeeks(weeks) {
     }
   }
   // Sleeper reports points allowed in PPR; take catches allowed back out for other formats
-  const cut = fmtCut();
+  const cut = fmtCut(), tep = tePrem();
   D.fpaRatio = {};
   for (const p of ['QB', 'RB', 'WR', 'TE']) {
     const ppr = Object.values(A).reduce((s, a) => s + a.fpa[p], 0), rec = Object.values(A).reduce((s, a) => s + a.recA[p], 0);
     // league-wide ratio, used to convert last season's PPR points allowed (no catch counts there); typical shares if no games yet
-    D.fpaRatio[p] = ppr > 0 ? 1 - cut * rec / ppr : 1 - cut * ({ QB: 0, RB: 0.18, WR: 0.32, TE: 0.36 })[p];
-    if (cut) for (const a of Object.values(A)) a.fpa[p] -= cut * a.recA[p];
+    const k = cut - (p === 'TE' ? tep : 0);   // net points removed per catch at this position
+    D.fpaRatio[p] = ppr > 0 ? 1 - k * rec / ppr : 1 - k * ({ QB: 0, RB: 0.18, WR: 0.32, TE: 0.36 })[p];
+    if (k) for (const a of Object.values(A)) a.fpa[p] -= k * a.recA[p];
   }
   const out = {}; for (const T in A) { const d = derive(A[T]); if (d) out[T] = d; } return out;
 }
@@ -736,7 +744,7 @@ async function gatherLive(err) {
     idp: { prev: idpPrev || [], now: idpCompactNow(idpRows, idpPrev), ret: prevRet || [] } };
 }
 function ingest(inp) {
-  D.inp = inp; D.fmtLoaded = state.scoring;   // kept so a scoring change can rebuild everything without refetching
+  D.inp = inp; D.fmtLoaded = fmtKey();   // kept so a scoring change can rebuild everything without refetching
   D.fresh = inp.fresh || null;
   D.season = inp.season; D.week = inp.week; D.detSeason = inp.detSeason; D.detWeek = inp.detWeek;
   D.games = inp.games.slice(); D.rec = inp.rec || {};
@@ -752,15 +760,15 @@ function ingest(inp) {
   D.prior = Object.fromEntries(inp.priors.map(([s, teams]) => [s, Object.fromEntries(Object.entries(teams).map(([T, b]) => {
     const c = Object.assign({}, b); for (const p of ['QB', 'RB', 'WR', 'TE']) if (ok(c['fpa' + p])) c['fpa' + p] *= D.fpaRatio[p]; return [T, c];
   }))]));
-  D.actual = {}; for (const p of inp.actual.P) D.actual[p[0]] = fmtPts(p[4], p[13]); for (const d of inp.actual.D) D.actual[d[0]] = d[11];
+  D.actual = {}; for (const p of inp.actual.P) D.actual[p[0]] = fmtPts(p[4], p[13], p[1]); for (const d of inp.actual.D) D.actual[d[0]] = d[11];
   D.U = new Map(); D.proj = {}; D.H = {};
   for (const [id, name, pos, team, inj, pts, opp, rec] of inp.proj) {
     if (!D.U.has(id)) D.U.set(id, { id, name, pos, team, inj });
-    if (pts != null && !(id in D.proj)) D.proj[id] = { pts: fmtPts(pts, rec), opp };
+    if (pts != null && !(id in D.proj)) D.proj[id] = { pts: fmtPts(pts, rec, pos), opp };
   }
   inp.weeks.forEach((wk, wi) => {
     for (const [id, pos, T, , ppr, , , , ra, , tg, , name, rec] of wk.P) {
-      const pts = fmtPts(ppr, rec);
+      const pts = fmtPts(ppr, rec, pos);
       const h = D.H[id] || (D.H[id] = { pts: [], tgt: 0, ra: 0, wks: [] }); h.pts.push(pts); h.tgt += tg; h.ra += ra; h.wks.push(wi + 1);
       if (!D.U.has(id)) D.U.set(id, { id, name, pos, team: T, inj: null });
     }
@@ -780,7 +788,7 @@ function ingest(inp) {
     else { const c = D.nameIdx.get(norm(name)) || []; id = c.find(x => D.U.get(x)?.pos === pos && D.U.get(x)?.team === T) || c.find(x => D.U.get(x)?.pos === pos) || null; }
     if (id && !D.own.has(id)) D.own.set(id, pct);
   }
-  D.prevPPG = Object.fromEntries(Object.entries(inp.prevPPG || {}).map(([id, [ppg, gp, rpg]]) => [id, [+fmtPts(ppg, rpg).toFixed(1), gp]]));
+  D.prevPPG = Object.fromEntries(Object.entries(inp.prevPPG || {}).map(([id, [ppg, gp, rpg]]) => [id, [+fmtPts(ppg, rpg, D.U.get(id)?.pos).toFixed(1), gp]]));
   D.idp = inp.idp && inp.idp.now?.length ? inp.idp : null;
   D.wCache = null; D.usage = null;
   computeAll();
@@ -805,6 +813,7 @@ async function load(opts = {}) {
   else if (!D.inp) { const snap = await fetchJSON('snapshot.json').catch(() => null); if (snap?.v === 1) useSaved(snap); }
   if (!D.inp) { D.loading = false; D.failed = true; render(); return; }
   D.loading = false; render();
+  if (location.hash !== '#export') slAutoSync();   // refresh linked Sleeper teams in the background
   if (D.snapshot) return;
   if (location.hash === '#export') {
     await checkCoaches(D.season);
@@ -1070,6 +1079,106 @@ async function loadLeague() {
   }
   render();
 }
+/* ---------- Sleeper league sync ----------
+   Sleeper's API is public (no login) and uses the same player ids as the projections, so a linked team copies its
+   roster, lineup slots, scoring and league size exactly, and every rostered player in the league is known, which
+   gives the Waiver Optimizer the league's real free agents. Linked teams re-sync when the page loads. */
+const SL = 'https://api.sleeper.app/v1';
+const SL_SLOT = { QB: 'QB', RB: 'RB', WR: 'WR', TE: 'TE', FLEX: 'FLEX', WRRB_FLEX: 'RB/WR', REC_FLEX: 'WR/TE', SUPER_FLEX: 'OP', K: 'K', DEF: 'D/ST' };
+function slScoring(ss) { const rec = +(ss?.rec ?? 1); return { scoring: rec >= 0.75 ? 'ppr' : rec >= 0.25 ? 'half' : 'std', tePrem: Math.max(0, +(ss?.bonus_rec_te || 0)) }; }
+// league settings Benny doesn't model, so the sync can say so plainly
+function slNotes(lg) {
+  const ss = lg.scoring_settings || {}, n = [];
+  if (+ss.pass_td && +ss.pass_td !== 4) n.push(`${ss.pass_td}-point passing TDs`);
+  if (+ss.bonus_rec_rb || +ss.bonus_rec_wr) n.push('RB or WR catch bonuses');
+  if (+ss.rush_fd || +ss.rec_fd) n.push('first-down points');
+  if ((lg.roster_positions || []).some(p => /^(DL|LB|DB|IDP)/.test(p))) n.push('individual defensive players');
+  return n;
+}
+function slApply(lg, rosters, rosterId) {
+  const r = rosters.find(x => String(x.roster_id) === String(rosterId)); if (!r) return null;
+  const taxi = new Set(r.taxi || []);
+  const slots = Object.fromEntries(SLOT_TYPES.map(t => [t.k, 0])); for (const p of lg.roster_positions || []) if (SL_SLOT[p]) slots[SL_SLOT[p]]++;
+  const sc = slScoring(lg.scoring_settings);
+  return { roster: (r.players || []).filter(id => !taxi.has(id)), slots, scoring: sc.scoring, tePrem: sc.tePrem, size: lg.total_rosters || rosters.length,
+    rostered: rosters.flatMap(x => x.players || []), starters: (r.starters || []).filter(id => id && id !== '0'),
+    // exact roster size: every lineup and bench spot (IR and taxi spots are extra)
+    rosterMax: (lg.roster_positions || []).filter(p => p !== 'IR').length, reserve: (r.reserve || []).filter(id => !taxi.has(id)) };
+}
+async function slFind() {
+  const q = ($('#slQuery')?.value || '').trim(); D.sl = { q, msg: null };
+  if (!q) { D.sl.msg = ['err', 'Enter your Sleeper username or a league ID.']; return render(); }
+  D.sl.msg = ['info', 'Looking up Sleeper…']; render();
+  try {
+    if (/^\d{8,}$/.test(q)) return await slLoadLeague(q);
+    const u = await fetchJSON(`${SL}/user/${encodeURIComponent(q)}`);
+    if (!u?.user_id) { D.sl.msg = ['err', `No Sleeper user named “${q}”. Check the spelling, or paste a league ID instead.`]; return render(); }
+    const ls = await fetchJSON(`${SL}/user/${u.user_id}/leagues/nfl/${D.season}`);
+    D.sl.userId = u.user_id; D.sl.leagues = (ls || []).map(l => ({ id: l.league_id, name: l.name, size: l.total_rosters }));
+    if (!D.sl.leagues.length) { D.sl.msg = ['err', `${u.display_name} has no ${D.season} leagues on Sleeper.`]; return render(); }
+    if (D.sl.leagues.length === 1) return await slLoadLeague(D.sl.leagues[0].id);
+    D.sl.msg = ['info', `Found ${D.sl.leagues.length} leagues. Pick one.`]; render();
+  } catch { D.sl.msg = ['err', 'Couldn’t reach Sleeper. Try again in a moment.']; render(); }
+}
+async function slLoadLeague(id) {
+  D.sl = Object.assign(D.sl || {}, { msg: ['info', 'Loading league…'], league: null }); render();
+  try {
+    const [lg, ros, users] = await Promise.all([fetchJSON(`${SL}/league/${id}`), fetchJSON(`${SL}/league/${id}/rosters`), fetchJSON(`${SL}/league/${id}/users`)]);
+    if (!lg?.league_id) { D.sl.msg = ['err', 'No Sleeper league with that ID.']; return render(); }
+    const byUser = Object.fromEntries((users || []).map(u => [u.user_id, u]));
+    D.sl.league = lg; D.sl.rosters = ros || [];
+    D.sl.teams = D.sl.rosters.map(r => { const u = byUser[r.owner_id]; return { rosterId: r.roster_id, ownerId: r.owner_id, name: u?.metadata?.team_name || u?.display_name || `Team ${r.roster_id}`, owner: u?.display_name || 'no owner', n: (r.players || []).length }; });
+    D.sl.pick = (D.sl.teams.find(t => t.ownerId === D.sl.userId) || D.sl.teams[0])?.rosterId;
+    D.sl.msg = lg.season !== String(D.season) ? ['err', `That league is from the ${lg.season} season; Benny is set to ${D.season}.`] : ['info', `${lg.name}: pick your team and press Sync this team.`];
+  } catch { D.sl.msg = ['err', 'Couldn’t reach Sleeper. Try again in a moment.']; }
+  render();
+}
+function slUseTeam() {
+  const lg = D.sl?.league, rid = $('#slTeam')?.value ?? D.sl?.pick; if (!lg) return;
+  const a = slApply(lg, D.sl.rosters, rid), t = D.sl.teams.find(x => String(x.rosterId) === String(rid)); if (!a) return;
+  Object.assign(state, { roster: a.roster, example: false, slots: a.slots, scoring: a.scoring, tePrem: a.tePrem });
+  state.espn.slotOf = {};
+  Object.assign(state.waivers, { teams: a.size, source: 'sleeper', taken: {} });
+  state.sleeper = { leagueId: lg.league_id, rosterId: +rid, leagueName: lg.name, teamName: t?.name || '', rostered: a.rostered, starters: a.starters, rosterMax: a.rosterMax, reserve: a.reserve, syncedAt: Date.now(), notes: slNotes(lg) };
+  const ct = curTeam(); if (ct && /^(my team|team \d+)$/i.test(ct.name) && t?.name) ct.name = t.name.slice(0, 40);
+  D.setupOpen = false; D.sl = null; D.wCache = null; D.open.clear(); save(); syncScoring(); render();
+}
+/* Re-sync every linked team (rosters, slots, scoring, league-wide rostered players). Quiet on failure: the last sync stays. */
+async function slAutoSync(force) {
+  stashTeam();
+  const linked = state.teams.filter(t => t.sleeper?.leagueId); if (!linked.length) return;
+  const byLeague = {}; for (const t of linked) (byLeague[t.sleeper.leagueId] = byLeague[t.sleeper.leagueId] || []).push(t);
+  D.slSyncing = true; renderSyncLine();
+  for (const [lid, teams] of Object.entries(byLeague)) {
+    if (!force && teams.every(t => Date.now() - (t.sleeper.syncedAt || 0) < 5 * 60000)) continue;
+    try {
+      const [lg, ros] = await Promise.all([fetchJSON(`${SL}/league/${lid}`), fetchJSON(`${SL}/league/${lid}/rosters`)]);
+      if (!lg?.league_id || !Array.isArray(ros)) continue;
+      for (const t of teams) {
+        const a = slApply(lg, ros, t.sleeper.rosterId); if (!a) continue;
+        Object.assign(t, { roster: a.roster, slots: a.slots, scoring: a.scoring, tePrem: a.tePrem, example: false });
+        t.sleeper = Object.assign({}, t.sleeper, { rostered: a.rostered, starters: a.starters, rosterMax: a.rosterMax, reserve: a.reserve, syncedAt: Date.now(), leagueName: lg.name, notes: slNotes(lg) });
+        t.waivers = Object.assign({}, t.waivers, { teams: a.size });
+      }
+    } catch {}
+  }
+  D.slSyncing = false;
+  applyTeam(curTeam()); D.wCache = null; save(); syncScoring(); render();
+}
+function slSyncLine() {
+  const s = state.sleeper; if (!s) return '';
+  return `<div class="slsync small" id="slsync"><span class="sl-dot"></span><span>Synced with Sleeper: <strong>${esc(s.leagueName || 'league')}</strong>${s.teamName ? ` · ${esc(s.teamName)}` : ''} · ${D.slSyncing ? 'syncing…' : 'updated ' + ago(s.syncedAt)}</span>
+    <button type="button" class="btn sm" data-act="slsync">Sync now</button><button type="button" class="btn sm" data-act="slunlink">Unlink</button>
+    ${s.notes?.length ? `<span class="muted">Your league also uses ${esc(s.notes.join(', '))}, which Benny doesn’t score yet.</span>` : ''}</div>`;
+}
+function renderSyncLine() { const el = $('#slsync'); if (el) el.outerHTML = slSyncLine(); }
+function sleeperControls() {
+  const s = D.sl || {};
+  return `<div class="toolbar"><input class="inp" id="slQuery" placeholder="Sleeper username or league ID" aria-label="Sleeper username or league ID" value="${esc(s.q || '')}" style="flex:1 1 180px"><button type="button" class="btn primary" data-act="slfind">Find</button></div>
+    ${s.leagues?.length > 1 && !s.league ? `<div class="toolbar"><select class="sel" id="slLeague" aria-label="Your Sleeper league" style="flex:1 1 180px">${s.leagues.map(l => `<option value="${esc(l.id)}">${esc(l.name)} (${l.size} teams)</option>`).join('')}</select><button type="button" class="btn" data-act="slleague">Load league</button></div>` : ''}
+    ${s.league ? `<div class="toolbar"><select class="sel" id="slTeam" aria-label="Your team" style="flex:1 1 180px">${s.teams.map(t => `<option value="${t.rosterId}" ${String(t.rosterId) === String(s.pick) ? 'selected' : ''}>${esc(t.name)} · ${esc(t.owner)}</option>`).join('')}</select><button type="button" class="btn primary" data-act="slteam">Sync this team</button></div>` : ''}
+    ${s.msg ? `<div class="banner ${s.msg[0]} small">${esc(s.msg[1])}</div>` : ''}`;
+}
 function useEspnTeam() {
   const t = (D.espnTeams || []).find(t => String(t.id) === String(state.espn.teamId)); if (!t) return;
   const ids = [], missed = [], slotOf = {};
@@ -1326,8 +1435,10 @@ function depthValue(ids, starters, wi, V) {
 function availablePool() {
   const W = state.waivers, ros = new Set(state.roster);
   const list = W.source === 'list' && W.faList.length ? new Set(W.faList) : null;
+  // a synced Sleeper league knows every rostered player, so its free agents are exact
+  const sl = W.source === 'sleeper' && state.sleeper?.rostered ? new Set(state.sleeper.rostered) : null;
   return [...D.U.values()].filter(u => D.M[u.id] && !ros.has(u.id) && !W.taken[u.id] && (D.proj[u.id]?.pts > 0 || D.H[u.id]?.n) && !isLongInj(u.inj)
-    && (list ? list.has(u.id) : (D.own.get(u.id) ?? 0) < W.ownMax)).map(u => u.id);
+    && (sl ? !sl.has(u.id) : list ? list.has(u.id) : (D.own.get(u.id) ?? 0) < W.ownMax)).map(u => u.id);
 }
 function computeWaivers() {
   const W = state.waivers;
@@ -1343,9 +1454,10 @@ function computeWaivers() {
   // candidates: best 24 overall over the horizon plus the best 5 at each position
   const byH = [...pool].sort((a, b) => sumH(b) - sumH(a)), cand = new Set(byH.slice(0, 24));
   for (const p of POS) byH.filter(id => D.U.get(id).pos === p).slice(0, 5).forEach(id => cand.add(id));
-  // one injured player can sit in ESPN's IR slot without taking a bench spot
-  const irHeld = Math.min(1, roster.filter(id => /^ir/i.test(D.U.get(id).inj || '')).length);
-  const maxRoster = slots.length + 7, canAddFree = roster.length - irHeld < maxRoster;
+  // roster limit: exact for a synced Sleeper team (players on its IR don't count); otherwise lineup spots + 7 bench, with one IR spot
+  const slr = state.sleeper?.rosterMax ? state.sleeper : null;
+  const irHeld = slr ? roster.filter(id => (slr.reserve || []).includes(id)).length : Math.min(1, roster.filter(id => /^ir/i.test(D.U.get(id).inj || '')).length);
+  const maxRoster = slr ? slr.rosterMax : slots.length + 7, canAddFree = roster.length - irHeld < maxRoster;
   const stashes = roster.map(stashInfo).filter(Boolean), kept = new Set(stashes.filter(s => s.keep).map(s => s.id));
   const droppable = roster.filter(id => !kept.has(id));
   const moves = [], posOf = id => D.U.get(id).pos, longTerm = W.rank === 'blend';
@@ -1460,7 +1572,7 @@ function waiversBody() {
   const pl = id => { const u = D.U.get(id), r = D.M[id]; return `<span class="pname">${esc(u.name)}</span><span class="psub">${u.pos} · ${u.team || 'FA'} ${injPill(r)} · ${f1(rosBase(id))} pts/g</span>`; };
   const src = W.source === 'list' && W.faList.length ? `your league’s free-agent list (${W.faList.length} players, pasted ${esc(new Date(W.faListAt).toLocaleDateString([], { month: 'short', day: 'numeric' }))})` : `players under ${W.ownMax}% owned across ESPN leagues`;
   const warn = [];
-  if (W.source !== 'list' && !D.own.size) warn.push('ESPN ownership didn’t load, so every player not on your roster counts as available. Paste your league’s free agents below for accurate suggestions.');
+  if (W.source === 'own' && !D.own.size) warn.push('ESPN ownership didn’t load, so every player not on your roster counts as available. Paste your league’s free agents below for accurate suggestions.');
   if (state.example) warn.push('These suggestions are for the example roster. Paste your own roster in Players first.');
   const levelCls = { Strong: 'n', OK: 'm', Weak: 'o' };
   const needCards = needs.list.map(n => `<div class="need"><div class="row-head"><h3>${n.P === 'DEF' ? 'D/ST' : n.P}</h3><span class="pill ${levelCls[n.level]}">${n.level}</span></div>
@@ -1508,7 +1620,10 @@ function waiversBody() {
   }).join('')}</div>` : '';
   const nTaken = Object.keys(W.taken).length;
   const longTerm = W.rank === 'blend';
-  const faRow = `<div class="card fasetup"><div class="fa-line"><span><strong>Free agents:</strong> ${W.source === 'list' && W.faList.length ? `your league’s list (${W.faList.length} players)` : `estimated: players under ${W.ownMax}% owned across ESPN leagues`}.</span>
+  const slFA = W.source === 'sleeper' && state.sleeper?.rostered;
+  const faRow = slFA ? `<div class="card fasetup"><div class="fa-line"><span><strong>Free agents:</strong> exact, from your Sleeper league (${esc(state.sleeper.leagueName || 'league')}, synced ${ago(state.sleeper.syncedAt)}).</span>
+      <button type="button" class="btn sm" data-act="slsync">Sync now</button></div></div>`
+    : `<div class="card fasetup"><div class="fa-line"><span><strong>Free agents:</strong> ${W.source === 'list' && W.faList.length ? `your league’s list (${W.faList.length} players)` : `estimated: players under ${W.ownMax}% owned across ESPN leagues`}.${state.sleeper ? '' : ' On Sleeper? Sync your league for exact free agents.'}</span>
       <button type="button" class="btn sm ${W.source === 'list' && W.faList.length ? '' : 'primary'}" data-act="toggleFa" aria-expanded="${!!D.faOpen}">${W.source === 'list' && W.faList.length ? 'Update my league’s free agents' : 'Use my league’s free agents'}</button></div>
     ${D.faOpen ? `<p class="small muted" style="margin:0">On ESPN, open Players → Add Players in your league, copy the free-agent table (a few positions or pages is fine), and paste it here.</p>
     <textarea class="inp" id="faPaste" placeholder="Paste ESPN's free-agent list"></textarea>
@@ -1517,8 +1632,8 @@ function waiversBody() {
   <div class="row-head"><h2>Waiver Optimizer</h2><span class="small muted">Add/drop moves ranked by expected lineup points gained</span></div>
   ${faRow}
   <div class="toolbar"><span class="small muted">Window</span><div class="seg" role="group" aria-label="Time window">${[[2, 'Next 2'], [4, 'Next 4'], [6, 'Next 6'], ['ros', 'Rest of season']].map(([k, l]) => `<button type="button" data-wh="${k}" aria-pressed="${W.horizon === k}">${l}</button>`).join('')}</div>
-    <label class="small muted" for="wTeams">League size</label><select class="sel" id="wTeams">${[8, 10, 12, 14, 16].map(n => `<option ${W.teams === n ? 'selected' : ''}>${n}</option>`).join('')}</select>
-    ${W.source === 'list' && W.faList.length ? `<button type="button" class="btn sm" data-wsrc="own">Use ESPN ownership instead</button>` : `<label class="small muted" for="wOwn">Owned under</label><input type="range" id="wOwn" min="5" max="90" step="5" value="${W.ownMax}" style="accent-color:var(--accent)"><span class="num" id="wOwn-v">${W.ownMax}%</span>`}
+    <label class="small muted" for="wTeams">League size</label><select class="sel" id="wTeams">${[...new Set([6, 8, 10, 12, 14, 16, 18, 20, W.teams])].sort((a, b) => a - b).map(n => `<option ${W.teams === n ? 'selected' : ''}>${n}</option>`).join('')}</select>
+    ${slFA ? '' : W.source === 'list' && W.faList.length ? `<button type="button" class="btn sm" data-wsrc="own">Use ESPN ownership instead</button>` : `<label class="small muted" for="wOwn">Owned under</label><input type="range" id="wOwn" min="5" max="90" step="5" value="${W.ownMax}" style="accent-color:var(--accent)"><span class="num" id="wOwn-v">${W.ownMax}%</span>`}
     ${nTaken ? `<button type="button" class="btn sm" data-act="untake">Show ${nTaken} hidden</button>` : ''}</div>
   <div class="toolbar"><span class="small muted">Rank by</span><div class="seg" role="group" aria-label="Rank moves by"><button type="button" data-wrank="window" aria-pressed="${!longTerm}">${hLab[0].toUpperCase() + hLab.slice(1)} only</button><button type="button" data-wrank="blend" aria-pressed="${longTerm}">+ long-term value</button></div></div>
   ${warn.map(w => `<div class="banner small">${esc(w)}</div>`).join('')}
@@ -1637,11 +1752,15 @@ function matchCell(r) {
   const when = r.locked ? (ok(r.actual) ? `<span class="pill m">${g.state === 'post' ? 'Final' : 'Live'} ${f1(r.actual)}</span>` : `<span class="pill m">${esc(g.short)}</span>`) : '';
   return `<span class="match"><span class="opp">${at} ${r.O}</span> <span class="muted">${D.rec[r.O] ? '(' + esc(D.rec[r.O]) + ') ' : ''}${ln}${g.ou ? ' · O/U ' + g.ou : ''}</span> ${when}${r.chip ? `<span style="display:block"><span class="chip ${r.chip.dir}">${esc(r.chip.text)}</span></span>` : ''}</span>`;
 }
+/* Where Benny's lineup differs from the one set in the league app (Sleeper starters, or ESPN slots from an import). */
 function espnNote(r, starting) {
-  const s = state.espn.slotOf?.[r.id]; if (s == null || state.example) return '';
-  const espnStarting = !(s === 20 || s === 21);
-  if (starting && !espnStarting) return `<span class="pill n">Start (benched on ESPN)</span>`;
-  if (!starting && espnStarting) return `<span class="pill q">Sit (starting on ESPN)</span>`;
+  if (state.example) return '';
+  let appStarting, app;
+  if (state.sleeper?.starters) { appStarting = state.sleeper.starters.includes(r.id); app = 'Sleeper'; }
+  else { const s = state.espn.slotOf?.[r.id]; if (s == null) return ''; appStarting = !(s === 20 || s === 21); app = 'ESPN'; }
+  if (r.locked) return '';
+  if (starting && !appStarting) return `<span class="pill n">Start (benched on ${app})</span>`;
+  if (!starting && appStarting) return `<span class="pill q">Sit (starting on ${app})</span>`;
   return '';
 }
 function playerRow(r, slotLabel, starting) {
@@ -1716,7 +1835,7 @@ function teamBar(manage) {
     return `<button type="button" class="tteam" data-fteam="${esc(t.id)}" aria-pressed="${on}" title="${esc(t.name)}"><span class="tn">${esc(t.name)}</span><span class="tm">${bits.map(b => `<span class="tb">${b}</span>`).join(' · ')}</span></button>`;
   }).join('');
   return `<div class="teambar"><div class="tteams" role="group" aria-label="Your teams">${heads}<button type="button" class="tteam add" data-act="addteam">+ Add team</button></div>
-  ${manage ? `<div class="tmanage"><label class="small muted" for="teamName">Team name</label><input class="inp" id="teamName" type="text" maxlength="40" value="${esc(ct.name)}">${scoringSelect('teamScoring')}${state.teams.length > 1 ? `<button type="button" class="btn sm danger" data-act="delteam">${D.delArm ? `Press again to delete ${esc(ct.name)}` : 'Delete team'}</button>` : ''}<button type="button" class="btn sm primary" data-act="setup" aria-expanded="${!!D.setupOpen}">Import your team</button><button type="button" class="btn sm" data-act="toggleio" aria-expanded="${!!D.ioOpen}">Share / back up</button><span class="small muted">Each team keeps its own roster, lineup slots, ESPN league and waiver list.</span></div>` : ''}</div>`;
+  ${manage ? `<div class="tmanage"><label class="small muted" for="teamName">Team name</label><input class="inp" id="teamName" type="text" maxlength="40" value="${esc(ct.name)}">${scoringSelect('teamScoring')}${state.teams.length > 1 ? `<button type="button" class="btn sm danger" data-act="delteam">${D.delArm ? `Press again to delete ${esc(ct.name)}` : 'Delete team'}</button>` : ''}<button type="button" class="btn sm primary" data-act="setup" aria-expanded="${!!D.setupOpen}">Import your team</button><button type="button" class="btn sm" data-act="toggleio" aria-expanded="${!!D.ioOpen}">Share / back up</button><span class="small muted">Each team keeps its own roster, lineup slots, ESPN league and waiver list.</span></div>` : ''}${slSyncLine()}</div>`;
 }
 function rosterPasteBox() {
   return `<div class="card panel"><h3>Add ${esc(curTeam().name)}’s roster</h3><p class="small muted" style="margin:0">On ESPN, open My Team, select the roster table, copy it, and paste it here. A plain list of names, one per line, also works. You can also search and add players one at a time in <a href="#" data-tab="players">Players</a>.</p>
@@ -1735,7 +1854,8 @@ function exportBundle(ids) {
   const wv = w => ({ horizon: w.horizon, teams: w.teams, ownMax: w.ownMax, source: w.source, faList: w.faList, faListAt: w.faListAt, taken: w.taken, allowDrop: w.allowDrop, forceKeep: w.forceKeep });
   return { app: IO_APP, v: 1, exported: new Date().toISOString(), season: D.season,
     teams: teams.map(t => ({ name: t.name, roster: t.roster.map(id => { const u = D.U.get(id); return [id, u?.name || '', u?.pos || '', u?.team || '']; }),
-      slots: t.slots, espn: { leagueId: t.espn?.leagueId || '', teamId: t.espn?.teamId ?? null }, waivers: wv(t.waivers || {}), scoring: t.scoring || 'ppr' })),
+      slots: t.slots, espn: { leagueId: t.espn?.leagueId || '', teamId: t.espn?.teamId ?? null }, waivers: wv(t.waivers || {}), scoring: t.scoring || 'ppr', tePrem: +t.tePrem || 0,
+      sleeper: t.sleeper ? { leagueId: t.sleeper.leagueId, rosterId: t.sleeper.rosterId, leagueName: t.sleeper.leagueName, teamName: t.sleeper.teamName } : null })),
     overrides: mine(state.overrides), returnWeek: mine(state.returnWeek) };
 }
 function toCode(obj) { let s = ''; for (const b of new TextEncoder().encode(JSON.stringify(obj))) s += String.fromCharCode(b); return 'BP1:' + btoa(s); }
@@ -1760,7 +1880,8 @@ function importBundle(obj, replace) {
       if (pid) { if (!roster.includes(pid)) roster.push(pid); } else missed.push(name || id);
     }
     const name = String(t.name || 'Imported team').trim().slice(0, 40) || 'Imported team';
-    const data = { roster, example: false, compare: [null, null], scoring: SCORING[t.scoring] ? t.scoring : 'ppr',
+    const data = { roster, example: false, compare: [null, null], scoring: SCORING[t.scoring] ? t.scoring : 'ppr', tePrem: +t.tePrem || 0,
+      sleeper: t.sleeper?.leagueId ? Object.assign({}, t.sleeper, { syncedAt: 0, rostered: null, starters: null }) : null,
       slots: Object.assign({}, DEFAULT_STATE.slots, t.slots || {}),
       espn: Object.assign({}, DEFAULT_STATE.espn, t.espn || {}, { slotOf: {} }),
       waivers: Object.assign(JSON.parse(JSON.stringify(DEFAULT_STATE.waivers)), t.waivers || {}) };
@@ -1814,7 +1935,8 @@ function setupPanel() {
   const ct = curTeam(), empty = !state.roster.length;
   return `<div class="card panel setup"><div class="row-head"><h2>Import your team <span class="small muted" style="font-family:var(--font-body);text-transform:none;font-weight:400">for ${esc(ct.name)}</span></h2>${empty ? '' : '<button type="button" class="btn sm" data-act="setup">Close</button>'}</div>
   <div class="setup-grid">
-    <section class="opt main"><h3>Paste your ESPN roster</h3><p class="small muted">Works for any league. On ESPN, open <strong>My Team</strong>, select the roster table, copy it, and paste it here. A list of names, one per line, works too.</p>
+    <section class="opt main"><h3>Sync your Sleeper league</h3><p class="small muted">Enter your Sleeper username or a league ID. Benny copies your roster, lineup slots and scoring, keeps them in sync, and finds your league’s real free agents.</p>${sleeperControls()}</section>
+    <section class="opt"><h3>Paste your ESPN roster</h3><p class="small muted">Works for any league. On ESPN, open <strong>My Team</strong>, select the roster table, copy it, and paste it here. A list of names, one per line, works too.</p>
       <textarea class="inp" id="rosterPaste" placeholder="Joe Burrow&#10;Bijan Robinson&#10;Ja'Marr Chase&#10;Packers D/ST"></textarea>
       <div class="toolbar"><button type="button" class="btn primary" data-act="pasteroster">Set roster</button><span class="small muted">${esc(D.rosterMsg || '')}</span></div></section>
     <section class="opt"><h3>Load a public ESPN league</h3><p class="small muted">If your league is viewable by the public, enter the number after <code>leagueId=</code> in its web address. This also sets your lineup slots.</p>${espnLeagueControls()}</section>
@@ -1997,7 +2119,7 @@ function viewSettings() {
     ${espnLeagueControls()}</div>
   <div class="card panel"><h3>Season, scoring &amp; lineup slots</h3>
     <div class="field inline"><label for="season">Season</label><input class="inp" id="season" type="number" data-season value="${D.season}" style="width:96px"></div>
-    <div class="field inline"><span>${esc(curTeam().name)}</span><span class="toolbar">${scoringSelect('setScoring')}</span></div>
+    <div class="field inline"><span>${esc(curTeam().name)}</span><span class="toolbar">${scoringSelect('setScoring')}<label class="small muted" for="tePrem">TE premium</label><select class="sel" id="tePrem" data-teprem>${[0, 0.25, 0.5, 0.75, 1].map(v => `<option value="${v}" ${tePrem() === v ? 'selected' : ''}>${v ? '+' + v + ' per catch' : 'None'}</option>`).join('')}</select></span></div>
     <p class="small muted" style="margin:0">Scoring and lineup slots are saved separately for each team.</p>
     <div class="slots">${SLOT_TYPES.map(t => `<label for="slot-${t.k}">${t.label || t.k}<input class="inp" id="slot-${t.k}" type="number" min="0" max="5" data-slot="${t.k}" value="${state.slots[t.k] || 0}"></label>`).join('')}</div></div>
   </div>
@@ -2048,6 +2170,11 @@ document.addEventListener('click', e => {
   if (a === 'reload') { for (let s = 0; s < 4; s++) store.del('fo1:coach:' + ((D.season || 0) - s)); load(); }
   else if (a === 'loadleague') loadLeague();
   else if (a === 'useteam') useEspnTeam();
+  else if (a === 'slfind') slFind();
+  else if (a === 'slleague') { const id = $('#slLeague')?.value; if (id) slLoadLeague(id); }
+  else if (a === 'slteam') slUseTeam();
+  else if (a === 'slsync') slAutoSync(true);
+  else if (a === 'slunlink') { state.sleeper = null; if (state.waivers.source === 'sleeper') state.waivers.source = 'own'; D.wCache = null; save(); render(); }
   else if (a === 'applycsv') applyCsv();
   else if (a === 'pasteroster') { pasteRoster(); if (state.roster.length && !state.example) { D.setupOpen = false; render(); } }
   else if (a === 'setup') { D.setupOpen = !D.setupOpen; D.ioOpen = false; D.ioInMsg = ''; state.tab = 'lineup'; save(); render(); if (D.setupOpen) { window.scrollTo(0, 0); $('#rosterPaste')?.focus(); } }
@@ -2067,7 +2194,7 @@ document.addEventListener('click', e => {
     const msg = $('#ioOutMsg'); if (msg) msg.textContent = 'Downloaded. Open it from Import on another device.';
   }
   else if (a === 'ioimport') {
-    try { D.ioInMsg = importBundle(parseBundle($('#ioIn')?.value), !!$('#ioReplace')?.checked); D.setupOpen = false; }
+    try { D.ioInMsg = importBundle(parseBundle($('#ioIn')?.value), !!$('#ioReplace')?.checked); D.setupOpen = false; slAutoSync(true); }
     catch (err) { D.ioInMsg = err.message; }
     render();
   }
@@ -2104,7 +2231,7 @@ document.addEventListener('click', e => {
     state = ensureTeams(JSON.parse(JSON.stringify(DEFAULT_STATE))); D.resetArm = false; D.open.clear(); load({ fresh: true });
   }
 });
-document.addEventListener('keydown', e => { if (e.key === 'Enter' && e.target.id === 'teamName') e.target.blur(); });
+document.addEventListener('keydown', e => { if (e.key === 'Enter' && e.target.id === 'teamName') e.target.blur(); if (e.key === 'Enter' && e.target.id === 'slQuery') { e.preventDefault(); slFind(); } });
 function refreshPlayers() { if (state.tab === 'players') { const b = $('#plistBox'); if (b) b.innerHTML = playerListHTML(); const tb = $('.teambar'); if (tb) tb.outerHTML = teamBar(false); const h = $('.row-head .small'); if (h) h.textContent = state.roster.length + ' on your roster'; } else render(); }
 document.addEventListener('input', e => {
   const t = e.target;
@@ -2124,6 +2251,7 @@ document.addEventListener('change', e => {
     rd.onerror = () => { D.ioInMsg = 'Couldn’t read that file.'; render(); };
     rd.readAsText(f); return;
   }
+  if (t.hasAttribute('data-teprem')) { state.tePrem = +t.value || 0; save(); if (D.inp) ingest(D.inp); D.open.clear(); render(); return; }
   if (t.hasAttribute('data-scoring')) { if (SCORING[t.value]) { state.scoring = t.value; save(); if (D.inp) ingest(D.inp); D.open.clear(); render(); } return; }
   if (t.id === 'teamName') { const ct = curTeam(), v = t.value.trim(); if (ct && v) ct.name = v; save(); render(); return; }
   if (t.dataset.rw) { const rw = state.returnWeek || (state.returnWeek = {}); if (t.value === '') delete rw[t.dataset.rw]; else rw[t.dataset.rw] = +t.value; save(); render(); return; }
