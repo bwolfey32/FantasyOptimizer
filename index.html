@@ -108,9 +108,80 @@ a { color: var(--accent); }
 .btn.danger { color: var(--bad); }
 
 /* Tabs */
-.tabs { display: flex; gap: 4px; overflow-x: auto; border-bottom: 1px solid var(--line); scrollbar-width: none; }
-.tabs button { background: none; border: 0; border-bottom: 3px solid transparent; padding: 8px 12px; font-family: var(--font-display); font-size: 17px; font-weight: 600; text-transform: uppercase; letter-spacing: .03em; color: var(--muted); white-space: nowrap; }
-.tabs button[aria-selected="true"] { color: var(--ink); border-bottom-color: var(--accent); }
+.tabs { display: flex; gap: 4px; border-bottom: 1px solid var(--line); }
+.tabs .navlink { flex: 0 0 auto; text-decoration: none; border-bottom: 3px solid transparent; padding: 8px 14px; font-family: var(--font-display); font-size: 18px; font-weight: 600; text-transform: uppercase; letter-spacing: .03em; color: var(--muted); white-space: nowrap; text-align: center; }
+.tabs .navlink:hover { color: var(--ink); }
+.tabs .navlink[aria-current="page"] { color: var(--ink); border-bottom-color: var(--accent); }
+#settingsBtn[aria-pressed="true"] { border-color: var(--accent); color: var(--accent); }
+@media (max-width: 600px) { .tabs { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 0; } .tabs .navlink { padding: 8px 2px; font-size: 14.5px; letter-spacing: .01em; white-space: normal; line-height: 1.1; } }
+
+/* Team context bar (every page) */
+.teamctx { display: flex; flex-direction: column; gap: 8px; }
+.teamctx:empty { display: none; }
+.tb-teams { display: flex; gap: 6px; overflow-x: auto; scrollbar-width: thin; padding-bottom: 2px; }
+.tchip { flex: 0 0 auto; display: flex; flex-direction: column; align-items: flex-start; max-width: 220px; padding: 5px 12px 6px; background: var(--surface); border: 1px solid var(--line); border-radius: 8px; text-align: left; }
+.tchip:hover { border-color: var(--accent); }
+.tchip .tn { font-family: var(--font-display); font-weight: 700; font-size: 16px; text-transform: uppercase; letter-spacing: .02em; line-height: 1.15; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 100%; }
+.tchip .tm { font-size: 12.5px; color: var(--muted); }
+.tchip[aria-pressed="true"] { border-color: var(--accent); background: color-mix(in srgb, var(--accent) 10%, var(--surface)); box-shadow: inset 0 -3px 0 var(--accent); }
+.tchip.add { justify-content: center; align-items: center; border-style: dashed; color: var(--accent); font-weight: 600; }
+.tb-ctx { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 14px; font-size: 14px; }
+.tb-item { display: inline-flex; align-items: center; gap: 6px; }
+.tb-item + .tb-item::before { content: "·"; color: var(--muted); margin-right: 8px; }
+.tb-actions { display: inline-flex; flex-wrap: wrap; gap: 6px; margin-left: auto; }
+.sel.sm { padding: 3px 6px; }
+.src { display: inline-flex; align-items: center; gap: 6px; }
+.linkbtn { background: none; border: 0; padding: 0; font: inherit; color: var(--accent); text-decoration: underline; text-underline-offset: 2px; cursor: pointer; }
+.hsub { font-family: var(--font-body); font-size: 14px; font-weight: 400; text-transform: none; letter-spacing: 0; color: var(--muted); }
+@media (max-width: 600px) { .tb-actions { margin-left: 0; width: 100%; } }
+
+/* Panels: setup flow, team settings, share */
+#panels:empty { display: none; }
+.flow, .tsp, .io { scroll-margin-top: 12px; border: 1px solid color-mix(in srgb, var(--accent) 40%, var(--line)); }
+.seg.wrap { display: grid; grid-template-columns: repeat(4, auto); max-width: 100%; }
+@media (max-width: 600px) { .seg.wrap { grid-template-columns: repeat(2, minmax(0, 1fr)); align-self: stretch; } }
+.flow .seg, .tsp .seg { align-self: flex-start; }
+.seg a { padding: 6px 14px; font-weight: 500; font-size: 14px; text-decoration: none; color: var(--ink); }
+.seg a[aria-current="page"] { background: var(--accent); color: var(--accent-ink); }
+.seg.sub { align-self: flex-start; }
+.flow-body { display: flex; flex-direction: column; gap: 10px; }
+.flow-body p { margin: 0; }
+.ts-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 12px 18px; }
+.rv-grid { display: grid; grid-template-columns: minmax(0, 1.4fr) minmax(0, 1fr); gap: 16px 24px; }
+.rv-players, .rv-teams { margin: 6px 0 0; padding: 0; list-style: none; display: flex; flex-direction: column; gap: 4px; font-size: 14px; }
+.rv-pos { display: inline-block; min-width: 40px; font-family: var(--font-display); font-weight: 700; color: var(--accent); }
+.rv-dest { border: 0; padding: 0; margin: 0; display: flex; flex-direction: column; gap: 6px; font-size: 14.5px; }
+.rv-dest input, .io input[type=checkbox] { accent-color: var(--accent); }
+.mchips { display: flex; flex-wrap: wrap; gap: 6px; }
+.mchips .chip { display: inline-flex; align-items: center; gap: 4px; font-size: 13px; padding: 2px 4px 2px 10px; }
+.chip-x { background: none; border: 0; font-size: 16px; line-height: 1; padding: 0 4px; color: var(--muted); cursor: pointer; }
+.chip-x:hover { color: var(--bad); }
+@media (max-width: 780px) { .rv-grid { grid-template-columns: minmax(0, 1fr); } }
+
+/* Player search with suggestions */
+.ac { position: relative; }
+.ac .inp { width: 100%; }
+.ac-list { position: absolute; z-index: 20; left: 0; right: 0; top: calc(100% + 4px); background: var(--surface); border: 1px solid var(--line); border-radius: 10px; box-shadow: 0 10px 28px rgba(0, 0, 0, .18); max-height: 340px; overflow-y: auto; }
+.ac-item { display: flex; align-items: center; justify-content: space-between; gap: 10px; width: 100%; padding: 8px 12px; background: none; border: 0; border-bottom: 1px solid var(--line); text-align: left; cursor: pointer; }
+.ac-item:last-child { border-bottom: 0; }
+.ac-item[aria-selected="true"], .ac-item:hover { background: color-mix(in srgb, var(--accent) 9%, var(--surface)); }
+.ac-main { display: flex; flex-direction: column; min-width: 0; }
+.ac-tag { flex: 0 0 auto; font-size: 12.5px; font-weight: 600; color: var(--accent); border: 1px solid currentColor; border-radius: 999px; padding: 1px 8px; }
+.ac-tag.on { color: var(--muted); }
+.ac-empty { padding: 10px 12px; }
+.addbox { padding: 12px 14px; display: flex; flex-direction: column; gap: 6px; }
+.rrow { display: grid; grid-template-columns: minmax(0, 1fr) 56px 34px auto auto; gap: 10px; align-items: center; padding: 8px 14px; }
+.rrow .rr-proj { font-size: 20px; text-align: right; }
+.rrow .rr-ovr { width: 92px; }
+.rrow [aria-disabled="true"] { opacity: .55; }
+.empty-row { padding: 14px; }
+.rlinks { grid-column: 1 / -1; display: flex; flex-wrap: wrap; gap: 4px 6px; }
+.empty { gap: 10px; }
+.flash { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 8px 14px; }
+
+/* Toast (Undo and quick confirmations) */
+.toast { position: fixed; left: 50%; transform: translateX(-50%); bottom: calc(16px + env(safe-area-inset-bottom, 0px)); z-index: 50; display: flex; align-items: center; gap: 12px; max-width: min(560px, calc(100vw - 32px)); padding: 10px 12px 10px 16px; border-radius: 10px; background: var(--ink); color: var(--bg); box-shadow: 0 10px 28px rgba(0, 0, 0, .25); font-size: 14.5px; }
+.toast .btn { background: transparent; color: var(--bg); border-color: color-mix(in srgb, var(--bg) 45%, transparent); }
 
 .banner { border: 1px solid var(--line); border-left: 4px solid var(--warn); background: var(--surface); border-radius: 8px; padding: 10px 14px; font-size: 14px; }
 .banner.info { border-left-color: var(--accent); }
@@ -371,16 +442,18 @@ td .wks { flex-wrap: nowrap; }
     </div>
     <div class="controls">
       <button type="button" class="status" id="status" data-act="fresh" aria-expanded="false" aria-controls="fresh" title="When each kind of data was last updated"><i></i><span>Loading…</span></button>
-      <label class="small muted" for="weekSel">Week</label>
-      <select id="weekSel" class="sel"></select>
-      <button class="btn" data-act="reload" type="button">Refresh</button>
+      <button class="btn" data-act="reload" type="button" title="Get the newest projections, injuries and lines">Refresh projections</button>
+      <button class="btn" data-tab="settings" type="button" id="settingsBtn">Settings</button>
     </div>
   </header>
   <div class="freshp card" id="fresh" hidden></div>
+  <nav class="tabs" id="tabs" aria-label="Main"></nav>
+  <section class="teamctx" id="teamctx" aria-label="Your team"></section>
+  <div id="panels"></div>
   <section class="brief" id="brief" aria-label="This week at a glance"></section>
-  <nav class="tabs" role="tablist" id="tabs"></nav>
   <div id="msgs" class="section"></div>
   <main id="main"></main>
+  <div class="toast" id="toast" role="status" aria-live="polite" hidden></div>
 </div>
 
 <script>
@@ -827,7 +900,7 @@ async function load(opts = {}) {
   else if (!D.inp) { const snap = await fetchJSON('snapshot.json').catch(() => null); if (snap?.v === 1) useSaved(snap); }
   if (!D.inp) { D.loading = false; D.failed = true; render(); return; }
   D.loading = false; render();
-  if (location.hash !== '#export') slAutoSync();   // refresh linked Sleeper teams in the background
+  if (location.hash !== '#export' && !opts.manual) slAutoSync();   // on page load, re-sync linked Sleeper teams; Refresh projections leaves rosters alone
   if (D.snapshot) return;
   if (location.hash === '#export') {
     await checkCoaches(D.season);
@@ -1058,7 +1131,7 @@ function makeExampleRoster() {
   for (const p in byPos) byPos[p].sort((a, b) => b[1] - a[1]);
   const pick = { QB: [5, 13], RB: [3, 12, 21, 29, 37], WR: [4, 11, 19, 27, 35], TE: [6, 14], K: [4], DEF: [3, 11] };
   const ids = []; for (const p in pick) for (const i of pick[p]) { const e = byPos[p]?.[i]; if (e) ids.push(e[0]); }
-  if (ids.length) { state.roster = ids; state.example = true; save(); }
+  if (ids.length) { state.roster = ids; state.example = true; const ct = curTeam(); if (ct && /^my team$/i.test(ct.name)) ct.name = 'Demo team'; save(); }
 }
 
 /* ---------- coaches (ESPN head-coach check, cached 24h) ---------- */
@@ -1147,15 +1220,13 @@ async function slLoadLeague(id) {
   } catch { D.sl.msg = ['err', 'Couldn’t reach Sleeper. Try again in a moment.']; }
   render();
 }
+// the chosen Sleeper team becomes a draft for the review step; nothing is saved until Save team
 function slUseTeam() {
-  const lg = D.sl?.league, rid = $('#slTeam')?.value ?? D.sl?.pick; if (!lg) return;
+  const lg = D.sl?.league, rid = $('#slTeam')?.value ?? D.sl?.pick; if (!lg || !D.flow) return;
   const a = slApply(lg, D.sl.rosters, rid), t = D.sl.teams.find(x => String(x.rosterId) === String(rid)); if (!a) return;
-  Object.assign(state, { roster: a.roster, example: false, slots: a.slots, scoring: a.scoring, tePrem: a.tePrem });
-  state.espn.slotOf = {};
-  Object.assign(state.waivers, { teams: a.size, source: 'sleeper', taken: {} });
-  state.sleeper = { leagueId: lg.league_id, rosterId: +rid, leagueName: lg.name, teamName: t?.name || '', rostered: a.rostered, starters: a.starters, rosterMax: a.rosterMax, reserve: a.reserve, syncedAt: Date.now(), notes: slNotes(lg) };
-  const ct = curTeam(); if (ct && /^(my team|team \d+)$/i.test(ct.name) && t?.name) ct.name = t.name.slice(0, 40);
-  D.setupOpen = false; D.sl = null; D.wCache = null; D.open.clear(); save(); syncScoring(); render();
+  makeDraft({ name: (t?.name || 'My team').slice(0, 40), roster: a.roster, scoring: a.scoring, tePrem: a.tePrem, slots: a.slots, source: `Sleeper: ${lg.name}`,
+    sleeper: { leagueId: lg.league_id, rosterId: +rid, leagueName: lg.name, teamName: t?.name || '', rostered: a.rostered, starters: a.starters, rosterMax: a.rosterMax, reserve: a.reserve, syncedAt: Date.now(), notes: slNotes(lg) },
+    espn: { slotOf: {} }, waivers: { teams: a.size, source: 'sleeper', taken: {} } });
 }
 /* Re-sync every linked team (rosters, slots, scoring, league-wide rostered players). Quiet on failure: the last sync stays. */
 async function slAutoSync(force) {
@@ -1185,12 +1256,12 @@ function slSyncLine() {
     <button type="button" class="btn sm" data-act="slsync">Sync now</button><button type="button" class="btn sm" data-act="slunlink">Unlink</button>
     ${s.notes?.length ? `<span class="muted">Your league also uses ${esc(s.notes.join(', '))}, which Benny doesn’t score yet.</span>` : ''}</div>`;
 }
-function renderSyncLine() { const el = $('#slsync'); if (el) el.outerHTML = slSyncLine(); }
+function renderSyncLine() { const el = $('#teamctx'); if (el && !D.loading && !D.failed) el.innerHTML = teamBar(); }
 function sleeperControls() {
   const s = D.sl || {};
   return `<div class="toolbar"><input class="inp" id="slQuery" placeholder="Sleeper username or league ID" aria-label="Sleeper username or league ID" value="${esc(s.q || '')}" style="flex:1 1 180px"><button type="button" class="btn primary" data-act="slfind">Find</button></div>
     ${s.leagues?.length > 1 && !s.league ? `<div class="toolbar"><select class="sel" id="slLeague" aria-label="Your Sleeper league" style="flex:1 1 180px">${s.leagues.map(l => `<option value="${esc(l.id)}">${esc(l.name)} (${l.size} teams)</option>`).join('')}</select><button type="button" class="btn" data-act="slleague">Load league</button></div>` : ''}
-    ${s.league ? `<div class="toolbar"><select class="sel" id="slTeam" aria-label="Your team" style="flex:1 1 180px">${s.teams.map(t => `<option value="${t.rosterId}" ${String(t.rosterId) === String(s.pick) ? 'selected' : ''}>${esc(t.name)} · ${esc(t.owner)}</option>`).join('')}</select><button type="button" class="btn primary" data-act="slteam">Sync this team</button></div>` : ''}
+    ${s.league ? `<div class="toolbar"><select class="sel" id="slTeam" aria-label="Your team" style="flex:1 1 180px">${s.teams.map(t => `<option value="${t.rosterId}" ${String(t.rosterId) === String(s.pick) ? 'selected' : ''}>${esc(t.name)} · ${esc(t.owner)}</option>`).join('')}</select><button type="button" class="btn primary" data-act="slteam">Review this team</button></div>` : ''}
     ${s.msg ? `<div class="banner ${s.msg[0]} small">${esc(s.msg[1])}</div>` : ''}`;
 }
 function useEspnTeam() {
@@ -1204,12 +1275,10 @@ function useEspnTeam() {
     if (id && D.U.has(id)) { ids.push(id); slotOf[id] = e.lineupSlotId; } else missed.push(p.fullName || '?');
   }
   const sc = D.espnLeague?.settings?.rosterSettings?.lineupSlotCounts;
-  if (sc) { const s = Object.fromEntries(SLOT_TYPES.map(t => [t.k, 0])); for (const k in sc) if (ESPN_SLOT[k]) s[ESPN_SLOT[k]] += sc[k]; if (Object.values(s).some(Boolean)) state.slots = s; }
-  state.roster = ids; state.example = false; state.espn.slotOf = slotOf;
-  const ct = curTeam(); if (ct && /^(my team|team \d+)$/i.test(ct.name)) ct.name = t.name;
-  save();
-  D.espnMsg = ['info', `Imported ${ids.length} players from ${t.name}.` + (missed.length ? ` Not matched: ${missed.join(', ')}. Add them in the Players tab.` : '')];
-  D.setupOpen = false; state.tab = 'lineup'; render();
+  let slots = null;
+  if (sc) { const s = Object.fromEntries(SLOT_TYPES.map(t => [t.k, 0])); for (const k in sc) if (ESPN_SLOT[k]) s[ESPN_SLOT[k]] += sc[k]; if (Object.values(s).some(Boolean)) slots = s; }
+  if (!D.flow) return;
+  makeDraft(Object.assign({ name: (t.name || 'My team').slice(0, 40), roster: ids, unresolved: missed, source: 'ESPN league', espn: { leagueId: state.espn.leagueId, teamId: state.espn.teamId, slotOf } }, slots ? { slots } : {}));
 }
 
 /* ---------- coaching profiles (matchup breakdown) ----------
@@ -1575,11 +1644,10 @@ function persSection(weeks, H) {
   return `<div class="row-head"><h2>Defense &amp; special-teams changes</h2><span class="small muted">Signings, trades, injuries and returns the season stats don’t show yet. Already applied to the week chips (marked •), schedule ratings and Lineup projections.</span></div>
   <div class="card list">${top.map(row).join('')}${rest.length ? `<details class="item prs-more"><summary class="small">Show ${rest.length} more teams</summary><div class="list">${rest.map(row).join('')}</div></details>` : ''}</div>`;
 }
-function viewWaivers() { return `<div class="section">${teamBar(false)}${waiversBody()}</div>`; }
-function viewPlayers() { return `<div class="section">${teamBar(false)}${playersBody()}</div>`; }
+function viewWaivers() { return waiversBody(); }
 function waiversBody() {
   const W = state.waivers;
-  if (!state.roster.length) return `<div class="card panel"><h2>Add your roster first</h2><p style="margin:0">Waiver suggestions compare free agents against your players. Paste your roster in <a href="#" data-tab="players">Players</a>.</p></div>`;
+  if (!state.roster.length) return `<div class="card panel"><h2>Add your roster first</h2><p style="margin:0">Waiver suggestions compare free agents against your players. <button type="button" class="linkbtn" data-act="flow" data-method="sleeper" data-dest="replace">Import your team</button> or add players in <a href="#roster" data-tab="players">Roster</a>.</p></div>`;
   const R = computeWaivers(), { weeks, H, moves, needs } = R;
   const hLab = H === 1 ? `week ${weeks[0]}` : `weeks ${weeks[0]}–${weeks[H - 1]}`;
   const ownTxt = id => D.own.has(id) ? `${D.own.get(id) < 1 ? '<1' : Math.round(D.own.get(id))}% owned` : 'unowned';
@@ -1587,7 +1655,7 @@ function waiversBody() {
   const src = W.source === 'list' && W.faList.length ? `your league’s free-agent list (${W.faList.length} players, pasted ${esc(new Date(W.faListAt).toLocaleDateString([], { month: 'short', day: 'numeric' }))})` : `players under ${W.ownMax}% owned across ESPN leagues`;
   const warn = [];
   if (W.source === 'own' && !D.own.size) warn.push('ESPN ownership didn’t load, so every player not on your roster counts as available. Paste your league’s free agents below for accurate suggestions.');
-  if (state.example) warn.push('These suggestions are for the example roster. Paste your own roster in Players first.');
+  if (state.example) warn.push('These suggestions are for the Demo team. Import your team to see moves for your roster.');
   const levelCls = { Strong: 'n', OK: 'm', Weak: 'o' };
   const needCards = needs.list.map(n => `<div class="need"><div class="row-head"><h3>${n.P === 'DEF' ? 'D/ST' : n.P}</h3><span class="pill ${levelCls[n.level]}">${n.level}</span></div>
     ${n.rows.length ? n.rows.map(r => `<div class="small ${r.starter ? '' : 'muted'}">${esc(D.U.get(r.id).name)} <span class="muted">${r.away ? (returnWeek(r.id) > 18 ? 'out for season' : 'out until wk ' + returnWeek(r.id)) : (n.P === 'DEF' ? 'DST' : n.P) + (r.rank || '?')}</span></div>`).join('') : '<div class="small muted">Nobody at this position</div>'}
@@ -1646,7 +1714,7 @@ function waiversBody() {
   <div class="row-head"><h2>Waiver Optimizer</h2><span class="small muted">Add/drop moves ranked by expected lineup points gained</span></div>
   ${faRow}
   <div class="toolbar"><span class="small muted">Window</span><div class="seg" role="group" aria-label="Time window">${[[2, 'Next 2'], [4, 'Next 4'], [6, 'Next 6'], ['ros', 'Rest of season']].map(([k, l]) => `<button type="button" data-wh="${k}" aria-pressed="${W.horizon === k}">${l}</button>`).join('')}</div>
-    <label class="small muted" for="wTeams">League size</label><select class="sel" id="wTeams">${[...new Set([6, 8, 10, 12, 14, 16, 18, 20, W.teams])].sort((a, b) => a - b).map(n => `<option ${W.teams === n ? 'selected' : ''}>${n}</option>`).join('')}</select>
+    <label class="small muted" for="wTeams">League size</label><select class="sel" id="wTeams" data-wteams>${[...new Set([6, 8, 10, 12, 14, 16, 18, 20, W.teams])].sort((a, b) => a - b).map(n => `<option ${W.teams === n ? 'selected' : ''}>${n}</option>`).join('')}</select>
     ${slFA ? '' : W.source === 'list' && W.faList.length ? `<button type="button" class="btn sm" data-wsrc="own">Use ESPN ownership instead</button>` : `<label class="small muted" for="wOwn">Owned under</label><input type="range" id="wOwn" min="5" max="90" step="5" value="${W.ownMax}" style="accent-color:var(--accent)"><span class="num" id="wOwn-v">${W.ownMax}%</span>`}
     ${nTaken ? `<button type="button" class="btn sm" data-act="untake">Show ${nTaken} hidden</button>` : ''}</div>
   <div class="toolbar"><span class="small muted">Rank by</span><div class="seg" role="group" aria-label="Rank moves by"><button type="button" data-wrank="window" aria-pressed="${!longTerm}">${hLab[0].toUpperCase() + hLab.slice(1)} only</button><button type="button" data-wrank="blend" aria-pressed="${longTerm}">+ long-term value</button></div></div>
@@ -1689,12 +1757,12 @@ function renderBrief() {
   const el = $('#brief'); if (!el) return;
   if (D.loading || D.failed) { el.innerHTML = ''; return; }
   const team = esc(curTeam().name);
-  if (!state.roster.length) { el.innerHTML = `<span class="bteam">${team}:</span> import your roster to get Benny’s picks. <button type="button" class="blink" data-tab="lineup">Import your team</button>`; return; }
+  if (!state.roster.length) { el.innerHTML = `<span class="bteam">${team}:</span> import your roster to get Benny’s picks. <button type="button" class="blink" data-act="flow" data-method="sleeper" data-dest="replace">Import your team</button>`; return; }
   const { starters } = optimize(), proj = starters.reduce((s, x) => s + (x.r ? x.r.mean : 0), 0);
   const dec = reviewDecisions(), W = computeWaivers(), best = W.moves[0];
   const decTxt = dec.length ? `<button type="button" class="blink" data-brief="decide"><span class="n">${dec.length}</span> decision${dec.length === 1 ? '' : 's'} to review</button>` : `<span>no close calls</span>`;
-  const bestTxt = best ? `<button type="button" class="blink" data-tab="waivers">best waiver move <span class="n up">+${f1(best.hz)}</span> pts over ${W.H} week${W.H === 1 ? '' : 's'}</button>` : `<span>no waiver move worth making</span>`;
-  el.innerHTML = `<span class="bteam">${state.example ? 'Example roster' : team}:</span> your optimal lineup projects for <button type="button" class="blink" data-tab="lineup"><span class="n">${f1(proj)}</span> points</button><span class="sep">·</span>${decTxt}<span class="sep">·</span>${bestTxt}`;
+  const bestTxt = best ? `<button type="button" class="blink" data-brief="waiver">best waiver move <span class="n up">+${f1(best.hz)}</span> pts over ${W.H} week${W.H === 1 ? '' : 's'}</button>` : `<span>no waiver move worth making</span>`;
+  el.innerHTML = `<span class="bteam">${state.example ? 'Demo team' : team}:</span> your optimal lineup projects for <button type="button" class="blink" data-tab="lineup"><span class="n">${f1(proj)}</span> points</button><span class="sep">·</span>${decTxt}<span class="sep">·</span>${bestTxt}`;
 }
 /* Freshness: "Updated 12 minutes ago", refreshed every minute. Live data is just-now; a saved copy shows its age. */
 function ago(t) {
@@ -1735,25 +1803,48 @@ function renderFresh() {
     <div class="small">${page} The saved copy refreshes every three hours; Refresh pulls the newest data now.</div>`;
 }
 setInterval(renderStatus, 60000);
-const TABS = [['lineup','Lineup'],['compare','Benny’s Pick'],['waivers','Waiver Optimizer'],['defenses','Defenses'],['teams','Teams & Schemes'],['players','Players'],['settings','Settings']];
+/* ---------- navigation ----------
+   Five destinations, each with its own address (#lineup, #start-sit, #waivers, #roster, #research), so Back, refresh
+   and shared links land on the same screen. Research has two subpages; Settings is a utility page off the header. */
+const NAV = [['lineup', 'Lineup'], ['compare', 'Start / Sit'], ['waivers', 'Waivers'], ['players', 'Roster'], ['defenses', 'Research']];
+const HASH = { lineup: 'lineup', compare: 'start-sit', waivers: 'waivers', players: 'roster', defenses: 'research', teams: 'research-teams', settings: 'settings' };
+const TAB_OF = Object.fromEntries(Object.entries(HASH).map(([k, v]) => [v, k]));
+const navOf = tab => tab === 'teams' ? 'defenses' : tab;
+function go(tab, opts = {}) {
+  if (!HASH[tab]) return;
+  D.flash = opts.keepFlash ? D.flash : null;
+  if (location.hash.slice(1) !== HASH[tab]) { D.navScroll = opts.scroll !== false; location.hash = HASH[tab]; return; }   // hashchange renders
+  state.tab = tab; save(); render(); if (opts.scroll !== false) window.scrollTo(0, 0); runAfter();
+}
+window.addEventListener('hashchange', () => {
+  const tab = TAB_OF[location.hash.slice(1)]; if (!tab) return;
+  state.tab = tab; save(); render(); if (D.navScroll !== false) window.scrollTo(0, 0); D.navScroll = true; runAfter();
+});
+// a one-shot step to run after the next page renders (scroll to a team, highlight the best move)
+function runAfter() { const f = D.after; D.after = null; if (f) setTimeout(f, 30); }
+function weekOptions() {
+  return D.snapshot ? `<option selected>${D.week}</option>` : Array.from({ length: 18 }, (_, i) => `<option value="${i + 1}" ${D.week === i + 1 ? 'selected' : ''}>${i + 1}${D.detWeek === i + 1 && D.season === D.detSeason ? ' (now)' : ''}</option>`).join('');
+}
 function render() {
-  $('#tabs').innerHTML = TABS.map(([k, l]) => `<button role="tab" type="button" data-tab="${k}" aria-selected="${state.tab === k}">${l}</button>`).join('');
-  const ws = $('#weekSel');
-  ws.disabled = !!D.snapshot;
-  ws.innerHTML = D.snapshot ? `<option selected>${D.week}</option>` : Array.from({ length: 18 }, (_, i) => `<option value="${i + 1}" ${D.week === i + 1 ? 'selected' : ''}>${i + 1}${D.detWeek === i + 1 && D.season === D.detSeason ? ' (now)' : ''}</option>`).join('');
+  const nav = navOf(state.tab);
+  $('#tabs').innerHTML = NAV.map(([k, l]) => `<a href="#${HASH[k]}" class="navlink" data-tab="${k}" ${nav === k ? 'aria-current="page"' : ''}>${l}</a>`).join('');
+  $('#settingsBtn')?.setAttribute('aria-pressed', String(state.tab === 'settings'));
   renderStatus();
+  $('#teamctx').innerHTML = D.loading || D.failed ? '' : teamBar();
+  $('#panels').innerHTML = D.loading || D.failed ? '' : D.flow ? flowPanel() : D.tsOpen ? teamSettingsPanel() : D.ioOpen ? sharePanel() : '';
   const msgs = [];
+  if (D.flash && !D.loading) msgs.push(`<div class="banner info flash"><span>${D.flash.html}</span><button type="button" class="btn sm" data-act="flashclose" aria-label="Dismiss">Dismiss</button></div>`);
   // Only interrupt for problems that change the picks: missing projections or schedule, or data that's gone stale.
   const age = D.loadedAt ? Date.now() - D.loadedAt.getTime() : 0;
   if (!D.loading && !D.failed && D.snapshot && !D.refreshing && age > 36e5 * 36) msgs.push(`<div class="banner">These numbers are from ${esc(D.loadedAt.toLocaleDateString([], { weekday: 'long', month: 'short', day: 'numeric' }))}, so injury news since then isn’t included. Press Refresh to try for newer data.</div>`);
   if (!D.loading && !D.snapshot && D.errors.some(e => /projections|schedule/i.test(e))) msgs.push(`<div class="banner err"><strong>Some of this week’s data didn’t load.</strong> Picks may be incomplete. Press Refresh to try again.</div>`);
-  if (!D.loading && state.example && state.tab === 'lineup') msgs.push(`<div class="banner info exban"><span><strong>You’re looking at an example roster.</strong> Bring in your own team to get Benny’s picks for it.</span><button type="button" class="btn sm primary" data-act="setup">Import your team</button></div>`);
+  if (!D.loading && state.example && state.tab === 'lineup' && !D.flow) msgs.push(`<div class="banner info exban"><span><strong>You’re viewing the Demo team.</strong> Import or build your own team to get Benny’s picks for it.</span><button type="button" class="btn sm primary" data-act="flow" data-method="sleeper" data-dest="replace">Import your team</button></div>`);
   $('#msgs').innerHTML = msgs.join('');
   const main = $('#main');
-  if (D.failed) { renderBrief(); main.innerHTML = `<div class="card panel"><h2>Couldn’t load this week’s data</h2><p style="margin:0">Sleeper and ESPN didn’t respond. Check your connection and press Refresh.</p></div>`; return; }
+  if (D.failed) { renderBrief(); main.innerHTML = `<div class="card panel"><h2>Couldn’t load this week’s data</h2><p style="margin:0">Sleeper and ESPN didn’t respond. Check your connection and press Refresh projections.</p></div>`; return; }
   if (D.loading) { renderBrief(); main.innerHTML = `<div class="card loading"><h3>Loading week ${D.week || ''}</h3><div class="small">Projections, stats and schedules. Past seasons are saved after your first visit.</div><div class="bar"><span id="lbar" style="width:${Math.round(D.progress * 100)}%"></span></div></div>`; return; }
   renderBrief();
-  main.innerHTML = ({ lineup: viewLineup, compare: viewCompare, waivers: viewWaivers, defenses: viewDefenses, teams: viewTeams, players: viewPlayers, settings: viewSettings })[state.tab]();
+  main.innerHTML = ({ lineup: viewLineup, compare: viewCompare, waivers: viewWaivers, defenses: viewResearch, teams: viewResearch, players: viewPlayers, settings: viewSettings })[state.tab]();
 }
 function injPill(r) {
   const i = r.inj || ''; if (!i) return '';
@@ -1809,6 +1900,12 @@ function probTiles(r) {
     <div><span class="label">Big week</span><span class="num">${f1(r.boom)}+</span><span class="small muted">about 1 week in 10</span></div>
   </div>`;
 }
+/* Jump from a player explanation to the research behind it. */
+function researchLinks(r) {
+  if (!r.O || !r.T) return '';
+  const d = r.pos === 'DEF' ? r.T : r.O, o = r.pos === 'DEF' ? r.O : r.T;
+  return `<div class="small rlinks"><span class="muted">Research:</span> <a href="#research-teams" data-research="${d}">${d} defense and coaches</a> · <a href="#research-teams" data-research="${o}">${o} offense</a> · <a href="#research" data-tab="defenses">all defenses</a></div>`;
+}
 function modelNote() {
   return `<details class="model small"><summary>Model estimate: how sure is this?</summary><p>Percentages and ranges come from Benny’s model, not from past results. Each player’s score is treated as a bell curve around his projection, with the spread taken from his weekly scores this season (pulled toward a typical spread for his position). The likely range is the middle half of outcomes, the 25th to 75th percentile, so real scores land outside it about half the time. A check of these estimates against past weeks isn’t available yet.</p></details>`;
 }
@@ -1820,6 +1917,7 @@ function detailBlock(r) {
     ${why.length ? `<ul class="reasons">${why.map(x => `<li class="${x.up ? 'up' : 'down'}"><span class="rv">${spct(x.pct)}</span> ${esc(x.text)}</li>`).join('')}</ul>` : '<div class="small muted">No matchup factor moves him much this week.</div>'}`}
   </div>
   <div class="section">${probTiles(r)}${modelNote()}</div>
+  ${researchLinks(r)}
   <details class="more"><summary>All matchup factors and the math</summary><div class="section">${factorList(r)}${r.scheme ? `<div class="scheme"><strong>Scheme:</strong> ${esc(r.scheme)}</div>` : ''}
   <div class="math">Sleeper projection ${f1(r.projPts)} · season avg ${f1(h?.avg)} → base ${f1(r.base)} × matchup ${f1(r.mult)} = <strong>${f1(r.base * r.mult)}</strong>${r.override != null ? ` · your override ${f1(r.override)}` : ''}${h?.n ? ` · weekly scores: ${h.pts.map(x => x.toFixed(1)).join(', ')}` : ''}</div>
   </div></details>
@@ -1837,23 +1935,6 @@ function teamProjection(t) {
 }
 function scoringSelect(id) {
   return `<label class="small muted" for="${id}">Scoring</label><select class="sel" id="${id}" data-scoring>${Object.entries(SCORING).map(([k, [label]]) => `<option value="${k}" ${state.scoring === k ? 'selected' : ''}>${label}</option>`).join('')}</select>`;
-}
-function teamBar(manage) {
-  const ct = curTeam();
-  const heads = state.teams.map(t => {
-    // projections are built for the active team's scoring, so only show totals for teams that score the same way
-    const fmt = SCORING[t.scoring] ? t.scoring : 'ppr', n = (t.roster || []).length, on = t.id === state.activeTeam;
-    const pts = n && !D.loading && fmt === state.scoring ? teamProjection(t) : null;
-    // each piece stays whole; the line wraps only between pieces
-    const bits = [n ? `${n} players` : 'No players yet', pts != null ? `<span class="num">${f1(pts)}</span> proj` : '', SCORING[fmt][0], t.example ? 'example' : ''].filter(Boolean);
-    return `<button type="button" class="tteam" data-fteam="${esc(t.id)}" aria-pressed="${on}" title="${esc(t.name)}"><span class="tn">${esc(t.name)}</span><span class="tm">${bits.map(b => `<span class="tb">${b}</span>`).join(' · ')}</span></button>`;
-  }).join('');
-  return `<div class="teambar"><div class="tteams" role="group" aria-label="Your teams">${heads}<button type="button" class="tteam add" data-act="addteam">+ Add team</button></div>
-  ${manage ? `<div class="tmanage"><label class="small muted" for="teamName">Team name</label><input class="inp" id="teamName" type="text" maxlength="40" value="${esc(ct.name)}">${scoringSelect('teamScoring')}${state.teams.length > 1 ? `<button type="button" class="btn sm danger" data-act="delteam">${D.delArm ? `Press again to delete ${esc(ct.name)}` : 'Delete team'}</button>` : ''}<button type="button" class="btn sm primary" data-act="setup" aria-expanded="${!!D.setupOpen}">Import your team</button><button type="button" class="btn sm" data-act="toggleio" aria-expanded="${!!D.ioOpen}">Share / back up</button><span class="small muted">Each team keeps its own roster, lineup slots, ESPN league and waiver list.</span></div>` : ''}${slSyncLine()}</div>`;
-}
-function rosterPasteBox() {
-  return `<div class="card panel"><h3>Add ${esc(curTeam().name)}’s roster</h3><p class="small muted" style="margin:0">On ESPN, open My Team, select the roster table, copy it, and paste it here. A plain list of names, one per line, also works. You can also search and add players one at a time in <a href="#" data-tab="players">Players</a>.</p>
-  <textarea class="inp" id="rosterPaste" placeholder="Joe Burrow&#10;Bijan Robinson&#10;Ja'Marr Chase&#10;Packers D/ST"></textarea><div class="toolbar"><button type="button" class="btn primary" data-act="pasteroster">Set roster</button><span class="small muted">${esc(D.rosterMsg || '')}</span></div></div>`;
 }
 /* ---------- team import / export ----------
    A team travels as JSON: its name, roster (Sleeper ids plus name and position, so players can be re-matched by name
@@ -1915,53 +1996,301 @@ function importBundle(obj, replace) {
   D.open.clear(); D.wCache = null; D.delArm = false; computeAll(); syncScoring(); save();
   return `Imported ${added + replaced} team${added + replaced === 1 ? '' : 's'}${replaced ? ` (${replaced} replaced)` : ''}.` + (missed.length ? ` Not found this week: ${missed.slice(0, 5).join(', ')}${missed.length > 5 ? '…' : ''}.` : '');
 }
+/* ---------- team bar (every page) ----------
+   Team chips to switch teams, then one line of context: week, scoring, where the roster comes from, and the team
+   actions (add, settings, import/replace, share). */
+const newTeamId = () => { let id; do id = 't' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6); while (state.teams.some(t => t.id === id)); return id; };
+function sourceLabel() {
+  if (state.example) return '<span class="pill m">Demo team</span>';
+  const s = state.sleeper;
+  if (s) return `<span class="src"><span class="sl-dot"></span>Sleeper · ${D.slSyncing ? 'syncing…' : 'synced ' + ago(s.syncedAt || 0)}</span> <button type="button" class="linkbtn" data-act="slsync">Sync roster</button>`;
+  return `<span class="src">${Object.keys(state.espn.slotOf || {}).length ? 'ESPN import' : 'Manual roster'}</span>`;
+}
+function teamBar() {
+  const chips = state.teams.map(t => {
+    const tag = t.example ? 'Demo' : t.sleeper?.leagueId ? 'Sleeper' : `${(t.roster || []).length} players`;
+    return `<button type="button" class="tchip" data-fteam="${esc(t.id)}" aria-pressed="${t.id === state.activeTeam}" title="${esc(t.name)}"><span class="tn">${esc(t.name)}</span><span class="tm">${esc(tag)}</span></button>`;
+  }).join('');
+  return `<div class="tb-teams" role="group" aria-label="Your teams">${chips}<button type="button" class="tchip add" data-act="flow" data-method="sleeper" data-dest="new">+ Add team</button></div>
+  <div class="tb-ctx">
+    <span class="tb-item"><label for="weekSel" class="muted">Week</label> <select id="weekSel" class="sel sm" ${D.snapshot ? 'disabled' : ''}>${weekOptions()}</select></span>
+    <span class="tb-item">${esc(fmtName())}</span>
+    <span class="tb-item">${sourceLabel()}</span>
+    <span class="tb-actions">
+      <button type="button" class="btn sm" data-act="teamsettings" aria-expanded="${!!D.tsOpen}">Team settings</button>
+      <button type="button" class="btn sm" data-act="flow" data-method="${state.sleeper ? 'sleeper' : 'espn'}" data-dest="replace">Import / replace</button>
+      <button type="button" class="btn sm" data-act="toggleio" aria-expanded="${!!D.ioOpen}">Share / back up</button>
+    </span>
+  </div>`;
+}
+const tePremSelect = id => `<label class="small muted" for="${id}">TE premium</label><select class="sel" id="${id}" data-teprem>${[0, 0.25, 0.5, 0.75, 1].map(v => `<option value="${v}" ${tePrem() === v ? 'selected' : ''}>${v ? '+' + v + ' per catch' : 'None'}</option>`).join('')}</select>`;
+const leagueSizeOptions = n => [...new Set([6, 8, 10, 12, 14, 16, 18, 20, n])].sort((a, b) => a - b).map(v => `<option ${n === v ? 'selected' : ''}>${v}</option>`).join('');
+const slotsSummary = slots => SLOT_TYPES.filter(t => slots?.[t.k]).map(t => (slots[t.k] > 1 ? slots[t.k] + ' ' : '') + (t.label || t.k)).join(', ') || 'none';
+function teamSettingsPanel() {
+  const ct = curTeam(), s = state.sleeper;
+  return `<div class="card panel tsp"><div class="row-head"><h2>Team settings <span class="hsub">${esc(ct.name)}</span></h2><button type="button" class="btn sm" data-act="teamsettings">Close</button></div>
+  <div class="ts-grid">
+    <div class="field"><label class="label" for="teamName">Team name</label><input class="inp" id="teamName" type="text" maxlength="40" value="${esc(ct.name)}"></div>
+    <div class="field"><span class="label">Scoring</span><span class="toolbar">${scoringSelect('teamScoring')}${tePremSelect('teamTep')}</span></div>
+    <div class="field"><label class="label" for="tsSize">League size</label><select class="sel" id="tsSize" data-wteams>${leagueSizeOptions(state.waivers.teams)}</select></div>
+  </div>
+  <div class="field"><span class="label">Lineup slots</span><div class="slots">${SLOT_TYPES.map(t => `<label for="slot-${t.k}">${t.label || t.k}<input class="inp" id="slot-${t.k}" type="number" min="0" max="5" data-slot="${t.k}" value="${state.slots[t.k] || 0}"></label>`).join('')}</div></div>
+  ${s ? `<div class="field"><span class="label">Roster source</span><div class="small">Synced with Sleeper: <strong>${esc(s.leagueName || 'league')}</strong>${s.teamName ? ' · ' + esc(s.teamName) : ''}, updated ${ago(s.syncedAt || 0)}. Each sync replaces this team’s roster, lineup slots and scoring with Sleeper’s, so make changes in Sleeper, or experiment on an editable copy.${s.notes?.length ? ` Your league also uses ${esc(s.notes.join(', '))}, which Benny doesn’t score yet.` : ''}</div>
+    <div class="toolbar"><button type="button" class="btn sm" data-act="slsync">Sync roster</button><button type="button" class="btn sm" data-act="copyteam">Make an editable copy</button><button type="button" class="btn sm" data-act="slunlink">Unlink from Sleeper</button></div></div>` : ''}
+  ${state.teams.length > 1 ? `<div class="toolbar"><button type="button" class="btn sm danger" data-act="delteam">${D.delArm ? `Press again to delete ${esc(ct.name)}` : 'Delete this team'}</button></div>` : ''}</div>`;
+}
 const ioSelected = () => state.teams.filter(t => (t.roster || []).length && !D.ioSkip?.has(t.id)).map(t => t.id);
 // downloads work on a normal site; inside the claude.ai viewer (an iframe) they're blocked, so offer copy only there
 const canDownload = (() => { try { return window.self === window.top; } catch { return false; } })();
-function ioPanel() {
+function sharePanel() {
   stashTeam();
   const exportable = state.teams.filter(t => (t.roster || []).length), sel = ioSelected(), code = sel.length ? toCode(exportBundle(sel)) : '';
-  return `<div class="card panel io"><div class="row-head"><h3>Share or back up teams</h3><button type="button" class="btn sm" data-act="toggleio">Close</button></div>
-  <div class="grid2">
-    <div class="section"><h3>Export</h3><p class="small muted" style="margin:0">Copy a code to paste on another device or send to a friend${canDownload ? ', or download a backup file' : ''}. It includes each team’s roster, lineup slots, ESPN league, waiver settings, and your overrides and return weeks for those players.</p>
-      ${exportable.length ? `<div class="iochecks">${exportable.map(t => `<label><input type="checkbox" data-iosel="${esc(t.id)}" ${sel.includes(t.id) ? 'checked' : ''}> ${esc(t.name)} <span class="muted">${t.roster.length} players${t.example ? ', example' : ''}</span></label>`).join('')}</div>
-      <div class="toolbar"><button type="button" class="btn primary" data-act="iocopy" ${sel.length ? '' : 'disabled'}>Copy code</button>${canDownload ? `<button type="button" class="btn" data-act="iodownload" ${sel.length ? '' : 'disabled'}>Download file</button>` : ''}<span class="small muted" id="ioOutMsg">${esc(D.ioOutMsg || '')}</span></div>
-      <textarea class="inp iocode" id="ioOut" readonly aria-label="Team code">${esc(code)}</textarea>` : '<p class="small muted" style="margin:0">Add players to a team first.</p>'}</div>
-    <div class="section"><h3>Import</h3><p class="small muted" style="margin:0">Paste a team code, or open a file exported from Benny’s Picks. Imported teams are added next to yours.</p>
-      ${importControls()}</div>
-  </div></div>`;
+  return `<div class="card panel io"><div class="row-head"><h2>Share or back up</h2><button type="button" class="btn sm" data-act="toggleio">Close</button></div>
+    <p class="small muted" style="margin:0">Copy a code to use on another device or send to a friend${canDownload ? ', or download a backup file' : ''}. It includes each team’s roster, scoring, lineup slots, league link and waiver settings, plus your overrides for those players. To bring one in, use <button type="button" class="linkbtn" data-act="flow" data-method="restore" data-dest="new">Restore saved team</button>.</p>
+    ${exportable.length ? `<div class="iochecks">${exportable.map(t => `<label><input type="checkbox" data-iosel="${esc(t.id)}" ${sel.includes(t.id) ? 'checked' : ''}> ${esc(t.name)} <span class="muted">${t.roster.length} players${t.example ? ', demo' : ''}</span></label>`).join('')}</div>
+    <div class="toolbar"><button type="button" class="btn primary" data-act="iocopy" ${sel.length ? '' : 'disabled'}>Copy code</button>${canDownload ? `<button type="button" class="btn" data-act="iodownload" ${sel.length ? '' : 'disabled'}>Download file</button>` : ''}<span class="small muted" id="ioOutMsg">${esc(D.ioOutMsg || '')}</span></div>
+    <textarea class="inp iocode" id="ioOut" readonly aria-label="Team code">${esc(code)}</textarea>` : '<p class="small muted" style="margin:0">Add players to a team first.</p>'}</div>`;
 }
-/* Shared controls, used by the Import-your-team panel, Settings and Import / export. */
-function espnLeagueControls() {
-  const tms = D.espnTeams;
-  return `<div class="toolbar"><input class="inp" id="leagueId" data-espn="leagueId" inputmode="numeric" placeholder="League ID" aria-label="ESPN league ID" value="${esc(state.espn.leagueId)}" style="flex:1 1 140px"><button type="button" class="btn" data-act="loadleague">Load league</button></div>
-    ${tms ? `<div class="toolbar"><select class="sel" id="espnTeam" data-espn="teamId" aria-label="Your ESPN team" style="flex:1 1 180px">${tms.map(t => `<option value="${t.id}" ${String(state.espn.teamId) === String(t.id) ? 'selected' : ''}>${esc(t.name)}</option>`).join('')}</select><button type="button" class="btn primary" data-act="useteam">Use this team</button></div>` : ''}
-    ${D.espnMsg ? `<div class="banner ${D.espnMsg[0]} small">${esc(D.espnMsg[1])}</div>` : ''}`;
+
+/* ---------- one setup flow ----------
+   Every way to bring a team in (the Demo banner, + Add team, Import / replace, Roster's Paste / import roster) opens
+   this flow with a method preselected. Pick a method, review exactly what was found and where it goes, then save. */
+const FLOW_METHODS = [['sleeper', 'Connect Sleeper'], ['espn', 'Import ESPN'], ['manual', 'Build manually'], ['restore', 'Restore saved team']];
+D.drafts = D.drafts || {};   // unfinished text in the flow survives closing it and moving between pages
+function openFlow(method, dest, espnMode) {
+  D.tsOpen = false; D.ioOpen = false; D.flash = null;
+  D.flow = { method: method || 'sleeper', dest: dest || 'replace', step: 'pick', espnMode: espnMode || D.flow?.espnMode || 'league', manual: D.flow?.manual || [], draft: null, msg: null };
+  render(); revealPanel($('.flow'));
+  deskFocus({ sleeper: '#slQuery', espn: D.flow.espnMode === 'paste' ? '#rosterPaste' : '#leagueId', manual: '#mq', restore: '#ioIn' }[D.flow.method]);
 }
-function importControls() {
-  return `<textarea class="inp iocode" id="ioIn" placeholder="BP1:…" aria-label="Team code"></textarea>
-      <div class="toolbar"><label class="btn sm" for="ioFile">Open file…</label><input class="vh" type="file" id="ioFile" accept=".json,.txt,application/json,text/plain">
-        <label class="small"><input type="checkbox" id="ioReplace" ${D.ioReplace ? 'checked' : ''}> Replace teams with the same name</label></div>
-      <div class="toolbar"><button type="button" class="btn" data-act="ioimport">Import teams</button><span class="small muted">${esc(D.ioInMsg || '')}</span></div>`;
+function flowPanel() {
+  const F = D.flow;
+  const title = F.step === 'review' ? 'Review and save' : F.dest === 'new' ? 'Add a team' : `Import into ${esc(curTeam().name)}`;
+  const head = `<div class="row-head"><h2>${title}</h2><button type="button" class="btn sm" data-act="flowclose">Cancel</button></div>`;
+  if (F.step === 'review') return `<div class="card panel flow">${head}${reviewHTML()}</div>`;
+  const methods = `<div class="seg wrap" role="group" aria-label="How to bring in your team">${FLOW_METHODS.map(([k, l]) => `<button type="button" data-flowmethod="${k}" aria-pressed="${F.method === k}">${l}</button>`).join('')}</div>`;
+  const body = { sleeper: flowSleeper, espn: flowEspn, manual: flowManual, restore: flowRestore }[F.method]();
+  return `<div class="card panel flow">${head}${methods}<div class="flow-body">${body}</div>${F.msg ? `<div class="banner ${F.msg[0]} small">${esc(F.msg[1])}</div>` : ''}</div>`;
 }
-/* Import your team: every way to get a roster in, in one place. Opens by itself for a team with no players. */
-function setupPanel() {
-  const ct = curTeam(), empty = !state.roster.length;
-  return `<div class="card panel setup"><div class="row-head"><h2>Import your team <span class="small muted" style="font-family:var(--font-body);text-transform:none;font-weight:400">for ${esc(ct.name)}</span></h2>${empty ? '' : '<button type="button" class="btn sm" data-act="setupclose">Close</button>'}</div>
-  <div class="setup-grid">
-    <section class="opt main"><h3>Sync your Sleeper league</h3><p class="small muted">Enter your Sleeper username or a league ID. Benny copies your roster, lineup slots and scoring, keeps them in sync, and finds your league’s real free agents.</p>${sleeperControls()}</section>
-    <section class="opt"><h3>Paste your ESPN roster</h3><p class="small muted">Works for any league. On ESPN, open <strong>My Team</strong>, select the roster table, copy it, and paste it here. A list of names, one per line, works too.</p>
-      <textarea class="inp" id="rosterPaste" placeholder="Joe Burrow&#10;Bijan Robinson&#10;Ja'Marr Chase&#10;Packers D/ST"></textarea>
-      <div class="toolbar"><button type="button" class="btn primary" data-act="pasteroster">Set roster</button><span class="small muted">${esc(D.rosterMsg || '')}</span></div></section>
-    <section class="opt"><h3>Load a public ESPN league</h3><p class="small muted">If your league is viewable by the public, enter the number after <code>leagueId=</code> in its web address. This also sets your lineup slots.</p>${espnLeagueControls()}</section>
-    <section class="opt"><h3>Use a team code or file</h3><p class="small muted">From a friend, or from Benny’s Picks on another device.</p>${importControls()}</section>
-  </div>
-  <div class="small muted">${state.example ? 'Not ready? Close this to keep exploring the example roster.' : 'You can also add or remove single players in the Players tab.'}</div></div>`;
+function flowSleeper() {
+  return `<p class="small muted">Enter your Sleeper username or a league ID. Benny copies your roster, lineup slots and scoring, keeps them in sync, and finds your league’s real free agents. No login needed.</p>${sleeperControls()}`;
 }
+function flowEspn() {
+  const F = D.flow, tms = D.espnTeams, paste = F.espnMode === 'paste';
+  return `<div class="seg" role="group" aria-label="ESPN import type"><button type="button" data-espnmode="league" aria-pressed="${!paste}">Public league</button><button type="button" data-espnmode="paste" aria-pressed="${paste}">Paste roster</button></div>
+  ${paste ? `<p class="small muted">Works for any league, private ones included. On ESPN, open <strong>My Team</strong>, select the roster table, copy it, and paste it here. A list of names, one per line, works too.</p>
+    <textarea class="inp" id="rosterPaste" data-draft="paste" placeholder="Joe Burrow&#10;Bijan Robinson&#10;Ja'Marr Chase&#10;Packers D/ST">${esc(D.drafts.paste || '')}</textarea>
+    <div class="toolbar"><button type="button" class="btn primary" data-act="flowpaste" data-src="paste">Match players</button></div>`
+  : `<p class="small muted">If your league is viewable by the public, enter the number after <code>leagueId=</code> in its web address. This also brings in your lineup slots. For a private league, use Paste roster.</p>
+    <div class="toolbar"><input class="inp" id="leagueId" data-espn="leagueId" inputmode="numeric" placeholder="League ID" aria-label="ESPN league ID" value="${esc(state.espn.leagueId)}" style="flex:1 1 140px"><button type="button" class="btn" data-act="loadleague">Load league</button></div>
+    ${tms ? `<div class="toolbar"><select class="sel" id="espnTeam" data-espn="teamId" aria-label="Your ESPN team" style="flex:1 1 180px">${tms.map(t => `<option value="${t.id}" ${String(state.espn.teamId) === String(t.id) ? 'selected' : ''}>${esc(t.name)}</option>`).join('')}</select><button type="button" class="btn primary" data-act="useteam">Review this team</button></div>` : ''}
+    ${D.espnMsg ? `<div class="banner ${D.espnMsg[0]} small">${esc(D.espnMsg[1])}</div>` : ''}`}`;
+}
+function manualListHTML() {
+  const ids = D.flow?.manual || [];
+  return ids.length ? `<div class="mchips">${ids.map(id => { const u = D.U.get(id); return `<span class="chip">${esc(u?.name || id)} <span class="muted">${u ? (u.pos === 'DEF' ? 'D/ST' : u.pos) + ' · ' + (u.team || 'FA') : ''}</span><button type="button" class="chip-x" data-mrem="${esc(id)}" aria-label="Remove ${esc(u?.name || id)}">×</button></span>`; }).join('')}</div>`
+    : '<div class="small muted">No players yet. Search above, or paste a list below.</div>';
+}
+function flowManual() {
+  return `<p class="small muted">Search for each player, or paste a list of names. You’ll see everything before it’s saved.</p>
+  <div class="ac"><input class="inp" id="mq" type="search" autocomplete="off" placeholder="Find a player…" aria-label="Find a player" role="combobox" aria-expanded="false" aria-controls="mqList" aria-autocomplete="list"><div class="ac-list" id="mqList" role="listbox" hidden></div></div>
+  <div id="manualList">${manualListHTML()}</div>
+  <details class="more"${D.drafts.manualPaste ? ' open' : ''}><summary>Paste a list of names</summary>
+    <textarea class="inp" id="manualPaste" data-draft="manualPaste" placeholder="Josh Allen&#10;Bijan Robinson&#10;Packers D/ST">${esc(D.drafts.manualPaste || '')}</textarea>
+    <div class="toolbar"><button type="button" class="btn" data-act="flowpaste" data-src="manualPaste">Add these names</button></div></details>
+  <div class="toolbar"><button type="button" class="btn primary" data-act="flowmanual" ${(D.flow.manual || []).length ? '' : 'disabled'}>Review ${(D.flow.manual || []).length || ''} player${(D.flow.manual || []).length === 1 ? '' : 's'}</button></div>`;
+}
+function flowRestore() {
+  return `<p class="small muted">Paste a team code (it starts with <code>BP1:</code>), or open a file saved from Benny’s Picks.</p>
+  <textarea class="inp iocode" id="ioIn" data-draft="code" placeholder="BP1:…" aria-label="Team code">${esc(D.drafts.code || '')}</textarea>
+  <div class="toolbar"><label class="btn sm" for="ioFile">Open file…</label><input class="vh" type="file" id="ioFile" accept=".json,.txt,application/json,text/plain"><button type="button" class="btn primary" data-act="flowrestore">Review</button></div>`;
+}
+/* Turn a method's result into a draft for review. Defaults come from the team being replaced, or standard ESPN settings. */
+function makeDraft(fields) {
+  const base = D.flow.dest === 'replace' && !state.example ? { scoring: state.scoring, tePrem: tePrem(), slots: state.slots } : { scoring: 'ppr', tePrem: 0, slots: DEFAULT_STATE.slots };
+  D.flow.draft = Object.assign({ name: D.flow.dest === 'replace' && !state.example ? curTeam().name : 'My team', unresolved: [] }, base, fields);
+  D.flow.step = 'review'; D.flow.msg = null; render(); revealPanel($('.flow'));
+}
+function reviewHTML() {
+  const F = D.flow, d = F.draft, ct = curTeam();
+  if (d.bundle) {
+    return `<p class="small">This code has ${d.bundle.teams.length} team${d.bundle.teams.length === 1 ? '' : 's'}. They’ll be added next to your teams.</p>
+      <ul class="rv-teams">${d.bundle.teams.map(t => `<li><strong>${esc(t.name || 'Team')}</strong> · ${(t.roster || []).length} players · ${esc((SCORING[t.scoring] || SCORING.ppr)[0])}${t.sleeper?.leagueId ? ' · Sleeper-linked' : ''}</li>`).join('')}</ul>
+      <label class="small"><input type="checkbox" id="ioReplace" ${D.ioReplace ? 'checked' : ''}> Replace teams that have the same name</label>
+      <div class="toolbar"><button type="button" class="btn primary" data-act="flowsave">Save</button><button type="button" class="btn" data-act="flowback">Back</button></div>`;
+  }
+  const byPos = POS.map(p => [p, d.roster.filter(id => D.U.get(id)?.pos === p)]).filter(([, ids]) => ids.length);
+  const destReplace = F.dest === 'replace';
+  return `<div class="rv-grid">
+    <div class="section">
+      <div class="field"><label class="label" for="flowName">Team name</label><input class="inp" id="flowName" type="text" maxlength="40" value="${esc(d.name)}"></div>
+      <div><span class="label">${d.roster.length} players found${d.source ? ' · from ' + esc(d.source) : ''}</span>
+        <ul class="rv-players">${byPos.map(([p, ids]) => `<li><span class="rv-pos">${p === 'DEF' ? 'D/ST' : p}</span> ${ids.map(id => esc(D.U.get(id).name) + ` <span class="muted">${D.U.get(id).team || 'FA'}</span>`).join(', ')}</li>`).join('')}</ul></div>
+      ${d.unresolved.length ? `<div class="banner small"><strong>Not found:</strong> ${esc(d.unresolved.slice(0, 8).join(', '))}${d.unresolved.length > 8 ? '…' : ''}. Check the spelling, or add them from Roster after saving.</div>` : ''}
+    </div>
+    <div class="section">
+      <div class="field"><span class="label">Scoring</span><span class="toolbar"><select class="sel" id="flowScoring" aria-label="Scoring">${Object.entries(SCORING).map(([k, [l]]) => `<option value="${k}" ${d.scoring === k ? 'selected' : ''}>${l}</option>`).join('')}</select>
+        <label class="small muted" for="flowTep">TE premium</label><select class="sel" id="flowTep">${[0, 0.25, 0.5, 0.75, 1].map(v => `<option value="${v}" ${+d.tePrem === v ? 'selected' : ''}>${v ? '+' + v : 'None'}</option>`).join('')}</select></span></div>
+      <div class="field"><span class="label">Lineup slots</span><div class="small">${esc(slotsSummary(d.slots))}</div><div class="small muted">Change these anytime in Team settings.</div></div>
+      <fieldset class="field rv-dest"><legend class="label">Save to</legend>
+        <label><input type="radio" name="flowDest" value="new" ${destReplace ? '' : 'checked'}> Create a new team</label>
+        <label><input type="radio" name="flowDest" value="replace" ${destReplace ? 'checked' : ''}> Replace ${ct.example ? 'the Demo team' : `${esc(ct.name)}’s roster (${state.roster.length} players)`}</label></fieldset>
+    </div></div>
+    <div class="toolbar"><button type="button" class="btn primary" data-act="flowsave" ${d.roster.length ? '' : 'disabled'}>Save team</button><button type="button" class="btn" data-act="flowback">Back</button></div>`;
+}
+function commitDraft() {
+  const F = D.flow, d = F?.draft; if (!d) return;
+  if (d.bundle) {
+    let msg; try { msg = importBundle(d.bundle, !!$('#ioReplace')?.checked); } catch (err) { F.msg = ['err', err.message]; return render(); }
+    D.drafts.code = ''; D.flow = null; D.flash = { html: `<strong>${esc(msg)}</strong> <a href="#roster" data-tab="players">Edit roster</a>` }; slAutoSync(true); return go('lineup', { keepFlash: true });
+  }
+  if (!d.roster.length) return;
+  const dest = $('input[name=flowDest]:checked')?.value || F.dest, name = ($('#flowName')?.value || d.name || 'My team').trim().slice(0, 40) || 'My team';
+  const data = { roster: d.roster.slice(), example: false, compare: [null, null], scoring: $('#flowScoring')?.value || d.scoring, tePrem: +($('#flowTep')?.value ?? d.tePrem) || 0,
+    slots: Object.assign({}, DEFAULT_STATE.slots, d.slots), sleeper: d.sleeper || null, espn: Object.assign({}, DEFAULT_STATE.espn, d.espn || {}),
+    waivers: Object.assign(JSON.parse(JSON.stringify(DEFAULT_STATE.waivers)), dest === 'replace' ? JSON.parse(JSON.stringify(state.waivers)) : {}, d.waivers || {}) };
+  if (!data.sleeper && data.waivers.source === 'sleeper') data.waivers.source = 'own';
+  stashTeam();
+  if (dest === 'new') {
+    let nm = name, n = 2; while (state.teams.some(x => x.name.toLowerCase() === nm.toLowerCase())) nm = `${name} (${n++})`;
+    const id = newTeamId(); state.teams.push(Object.assign({ id, name: nm }, data)); state.activeTeam = id;
+    state.teams = state.teams.filter(t => !t.example);   // the Demo team goes once you have a real one
+  } else Object.assign(curTeam(), data, { name });
+  applyTeam(curTeam()); syncScoring();
+  if (d.src) D.drafts[d.src] = '';
+  D.flow = null; D.open.clear(); D.wCache = null; D.sl = null; save();
+  D.flash = { html: `<strong>Saved ${esc(curTeam().name)}:</strong> ${data.roster.length} players, ${esc(fmtName(true))} scoring${d.unresolved.length ? `; ${d.unresolved.length} name${d.unresolved.length === 1 ? '' : 's'} not found` : ''}. <a href="#roster" data-tab="players">Edit roster</a>` };
+  go('lineup', { keepFlash: true });
+}
+function flowPaste(src) {
+  const text = $(src === 'paste' ? '#rosterPaste' : '#manualPaste')?.value || '';
+  const { ids, miss } = matchPasted(text);
+  if (!ids.length) { D.flow.msg = ['err', 'No player names found in that text. Paste one name per line, or ESPN’s roster table.']; return render(); }
+  if (src === 'paste') return makeDraft({ roster: ids, unresolved: miss, source: 'pasted ESPN roster', src: 'paste' });
+  const set = D.flow.manual; for (const id of ids) if (!set.includes(id)) set.push(id);
+  D.drafts.manualPaste = ''; D.flow.manualMiss = miss;
+  D.flow.msg = miss.length ? ['', `Added ${ids.length}. Not found: ${miss.slice(0, 6).join(', ')}${miss.length > 6 ? '…' : ''}`] : ['info', `Added ${ids.length} players.`];
+  render();
+}
+
+/* ---------- player search (Roster and Build manually) ----------
+   Suggests as you type from every player, whatever list is showing, with position, team and roster status. */
+function acMatches(q) {
+  q = norm(q); if (q.length < 2) return [];
+  // an exact team code ("dal") lists that team's players first; otherwise name matches rank by where they match
+  const teamCode = ABBR.find(a => a.toLowerCase() === q), out = [];
+  for (const u of D.U.values()) {
+    if (!D.M[u.id] && !D.prevPPG?.[u.id]) continue;
+    const n = norm(u.name), i = n.indexOf(q), last = n.split(' ').slice(-1)[0];
+    const teamHit = (u.team || '').toLowerCase() === q || (u.pos === 'DEF' && norm(TEAMS[u.team]?.[1] || '').startsWith(q));
+    if (i < 0 && !teamHit) continue;
+    out.push([(teamCode && u.team === teamCode ? 400 : i === 0 ? 300 : last.startsWith(q) ? 200 : i > 0 ? 100 : 50) + (D.M[u.id]?.mean || 0), u]);
+  }
+  return out.sort((a, b) => b[0] - a[0]).slice(0, 8).map(x => x[1]);
+}
+function renderAc(inputId) {
+  const inp = $('#' + inputId), list = $('#' + (inputId === 'addq' ? 'acList' : 'mqList')); if (!inp || !list) return;
+  const mode = inputId === 'addq' ? 'roster' : 'manual', items = acMatches(inp.value), have = new Set(mode === 'manual' ? D.flow?.manual || [] : state.roster);
+  D.ac = { input: inputId, items, idx: Math.max(0, Math.min(D.ac?.input === inputId ? D.ac.idx : 0, items.length - 1)) };
+  const open = inp.value.trim().length >= 2; list.hidden = !open; inp.setAttribute('aria-expanded', String(open));
+  list.innerHTML = items.length ? items.map((u, i) => { const r = D.M[u.id], on = have.has(u.id); return `<button type="button" role="option" class="ac-item" data-acadd="${esc(u.id)}" data-acmode="${mode}" aria-selected="${i === D.ac.idx}"><span class="ac-main"><span class="pname">${esc(u.name)}</span><span class="psub">${u.pos === 'DEF' ? 'D/ST' : u.pos} · ${u.team || 'FA'}${r && r.status !== 'bye' ? ` · ${f1(r.mean)} proj` : r?.status === 'bye' ? ' · bye' : ''}${u.inj ? ' · ' + esc(u.inj) : ''}</span></span><span class="ac-tag ${on ? 'on' : ''}">${on ? 'On roster' : 'Add'}</span></button>`; }).join('')
+    : `<div class="ac-empty small muted">No player matches “${esc(inp.value.trim())}”.</div>`;
+}
+function acPick(id, mode) {
+  const u = D.U.get(id); if (!u) return;
+  if (mode === 'manual') {
+    const set = D.flow.manual; if (!set.includes(id)) set.push(id);
+    const ml = $('#manualList'); if (ml) ml.innerHTML = manualListHTML();
+    const rb = $('[data-act=flowmanual]'); if (rb) { rb.disabled = false; rb.textContent = `Review ${set.length} player${set.length === 1 ? '' : 's'}`; }
+    const q = $('#mq'); if (q) { q.value = ''; renderAc('mq'); }
+    return;
+  }
+  addToRoster(id);
+  const q = $('#addq'); if (q) { q.value = ''; D.addq = ''; renderAc('addq'); }
+}
+
+/* ---------- Roster ---------- */
+function editRosterGuard() {
+  if (state.sleeper) { toast('This roster syncs from Sleeper, so edits here would be replaced. Make an editable copy to experiment.', 'Make a copy', 'copyteam'); return false; }
+  if (state.example) { state.example = false; const ct = curTeam(); if (ct && ct.name === 'Demo team') ct.name = 'My team'; }   // editing the demo makes it yours
+  return true;
+}
+function addToRoster(id) {
+  if (state.roster.includes(id)) return toast(`${D.U.get(id)?.name || 'That player'} is already on your roster.`);
+  if (!editRosterGuard()) return;
+  state.roster.push(id); D.wCache = null; save(); refreshPlayers(); toast(`Added ${D.U.get(id)?.name || 'player'}.`);
+}
+function removeFromRoster(id) {
+  const idx = state.roster.indexOf(id); if (idx < 0 || !editRosterGuard()) return;
+  state.roster.splice(idx, 1); D.wCache = null; save(); refreshPlayers();
+  D.undo = { id, idx, team: state.activeTeam };
+  toast(`Removed ${D.U.get(id)?.name || 'player'}.`, 'Undo', 'undo');
+}
+function makeEditableCopy() {
+  stashTeam(); const src = curTeam(); if (!src) return;
+  const copy = JSON.parse(JSON.stringify(src)); copy.id = newTeamId(); copy.sleeper = null; copy.example = false;
+  let nm = `${src.name} (copy)`, n = 2; while (state.teams.some(x => x.name === nm)) nm = `${src.name} (copy ${n++})`; copy.name = nm.slice(0, 40);
+  if (copy.waivers?.source === 'sleeper') copy.waivers.source = 'own';
+  state.teams.push(copy); state.activeTeam = copy.id; applyTeam(copy); D.tsOpen = false; save();
+  D.flash = { html: `<strong>Made ${esc(copy.name)}.</strong> Edit it freely; ${esc(src.name)} stays synced with Sleeper.` };
+  go('players', { keepFlash: true });
+}
+let toastTimer = null;
+function toast(msg, action, act) {
+  const el = $('#toast'); if (!el) return;
+  el.innerHTML = `<span>${esc(msg)}</span>${action ? `<button type="button" class="btn sm" data-act="${act}">${esc(action)}</button>` : ''}`;
+  el.hidden = false; clearTimeout(toastTimer); toastTimer = setTimeout(() => { el.hidden = true; }, action ? 8000 : 3500);
+}
+const POS_ORDER = { QB: 0, RB: 1, WR: 2, TE: 3, K: 4, DEF: 5 };
+function playerListHTML() {
+  const view = D.rview || 'mine', pp = POS.includes(D.ppos) ? D.ppos : 'All', ros = new Set(state.roster), locked = !!state.sleeper;
+  let list = view === 'mine' ? state.roster.map(id => D.U.get(id) || { id, name: `Player ${id}`, pos: '', team: '' })
+    : [...D.U.values()].filter(u => D.M[u.id] && (ros.has(u.id) || D.M[u.id].mean > 1));
+  if (pp !== 'All') list = list.filter(u => u.pos === pp);
+  list.sort(view === 'mine' ? (a, b) => (POS_ORDER[a.pos] ?? 9) - (POS_ORDER[b.pos] ?? 9) || (D.M[b.id]?.mean || 0) - (D.M[a.id]?.mean || 0) : (a, b) => D.M[b.id].mean - D.M[a.id].mean);
+  const shown = list.slice(0, 60);
+  if (!shown.length) return `<div class="item empty-row small muted">${view === 'mine' ? (pp === 'All' ? 'No players yet. Find one above, or use Paste / import roster.' : `No ${pp === 'DEF' ? 'D/ST' : pp}s on your roster.`) : 'No players match.'}</div>`;
+  return shown.map(u => {
+    const r = D.M[u.id], on = ros.has(u.id);
+    return `<div class="item rrow"><div class="rr-who"><div class="pname">${esc(u.name)}</div><div class="psub">${u.pos === 'DEF' ? 'D/ST' : u.pos || '—'} · ${u.team || 'FA'} ${r ? injPill(r) : ''} ${!r ? '<span class="pill m">No data this week</span>' : r.status === 'bye' ? '<span class="pill m">Bye</span>' : r.O ? `${D.tg[u.team]?.home ? 'vs' : '@'} ${r.O}` : ''} ${r?.chip ? `<span class="chip ${r.chip.dir}">${esc(r.chip.text)}</span>` : ''}</div></div>
+      <div class="num rr-proj">${!r || r.status === 'bye' ? '—' : f1(r.mean)}</div>${r ? `<span class="grade g-${r.grade}" title="${esc(gradeTip(r))}">${r.grade}</span>` : '<span></span>'}
+      ${D.showOvr && r ? `<input class="inp rr-ovr" type="number" step="0.1" data-ovr="${esc(u.id)}" value="${r.override ?? ''}" placeholder="Override" aria-label="Override projection for ${esc(u.name)}">` : ''}
+      <button type="button" class="btn sm ${on ? '' : 'primary'}" data-${on ? 'remove' : 'add'}="${esc(u.id)}" ${locked ? 'aria-disabled="true"' : ''}>${on ? 'Remove' : 'Add'}</button></div>`;
+  }).join('') + (list.length > 60 ? `<div class="item small muted" style="padding:8px 14px">${list.length - 60} more. Pick a position to narrow the list, or search above.</div>` : '');
+}
+function viewPlayers() {
+  const ct = curTeam(), s = state.sleeper, view = D.rview || 'mine', pp = POS.includes(D.ppos) ? D.ppos : 'All';
+  return `<div class="section">
+  <div class="row-head"><h2>Roster <span class="hsub" id="rosterCount">${esc(ct.name)} · ${state.roster.length} players</span></h2><button type="button" class="btn sm" data-act="flow" data-method="espn" data-espnmode="paste" data-dest="replace">Paste / import roster</button></div>
+  ${s ? `<div class="banner info small exban"><span>This roster syncs from Sleeper (<strong>${esc(s.leagueName || 'league')}</strong>). Changes you make in Sleeper show up here; edits here would be replaced at the next sync.</span><button type="button" class="btn sm" data-act="copyteam">Make an editable copy</button></div>` : ''}
+  <div class="addbox card"><label class="label" for="addq">Find a player to add</label>
+    <div class="ac"><input class="inp" id="addq" type="search" autocomplete="off" placeholder="Name or NFL team, e.g. Puka or DAL" role="combobox" aria-expanded="false" aria-controls="acList" aria-autocomplete="list" value="${esc(D.addq || '')}"><div class="ac-list" id="acList" role="listbox" hidden></div></div>
+    <div class="small muted">Searches every player, whatever the list below shows.</div></div>
+  <div class="toolbar"><div class="seg" role="group" aria-label="Show"><button type="button" data-rview="mine" aria-pressed="${view === 'mine'}">My roster</button><button type="button" data-rview="all" aria-pressed="${view === 'all'}">All players</button></div>
+    <label class="small muted" for="ppos">Position</label><select class="sel" id="ppos">${['All', ...POS].map(p => `<option value="${p}" ${pp === p ? 'selected' : ''}>${p === 'All' ? 'All positions' : p === 'DEF' ? 'D/ST' : p}</option>`).join('')}</select></div>
+  <div class="card list" id="plistBox">${playerListHTML()}</div>
+  <details class="more adv"${D.showOvr ? ' open' : ''}><summary>Advanced: projection overrides</summary>
+    <label class="small"><input type="checkbox" id="showOvr" ${D.showOvr ? 'checked' : ''}> Show an override box on each player above</label>
+    <p class="small muted" style="margin:0">Or paste one player per line as <code>name,points</code>, for example from your own rankings. Overrides replace Benny’s projection for that player this week.</p>
+    <textarea class="inp" id="csv" placeholder="Bijan Robinson,21.5&#10;Puka Nacua,18"></textarea><div class="toolbar"><button type="button" class="btn" data-act="applycsv">Apply overrides</button><button type="button" class="btn" data-act="clearovr">Clear all overrides</button><span class="small muted" id="csvmsg">${esc(D.csvMsg || '')}</span></div></details></div>`;
+}
+function refreshPlayers() {
+  if (state.tab !== 'players') return render();
+  const b = $('#plistBox'); if (b) b.innerHTML = playerListHTML();
+  const c = $('#rosterCount'); if (c) c.textContent = `${curTeam().name} · ${state.roster.length} players`;
+  $('#teamctx').innerHTML = teamBar(); renderBrief();
+}
+
+/* ---------- Lineup and Research ---------- */
 function viewLineup() {
-  const panel = D.ioOpen ? ioPanel() : (D.setupOpen || !state.roster.length) ? setupPanel() : '';
-  if (!state.roster.length) return `<div class="section">${teamBar(true)}${panel}</div>`;
-  return `<div class="section">${teamBar(true)}${panel}${lineupBody()}</div>`;
+  if (!state.roster.length) return `<div class="card panel empty"><h2>${esc(curTeam().name)} has no players yet</h2><p style="margin:0">Bring in your roster to see Benny’s lineup.</p>
+    <div class="toolbar"><button type="button" class="btn primary" data-act="flow" data-method="sleeper" data-dest="replace">Import your team</button><button type="button" class="btn" data-act="flow" data-method="manual" data-dest="replace">Build it manually</button></div></div>`;
+  return lineupBody();
+}
+function viewResearch() {
+  const sub = state.tab === 'teams' ? 'teams' : 'defenses';
+  return `<div class="section"><div class="seg sub" role="group" aria-label="Research"><a href="#research" data-tab="defenses" ${sub === 'defenses' ? 'aria-current="page"' : ''}>Defenses</a><a href="#research-teams" data-tab="teams" ${sub === 'teams' ? 'aria-current="page"' : ''}>Teams &amp; schemes</a></div>
+    ${sub === 'teams' ? viewTeams() : viewDefenses()}</div>`;
 }
 function lineupBody() {
   const { starters, bench } = optimize();
@@ -1980,7 +2309,7 @@ function lineupBody() {
     <div><span class="label">Injury alerts</span><span class="big num">${startTags.length}<span class="small muted" style="font-family:var(--font-body);font-size:14px;font-weight:400"> starter${startTags.length === 1 ? '' : 's'} · ${benchTags.length} bench</span></span><span class="small muted">${startTags.length ? 'Starting: ' + esc(tagTxt(startTags)) : 'No starters tagged'}${benchTags.length ? ' · Bench: ' + esc(tagTxt(benchTags)) : ''}${empty ? ` · ${empty} empty slot${empty === 1 ? '' : 's'}` : ''}</span></div>
   </div>
   <div class="row-head"><h2>Start</h2><div class="seg" role="group" aria-label="Strategy">${['mean', 'floor', 'ceil'].map(k => `<button type="button" data-strategy="${k}" aria-pressed="${strat === k}">${{ mean: 'Projected', floor: 'Safe', ceil: 'Boom' }[k]}</button>`).join('')}</div></div>
-  <div class="card list">${head}${starters.map(s => s.r ? playerRow(s.r, s.slot.label || s.slot.k, true) : `<div class="item"><div class="prow"><span class="slot">${esc(s.slot.label || s.slot.k)}</span><span class="pwho muted">No eligible player available. Add one in Players.</span></div></div>`).join('')}</div>
+  <div class="card list">${head}${starters.map(s => s.r ? playerRow(s.r, s.slot.label || s.slot.k, true) : `<div class="item"><div class="prow"><span class="slot">${esc(s.slot.label || s.slot.k)}</span><span class="pwho muted">No eligible player. <a href="#roster" data-tab="players">Add one in Roster</a>.</span></div></div>`).join('')}</div>
   <div class="row-head"><h2>Bench</h2><span class="small muted">Tap any player for the full matchup breakdown</span></div>
   <div class="card list">${bench.length ? bench.map(r => playerRow(r, 'BN', false)).join('') : '<div class="item"><div class="prow"><span></span><span class="muted">Nobody on the bench.</span></div></div>'}</div>
   </div>`;
@@ -2106,36 +2435,11 @@ function teamDetail(T, seasons) {
   return `<div class="section" style="padding:6px 0"><div class="small"><strong>${TEAMS[T][1]}:</strong> HC ${esc(s.hc)} · OC ${esc(s.oc)} · DC ${esc(s.dc)}${s.note ? ' · ' + esc(s.note) : ''}. ${s.offNew ? `New offensive play-caller, so ${D.season - 1} offense counts as ${D.B[T].kO.toFixed(1)} games` : `Offense continuity: ${D.season - 1} counts as ${D.B[T].kO.toFixed(1)} games`}; ${s.defNew ? `new defensive play-caller (${D.B[T].kD.toFixed(1)} games)` : `defense continuity (${D.B[T].kD.toFixed(1)} games)`}.</div>
   <div class="tscroll"><table><thead><tr><th class="l">Metric</th>${all.map(([y]) => `<th>${y}</th>`).join('')}</tr></thead><tbody>${ks.map(([k, l, f]) => `<tr><td>${l}</td>${all.map(([, p]) => `<td>${p ? f(p[k]) : '—'}</td>`).join('')}</tr>`).join('')}</tbody></table></div></div>`;
 }
-function playersBody() {
-  return `<div class="section"><div class="row-head"><h2>Players</h2><span class="small muted">${state.roster.length} on your roster</span></div>
-  <div class="card panel"><h3>Paste your roster</h3><p class="small muted" style="margin:0">On ESPN, open My Team, select the roster table, copy it, and paste it here. A plain list of names, one per line, also works. Lines that aren’t player names are skipped. This replaces your current roster.</p>
-  <textarea class="inp" id="rosterPaste" placeholder="Joe Burrow&#10;Bijan Robinson&#10;Ja'Marr Chase&#10;Packers D/ST"></textarea><div class="toolbar"><button type="button" class="btn primary" data-act="pasteroster">Set my roster</button><span class="small muted">${esc(D.rosterMsg || '')}</span></div></div>
-  <div class="toolbar"><input class="inp" id="psearch" type="search" placeholder="Search name or team" value="${esc(D.psearch || '')}" style="flex:1 1 220px"><select class="sel" id="ppos">${['All', 'Roster', ...POS].map(p => `<option ${D.ppos === p ? 'selected' : ''}>${p}</option>`).join('')}</select></div>
-  <div class="card list" id="plistBox">${playerListHTML()}</div>
-  <div class="card panel"><h3>Bulk overrides</h3><p class="small muted" style="margin:0">Paste one player per line as <code>name,points</code>, for example from your own rankings. Overrides replace the model projection for that week.</p>
-  <textarea class="inp" id="csv" placeholder="Bijan Robinson,21.5&#10;Puka Nacua,18"></textarea><div class="toolbar"><button type="button" class="btn primary" data-act="applycsv">Apply overrides</button><button type="button" class="btn" data-act="clearovr">Clear all overrides</button><span class="small muted" id="csvmsg">${esc(D.csvMsg || '')}</span></div></div></div>`;
-}
-function playerListHTML() {
-  const q = norm(D.psearch || ''), pp = D.ppos || 'All', ros = new Set(state.roster);
-  let list = [...D.U.values()].filter(u => D.M[u.id]);
-  if (pp === 'Roster') list = list.filter(u => ros.has(u.id)); else if (pp !== 'All') list = list.filter(u => u.pos === pp);
-  if (q) list = list.filter(u => norm(u.name).includes(q) || (u.team || '').toLowerCase() === q);
-  else if (pp !== 'Roster') list = list.filter(u => ros.has(u.id) || D.M[u.id].mean > 1);
-  list.sort((a, b) => D.M[b.id].mean - D.M[a.id].mean); const shown = list.slice(0, 60);
-  if (!shown.length) return `<div class="item"><div class="prow"><span></span><span class="muted">No players match.</span></div></div>`;
-  return shown.map(u => { const r = D.M[u.id], on = ros.has(u.id); return `<div class="item" style="display:flex;flex-wrap:wrap;align-items:center;gap:10px;padding:8px 14px"><div style="flex:1 1 200px;min-width:0"><div class="pname">${esc(u.name)}</div><div class="psub">${u.pos} · ${u.team || 'FA'} ${injPill(r)} ${r.status === 'bye' ? '<span class="pill m">Bye</span>' : r.O ? `${D.tg[u.team].home ? 'vs' : '@'} ${r.O}` : ''} ${r.chip ? `<span class="chip ${r.chip.dir}">${esc(r.chip.text)}</span>` : ''}</div></div><div class="num" style="font-size:20px;min-width:52px;text-align:right">${r.status === 'bye' ? '—' : f1(r.mean)}</div><span class="grade g-${r.grade}">${r.grade}</span><input class="inp" type="number" step="0.1" data-ovr="${esc(u.id)}" value="${r.override ?? ''}" placeholder="Override" aria-label="Override projection for ${esc(u.name)}" style="width:96px"><button type="button" class="btn sm ${on ? 'danger' : 'primary'}" data-${on ? 'remove' : 'add'}="${esc(u.id)}">${on ? 'Remove' : 'Add'}</button></div>`; }).join('') + (list.length > 60 ? `<div class="item small muted" style="padding:8px 14px">${list.length - 60} more. Narrow the search to see them.</div>` : '');
-}
 function viewSettings() {
   const S = state.settings, sl = (id, label, val, min, max, step, fmt) => `<div class="slider"><label for="${id}">${label}</label><input type="range" id="${id}" data-set="${id}" min="${min}" max="${max}" step="${step}" value="${val}"><span class="num" id="${id}-v">${fmt(val)}</span></div>`;
-  const tms = D.espnTeams;
-  return `<div class="section"><div class="grid2">
-  <div class="card panel"><h3>ESPN league</h3><p class="small muted" style="margin:0">Public leagues import directly. Find the ID in your league URL after <code>leagueId=</code>.</p>
-    ${espnLeagueControls()}</div>
-  <div class="card panel"><h3>Season, scoring &amp; lineup slots</h3>
+  return `<div class="section"><div class="row-head"><h2>Settings</h2><span class="small muted">These apply to every team. Scoring, lineup slots and league size are per team, in <button type="button" class="linkbtn" data-act="teamsettings">Team settings</button>.</span></div>
+  <div class="card panel"><h3>Season</h3>
     <div class="field inline"><label for="season">Season</label><input class="inp" id="season" type="number" data-season value="${D.season}" style="width:96px"></div>
-    <div class="field inline"><span>${esc(curTeam().name)}</span><span class="toolbar">${scoringSelect('setScoring')}<label class="small muted" for="tePrem">TE premium</label><select class="sel" id="tePrem" data-teprem>${[0, 0.25, 0.5, 0.75, 1].map(v => `<option value="${v}" ${tePrem() === v ? 'selected' : ''}>${v ? '+' + v + ' per catch' : 'None'}</option>`).join('')}</select></span></div>
-    <p class="small muted" style="margin:0">Scoring and lineup slots are saved separately for each team.</p>
-    <div class="slots">${SLOT_TYPES.map(t => `<label for="slot-${t.k}">${t.label || t.k}<input class="inp" id="slot-${t.k}" type="number" min="0" max="5" data-slot="${t.k}" value="${state.slots[t.k] || 0}"></label>`).join('')}</div></div>
   </div>
   <div class="card panel"><h3>Model weights</h3>
     ${sl('blend', 'Weekly projection vs. season average', S.blend, 0, 1, 0.05, v => Math.round(v * 100) + '%')}
@@ -2159,10 +2463,17 @@ function viewSettings() {
 
 /* ---------- events ---------- */
 document.addEventListener('click', e => {
-  const t = e.target.closest('[data-tab],[data-expand],[data-add],[data-remove],[data-strategy],[data-act],[data-sort],[data-team],[data-fteam],[data-clearovr],[data-wh],[data-wsrc],[data-taken],[data-keepmode],[data-decide],[data-brief],[data-wrank]'); if (!t) return;
+  const t = e.target.closest('[data-tab],[data-expand],[data-add],[data-remove],[data-strategy],[data-act],[data-sort],[data-team],[data-fteam],[data-clearovr],[data-wh],[data-wsrc],[data-taken],[data-keepmode],[data-decide],[data-brief],[data-wrank],[data-acadd],[data-mrem],[data-flowmethod],[data-espnmode],[data-rview],[data-research]'); if (!t) return;
+  if (t.dataset.acadd) { e.preventDefault(); acPick(t.dataset.acadd, t.dataset.acmode); return; }
+  if (t.dataset.mrem) { D.flow.manual = D.flow.manual.filter(x => x !== t.dataset.mrem); const ml = $('#manualList'); if (ml) ml.innerHTML = manualListHTML(); const rb = $('[data-act=flowmanual]'); if (rb) { const n = D.flow.manual.length; rb.disabled = !n; rb.textContent = `Review ${n || ''} player${n === 1 ? '' : 's'}`; } return; }
+  if (t.dataset.flowmethod) { D.flow.method = t.dataset.flowmethod; D.flow.msg = null; render(); deskFocus({ sleeper: '#slQuery', espn: '#leagueId', manual: '#mq', restore: '#ioIn' }[D.flow.method]); return; }
+  if (t.dataset.espnmode) { D.flow.espnMode = t.dataset.espnmode; render(); return; }
+  if (t.dataset.rview) { D.rview = t.dataset.rview; render(); return; }
+  if (t.dataset.research) { e.preventDefault(); D.teamOpen = t.dataset.research; D.after = () => $(`[data-team="${D.teamOpen}"]`)?.scrollIntoView({ block: 'center' }); go('teams'); return; }
   if (t.dataset.wrank) { state.waivers.rank = t.dataset.wrank; save(); render(); return; }
   if (t.dataset.decide) { state.compare = t.dataset.decide.split('|'); save(); render(); return; }
-  if (t.dataset.brief === 'decide') { const d = reviewDecisions()[0]; if (d) state.compare = [d.start, d.alt]; state.tab = 'compare'; save(); render(); window.scrollTo(0, 0); return; }
+  if (t.dataset.brief === 'decide') { const d = reviewDecisions()[0]; if (d) state.compare = [d.start, d.alt]; save(); go('compare'); return; }
+  if (t.dataset.brief === 'waiver') { D.after = () => revealPanel($('.wbest')); go('waivers'); return; }
   if (t.dataset.fteam) { switchTeam(t.dataset.fteam); return; }
   if (t.dataset.wh) { state.waivers.horizon = t.dataset.wh === 'ros' ? 'ros' : +t.dataset.wh; save(); render(); return; }
   if (t.dataset.wsrc) { state.waivers.source = t.dataset.wsrc; save(); render(); return; }
@@ -2172,16 +2483,16 @@ document.addEventListener('click', e => {
     delete a[id]; delete k[id]; if (t.dataset.mode === 'drop') a[id] = 1; else if (t.dataset.mode === 'keep') k[id] = 1;
     save(); render(); return;
   }
-  if (t.dataset.tab) { e.preventDefault(); state.tab = t.dataset.tab; save(); render(); window.scrollTo(0, 0); return; }
+  if (t.dataset.tab) { e.preventDefault(); go(t.dataset.tab); return; }
   if (t.dataset.expand) { const id = t.dataset.expand; D.open.has(id) ? D.open.delete(id) : D.open.add(id); render(); return; }
-  if (t.dataset.add) { if (state.example) { state.roster = []; state.example = false; } state.roster.push(t.dataset.add); save(); refreshPlayers(); return; }
-  if (t.dataset.remove) { state.roster = state.roster.filter(x => x !== t.dataset.remove); save(); refreshPlayers(); return; }
+  if (t.dataset.add) { addToRoster(t.dataset.add); return; }
+  if (t.dataset.remove) { removeFromRoster(t.dataset.remove); return; }
   if (t.dataset.clearovr) { delete state.overrides[t.dataset.clearovr]; save(); computeAll(); render(); return; }
   if (t.dataset.strategy) { state.settings.strategy = t.dataset.strategy; save(); render(); return; }
   if (t.dataset.sort) { const k = t.dataset.sort; D.defSort = D.defSort[0] === k ? [k, -D.defSort[1]] : [k, -1]; render(); return; }
   if (t.dataset.team) { D.teamOpen = D.teamOpen === t.dataset.team ? null : t.dataset.team; render(); return; }
   const a = t.dataset.act;
-  if (a === 'reload') { for (let s = 0; s < 4; s++) store.del('fo1:coach:' + ((D.season || 0) - s)); load(); }
+  if (a === 'reload') { for (let s = 0; s < 4; s++) store.del('fo1:coach:' + ((D.season || 0) - s)); load({ manual: true }); }
   else if (a === 'loadleague') loadLeague();
   else if (a === 'useteam') useEspnTeam();
   else if (a === 'slfind') slFind();
@@ -2190,13 +2501,20 @@ document.addEventListener('click', e => {
   else if (a === 'slsync') slAutoSync(true);
   else if (a === 'slunlink') { state.sleeper = null; if (state.waivers.source === 'sleeper') state.waivers.source = 'own'; D.wCache = null; save(); render(); }
   else if (a === 'applycsv') applyCsv();
-  else if (a === 'pasteroster') { pasteRoster(); if (state.roster.length && !state.example) { D.setupOpen = false; render(); } }
-  // always opens (a second press shouldn't hide it) and brings the panel into view; on phones it sits well below the header
-  else if (a === 'setup') { D.setupOpen = true; D.ioOpen = false; D.ioInMsg = ''; state.tab = 'lineup'; save(); render(); revealPanel($('.setup')); deskFocus('#slQuery'); }
-  else if (a === 'setupclose') { D.setupOpen = false; render(); }
+  else if (a === 'flow') openFlow(t.dataset.method, t.dataset.dest, t.dataset.espnmode);
+  else if (a === 'flowclose') { D.flow = null; render(); }
+  else if (a === 'flowback') { D.flow.step = 'pick'; D.flow.draft = null; render(); }
+  else if (a === 'flowsave') commitDraft();
+  else if (a === 'flowpaste') flowPaste(t.dataset.src);
+  else if (a === 'flowmanual') { if (D.flow.manual.length) makeDraft({ roster: D.flow.manual.slice(), unresolved: D.flow.manualMiss || [], source: 'players you picked' }); }
+  else if (a === 'flowrestore') { try { D.flow.draft = { bundle: parseBundle($('#ioIn')?.value) }; D.flow.step = 'review'; D.flow.msg = null; } catch (err) { D.flow.msg = ['err', err.message]; } render(); }
+  else if (a === 'teamsettings') { D.tsOpen = !D.tsOpen; D.flow = null; D.ioOpen = false; D.delArm = false; render(); if (D.tsOpen) revealPanel($('.tsp')); }
+  else if (a === 'copyteam') makeEditableCopy();
+  else if (a === 'undo') { const u = D.undo; if (u && u.team === state.activeTeam && !state.roster.includes(u.id)) { state.roster.splice(Math.min(u.idx, state.roster.length), 0, u.id); D.wCache = null; save(); refreshPlayers(); toast(`Restored ${D.U.get(u.id)?.name || 'player'}.`); } D.undo = null; }
+  else if (a === 'flashclose') { D.flash = null; render(); }
   else if (a === 'fresh') { D.freshOpen = !D.freshOpen; renderFresh(); }
   else if (a === 'toggleFa') { D.faOpen = !D.faOpen; render(); if (D.faOpen) deskFocus('#faPaste'); }
-  else if (a === 'toggleio') { D.ioOpen = !D.ioOpen; D.setupOpen = false; D.ioOutMsg = ''; D.ioInMsg = ''; render(); if (D.ioOpen) revealPanel($('.io')); }
+  else if (a === 'toggleio') { D.ioOpen = !D.ioOpen; D.flow = null; D.tsOpen = false; D.ioOutMsg = ''; D.ioInMsg = ''; render(); if (D.ioOpen) revealPanel($('.io')); }
   else if (a === 'iocopy') {
     const out = $('#ioOut'), code = out?.value || '', msg = $('#ioOutMsg');
     const fallback = () => { out.focus(); out.select(); if (msg) msg.textContent = 'Code selected. Press Ctrl+C (or Cmd+C) to copy it.'; };
@@ -2209,22 +2527,8 @@ document.addEventListener('click', e => {
     document.body.appendChild(link); link.click(); link.remove(); setTimeout(() => URL.revokeObjectURL(url), 2000);
     const msg = $('#ioOutMsg'); if (msg) msg.textContent = 'Downloaded. Open it from Import on another device.';
   }
-  else if (a === 'ioimport') {
-    try { D.ioInMsg = importBundle(parseBundle($('#ioIn')?.value), !!$('#ioReplace')?.checked); D.setupOpen = false; slAutoSync(true); }
-    catch (err) { D.ioInMsg = err.message; }
-    render();
-  }
-  else if (a === 'addteam') {
-    stashTeam();
-    let n = state.teams.length + 1; while (state.teams.some(t => t.name === 'Team ' + n)) n++;
-    let id; do id = 't' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6); while (state.teams.some(t => t.id === id));
-    state.teams.push({ id, name: 'Team ' + n }); state.activeTeam = id; applyTeam({}); syncScoring();
-    D.open.clear(); D.wCache = null; D.rosterMsg = ''; D.faMsg = ''; D.espnMsg = null; D.espnTeams = null; D.delArm = false;
-    state.tab = 'lineup'; save(); render();
-    deskFocus('#teamName', true);
-  }
   else if (a === 'delteam') {
-    if (!D.delArm) { D.delArm = true; render(); setTimeout(() => { if (D.delArm) { D.delArm = false; if (state.tab === 'lineup') render(); } }, 4000); return; }
+    if (!D.delArm) { D.delArm = true; render(); setTimeout(() => { if (D.delArm) { D.delArm = false; render(); } }, 4000); return; }
     D.delArm = false;
     state.teams = state.teams.filter(t => t.id !== state.activeTeam);
     state.activeTeam = state.teams[0].id; applyTeam(state.teams[0]); syncScoring();
@@ -2247,11 +2551,30 @@ document.addEventListener('click', e => {
     state = ensureTeams(JSON.parse(JSON.stringify(DEFAULT_STATE))); D.resetArm = false; D.open.clear(); load({ fresh: true });
   }
 });
-document.addEventListener('keydown', e => { if (e.key === 'Enter' && e.target.id === 'teamName') e.target.blur(); if (e.key === 'Enter' && e.target.id === 'slQuery') { e.preventDefault(); slFind(); } });
-function refreshPlayers() { if (state.tab === 'players') { const b = $('#plistBox'); if (b) b.innerHTML = playerListHTML(); const tb = $('.teambar'); if (tb) tb.outerHTML = teamBar(false); const h = $('.row-head .small'); if (h) h.textContent = state.roster.length + ' on your roster'; } else render(); }
+document.addEventListener('keydown', e => {
+  const t = e.target;
+  if (e.key === 'Enter' && t.id === 'teamName') t.blur();
+  if (e.key === 'Enter' && t.id === 'slQuery') { e.preventDefault(); slFind(); }
+  // player search: arrows move through suggestions, Enter adds the highlighted one, Escape closes the list
+  if ((t.id === 'addq' || t.id === 'mq') && D.ac?.input === t.id) {
+    const n = D.ac.items.length;
+    if (e.key === 'ArrowDown' || e.key === 'ArrowUp') { e.preventDefault(); if (!n) return; D.ac.idx = (D.ac.idx + (e.key === 'ArrowDown' ? 1 : n - 1)) % n; renderAc(t.id); }
+    else if (e.key === 'Enter') { e.preventDefault(); const u = D.ac.items[D.ac.idx]; if (u) acPick(u.id, t.id === 'addq' ? 'roster' : 'manual'); }
+    else if (e.key === 'Escape') { const l = $(t.id === 'addq' ? '#acList' : '#mqList'); if (l) l.hidden = true; t.setAttribute('aria-expanded', 'false'); }
+  }
+});
+// close the suggestion list when focus leaves the search box (after a beat, so a tap on a suggestion still lands)
+document.addEventListener('focusout', e => {
+  const id = e.target.id; if (id !== 'addq' && id !== 'mq') return;
+  setTimeout(() => { const l = $(id === 'addq' ? '#acList' : '#mqList'); if (l && !l.contains(document.activeElement) && document.activeElement?.id !== id) { l.hidden = true; e.target.setAttribute('aria-expanded', 'false'); } }, 200);
+});
 document.addEventListener('input', e => {
   const t = e.target;
   if (t.id === 'wOwn') { const o = $('#wOwn-v'); if (o) o.textContent = t.value + '%'; return; }
+  if (t.id === 'addq') { D.addq = t.value; renderAc('addq'); return; }
+  if (t.id === 'mq') { renderAc('mq'); return; }
+  if (t.dataset.draft) { D.drafts[t.dataset.draft] = t.value; return; }
+  if (t.id === 'slQuery') { D.sl = D.sl || {}; D.sl.q = t.value; return; }
   if (t.id === 'psearch') { D.psearch = t.value; $('#plistBox').innerHTML = playerListHTML(); }
   else if (t.dataset.set) { const v = +t.value, o = $('#' + CSS.escape(t.id) + '-v'); if (o) o.textContent = t.id === 'priorWeeks' ? v.toFixed(1) : t.id.startsWith('w.') ? '×' + v.toFixed(1) : Math.round(v * 100) + '%'; }
 });
@@ -2263,17 +2586,18 @@ document.addEventListener('change', e => {
   if (t.id === 'ioFile') {
     const f = t.files?.[0]; if (!f) return;
     const rd = new FileReader();
-    rd.onload = () => { const box = $('#ioIn'); if (box) box.value = String(rd.result || ''); D.ioInMsg = ''; const m = box?.closest('.section')?.querySelector('.toolbar:last-child .small'); if (m) m.textContent = `Loaded ${f.name}. Press Import teams.`; };
-    rd.onerror = () => { D.ioInMsg = 'Couldn’t read that file.'; render(); };
+    rd.onload = () => { D.drafts.code = String(rd.result || ''); const box = $('#ioIn'); if (box) box.value = D.drafts.code; if (D.flow) { D.flow.msg = ['info', `Loaded ${f.name}. Press Review.`]; render(); } };
+    rd.onerror = () => { if (D.flow) { D.flow.msg = ['err', 'Couldn’t read that file.']; render(); } };
     rd.readAsText(f); return;
   }
   if (t.hasAttribute('data-teprem')) { state.tePrem = +t.value || 0; save(); if (D.inp) ingest(D.inp); D.open.clear(); render(); return; }
   if (t.hasAttribute('data-scoring')) { if (SCORING[t.value]) { state.scoring = t.value; save(); if (D.inp) ingest(D.inp); D.open.clear(); render(); } return; }
   if (t.id === 'teamName') { const ct = curTeam(), v = t.value.trim(); if (ct && v) ct.name = v; save(); render(); return; }
   if (t.dataset.rw) { const rw = state.returnWeek || (state.returnWeek = {}); if (t.value === '') delete rw[t.dataset.rw]; else rw[t.dataset.rw] = +t.value; save(); render(); return; }
-  if (t.id === 'wTeams') { state.waivers.teams = +t.value; save(); render(); return; }
+  if (t.hasAttribute('data-wteams')) { state.waivers.teams = +t.value; D.wCache = null; save(); render(); return; }
+  if (t.id === 'showOvr') { D.showOvr = t.checked; const b = $('#plistBox'); if (b) b.innerHTML = playerListHTML(); return; }
   if (t.id === 'wOwn') { state.waivers.ownMax = +t.value; save(); render(); return; }
-  if (t.id === 'ppos') { D.ppos = t.value; $('#plistBox').innerHTML = playerListHTML(); return; }
+  if (t.id === 'ppos') { D.ppos = t.value; const b = $('#plistBox'); if (b) b.innerHTML = playerListHTML(); return; }
   if (t.dataset.set) { const k = t.dataset.set, v = +t.value; if (k.startsWith('w.')) state.settings.w[k.slice(2)] = v; else state.settings[k] = v; save(); computeAll(); return; }
   if (t.dataset.ovr != null && t.dataset.ovr !== undefined && t.hasAttribute('data-ovr')) { const id = t.dataset.ovr; if (t.value === '') delete state.overrides[id]; else state.overrides[id] = +t.value; save(); computeAll(); state.tab === 'players' ? refreshPlayers() : render(); return; }
   if (t.dataset.cmp) { const id = resolvePick(t.value); if (id) { state.compare[+t.dataset.cmp] = id; save(); render(); } return; }
@@ -2283,24 +2607,7 @@ document.addEventListener('change', e => {
   if (t.dataset.staff) { const [T, f] = t.dataset.staff.split('.'); const v = t.type === 'checkbox' ? t.checked : (f.endsWith('Prev') ? fixAbbr(t.value.trim().toUpperCase()) || '' : t.value); state.staffEdits[T] = Object.assign({}, state.staffEdits[T], { [f]: v }); save(); computeAll(); return; }
 });
 /* Matches pasted text (ESPN's roster table, or one name per line) against every player with a projection or a game played.
-   Longest names are tried first so "Kenneth Walker" wins over "Ken Walker"-style partials. */
-function pasteRoster() {
-  const lines = ($('#rosterPaste')?.value || '').split(/\r?\n/).map(l => l.trim()).filter(Boolean);
-  const live = [...D.U.values()].filter(u => (D.proj[u.id]?.pts || 0) > 0 || D.H[u.id] || D.prevPPG?.[u.id]);
-  const names = live.map(u => [norm(u.name), u]).filter(([n]) => n.includes(' ') && n.length >= 6).sort((a, b) => b[0].length - a[0].length || (D.M[b[1].id]?.mean || 0) - (D.M[a[1].id]?.mean || 0));
-  const ids = [], miss = [];
-  for (const l of lines) {
-    const k = norm(l); if (k.length < 4 || /^\d/.test(k)) continue;
-    let u = (D.nameIdx.get(k) || []).map(id => D.U.get(id)).sort((a, b) => (D.M[b.id]?.mean || 0) - (D.M[a.id]?.mean || 0))[0];
-    if (!u) u = names.find(([n]) => k.includes(n))?.[1];
-    if (!u && /d\/?st|defense|\bdef\b/.test(k)) { const T = ABBR.find(a => k.includes(TEAMS[a][1].toLowerCase())); if (T) u = D.U.get(T); }
-    if (u) { if (!ids.includes(u.id)) ids.push(u.id); } else if (/[a-z]{2,} [a-z]{2,}/.test(k) && k.length < 40) miss.push(l);
-  }
-  if (ids.length) { state.roster = ids; state.example = false; state.espn.slotOf = {}; save(); }
-  D.rosterMsg = ids.length ? `Set ${ids.length} players.` + (miss.length ? ` Not matched: ${miss.slice(0, 5).join(', ')}${miss.length > 5 ? '…' : ''}. Add them with the search below.` : '') : 'No player names found in that text.';
-  render();
-}
-/* Same matching as pasteRoster, returning matches instead of setting the roster (used for pasted free-agent lists). */
+   Longest names are tried first so "Kenneth Walker" wins over "Ken Walker"-style partials. Used for rosters and free-agent lists. */
 function matchPasted(text) {
   const lines = text.split(/\r?\n/).map(l => l.trim()).filter(Boolean);
   const live = [...D.U.values()].filter(u => (D.proj[u.id]?.pts || 0) > 0 || D.H[u.id] || D.prevPPG?.[u.id]);
@@ -2330,7 +2637,7 @@ function applyCsv() {
   render();
 }
 
-{ const h = location.hash.slice(1); if (TABS.some(t => t[0] === h)) state.tab = h; }
+{ const tab = TAB_OF[location.hash.slice(1)]; if (tab) state.tab = tab; else if (location.hash !== '#export' && HASH[state.tab]) { try { history.replaceState(null, '', '#' + HASH[state.tab]); } catch {} } }
 render();
 load();
 </script>

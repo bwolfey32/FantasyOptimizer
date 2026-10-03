@@ -8,29 +8,32 @@ A free weekly lineup optimizer for ESPN fantasy football. It sets your best line
 
 ## What it does
 
-- **This week at a glance:** one line at the top tells you what your optimal lineup projects for, how many close calls to review, and the best waiver move.
-- **Lineup:** picks the starters that score the most for your lineup slots and benches anyone on bye, ruled out, or on IR. Each player gets a matchup grade (A–F), a projected score with a likely range, and the chance of beating his season average. Tap a player for the full breakdown.
-- **Benny's Pick:** for any two players, the recommended start, the chance he outscores the other player, the projected edge, and the reasons why. It opens on your closest start/sit calls.
-- **Waiver Optimizer:** add/drop moves ranked by the expected lineup points they add over the next few weeks, using each player's schedule. Injured players worth keeping are never suggested as drops, and bench depth counts as injury cover.
-- **Safe and Boom modes:** favor steady floors when you're favored, or high ceilings when you're the underdog.
-- **Matchup breakdowns:** points the opponent allows to the position, its secondary or run defense, pass rush against your line, the Vegas implied total and spread, offensive style and pace, and defensive roster changes. Each team's play-callers have a short profile explaining how their scheme tends to help or hurt your player.
-- **Defense & special-teams changes:** signings, trades, injuries and returners that make a defense stronger or weaker than its stats. These feed into schedule difficulty and projections.
-- **Sleeper sync:** enter your Sleeper username or league ID and Benny copies your roster, lineup slots and scoring (including TE premium), re-syncs every time you open the site, flags lineup differences from Sleeper, and uses your league's exact free agents.
-- **Multiple teams:** keep several leagues side by side, each with its own roster, scoring (PPR, half-PPR or standard, with optional TE premium), lineup slots and waiver settings.
-- **Import / export:** move teams between devices or send one to a friend as a short code or a file.
+The site has five sections, plus Settings in the header:
+
+- **Lineup:** who should I start this week? Benny picks the starters that score the most for your lineup slots and benches anyone on bye, ruled out, or on IR. Each player gets a matchup grade (A–F), a projected score with a likely range, and the chance of beating his season average. Tap a player for the three biggest reasons, with the full breakdown and coaching profiles one tap further.
+- **Start / Sit:** which of these two players should I choose? **Benny's Pick** names the start, the chance he outscores the other player, the projected edge, and the reasons why. It opens on your closest calls.
+- **Waivers:** which available players improve my team? Add/drop moves ranked by the expected lineup points they add over the window you choose, using each player's schedule. Injured players worth keeping are never suggested as drops, and bench depth counts as injury cover.
+- **Roster:** who's on my team, and how do I change it? Search every player as you type, add or remove (with Undo), filter by position, and set projection overrides under Advanced.
+- **Research:** every defense, plus each team's schemes and play-callers, including signings, trades and injuries that make a defense stronger or weaker than its stats.
+
+A team bar on every page shows the selected team, week, scoring and where the roster comes from, with **+ Add team**, **Team settings**, **Import / replace** and **Share / back up**. Each team keeps its own roster, scoring (PPR, half-PPR or standard, with optional TE premium), lineup slots and league size.
 
 ## Getting started
 
-1. Open the site. It starts with an example roster.
-2. Press **Import your team**. On Sleeper, enter your username or league ID and pick your team; it stays in sync from then on. On ESPN, open **My Team**, copy the roster table, and paste it in. A plain list of names, one per line, also works.
-3. On the **Lineup** tab, set your league's **Scoring**. If your league doesn't use ESPN's default lineup, set the slots in **Settings**.
-4. Open **Waiver Optimizer** for pickups. For exact suggestions, paste your league's free-agent list at the bottom of that tab.
+1. Open the site. It starts with the **Demo team**.
+2. Press **Import your team** and pick a method:
+   - **Connect Sleeper:** enter your username or league ID and pick your team. It re-syncs every time you open the site, flags lineup differences from Sleeper, and the Waivers section uses your league's exact free agents.
+   - **Import ESPN:** load a public league by its ID, or, for any league, copy the roster table from **My Team** and paste it.
+   - **Build manually:** search for each player, or paste a list of names.
+   - **Restore saved team:** paste a team code or open a file from **Share / back up**.
+3. Review what was found (players, any names that didn't match, scoring and lineup slots), choose whether to create a new team or replace the selected one, and save. Benny opens your lineup.
+4. Use **Waivers** for pickups. For exact suggestions in an ESPN league, use **Use my league's free agents** at the top of that section.
 
-Public ESPN leagues can also be imported with the league ID in **Settings**. Private leagues can't be read by a website, so paste the roster instead.
+Each section has its own address (for example `#start-sit` or `#roster`), so the browser's Back button, refreshing, and shared links all land where you expect.
 
 ## Your data
 
-Your teams and settings are saved only in your own browser. Nothing is sent to a server, and nobody else who uses the site can see them. Clearing your browser's site data erases them, so use **Import / export** to keep a backup.
+Your teams and settings are saved only in your own browser. Nothing is sent to a server, and nobody else who uses the site can see them. Clearing your browser's site data erases them, so use **Share / back up** to keep a copy.
 
 ## Data sources
 
