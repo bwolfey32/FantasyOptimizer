@@ -1,0 +1,1372 @@
+<title>Start/Sit Board</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600&family=Saira+Condensed:wght@500;600;700&display=swap">
+<style>
+/* Layout: a coach's call sheet. One column of lineup rows on chalk-green paper, numbers set in a condensed jersey face, turf green as the only accent. */
+:root {
+  --bg: #eef2ee;
+  --surface: #ffffff;
+  --surface-2: #e3e9e4;
+  --ink: #13201a;
+  --muted: #56655d;
+  --line: #cfd8d1;
+  --accent: #176a49;
+  --accent-ink: #ffffff;
+  --good: #1b7a4b;
+  --bad: #b23a30;
+  --warn: #a8670f;
+  --font-display: "Saira Condensed", "Arial Narrow", "Roboto Condensed", sans-serif;
+  --font-body: "IBM Plex Sans", system-ui, -apple-system, "Segoe UI", sans-serif;
+  --radius: 10px;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #0e1512; --surface: #151e1a; --surface-2: #1c2722; --ink: #e4ebe6; --muted: #91a198;
+    --line: #29352f; --accent: #4fc38e; --accent-ink: #07130d; --good: #4fc38e; --bad: #f07a6e; --warn: #e3b052;
+    color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #0e1512; --surface: #151e1a; --surface-2: #1c2722; --ink: #e4ebe6; --muted: #91a198;
+  --line: #29352f; --accent: #4fc38e; --accent-ink: #07130d; --good: #4fc38e; --bad: #f07a6e; --warn: #e3b052;
+  color-scheme: dark;
+}
+* { box-sizing: border-box; }
+body { background: var(--bg); color: var(--ink); font: 15px/1.5 var(--font-body); }
+.wrap { max-width: 1100px; margin: 0 auto; padding-inline: 16px; padding-block: 18px 56px; display: flex; flex-direction: column; gap: 16px; }
+h1, h2, h3 { font-family: var(--font-display); font-weight: 700; letter-spacing: .01em; margin: 0; text-wrap: balance; line-height: 1.1; }
+h1 { font-size: 30px; text-transform: uppercase; }
+h2 { font-size: 22px; text-transform: uppercase; }
+h3 { font-size: 17px; text-transform: uppercase; letter-spacing: .03em; }
+.num { font-family: var(--font-display); font-variant-numeric: tabular-nums; font-weight: 600; }
+.muted { color: var(--muted); }
+.small { font-size: 13px; }
+.label { font-size: 11.5px; text-transform: uppercase; letter-spacing: .08em; color: var(--muted); font-weight: 600; }
+button, input, select, textarea { font: inherit; color: inherit; }
+button { cursor: pointer; }
+:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+a { color: var(--accent); }
+
+/* Header */
+.top { display: flex; flex-wrap: wrap; align-items: end; justify-content: space-between; gap: 12px; }
+.brand { display: flex; flex-direction: column; gap: 2px; }
+.brand .hash { display: flex; gap: 5px; margin-bottom: 4px; }
+.brand .hash i { width: 14px; height: 3px; background: var(--accent); border-radius: 1px; }
+.brand .hash i:nth-child(n+2) { opacity: .45; }
+.controls { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+.sel, .inp { background: var(--surface); border: 1px solid var(--line); border-radius: 8px; padding: 7px 10px; min-width: 0; }
+.inp:focus, .sel:focus { border-color: var(--accent); outline: none; }
+.btn { background: var(--surface); border: 1px solid var(--line); border-radius: 8px; padding: 7px 12px; font-weight: 500; }
+.btn:hover { border-color: var(--accent); }
+.btn.primary { background: var(--accent); color: var(--accent-ink); border-color: var(--accent); }
+.btn.sm { padding: 4px 9px; font-size: 13px; }
+.btn.danger { color: var(--bad); }
+
+/* Tabs */
+.tabs { display: flex; gap: 4px; overflow-x: auto; border-bottom: 1px solid var(--line); scrollbar-width: none; }
+.tabs button { background: none; border: 0; border-bottom: 3px solid transparent; padding: 8px 12px; font-family: var(--font-display); font-size: 17px; font-weight: 600; text-transform: uppercase; letter-spacing: .03em; color: var(--muted); white-space: nowrap; }
+.tabs button[aria-selected="true"] { color: var(--ink); border-bottom-color: var(--accent); }
+
+.banner { border: 1px solid var(--line); border-left: 4px solid var(--warn); background: var(--surface); border-radius: 8px; padding: 10px 14px; font-size: 14px; }
+.banner.info { border-left-color: var(--accent); }
+.banner.err { border-left-color: var(--bad); }
+
+.card { background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius); }
+.wrap > *, .section > *, #main { min-width: 0; max-width: 100%; }
+.banner { overflow-wrap: anywhere; }
+.section { display: flex; flex-direction: column; gap: 10px; }
+.row-head { display: flex; flex-wrap: wrap; align-items: baseline; justify-content: space-between; gap: 8px; }
+
+/* Summary strip */
+.summary { display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 1px; background: var(--line); border: 1px solid var(--line); border-radius: var(--radius); overflow: hidden; }
+.summary > div { background: var(--surface); padding: 12px 16px; display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.summary .big { font-size: 34px; line-height: 1; }
+.seg { display: inline-flex; border: 1px solid var(--line); border-radius: 8px; overflow: hidden; background: var(--surface); }
+.seg button { border: 0; background: none; padding: 6px 12px; font-weight: 500; font-size: 14px; }
+.seg button[aria-pressed="true"] { background: var(--accent); color: var(--accent-ink); }
+
+/* Lineup rows */
+.list { display: flex; flex-direction: column; }
+.list .item + .item { border-top: 1px solid var(--line); }
+.prow { display: grid; grid-template-columns: 54px minmax(0, 1.5fr) minmax(0, 1.25fr) 38px 64px 86px 58px; align-items: center; gap: 12px; padding: 10px 14px; width: 100%; background: none; border: 0; text-align: left; }
+.prow:hover { background: color-mix(in srgb, var(--accent) 5%, transparent); }
+.lhead { padding-block: 8px; }
+.lhead:hover { background: none; }
+.slot { font-family: var(--font-display); font-weight: 700; font-size: 15px; letter-spacing: .04em; color: var(--accent); }
+.slot.bench { color: var(--muted); }
+.pname { display: block; font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.psub { font-size: 12.5px; color: var(--muted); display: flex; flex-wrap: wrap; gap: 4px 8px; align-items: center; }
+.match { font-size: 13px; min-width: 0; }
+.match .opp { font-weight: 600; }
+.proj { font-size: 24px; text-align: right; line-height: 1; }
+.range { font-size: 13px; text-align: right; color: var(--muted); font-variant-numeric: tabular-nums; }
+.pav { text-align: right; font-size: 13px; font-variant-numeric: tabular-nums; }
+.grade { width: 30px; height: 30px; border-radius: 6px; display: grid; place-items: center; font-family: var(--font-display); font-weight: 700; font-size: 18px; border: 1px solid var(--line); }
+.g-A { background: color-mix(in srgb, var(--good) 22%, transparent); color: var(--good); border-color: color-mix(in srgb, var(--good) 45%, transparent); }
+.g-B { background: color-mix(in srgb, var(--good) 10%, transparent); color: var(--good); }
+.g-C { color: var(--muted); }
+.g-D { background: color-mix(in srgb, var(--warn) 12%, transparent); color: var(--warn); }
+.g-F { background: color-mix(in srgb, var(--bad) 16%, transparent); color: var(--bad); border-color: color-mix(in srgb, var(--bad) 40%, transparent); }
+.pill { display: inline-block; font-size: 11px; font-weight: 600; letter-spacing: .04em; text-transform: uppercase; padding: 1px 6px; border-radius: 4px; border: 1px solid currentColor; line-height: 1.4; white-space: nowrap; }
+.pill.q { color: var(--warn); }
+.pill.o { color: var(--bad); }
+.pill.n { color: var(--accent); }
+.pill.m { color: var(--muted); }
+.chip { display: inline-block; font-size: 12px; padding: 1px 8px; border-radius: 999px; background: var(--surface-2); color: var(--ink); white-space: nowrap; }
+.chip.up { background: color-mix(in srgb, var(--good) 14%, transparent); color: var(--good); }
+.chip.down { background: color-mix(in srgb, var(--bad) 13%, transparent); color: var(--bad); }
+
+/* Detail */
+.detail { padding: 4px 14px 16px 80px; display: grid; grid-template-columns: minmax(0, 1.4fr) minmax(0, 1fr); gap: 20px; }
+.factors { display: flex; flex-direction: column; gap: 9px; }
+.factor { display: grid; grid-template-columns: minmax(0, 1fr) 120px 48px; gap: 10px; align-items: center; }
+.factor .fl { font-weight: 600; font-size: 13.5px; }
+.factor .fn { font-size: 12.5px; color: var(--muted); }
+.fbar { position: relative; height: 10px; background: var(--surface-2); border-radius: 3px; }
+.fbar::after { content: ""; position: absolute; left: 50%; top: -3px; bottom: -3px; width: 1px; background: var(--muted); }
+.fbar span { position: absolute; top: 0; bottom: 0; border-radius: 3px; }
+.fbar .pos { left: 50%; background: var(--good); }
+.fbar .neg { right: 50%; background: var(--bad); }
+.fv { text-align: right; font-size: 13px; font-variant-numeric: tabular-nums; font-weight: 600; }
+.scheme { font-size: 13px; padding: 8px 10px; border-radius: 8px; background: var(--surface-2); }
+.probs { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
+.probs > div { border: 1px solid var(--line); border-radius: 8px; padding: 8px 10px; display: flex; flex-direction: column; gap: 2px; }
+.probs .num { font-size: 22px; line-height: 1; }
+.math { font-size: 12.5px; color: var(--muted); font-variant-numeric: tabular-nums; }
+.ovr { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; font-size: 13px; }
+.ovr input { width: 84px; }
+
+/* Tables */
+.tscroll { overflow-x: auto; max-width: 100%; border: 1px solid var(--line); border-radius: var(--radius); background: var(--surface); }
+table { border-collapse: collapse; width: 100%; font-size: 13.5px; font-variant-numeric: tabular-nums; }
+th, td { padding: 7px 10px; text-align: right; white-space: nowrap; border-bottom: 1px solid var(--line); }
+th { font-size: 11.5px; text-transform: uppercase; letter-spacing: .06em; color: var(--muted); font-weight: 600; background: var(--surface); position: sticky; top: 0; }
+th[data-sort] { cursor: pointer; }
+th[data-sort]:hover { color: var(--ink); }
+td:first-child, th:first-child, td.l, th.l { text-align: left; }
+tr:last-child td { border-bottom: 0; }
+tr.click { cursor: pointer; }
+tr.click:hover td { background: color-mix(in srgb, var(--accent) 5%, transparent); }
+.spark { display: inline-block; vertical-align: middle; }
+.spark polyline { fill: none; stroke: var(--accent); stroke-width: 1.6; }
+.spark .area { fill: color-mix(in srgb, var(--accent) 14%, transparent); stroke: none; }
+.spark circle { fill: var(--accent); }
+.trend-up { color: var(--good); }
+.trend-down { color: var(--bad); }
+
+/* Compare */
+.cmp { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 14px; }
+.cmp .card { padding: 14px; display: flex; flex-direction: column; gap: 12px; min-width: 0; }
+.verdict { padding: 14px 16px; display: flex; flex-wrap: wrap; align-items: center; gap: 14px; }
+.verdict .num { font-size: 40px; line-height: 1; color: var(--accent); }
+.meter { height: 10px; border-radius: 5px; background: var(--surface-2); overflow: hidden; display: flex; flex: 1 1 200px; }
+.meter span { background: var(--accent); }
+
+/* Players / settings */
+.toolbar { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+.grid2 { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px; }
+.panel { padding: 16px; display: flex; flex-direction: column; gap: 12px; min-width: 0; }
+.field { display: flex; flex-direction: column; gap: 4px; }
+.field.inline { flex-direction: row; align-items: center; justify-content: space-between; gap: 12px; }
+.slider { display: grid; grid-template-columns: minmax(0, 1fr) 140px 46px; gap: 10px; align-items: center; font-size: 14px; }
+.slider input { width: 100%; accent-color: var(--accent); }
+.slots { display: grid; grid-template-columns: repeat(auto-fill, minmax(118px, 1fr)); gap: 8px; }
+.slots label { display: flex; justify-content: space-between; align-items: center; gap: 6px; border: 1px solid var(--line); border-radius: 8px; padding: 5px 8px; font-size: 13.5px; font-weight: 600; }
+.slots input { width: 46px; }
+textarea.inp { width: 100%; min-height: 90px; resize: vertical; font-family: ui-monospace, Consolas, monospace; font-size: 13px; }
+.staff input[type=text] { width: 140px; padding: 4px 6px; }
+.staff input.ab { width: 52px; }
+.loading { padding: 40px 16px; text-align: center; color: var(--muted); }
+.loading .bar { height: 4px; max-width: 320px; margin: 12px auto 0; background: var(--surface-2); border-radius: 2px; overflow: hidden; }
+.loading .bar span { display: block; height: 100%; background: var(--accent); transition: width .2s; }
+details.how summary { cursor: pointer; font-weight: 600; }
+details.how { font-size: 14px; }
+details.how p, details.how li { max-width: 72ch; }
+
+/* Scheme matchup */
+.schemes { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 12px; }
+.side { border: 1px solid var(--line); border-radius: 8px; padding: 10px 12px; display: flex; flex-direction: column; gap: 6px; min-width: 0; background: var(--surface); }
+.tend { margin: 0; padding-left: 18px; font-size: 13px; display: flex; flex-direction: column; gap: 2px; font-variant-numeric: tabular-nums; }
+
+/* Waivers */
+.needs { display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 10px; }
+.need { background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius); padding: 10px 12px; display: flex; flex-direction: column; gap: 3px; min-width: 0; }
+.move { display: grid; grid-template-columns: 28px minmax(0, 1fr) minmax(0, 1fr) 120px; grid-template-areas: "rank add drop gain" "rank why why why"; gap: 8px 14px; padding: 12px 14px; align-items: start; }
+.move .mrank { grid-area: rank; font-size: 22px; color: var(--muted); line-height: 1.2; }
+.move .mside { display: flex; flex-wrap: wrap; align-items: flex-start; gap: 4px 8px; min-width: 0; }
+.move .mside:nth-of-type(2) { grid-area: add; }
+.move .mside:nth-of-type(3) { grid-area: drop; }
+.move .mside > div { min-width: 0; flex: 1 1 140px; }
+.move .mgain { grid-area: gain; display: flex; flex-direction: column; align-items: flex-end; text-align: right; }
+.move .mgain .num { font-size: 28px; line-height: 1; color: var(--good); }
+.move .mwhy { grid-area: why; color: var(--muted); }
+.move .mwhy .btn { margin-left: 6px; }
+.wks { display: flex; flex-wrap: wrap; gap: 3px; flex-basis: 100%; }
+.wk { font-size: 11px; font-variant-numeric: tabular-nums; padding: 1px 5px; border-radius: 4px; border: 1px solid var(--line); white-space: nowrap; }
+.wk.bye { color: var(--muted); border-style: dashed; }
+td .wks { flex-wrap: nowrap; }
+
+@media (max-width: 780px) {
+  .move { grid-template-columns: 24px minmax(0, 1fr) 92px; grid-template-areas: "rank add gain" "rank drop drop" "rank why why"; }
+  .prow { grid-template-columns: 44px minmax(0, 1fr) 38px 58px; grid-template-areas: "slot name grade proj" "slot match match range"; row-gap: 4px; }
+  .prow > .slot { grid-area: slot; align-self: start; padding-top: 2px; }
+  .prow > .pwho { grid-area: name; min-width: 0; }
+  .prow > .match { grid-area: match; }
+  .prow > .grade { grid-area: grade; }
+  .prow > .proj { grid-area: proj; }
+  .prow > .range { grid-area: range; }
+  .prow > .pav { display: none; }
+  .lhead { display: none; }
+  .detail { padding: 4px 14px 16px; grid-template-columns: minmax(0, 1fr); }
+  .factor { grid-template-columns: minmax(0, 1fr) 80px 44px; }
+  .cmp, .grid2 { grid-template-columns: minmax(0, 1fr); }
+  .slider { grid-template-columns: minmax(0, 1fr) 110px 40px; }
+}
+@media (prefers-reduced-motion: reduce) { * { transition: none !important; } }
+</style>
+
+<div class="wrap">
+  <header class="top">
+    <div class="brand">
+      <div class="hash" aria-hidden="true"><i></i><i></i><i></i><i></i><i></i></div>
+      <h1>Start/Sit Board</h1>
+      <div class="small muted" id="asof">ESPN PPR · loading data…</div>
+    </div>
+    <div class="controls">
+      <label class="small muted" for="weekSel">Week</label>
+      <select id="weekSel" class="sel"></select>
+      <button class="btn" data-act="reload" type="button">Refresh data</button>
+    </div>
+  </header>
+  <nav class="tabs" role="tablist" id="tabs"></nav>
+  <div id="msgs" class="section"></div>
+  <main id="main"></main>
+</div>
+
+<script>
+'use strict';
+/* ---------- constants ---------- */
+const TEAMS = {ARI:[22,'Cardinals'],ATL:[1,'Falcons'],BAL:[33,'Ravens'],BUF:[2,'Bills'],CAR:[29,'Panthers'],CHI:[3,'Bears'],CIN:[4,'Bengals'],CLE:[5,'Browns'],DAL:[6,'Cowboys'],DEN:[7,'Broncos'],DET:[8,'Lions'],GB:[9,'Packers'],HOU:[34,'Texans'],IND:[11,'Colts'],JAX:[30,'Jaguars'],KC:[12,'Chiefs'],LV:[13,'Raiders'],LAC:[24,'Chargers'],LAR:[14,'Rams'],MIA:[15,'Dolphins'],MIN:[16,'Vikings'],NE:[17,'Patriots'],NO:[18,'Saints'],NYG:[19,'Giants'],NYJ:[20,'Jets'],PHI:[21,'Eagles'],PIT:[23,'Steelers'],SF:[25,'49ers'],SEA:[26,'Seahawks'],TB:[27,'Buccaneers'],TEN:[10,'Titans'],WAS:[28,'Commanders']};
+const ABBR = Object.keys(TEAMS);
+const ESPN_TO_ABBR = Object.fromEntries(ABBR.map(a => [TEAMS[a][0], a]));
+const fixAbbr = a => a ? ({WSH:'WAS', JAC:'JAX', LA:'LAR', OAK:'LV', SD:'LAC', STL:'LAR'}[a] || a) : null;
+const POS = ['QB','RB','WR','TE','K','DEF'];
+const POSQ = POS.map(p => 'position[]=' + p).join('&');
+const API = {
+  sbHosts: ['https://site.web.api.espn.com', 'https://site.api.espn.com'],
+  sbPath: (s, w) => '/apis/site/v2/sports/football/nfl/scoreboard' + (w ? `?week=${w}&seasontype=2&dates=${s}` : ''),
+  state: 'https://api.sleeper.app/v1/state/nfl',
+  proj: (s, w) => `https://api.sleeper.com/projections/nfl/${s}/${w}?season_type=regular&${POSQ}`,
+  wk: (s, w) => `https://api.sleeper.com/stats/nfl/${s}/${w}?season_type=regular&${POSQ}`,
+  tot: s => `https://api.sleeper.com/stats/nfl/${s}?season_type=regular&${POSQ}`,
+  wkQB: (s, w) => `https://api.sleeper.com/stats/nfl/${s}/${w}?season_type=regular&position[]=QB`,
+  sched: s => `https://api.sleeper.com/schedule/nfl/regular/${s}`,
+  own: s => `https://lm-api-reads.fantasy.espn.com/apis/v3/games/ffl/seasons/${s}/segments/0/leaguedefaults/3?view=players_wl`,
+  ownFilter: JSON.stringify({ players: { filterActive: { value: true }, filterSlotIds: { value: [0, 2, 4, 6, 16, 17] }, limit: 450, sortPercOwned: { sortPriority: 1, sortAsc: false } } }),
+  league: (s, id) => `https://lm-api-reads.fantasy.espn.com/apis/v3/games/ffl/seasons/${s}/segments/0/leagues/${encodeURIComponent(id)}?view=mRoster&view=mTeam&view=mSettings`,
+  coaches: (s, id) => `https://sports.core.api.espn.com/v2/sports/football/leagues/nfl/seasons/${s}/teams/${id}/coaches`,
+};
+/* 2026 staffs, researched Oct 2, 2026 from offseason hiring trackers. Mid-season changes are not included; edit in Settings.
+   [HC, OC, DC, offensive play-caller, defensive play-caller, HC new, offense new, defense new, offense prev team, defense prev team, note] */
+const STAFF_AS_OF = 'Oct 2, 2026';
+const STAFF_BASE = {
+  ARI:['Mike LaFleur','Nathaniel Hackett','Nick Rallis','Mike LaFleur','Nick Rallis',1,1,0,'','','LaFleur was the Rams OC, but McVay called plays there'],
+  ATL:['Kevin Stefanski','Tommy Rees','Jeff Ulbrich','Kevin Stefanski','Jeff Ulbrich',1,1,0,'CLE','','Stefanski and Rees both came from Cleveland'],
+  BAL:['Jesse Minter','Declan Doyle','Anthony Weaver','Declan Doyle','Jesse Minter',1,1,1,'','LAC','Minter ran the Chargers defense; Weaver was the Dolphins DC'],
+  BUF:['Joe Brady','Pete Carmichael Jr.','Jim Leonhard','Joe Brady','Jim Leonhard',1,0,1,'','','Brady was promoted from OC, so the offense keeps its play-caller'],
+  CAR:['Dave Canales','Brad Idzik','Ejiro Evero','Dave Canales','Ejiro Evero',0,0,0,'','',''],
+  CHI:['Ben Johnson','Press Taylor','Dennis Allen','Ben Johnson','Dennis Allen',0,0,0,'','','Taylor promoted; Johnson still calls plays'],
+  CIN:['Zac Taylor','Dan Pitcher','Al Golden','Zac Taylor','Al Golden',0,0,0,'','',''],
+  CLE:['Todd Monken','Travis Switzer','Mike Rutenberg','Todd Monken','Mike Rutenberg',1,1,1,'BAL','','Monken called plays in Baltimore'],
+  DAL:['Brian Schottenheimer','Klayton Adams','Christian Parker','Brian Schottenheimer','Christian Parker',0,0,1,'','','Parker came from the Eagles secondary staff'],
+  DEN:['Sean Payton','Davis Webb','Vance Joseph','Sean Payton','Vance Joseph',0,0,0,'','','Webb promoted; Payton still calls plays'],
+  DET:['Dan Campbell','Drew Petzing','Kelvin Sheppard','Drew Petzing','Kelvin Sheppard',0,1,0,'ARI','','Petzing called plays in Arizona'],
+  GB:['Matt LaFleur','Adam Stenavich','Jonathan Gannon','Matt LaFleur','Jonathan Gannon',0,0,1,'','ARI','Gannon was the Cardinals head coach'],
+  HOU:['DeMeco Ryans','Nick Caley','Matt Burke','Nick Caley','DeMeco Ryans',0,0,0,'','',''],
+  IND:['Shane Steichen','Jim Bob Cooter','Lou Anarumo','Shane Steichen','Lou Anarumo',0,0,0,'','',''],
+  JAX:['Liam Coen','Grant Udinski','Anthony Campanile','Liam Coen','Anthony Campanile',0,0,0,'','',''],
+  KC:['Andy Reid','Eric Bieniemy','Steve Spagnuolo','Andy Reid','Steve Spagnuolo',0,0,0,'','','Bieniemy returns; Reid still calls plays'],
+  LV:['Klint Kubiak','Andrew Janocko','Rob Leonard','Klint Kubiak','Rob Leonard',1,1,1,'SEA','','Kubiak called plays in Seattle'],
+  LAC:['Jim Harbaugh','Mike McDaniel','Chris O’Leary','Mike McDaniel','Chris O’Leary',0,1,1,'MIA','','McDaniel called plays as the Dolphins head coach'],
+  LAR:['Sean McVay','Nate Scheelhaase','Chris Shula','Sean McVay','Chris Shula',0,0,0,'','',''],
+  MIA:['Jeff Hafley','Bobby Slowik','Sean Duggan','Bobby Slowik','Jeff Hafley',1,1,1,'','GB','Hafley ran the Packers defense'],
+  MIN:['Kevin O’Connell','Wes Phillips','Brian Flores','Kevin O’Connell','Brian Flores',0,0,0,'','',''],
+  NE:['Mike Vrabel','Josh McDaniels','Zak Kuhr','Josh McDaniels','Zak Kuhr',0,0,1,'','',''],
+  NO:['Kellen Moore','Doug Nussmeier','Brandon Staley','Kellen Moore','Brandon Staley',0,0,0,'','',''],
+  NYG:['John Harbaugh','Matt Nagy','Dennard Wilson','Matt Nagy','Dennard Wilson',1,1,1,'','TEN','Wilson was the Titans DC'],
+  NYJ:['Aaron Glenn','Frank Reich','Brian Duker','Frank Reich','Brian Duker',0,1,1,'','',''],
+  PHI:['Nick Sirianni','Sean Mannion','Vic Fangio','Sean Mannion','Vic Fangio',0,1,0,'','',''],
+  PIT:['Mike McCarthy','Brian Angelichio','Patrick Graham','Mike McCarthy','Patrick Graham',1,1,1,'','LV','Graham was the Raiders DC'],
+  SF:['Kyle Shanahan','Klay Kubiak','Raheem Morris','Kyle Shanahan','Raheem Morris',0,0,1,'','',''],
+  SEA:['Mike Macdonald','Brian Fleury','Aden Durde','Brian Fleury','Mike Macdonald',0,1,0,'','','Kubiak left for Las Vegas'],
+  TB:['Todd Bowles','Zac Robinson','Todd Bowles','Zac Robinson','Todd Bowles',0,1,0,'ATL','','Robinson called plays in Atlanta'],
+  TEN:['Robert Saleh','Brian Daboll','Gus Bradley','Brian Daboll','Robert Saleh',1,1,1,'NYG','SF','Saleh ran the 49ers defense; Daboll was the Giants head coach'],
+  WAS:['Dan Quinn','David Blough','Daronte Jones','David Blough','Daronte Jones',0,1,1,'','','Kingsbury left; Blough was promoted'],
+};
+const SLOT_TYPES = [
+  {k:'QB', elig:['QB']}, {k:'RB', elig:['RB']}, {k:'WR', elig:['WR']}, {k:'TE', elig:['TE']},
+  {k:'FLEX', elig:['RB','WR','TE']}, {k:'RB/WR', elig:['RB','WR']}, {k:'WR/TE', elig:['WR','TE']},
+  {k:'OP', label:'Superflex', elig:['QB','RB','WR','TE']}, {k:'D/ST', elig:['DEF']}, {k:'K', elig:['K']},
+];
+const ESPN_SLOT = {0:'QB', 2:'RB', 3:'RB/WR', 4:'WR', 5:'WR/TE', 6:'TE', 7:'OP', 16:'D/ST', 17:'K', 23:'FLEX'};
+const ESPN_POS = {1:'QB', 2:'RB', 3:'WR', 4:'TE', 5:'K', 16:'DEF'};
+const CV = {QB:.38, RB:.5, WR:.55, TE:.6, K:.45, DEF:.7};
+const FACTOR_KEYS = [['dvp','Defense vs. position'],['cover','Secondary / run defense'],['protect','Pass protection vs. pass rush'],['script','Game script & opponent'],['style','Offensive style & pace']];
+
+/* ---------- helpers ---------- */
+const $ = (s, r = document) => r.querySelector(s);
+const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const clamp = (x, a, b) => Math.max(a, Math.min(b, x));
+const ok = x => x != null && isFinite(x);
+const f1 = x => ok(x) ? x.toFixed(1) : '—';
+const f0 = x => ok(x) ? Math.round(x).toString() : '—';
+const pct = x => ok(x) ? Math.round(x * 100) + '%' : '—';
+const spct = x => (x >= 0 ? '+' : '−') + Math.abs(Math.round(x * 100)) + '%';
+const ord = n => { const s = ['th','st','nd','rd'], v = n % 100; return n + (s[(v - 20) % 10] || s[v] || s[0]); };
+const norm = s => String(s || '').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/[.'’,-]/g, '').replace(/\b(jr|sr|ii|iii|iv|v)\b/g, '').replace(/\s+/g, ' ').trim();
+function erf(x) { const s = Math.sign(x); x = Math.abs(x); const t = 1 / (1 + 0.3275911 * x); const y = 1 - (((((1.061405429 * t - 1.453152027) * t) + 1.421413741) * t - 0.284496736) * t + 0.254829592) * t * Math.exp(-x * x); return s * y; }
+const Phi = z => 0.5 * (1 + erf(z / Math.SQRT2));
+const pAbove = (x, m, sd) => sd > 0 ? 1 - Phi((x - m) / sd) : (m >= x ? 1 : 0);
+const mean = a => a.length ? a.reduce((s, x) => s + x, 0) / a.length : null;
+const store = {
+  get(k, d = null) { try { const v = localStorage.getItem(k); return v == null ? d : JSON.parse(v); } catch { return d; } },
+  set(k, v) { try { localStorage.setItem(k, JSON.stringify(v)); return true; } catch { return false; } },
+  del(k) { try { localStorage.removeItem(k); } catch {} },
+};
+async function fetchJSON(url, ms = 30000, headers) {
+  const ac = new AbortController(); const t = setTimeout(() => ac.abort(), ms);
+  try {
+    const r = await fetch(url, { signal: ac.signal, credentials: 'omit', headers });
+    if (!r.ok) { const e = new Error('HTTP ' + r.status); e.status = r.status; throw e; }
+    return await r.json();
+  } catch (e) { if (e.name === 'AbortError') throw new Error('timed out'); throw e; }
+  finally { clearTimeout(t); }
+}
+/* Some browsers (Edge in particular) refuse site.api.espn.com from web pages, so try the mirror host first. */
+async function fetchSB(s, w) { let last; for (const h of API.sbHosts) { try { return await fetchJSON(h + API.sbPath(s, w)); } catch (e) { last = e; } } throw last; }
+async function pool(items, n, fn) { const out = new Array(items.length); let i = 0; await Promise.all(Array.from({length: Math.min(n, items.length)}, async () => { while (i < items.length) { const k = i++; try { out[k] = await fn(items[k]); } catch (e) { out[k] = null; } } })); return out; }
+
+/* ---------- state ---------- */
+const DEFAULT_STATE = {
+  v: 1, tab: 'lineup', roster: [], example: false, overrides: {}, staffEdits: {}, compare: [null, null],
+  settings: { season: null, week: null, blend: 0.6, intensity: 0.6, priorWeeks: 4, strategy: 'mean', w: { dvp: 1, cover: 1, protect: 1, script: 1, style: 1 } },
+  slots: { QB:1, RB:2, WR:2, TE:1, FLEX:1, 'RB/WR':0, 'WR/TE':0, OP:0, 'D/ST':1, K:1 },
+  espn: { leagueId: '', teamId: null, slotOf: {} },
+  waivers: { horizon: 4, teams: 12, ownMax: 50, source: 'own', faList: [], faListAt: null, taken: {} },
+};
+function loadState() {
+  const s = store.get('fo1:state');
+  const st = JSON.parse(JSON.stringify(DEFAULT_STATE));
+  if (s && s.v === 1) {
+    Object.assign(st, s);
+    st.settings = Object.assign({}, DEFAULT_STATE.settings, s.settings || {});
+    st.settings.w = Object.assign({}, DEFAULT_STATE.settings.w, (s.settings || {}).w || {});
+    st.slots = Object.assign({}, DEFAULT_STATE.slots, s.slots || {});
+    st.espn = Object.assign({}, DEFAULT_STATE.espn, s.espn || {});
+    st.waivers = Object.assign(JSON.parse(JSON.stringify(DEFAULT_STATE.waivers)), s.waivers || {});
+  }
+  return st;
+}
+let state = loadState();
+const save = () => store.set('fo1:state', state);
+const D = { loading: true, progress: 0, errors: [], open: new Set(), U: new Map(), proj: {}, H: {}, tg: {}, rec: {}, prior: {}, cur: {}, B: {}, L: {}, ranks: {}, M: {}, coaches: null, espnTeams: null, defSort: ['fpaWR', -1], teamOpen: null, resetArm: false };
+
+function staffOf(T) {
+  const b = STAFF_BASE[T] || ['','','','','',0,0,0,'','',''];
+  const s = { hc:b[0], oc:b[1], dc:b[2], offCaller:b[3], defCaller:b[4], hcNew:!!b[5], offNew:!!b[6], defNew:!!b[7], offPrev:b[8], defPrev:b[9], note:b[10] };
+  return Object.assign(s, state.staffEdits[T] || {});
+}
+
+/* ---------- data shaping ---------- */
+function nameOf(r) { const p = r.player || {}; if (p.position === 'DEF') return (TEAMS[fixAbbr(r.player_id)] || [0, r.player_id])[1] + ' D/ST'; return [p.first_name, p.last_name].filter(Boolean).join(' ') || r.player_id; }
+function compactWeek(rows) {
+  const P = [], Dd = [];
+  for (const r of rows || []) {
+    const s = r.stats || {}, pos = r.player?.position;
+    if (!(s.gp > 0)) continue;
+    if (pos === 'DEF') { const T = fixAbbr(r.team || r.player_id); if (!TEAMS[T]) continue; Dd.push([T, fixAbbr(r.opponent), s.fan_pts_allow_qb||0, s.fan_pts_allow_rb||0, s.fan_pts_allow_wr||0, s.fan_pts_allow_te||0, s.fan_pts_allow_k||0, s.fan_pts_allow_def||0, s.sack||0, s.pts_allow||0, s.yds_allow||0, +(s.pts_ppr||0).toFixed(2)]); continue; }
+    if (!POS.includes(pos)) continue;
+    P.push([r.player_id, pos, fixAbbr(r.team), fixAbbr(r.opponent), +(s.pts_ppr||0).toFixed(2), s.pass_att||0, s.pass_yd||0, s.pass_sack||0, s.rush_att||0, s.rush_yd||0, s.rec_tgt||0, s.rec_yd||0, nameOf(r)]);
+  }
+  return { P, D: Dd };
+}
+const blankAgg = () => ({ g:0, passAtt:0, sacksTaken:0, rushAtt:0, rushYd:0, tgt:{RB:0,WR:0,TE:0}, fpa:{QB:0,RB:0,WR:0,TE:0,K:0,DEF:0}, sacks:0, ptsA:0, ydsA:0, passYdA:null, rushAttA:null, rushYdA:null, ptsFor:null });
+function derive(a) {
+  const g = a.g; if (!g) return null;
+  const plays = a.passAtt + a.rushAtt + a.sacksTaken, tt = (a.tgt.RB + a.tgt.WR + a.tgt.TE) || 1;
+  return { g, passRate: plays ? (a.passAtt + a.sacksTaken) / plays : null, plays: plays / g, ypc: a.rushAtt ? a.rushYd / a.rushAtt : null, sacksTaken: a.sacksTaken / g,
+    tsRB: a.tgt.RB / tt, tsWR: a.tgt.WR / tt, tsTE: a.tgt.TE / tt,
+    fpaQB: a.fpa.QB / g, fpaRB: a.fpa.RB / g, fpaWR: a.fpa.WR / g, fpaTE: a.fpa.TE / g, fpaK: a.fpa.K / g, fpaDEF: a.fpa.DEF / g,
+    sacks: a.sacks / g, ptsA: a.ptsA / g, ydsA: a.ydsA / g,
+    passYdA: a.passYdA != null ? a.passYdA / g : null, ypcA: a.rushAttA ? a.rushYdA / a.rushAttA : null, ptsFor: a.ptsFor != null ? a.ptsFor / g : null };
+}
+/* Season totals credit a traded player's whole season to his final team, so when weekly QB rows are
+   available, team passing volume comes from those (each week carries that week's team). */
+function deriveTotals(rows, qbWeeks) {
+  const A = {}; const ga = T => A[T] || (A[T] = blankAgg());
+  const useWk = qbWeeks && qbWeeks.filter(w => w && w.length).length >= 10;
+  for (const r of rows || []) {
+    const s = r.stats || {}, pos = r.player?.position;
+    const T = fixAbbr(r.team || (pos === 'DEF' ? r.player_id : null)); if (!TEAMS[T]) continue;
+    const a = ga(T);
+    if (pos === 'DEF') { a.g = s.gp || 0; a.fpa = { QB:s.fan_pts_allow_qb||0, RB:s.fan_pts_allow_rb||0, WR:s.fan_pts_allow_wr||0, TE:s.fan_pts_allow_te||0, K:s.fan_pts_allow_k||0, DEF:s.fan_pts_allow_def||0 }; a.sacks = s.sack||0; a.ptsA = s.pts_allow||0; a.ydsA = s.yds_allow||0; }
+    else if (['QB','RB','WR','TE'].includes(pos)) {
+      if (!(useWk && pos === 'QB')) { a.passAtt += s.pass_att||0; a.sacksTaken += s.pass_sack||0; a.rushAtt += s.rush_att||0; a.rushYd += s.rush_yd||0; }
+      if (pos !== 'QB') a.tgt[pos] += s.rec_tgt||0;
+    }
+  }
+  if (useWk) for (const wk of qbWeeks) for (const r of wk || []) {
+    const s = r.stats || {}, T = fixAbbr(r.team); if (!TEAMS[T] || !(s.gp > 0)) continue;
+    const a = ga(T); a.passAtt += s.pass_att||0; a.sacksTaken += s.pass_sack||0; a.rushAtt += s.rush_att||0; a.rushYd += s.rush_yd||0;
+  }
+  const out = {}; for (const T in A) { const d = derive(A[T]); if (d) out[T] = d; } return out;
+}
+function aggWeeks(weeks) {
+  const A = {}; const ga = T => A[T] || (A[T] = blankAgg());
+  for (const wk of weeks) {
+    for (const [T, O, qb, rb, wr, te, k, dst, sk, pa, ya] of wk.D) {
+      const a = ga(T); a.g++; a.fpa.QB += qb; a.fpa.RB += rb; a.fpa.WR += wr; a.fpa.TE += te; a.fpa.K += k; a.fpa.DEF += dst; a.sacks += sk; a.ptsA += pa; a.ydsA += ya;
+      if (TEAMS[O]) { const o = ga(O); o.ptsFor = (o.ptsFor || 0) + pa; }
+    }
+    for (const [, pos, T, O, , pa, py, ps, ra, ry, tg] of wk.P) {
+      if (!TEAMS[T]) continue; const a = ga(T);
+      a.passAtt += pa; a.sacksTaken += ps; a.rushAtt += ra; a.rushYd += ry; if (a.tgt[pos] != null) a.tgt[pos] += tg;
+      if (TEAMS[O]) { const o = ga(O); o.passYdA = (o.passYdA || 0) + py; o.rushAttA = (o.rushAttA || 0) + ra; o.rushYdA = (o.rushYdA || 0) + ry; }
+    }
+  }
+  const out = {}; for (const T in A) { const d = derive(A[T]); if (d) out[T] = d; } return out;
+}
+function parseSB(j) {
+  const games = [], rec = {};
+  for (const e of j?.events || []) {
+    const c = e.competitions?.[0]; if (!c) continue;
+    const teams = (c.competitors || []).map(t => ({ abbr: fixAbbr(t.team?.abbreviation), home: t.homeAway === 'home', rec: (t.records || []).find(r => r.type === 'total' || r.name === 'overall')?.summary }));
+    const h = teams.find(t => t.home), a = teams.find(t => !t.home); if (!h || !a) continue;
+    for (const t of teams) if (t.rec) rec[t.abbr] = t.rec;
+    const od = c.odds?.[0]; let fav = null, line = 0, ou = null;
+    if (od) { ou = ok(+od.overUnder) && +od.overUnder > 0 ? +od.overUnder : null; const m = /^([A-Z]{2,4})\s*-(\d+(?:\.\d+)?)/.exec(od.details || ''); if (m) { fav = fixAbbr(m[1]); line = +m[2]; } }
+    const st = c.status?.type || e.status?.type || {};
+    games.push({ id: e.id, date: e.date, home: h.abbr, away: a.abbr, state: st.state || 'pre', short: st.shortDetail || '', fav, line, ou });
+  }
+  return { games, rec };
+}
+const winPct = r => { if (!r) return null; const [w, l, t = 0] = r.split('-').map(Number); const g = w + l + t; return g ? (w + t / 2) / g : null; };
+function implied(g, T) { if (!g || g.ou == null) return null; if (!g.fav) return g.ou / 2; return g.fav === T ? (g.ou + g.line) / 2 : (g.ou - g.line) / 2; }
+
+/* ---------- loading ---------- */
+/* Live sources first. A published claude.ai copy cannot reach outside sites, so it falls back to snapshot.json,
+   which is the same input bundle that a local copy writes out when opened with #export. */
+async function gatherLive(err) {
+  const [sb0, sl] = await Promise.all([fetchSB().catch(e => { err('ESPN schedule', e); return null; }), fetchJSON(API.state).catch(() => null)]);
+  if (!sb0 && !sl) return null;
+  let detSeason = sb0?.season?.year || +sl?.season || new Date().getFullYear(), detWeek = sb0?.week?.number || sl?.week || 1;
+  const stype = sb0?.season?.type ?? (sl ? { pre: 1, regular: 2, post: 3 }[sl.season_type] : undefined);
+  if (stype === 1) detWeek = 1;
+  else if (stype === 3 || stype === 4) detWeek = 18;
+  else if (sb0?.events?.length && sb0.events.every(e => e.competitions?.[0]?.status?.type?.completed)) detWeek = Math.min(18, detWeek + 1);
+  const season = state.settings.season || detSeason;
+  const week = state.settings.week || (season < detSeason ? 18 : detWeek);
+  D.season = season; D.week = week; render();
+  const past = season < detSeason;
+  const completedThrough = past ? 18 : (stype === 1 ? 0 : detWeek - 1);
+  const histMax = Math.min(week - 1, past ? 18 : detWeek);
+  const tasks = [];
+  let done = 0; const tick = () => { done++; D.progress = done / tasks.length; const b = $('#lbar'); if (b) b.style.width = Math.round(D.progress * 100) + '%'; };
+  const T = (p) => { tasks.push(p); p.finally(tick); return p; };
+
+  const pSB = T(fetchSB(season, week).catch(e => { err('ESPN week ' + week + ' schedule', e); return null; }));
+  const pProj = T(fetchJSON(API.proj(season, week)).catch(e => { err('Sleeper projections', e); return []; }));
+  const weekPs = [];
+  for (let w = 1; w <= histMax; w++) {
+    const key = `fo1:wk:${season}:${w}`, cached = w <= completedThrough ? store.get(key) : null;
+    weekPs.push(cached ? Promise.resolve(cached) : T(fetchJSON(API.wk(season, w)).then(rows => { const c = compactWeek(rows); if (w <= completedThrough && c.D.length) store.set(key, c); return c; }).catch(e => { err('Sleeper stats week ' + w, e); return { P: [], D: [] }; })));
+  }
+  const pActual = week <= (past ? 18 : detWeek) ? T(fetchJSON(API.wk(season, week)).then(compactWeek).catch(() => ({ P: [], D: [] }))) : Promise.resolve({ P: [], D: [] });
+  const priorPs = [1, 2, 3].map(k => {
+    const s = season - k, key = `fo1:prior2:${s}`, cached = store.get(key);
+    if (cached) return Promise.resolve([s, cached]);
+    const qb = k === 1 ? pool(Array.from({ length: 18 }, (_, i) => i + 1), 6, w => fetchJSON(API.wkQB(s, w))) : Promise.resolve(null);
+    return T(Promise.all([fetchJSON(API.tot(s)), qb]).then(([rows, qbw]) => { const d = deriveTotals(rows, qbw); if (Object.keys(d).length > 20) store.set(key, d); return [s, d]; }).catch(e => { err(s + ' season history', e); return [s, {}]; }));
+  });
+  const schedKey = `fo1:sched:${season}`, schedCached = store.get(schedKey);
+  const pSched = schedCached ? Promise.resolve(schedCached) : T(fetchJSON(API.sched(season)).then(rows => { const c = (rows || []).filter(g => g.week && g.home && g.away).map(g => [g.week, fixAbbr(g.home), fixAbbr(g.away)]); if (c.length > 200) store.set(schedKey, c); return c; }).catch(e => { err('Season schedule', e); return []; }));
+  const pOwn = T(fetchJSON(API.own(season), 30000, { 'x-fantasy-filter': API.ownFilter }).then(j => (j.players || []).map(e => e.player).filter(p => p && ESPN_POS[p.defaultPositionId]).map(p => [p.fullName, p.defaultPositionId, p.proTeamId, p.ownership?.percentOwned ?? 0])).catch(e => { err('ESPN ownership', e); return []; }));
+  if (!tasks.length) tasks.push(Promise.resolve());
+
+  const [sbj, projRows, weeks, actual, priors, sched, own] = await Promise.all([pSB, pProj, Promise.all(weekPs), pActual, Promise.all(priorPs), pSched, pOwn]);
+  const sb = parseSB(sbj), now = parseSB(sb0), proj = [];
+  for (const r of projRows || []) { const p = r.player || {}; if (!POS.includes(p.position)) continue; proj.push([r.player_id, nameOf(r), p.position, fixAbbr(r.team || p.team), p.injury_status || null, r.stats?.pts_ppr ?? null, fixAbbr(r.opponent)]); }
+  return { v: 1, createdAt: new Date().toISOString(), season, week, detSeason, detWeek, games: sb.games, rec: Object.assign({}, sb.rec, now.rec), proj, weeks, actual, priors, sched, own };
+}
+function ingest(inp) {
+  D.season = inp.season; D.week = inp.week; D.detSeason = inp.detSeason; D.detWeek = inp.detWeek;
+  D.games = inp.games.slice(); D.rec = inp.rec || {};
+  D.tg = {}; for (const g of D.games) { D.tg[g.home] = { opp: g.away, home: true, g }; D.tg[g.away] = { opp: g.home, home: false, g }; }
+  if (!D.games.length) { // no ESPN schedule: take matchups from Sleeper's projections (no lines or kickoff status)
+    for (const [, , , A, , , O] of inp.proj) { if (!TEAMS[A] || !TEAMS[O] || D.tg[A]) continue; const g = { home: A, away: O, state: 'pre', short: '', fav: null, line: 0, ou: null }; D.tg[A] = { opp: O, home: true, g }; D.tg[O] = { opp: A, home: false, g }; D.games.push(g); }
+  }
+  const imps = []; for (const g of D.games) { const a = implied(g, g.home), b = implied(g, g.away); if (a != null) imps.push(a, b); }
+  D.lgImplied = imps.length >= 6 ? mean(imps) : 22.5;
+  D.prior = Object.fromEntries(inp.priors);
+  D.weeks = inp.weeks;
+  D.cur = aggWeeks(inp.weeks);
+  D.actual = {}; for (const p of inp.actual.P) D.actual[p[0]] = p[4]; for (const d of inp.actual.D) D.actual[d[0]] = d[11];
+  D.U = new Map(); D.proj = {}; D.H = {};
+  for (const [id, name, pos, team, inj, pts, opp] of inp.proj) {
+    if (!D.U.has(id)) D.U.set(id, { id, name, pos, team, inj });
+    if (pts != null && !(id in D.proj)) D.proj[id] = { pts, opp };
+  }
+  inp.weeks.forEach((wk, wi) => {
+    for (const [id, pos, T, , pts, , , , ra, , tg, , name] of wk.P) {
+      const h = D.H[id] || (D.H[id] = { pts: [], tgt: 0, ra: 0, wks: [] }); h.pts.push(pts); h.tgt += tg; h.ra += ra; h.wks.push(wi + 1);
+      if (!D.U.has(id)) D.U.set(id, { id, name, pos, team: T, inj: null });
+    }
+    for (const d of wk.D) { const id = d[0]; const h = D.H[id] || (D.H[id] = { pts: [], tgt: 0, ra: 0, wks: [] }); h.pts.push(d[11]); h.wks.push(wi + 1); if (!D.U.has(id)) D.U.set(id, { id, name: TEAMS[id][1] + ' D/ST', pos: 'DEF', team: id, inj: null }); }
+  });
+  for (const id in D.H) { const h = D.H[id], n = h.pts.length; h.n = n; h.avg = mean(h.pts); h.sd = n > 1 ? Math.sqrt(h.pts.reduce((s, x) => s + (x - h.avg) ** 2, 0) / (n - 1)) : null; }
+  D.nameIdx = new Map(); for (const u of D.U.values()) { const k = norm(u.name); if (!D.nameIdx.has(k)) D.nameIdx.set(k, []); D.nameIdx.get(k).push(u.id); }
+  D.loadedAt = new Date(inp.createdAt);
+  // full-season schedule (byes, future opponents) and ESPN-wide ownership, used by the Waivers tab
+  D.sched = {};
+  for (const [w, h, a] of inp.sched || []) { const m = D.sched[w] || (D.sched[w] = {}); m[h] = { opp: a, home: true }; m[a] = { opp: h, home: false }; }
+  if (!D.sched[D.week] && D.games.length) { const m = D.sched[D.week] = {}; for (const T in D.tg) m[T] = { opp: D.tg[T].opp, home: D.tg[T].home }; }
+  D.own = new Map();
+  for (const [name, posId, team, pct] of inp.own || []) {
+    const pos = ESPN_POS[posId], T = ESPN_TO_ABBR[team]; let id = null;
+    if (pos === 'DEF') id = T || null;
+    else { const c = D.nameIdx.get(norm(name)) || []; id = c.find(x => D.U.get(x)?.pos === pos && D.U.get(x)?.team === T) || c.find(x => D.U.get(x)?.pos === pos) || null; }
+    if (id && !D.own.has(id)) D.own.set(id, pct);
+  }
+  D.wCache = null; D.usage = null;
+  computeAll();
+}
+async function load() {
+  D.loading = true; D.failed = false; D.errors = []; D.progress = 0; D.snapshot = null; render();
+  const err = (what, e) => D.errors.push(`${what}: ${e.status === 404 ? 'not published yet' : (e.message || 'request failed')}.`);
+  let inp = await gatherLive(err);
+  if (!inp) {
+    const snap = await fetchJSON('snapshot.json').catch(() => null);
+    if (snap?.v === 1) { inp = snap; D.snapshot = snap; D.errors = []; D.coaches = snap.coaches || null; }
+  }
+  if (!inp) { D.loading = false; D.failed = true; render(); return; }
+  ingest(inp);
+  if (!state.roster.length && D.U.size) makeExampleRoster();
+  D.loading = false; render();
+  if (D.snapshot) return;
+  if (location.hash === '#export') {
+    await checkCoaches(D.season);
+    const snap = Object.assign({}, inp, { coaches: D.coaches, proj: inp.proj.filter(p => (p[5] || 0) > 0 || D.H[p[0]]) });
+    const pre = document.createElement('pre'); pre.id = 'snapshot-out'; pre.hidden = true; pre.textContent = JSON.stringify(snap); document.body.appendChild(pre);
+  } else checkCoaches(D.season);
+}
+
+/* ---------- team model ---------- */
+const OFF_KEYS = ['passRate','plays','ypc','sacksTaken','tsRB','tsWR','tsTE','ptsFor','fpaDEF'];
+const DEF_KEYS = ['fpaQB','fpaRB','fpaWR','fpaTE','fpaK','sacks','ptsA','ydsA'];
+const CUR_KEYS = ['passYdA','ypcA'];
+const RANK_KEYS = ['fpaQB','fpaRB','fpaWR','fpaTE','fpaK','fpaDEF','passYdA','ypcA','sacks','sacksTaken','ptsA'];
+function blendVal(c, cn, p, k) { const cv = ok(c) ? c : null, pv = ok(p) ? p : null; if (cv == null && pv == null) return null; if (cv == null) return pv; if (pv == null || k <= 0) return cv; return (cv * cn + pv * k) / (cn + k); }
+function mixP(a, b, keys) { if (!a) return b; if (!b) return a; const o = {}; for (const k of keys) o[k] = ok(a[k]) && ok(b[k]) ? (a[k] + b[k]) / 2 : (ok(a[k]) ? a[k] : b[k]); return o; }
+function computeTeams() {
+  const K = state.settings.priorWeeks, prev = D.prior[D.season - 1] || {};
+  const lc = {}; for (const k of CUR_KEYS) lc[k] = mean(ABBR.map(T => D.cur[T]?.[k]).filter(ok));
+  const B = {};
+  for (const T of ABBR) {
+    const st = staffOf(T), c = D.cur[T], cn = c ? c.g : 0, own = prev[T];
+    const offP = st.offNew && st.offPrev && prev[st.offPrev] ? mixP(own, prev[st.offPrev], OFF_KEYS) : own;
+    const defP = st.defNew && st.defPrev && prev[st.defPrev] ? mixP(own, prev[st.defPrev], DEF_KEYS) : own;
+    const kO = st.offNew ? Math.min(K, 1.5) : K, kD = st.defNew ? Math.min(K, 1.5) : K;
+    const b = { g: cn, kO, kD };
+    for (const k of OFF_KEYS) b[k] = blendVal(c?.[k], cn, offP?.[k], kO);
+    for (const k of DEF_KEYS) b[k] = blendVal(c?.[k], cn, defP?.[k], kD);
+    for (const k of CUR_KEYS) b[k] = blendVal(c?.[k], cn, lc[k], 2);
+    B[T] = b;
+  }
+  const L = {}; for (const k of [...OFF_KEYS, ...DEF_KEYS, ...CUR_KEYS]) L[k] = mean(ABBR.map(T => B[T][k]).filter(ok));
+  const ranks = {};
+  for (const k of RANK_KEYS) { const order = ABBR.filter(T => ok(B[T][k])).sort((a, b) => B[b][k] - B[a][k]); ranks[k] = Object.fromEntries(order.map((T, i) => [T, i + 1])); }
+  D.B = B; D.L = L; D.ranks = ranks;
+}
+const ratio = (a, b) => ok(a) && ok(b) && b ? a / b - 1 : 0;
+
+/* ---------- player model ---------- */
+function evalPlayer(id) {
+  const u = D.U.get(id); if (!u) return null;
+  const S = state.settings, I = S.intensity, pos = u.pos, T = u.team;
+  const h = D.H[id], pr = D.proj[id], tg = T ? D.tg[T] : null;
+  const r = { id, u, pos, T, h, projPts: pr ? pr.pts : null, factors: [], status: 'ok', inj: u.inj };
+  if (/^(out|ir|pup|sus|na|cov)/i.test(u.inj || '')) r.status = 'out';
+  if (!tg) { r.status = 'bye'; r.mean = 0; r.sd = 0; r.grade = '–'; r.mult = 1; r.base = 0; return finish(r); }
+  const O = r.O = tg.opp, g = r.game = tg.g, tb = D.B[T] || {}, ob = D.B[O] || {}, L = D.L;
+  if (g.state !== 'pre') { r.locked = true; r.actual = D.actual[id]; }
+  const avg = h?.n ? h.avg : null;
+  r.base = r.projPts != null ? (avg != null ? S.blend * r.projPts + (1 - S.blend) * avg : r.projPts) : (avg ?? 0);
+  const add = (key, label, raw, note, short) => { const v = clamp(raw * I * (S.w[key] ?? 1), -0.25, 0.25); r.factors.push({ key, label, pct: v, note, short }); };
+  const itT = implied(g, T), itO = implied(g, O), lgI = D.lgImplied;
+  const st = staffOf(T), so = staffOf(O);
+  const rk = (k, team) => D.ranks[k]?.[team];
+  const lineTxt = g.fav ? (g.fav === T ? `${T} favored by ${g.line}` : `${T} +${g.line} underdog`) : (g.ou ? 'Pick’em' : '');
+  if (['QB','RB','WR','TE'].includes(pos)) {
+    const fk = 'fpa' + pos, rank = rk(fk, O);
+    add('dvp', `Defense vs. ${pos}`, ratio(ob[fk], L[fk]), `${O} allows ${f1(ob[fk])} PPR pts/game to ${pos}s, the ${rank ? ord(rank) : '?'} most of 32 (avg ${f1(L[fk])})`, s => s > 0 ? `Soft vs. ${pos}` : `Tough vs. ${pos}`);
+    if (pos === 'RB') add('cover', 'Run defense & run blocking', 0.6 * ratio(ob.ypcA, L.ypcA) + 0.4 * ratio(tb.ypc, L.ypc), `${O} allows ${f1(ob.ypcA)} yds/carry (avg ${f1(L.ypcA)}) · ${T} gains ${f1(tb.ypc)} yds/carry behind its line`, s => s > 0 ? 'Weak run D' : 'Stout run D');
+    else add('cover', 'Secondary', ratio(ob.passYdA, L.passYdA), `${O} allows ${f0(ob.passYdA)} passing yds/game (avg ${f0(L.passYdA)}), ${ord(rk('passYdA', O) || 16)} most`, s => s > 0 ? 'Leaky secondary' : 'Tough secondary');
+    const pm = { QB: 1, WR: 0.5, TE: 0.5, RB: 0 }[pos];
+    if (pm) { const idx = (ratio(tb.sacksTaken, L.sacksTaken) + ratio(ob.sacks, L.sacks)) / 2; add('protect', 'Pass protection vs. pass rush', -0.6 * idx * pm, `${T} allows ${f1(tb.sacksTaken)} sacks/game · ${O} gets ${f1(ob.sacks)} sacks/game (avg ${f1(L.sacks)})`, s => s > 0 ? 'Clean pocket' : 'Heavy pass rush'); }
+    if (itT != null) { const edge = itT - itO; const tilt = pos === 'RB' ? 0.01 * edge : -0.005 * edge; add('script', 'Game script & opponent', ratio(itT, lgI) + tilt, `${T} implied ${f1(itT)} pts (avg ${f1(lgI)}) · ${lineTxt} · O/U ${g.ou} · ${O} is ${D.rec[O] || '0-0'}`, s => s > 0 ? 'High team total' : 'Low team total'); }
+    else add('script', 'Game script & opponent', 0, `No betting line posted yet · ${O} is ${D.rec[O] || '0-0'}`, () => '');
+    const pr2 = pos === 'RB' ? ratio(1 - tb.passRate, 1 - L.passRate) : ratio(tb.passRate, L.passRate);
+    add('style', 'Offensive style & pace', 0.7 * pr2 + 0.5 * ratio(tb.plays, L.plays), `${T} passes on ${pct(tb.passRate)} of plays (avg ${pct(L.passRate)}) · ${f1(tb.plays)} plays/game (avg ${f1(L.plays)})${trendTxt(T, 'passRate')}`, s => s > 0 ? (pos === 'RB' ? 'Run-heavy offense' : 'Pass-heavy offense') : (pos === 'RB' ? 'Pass-first offense' : 'Run-first offense'));
+  } else if (pos === 'K') {
+    add('dvp', 'Defense vs. K', ratio(ob.fpaK, L.fpaK), `Kickers average ${f1(ob.fpaK)} pts against ${O} (avg ${f1(L.fpaK)})`, s => s > 0 ? 'Kicker-friendly D' : 'Tough for kickers');
+    if (itT != null) add('script', 'Game script & opponent', 0.8 * ratio(itT, lgI), `${T} implied ${f1(itT)} pts · ${lineTxt} · O/U ${g.ou}`, s => s > 0 ? 'High team total' : 'Low team total');
+    add('style', 'Offensive style & pace', 0.5 * ratio(tb.plays, L.plays), `${T} runs ${f1(tb.plays)} plays/game (avg ${f1(L.plays)})`, s => s > 0 ? 'Fast pace' : 'Slow pace');
+  } else if (pos === 'DEF') {
+    add('dvp', 'Opponent offense', ratio(ob.fpaDEF, L.fpaDEF), `D/STs average ${f1(ob.fpaDEF)} pts against ${O}’s offense (avg ${f1(L.fpaDEF)}), ${ord(rk('fpaDEF', O) || 16)} most`, s => s > 0 ? 'Mistake-prone offense' : 'Careful offense');
+    add('protect', 'Pass rush vs. protection', 0.6 * (ratio(ob.sacksTaken, L.sacksTaken) + ratio(tb.sacks, L.sacks)) / 2, `${T} gets ${f1(tb.sacks)} sacks/game · ${O} allows ${f1(ob.sacksTaken)} (avg ${f1(L.sacksTaken)})`, s => s > 0 ? 'Sack chances' : 'Few sacks likely');
+    if (itO != null) add('script', 'Game script & opponent', -1.2 * ratio(itO, lgI) + 0.3 * ((winPct(D.rec[T]) ?? .5) - (winPct(D.rec[O]) ?? .5)), `${O} implied ${f1(itO)} pts (avg ${f1(lgI)}) · ${O} is ${D.rec[O] || '0-0'} · ${lineTxt}`, s => s > 0 ? 'Low opponent total' : 'High opponent total');
+  }
+  // scheme & coaching continuity
+  const offSide = pos === 'DEF' ? so : st, offTeam = pos === 'DEF' ? O : T, defSide = pos === 'DEF' ? st : so, defTeam = pos === 'DEF' ? T : O;
+  const bits = [];
+  if (offSide.offNew) bits.push(`${offTeam} offense has a new play-caller (${offSide.offCaller || offSide.oc}${offSide.offPrev ? ', from ' + offSide.offPrev : ''})`);
+  if (defSide.defNew) bits.push(`${defTeam} defense is new under ${defSide.defCaller || defSide.dc}${defSide.defPrev ? ' (from ' + defSide.defPrev + ')' : ''}`);
+  const curG = D.cur[T]?.g || 0;
+  r.newStaff = bits.length > 0;
+  r.scheme = bits.length ? bits.join('. ') + `. Last season’s tendencies count less, so the range is wider.` : `Same play-callers as last season on both sides, so ${D.season - 1} tendencies are blended in with ${curG} game${curG === 1 ? '' : 's'} of ${D.season} data.`;
+  const tr = trendTxt(O, 'fpa' + (pos === 'DEF' ? 'DEF' : pos), true); if (tr) r.scheme += tr;
+  r.mult = clamp(r.factors.reduce((m, f) => m * (1 + f.pct), 1), 0.6, 1.4);
+  r.mean = r.base * r.mult;
+  const n = h?.n || 0, dsd = CV[pos] * Math.max(r.mean, 3);
+  r.sd = Math.sqrt(((n > 1 ? n * h.sd ** 2 : 0) + 3 * dsd ** 2) / ((n > 1 ? n : 0) + 3)) * (r.newStaff ? 1.1 : 1);
+  const adj = r.mult - 1; r.grade = adj >= 0.12 ? 'A' : adj >= 0.04 ? 'B' : adj > -0.04 ? 'C' : adj > -0.12 ? 'D' : 'F';
+  return finish(r);
+}
+function trendTxt(T, k, def) {
+  const p = D.prior[D.season - 1]?.[T]?.[k], c = D.B[T]?.[k]; if (!ok(p) || !ok(c)) return '';
+  if (k === 'passRate') { const d = (c - p) * 100; return Math.abs(d) >= 3 ? ` · ${d > 0 ? '↑' : '↓'} ${Math.abs(d).toFixed(0)} pts vs. ${D.season - 1}` : ''; }
+  const d = p ? c / p - 1 : 0; return Math.abs(d) >= 0.12 ? ` ${T} is allowing ${Math.abs(Math.round(d * 100))}% ${d > 0 ? 'more' : 'fewer'} points to this position than in ${D.season - 1}.` : '';
+}
+function finish(r) {
+  const ov = state.overrides[r.id];
+  if (ov != null && ok(+ov)) { r.override = +ov; r.mean = +ov; }
+  const m = r.mean, sd = r.sd || 0;
+  r.floor = m - 0.674 * sd; r.ceil = m + 0.674 * sd; r.boom = m + 1.2816 * sd;
+  if (r.pos !== 'DEF') r.floor = Math.max(0, r.floor);
+  r.pAvg = r.h?.n && r.status !== 'bye' ? pAbove(r.h.avg, m, sd) : null;
+  r.p10 = pAbove(10, m, sd); r.p15 = pAbove(15, m, sd); r.p20 = pAbove(20, m, sd);
+  const top = [...r.factors].filter(f => Math.abs(f.pct) >= 0.03).sort((a, b) => Math.abs(b.pct) - Math.abs(a.pct))[0];
+  r.chip = top ? { text: top.short(top.pct), dir: top.pct > 0 ? 'up' : 'down' } : null;
+  return r;
+}
+function computeAll() {
+  computeTeams(); D.M = {};
+  for (const id of D.U.keys()) { const r = evalPlayer(id); if (r) D.M[id] = r; }
+}
+const metricOf = r => { if (r.locked && ok(r.actual)) return r.actual; const s = state.settings.strategy; return s === 'floor' ? r.floor : s === 'ceil' ? r.ceil : r.mean; };
+
+/* ---------- lineup optimizer (Hungarian assignment, exact for any slot mix) ---------- */
+function hungarian(cost) {
+  const n = cost.length, m = cost[0].length, INF = 1e18;
+  const u = new Array(n + 1).fill(0), v = new Array(m + 1).fill(0), p = new Array(m + 1).fill(0), way = new Array(m + 1).fill(0);
+  for (let i = 1; i <= n; i++) {
+    p[0] = i; let j0 = 0; const minv = new Array(m + 1).fill(INF), used = new Array(m + 1).fill(false);
+    do {
+      used[j0] = true; const i0 = p[j0]; let delta = INF, j1 = 0;
+      for (let j = 1; j <= m; j++) if (!used[j]) { const cur = cost[i0 - 1][j - 1] - u[i0] - v[j]; if (cur < minv[j]) { minv[j] = cur; way[j] = j0; } if (minv[j] < delta) { delta = minv[j]; j1 = j; } }
+      for (let j = 0; j <= m; j++) if (used[j]) { u[p[j]] += delta; v[j] -= delta; } else minv[j] -= delta;
+      j0 = j1;
+    } while (p[j0] !== 0);
+    do { const j1 = way[j0]; p[j0] = p[j1]; j0 = j1; } while (j0);
+  }
+  const ans = new Array(n).fill(-1); for (let j = 1; j <= m; j++) if (p[j]) ans[p[j] - 1] = j - 1; return ans;
+}
+function expandSlots() { const out = []; for (const t of SLOT_TYPES) for (let i = 0; i < (state.slots[t.k] || 0); i++) out.push(t); return out; }
+function optimize() {
+  const slots = expandSlots(), roster = state.roster.map(id => D.M[id]).filter(Boolean);
+  const cands = roster.filter(r => r.status === 'ok');
+  if (!slots.length) return { starters: [], bench: roster };
+  const n = slots.length, m = cands.length + n;
+  const cost = slots.map(s => { const row = cands.map(r => s.elig.includes(r.pos) ? -metricOf(r) : 1e6); for (let i = 0; i < n; i++) row.push(1e5); return row; });
+  const asg = hungarian(cost), used = new Set();
+  const starters = slots.map((s, i) => { const j = asg[i]; const r = j >= 0 && j < cands.length && cost[i][j] < 1e5 ? cands[j] : null; if (r) used.add(r.id); return { slot: s, r }; });
+  const bench = roster.filter(r => !used.has(r.id)).sort((a, b) => (b.status === 'ok') - (a.status === 'ok') || metricOf(b) - metricOf(a));
+  return { starters, bench };
+}
+
+/* ---------- example roster ---------- */
+function makeExampleRoster() {
+  const byPos = {}; for (const id in D.proj) { const u = D.U.get(id); if (!u || !D.tg[u.team] && D.games.length) continue; (byPos[u.pos] = byPos[u.pos] || []).push([id, D.proj[id].pts]); }
+  for (const p in byPos) byPos[p].sort((a, b) => b[1] - a[1]);
+  const pick = { QB: [5, 13], RB: [3, 12, 21, 29, 37], WR: [4, 11, 19, 27, 35], TE: [6, 14], K: [4], DEF: [3, 11] };
+  const ids = []; for (const p in pick) for (const i of pick[p]) { const e = byPos[p]?.[i]; if (e) ids.push(e[0]); }
+  if (ids.length) { state.roster = ids; state.example = true; save(); }
+}
+
+/* ---------- coaches (ESPN head-coach check, cached 24h) ---------- */
+async function checkCoaches(season) {
+  const key = 'fo1:coach:' + season, c = store.get(key);
+  if (c && Date.now() - c.ts < 864e5) { D.coaches = c.data; if (state.tab === 'teams') render(); return; }
+  const idFrom = j => { const ref = j?.items?.[0]?.$ref || ''; const m = /coaches\/(\d+)/.exec(ref); return m ? { id: m[1], ref: ref.replace(/^http:/, 'https:') } : null; };
+  const res = await pool(ABBR, 6, async T => {
+    const tid = TEAMS[T][0];
+    const [now, prev] = await Promise.all([fetchJSON(API.coaches(season, tid)).catch(() => null), fetchJSON(API.coaches(season - 1, tid)).catch(() => null)]);
+    const a = idFrom(now), b = idFrom(prev); if (!a) return null;
+    const doc = await fetchJSON(a.ref).catch(() => null);
+    return [T, { name: doc ? `${doc.firstName} ${doc.lastName}` : null, isNew: b ? a.id !== b.id : null }];
+  });
+  const data = Object.fromEntries(res.filter(Boolean));
+  if (Object.keys(data).length) { D.coaches = data; store.set(key, { ts: Date.now(), data }); if (state.tab === 'teams') render(); }
+}
+
+/* ---------- ESPN league import ---------- */
+async function loadLeague() {
+  const id = (state.espn.leagueId || '').trim(); D.espnMsg = null;
+  if (!/^\d+$/.test(id)) { D.espnMsg = ['err', 'Enter the number after leagueId= in your ESPN league URL.']; return render(); }
+  if (D.snapshot) { D.espnMsg = ['err', 'This published copy can’t reach ESPN. Paste your roster in the Players tab instead, or use index.html on your computer.']; return render(); }
+  D.espnMsg = ['info', 'Loading league…']; render();
+  try {
+    const j = await fetchJSON(API.league(D.season, id));
+    D.espnLeague = j;
+    D.espnTeams = (j.teams || []).map(t => ({ id: t.id, name: t.name || [t.location, t.nickname].filter(Boolean).join(' ') || ('Team ' + t.id), entries: t.roster?.entries || [] }));
+    D.espnMsg = D.espnTeams.length ? ['info', `Found ${D.espnTeams.length} teams. Pick yours and press Use this team.`] : ['err', 'ESPN returned no teams for that league and season.'];
+  } catch (e) {
+    D.espnMsg = ['err', e.status === 401 || e.status === 403 ? 'This league is private, so ESPN won’t share it with this page. Copy your roster from ESPN and paste it in the Players tab (it stays saved here). Or ask your league manager to make the league viewable to the public in ESPN’s league settings, then load it again.' : e.status === 404 ? 'ESPN has no league with that ID for this season.' : 'Could not reach ESPN (' + e.message + '). Try again, or add players in the Players tab.'];
+  }
+  render();
+}
+function useEspnTeam() {
+  const t = (D.espnTeams || []).find(t => String(t.id) === String(state.espn.teamId)); if (!t) return;
+  const ids = [], missed = [], slotOf = {};
+  for (const e of t.entries) {
+    const p = e.playerPoolEntry?.player || {}, pos = ESPN_POS[p.defaultPositionId], team = ESPN_TO_ABBR[p.proTeamId];
+    let id = null;
+    if (pos === 'DEF') id = team || null;
+    else { const c = D.nameIdx.get(norm(p.fullName)) || []; id = c.find(x => D.U.get(x)?.pos === pos && D.U.get(x)?.team === team) || c.find(x => D.U.get(x)?.pos === pos) || c[0] || null; }
+    if (id && D.U.has(id)) { ids.push(id); slotOf[id] = e.lineupSlotId; } else missed.push(p.fullName || '?');
+  }
+  const sc = D.espnLeague?.settings?.rosterSettings?.lineupSlotCounts;
+  if (sc) { const s = Object.fromEntries(SLOT_TYPES.map(t => [t.k, 0])); for (const k in sc) if (ESPN_SLOT[k]) s[ESPN_SLOT[k]] += sc[k]; if (Object.values(s).some(Boolean)) state.slots = s; }
+  state.roster = ids; state.example = false; state.espn.slotOf = slotOf; save();
+  D.espnMsg = ['info', `Imported ${ids.length} players from ${t.name}.` + (missed.length ? ` Not matched: ${missed.join(', ')}. Add them in the Players tab.` : '')];
+  state.tab = 'lineup'; render();
+}
+
+/* ---------- coaching profiles (matchup breakdown) ----------
+   Play-caller backgrounds come from public coaching records through 2025 plus 2026 hiring reports. Each coach maps to a
+   scheme family; the family carries a general lean per position: 1 helps, -1 hurts, 0 neutral. That lean is paired with
+   the team's measured tendencies below; it is shown for context only and does not change any projection. */
+const OFF_FAM = {
+  shanahan: { label: 'Wide zone & play-action (Shanahan tree)', QB: [-1, 'efficient passing but below-average volume and few designed QB runs'], RB: [1, 'outside-zone runs and screens make the lead back a high-volume role'], WR: [0, 'targets funnel to one or two receivers, with yards after catch on crossers'], TE: [1, 'the TE gets seam and play-action targets when he isn’t blocking'], K: [0, ''], DEF: [0, 'play-action and bootlegs cut down on sacks'] },
+  mcvay: { label: 'Three-WR play-action (McVay tree)', QB: [0, 'play-action efficiency with average volume'], RB: [0, 'steady carries for the lead back but limited targets'], WR: [1, 'the top two receivers soak up most targets'], TE: [-1, 'the TE is a low-volume target'], K: [0, ''], DEF: [0, 'quick play-action limits sacks'] },
+  reid: { label: 'West Coast with RPOs & screens (Reid tree)', QB: [1, 'high pass volume with RPOs and designed throws'], RB: [1, 'backs catch plenty of screens and swing passes'], WR: [0, 'targets spread among several receivers'], TE: [1, 'the TE is a focal point of the passing game'], K: [0, ''], DEF: [-1, 'quick throws are hard to sack'] },
+  payton: { label: 'Multiple-personnel West Coast (Payton tree)', QB: [0, 'timing passing game with moderate volume'], RB: [1, 'backs are heavily involved as receivers'], WR: [0, 'targets rotate by matchup'], TE: [0, 'TE usage swings week to week'], K: [0, ''], DEF: [0, ''] },
+  johnson: { label: 'Motion-heavy multiple (Ben Johnson tree)', QB: [1, 'play-action and motion create efficient throws'], RB: [1, 'gap and zone runs feed the backfield a lot of volume'], WR: [1, 'slot and motion receivers get schemed touches'], TE: [1, 'the TE works the middle of the field'], K: [0, ''], DEF: [-1, 'motion and quick game limit sacks'] },
+  spread: { label: 'Shotgun spread with QB runs', QB: [1, 'designed QB runs add rushing points'], RB: [-1, 'carries are shared with the QB and often a committee'], WR: [0, 'targets are spread across many receivers'], TE: [0, 'the TE is one of several options'], K: [0, ''], DEF: [-1, 'mobile QBs avoid sacks'] },
+  erhardt: { label: 'Game-plan offense (Erhardt-Perkins)', QB: [0, 'short, high-percentage passing'], RB: [0, 'committee backfield whose roles change by opponent'], WR: [-1, 'targets shift weekly with the game plan'], TE: [1, 'the TE is a regular part of the plan'], K: [0, ''], DEF: [0, ''] },
+  westcoast: { label: 'West Coast timing offense', QB: [0, 'quick, timing-based passing'], RB: [1, 'a workhorse back with receiving work'], WR: [1, 'the WR1 is fed heavily'], TE: [0, 'moderate TE role'], K: [0, ''], DEF: [0, ''] },
+  vertical: { label: 'Play-action with vertical shots', QB: [0, 'boom-or-bust passing weeks'], RB: [0, 'the run game sets up play-action'], WR: [1, 'downfield shots favor the outside receivers'], TE: [0, ''], K: [0, ''], DEF: [1, 'deep drops lead to more sacks and turnovers'] },
+};
+const DEF_FAM = {
+  fangio: { label: 'Two-high shell (Fangio tree)', QB: [-1, 'deep throws are taken away, so QBs have to check down'], RB: [1, 'light boxes invite the run'], WR: [-1, 'fewer explosive plays for outside receivers'], TE: [1, 'underneath and seam targets open up'], K: [0, 'long drives that stall create field-goal tries'], DEF: [0, 'limits big plays; sacks come from a four-man rush'] },
+  wide9: { label: '4-3 wide-9 with single-high coverage', QB: [0, 'pressure comes from four rushers with zone coverage behind'], RB: [-1, 'the front is built to stop the run'], WR: [1, 'single-high coverage leaves outside receivers one-on-one'], TE: [1, 'the seams and middle can open against Cover-3'], K: [0, ''], DEF: [1, 'a four-man rush produces sacks without blitzing'] },
+  blitz: { label: 'Blitz-heavy with man coverage', QB: [-1, 'frequent pressure leads to sacks and turnovers'], RB: [1, 'screens and checkdowns beat the blitz'], WR: [0, 'big-play chances against man coverage, but less time to throw'], TE: [0, 'quick throws to the TE beat the blitz'], K: [0, ''], DEF: [1, 'pressure creates sacks and turnovers'] },
+  multiple: { label: 'Multiple fronts & disguised coverage', QB: [-1, 'disguised looks slow QBs down'], RB: [0, 'no consistent weakness against the run'], WR: [0, 'no single coverage weakness to target'], TE: [0, ''], K: [0, ''], DEF: [0, 'disguise creates some pressure and mistakes'] },
+};
+const COACH = {
+  // offensive play-callers: [family, background, how they run the offense]
+  'Mike LaFleur': ['shanahan', 'First year as a head coach. Rams OC 2023–25 under Sean McVay, Jets OC 2021–22, and came up on Kyle Shanahan’s 49ers staff.', 'Outside-zone runs, play-action and bootlegs, with crossing routes built off the run game.'],
+  'Kevin Stefanski': ['shanahan', 'Browns head coach 2020–25 (two-time Coach of the Year) and Vikings OC before that. Reunited with Tommy Rees in Atlanta.', 'Wide-zone run game with heavy two-TE personnel and play-action shots; stays committed to the run.'],
+  'Declan Doyle': ['johnson', 'First-time play-caller with the Ravens. Bears OC under Ben Johnson in 2025, earlier on Sean Payton’s staffs in Denver and New Orleans.', 'Expect a Johnson/Payton blend: lots of pre-snap motion, varied personnel, and a run game built around a mobile QB.'],
+  'Joe Brady': ['spread', 'Promoted to head coach after running Buffalo’s offense as OC (2023–25); LSU passing-game coordinator in its 2019 title season.', 'Shotgun spread built around Josh Allen: designed QB runs, short passes spread across many receivers, and an RB committee.'],
+  'Dave Canales': ['shanahan', 'Panthers head coach since 2024; Buccaneers OC in 2023 and a longtime Seahawks assistant under Pete Carroll.', 'Run-first, under-center play-action and outside zone; the passing game is built off play-action rather than volume.'],
+  'Ben Johnson': ['johnson', 'Bears head coach since 2025; Lions OC 2022–24, when Detroit led the league in scoring.', 'Creative, motion-heavy offense mixing gap and zone runs, trick plays and play-action; feeds the slot and the TE over the middle.'],
+  'Zac Taylor': ['mcvay', 'Bengals head coach since 2019; came from Sean McVay’s Rams staff.', 'Pass-first, three-receiver offense built on timing throws; targets concentrate on the top two WRs with a modest run game.'],
+  'Todd Monken': ['vertical', 'First year as Browns head coach; Ravens OC 2023–25, Georgia OC for two national titles, and Buccaneers OC before that.', 'Spread passing with vertical shots, balanced by a downhill run game; uses the TE as a primary receiver.'],
+  'Brian Schottenheimer': ['vertical', 'Cowboys head coach since 2025 after three years as Dallas OC; longtime coordinator with the Jets, Rams and Seahawks.', 'Balanced, play-action-heavy offense that leans hard on its WR1 and runs to set up shots.'],
+  'Sean Payton': ['payton', 'Broncos head coach since 2023; Saints head coach 2006–21, including the Super Bowl XLIV title.', 'Multiple-personnel West Coast offense: backs heavily involved as receivers, screens, and matchup-based targeting of the TE and slot.'],
+  'Drew Petzing': ['shanahan', 'Lions OC in 2026; Cardinals OC 2023–25 and Browns QB coach under Kevin Stefanski before that.', 'Stefanski-tree zone and gap runs with heavy TE usage; his Arizona offenses featured the TE and a high run rate.'],
+  'Matt LaFleur': ['shanahan', 'Packers head coach since 2019; former Titans OC and Rams OC from the Shanahan/McVay tree.', 'Wide-zone and play-action offense that spreads targets across a deep WR room instead of feeding one receiver.'],
+  'Nick Caley': ['mcvay', 'Texans OC since 2025; Rams TE coach and pass-game coordinator under McVay, and a Patriots assistant before that.', 'McVay-tree system: under-center play-action, outside zone and condensed formations.'],
+  'Shane Steichen': ['spread', 'Colts head coach since 2023; Eagles OC 2021–22 during Jalen Hurts’ breakout, Chargers OC before that.', 'RPOs and QB runs blended with play-action, and a high run rate built around the lead back.'],
+  'Liam Coen': ['mcvay', 'Jaguars head coach since 2025; Buccaneers OC in 2024 and twice on McVay’s Rams staff.', 'McVay-tree outside zone and play-action with heavy RB usage; his Tampa offense ranked near the top in rushing.'],
+  'Andy Reid': ['reid', 'Chiefs head coach since 2013 (three Super Bowl titles); Eagles head coach 1999–2012.', 'Pass-first West Coast offense with RPOs, screens and creative designs; the TE is a focal point and backs catch a lot of passes.'],
+  'Klint Kubiak': ['shanahan', 'First year as Raiders head coach; Seahawks OC in 2025, Saints OC in 2024, from the Shanahan/Kubiak tree.', 'Wide zone, under-center play-action and bootlegs; leans on the run and pushes volume to the lead back.'],
+  'Mike McDaniel': ['shanahan', 'Chargers OC in 2026; Dolphins head coach 2022–25 and Kyle Shanahan’s run-game coordinator and OC in San Francisco.', 'Speed-based outside zone, heavy motion and explosive play-action designed to get receivers the ball in space.'],
+  'Sean McVay': ['mcvay', 'Rams head coach since 2017 (Super Bowl LVI title).', 'Three-receiver, under-center play-action and outside zone; targets funnel to the top two WRs and the TE plays a smaller role.'],
+  'Bobby Slowik': ['shanahan', 'Dolphins OC in 2026; Texans OC 2023–24 and a Shanahan assistant in San Francisco.', 'Shanahan-tree play-action and wide zone; his Houston offense pushed the ball downfield to its top WRs.'],
+  'Kevin O’Connell': ['mcvay', 'Vikings head coach since 2022; Rams OC under McVay before that.', 'McVay-tree passing game that feeds the WR1 heavily, with play-action and a moderate run game.'],
+  'Josh McDaniels': ['erhardt', 'Patriots OC since 2025 (third stint); designed New England’s Brady-era offenses, Raiders head coach 2022–23.', 'Game-plan offense that changes weekly to attack the opponent; uses the TE and backs as receivers and often a backfield committee.'],
+  'Kellen Moore': ['vertical', 'Saints head coach since 2025; Eagles OC in their 2024 title season, previously Chargers and Cowboys OC.', 'Motion-heavy, adaptable offense: willing to run a lot (Eagles 2024) or throw a lot (Dallas) depending on personnel.'],
+  'Matt Nagy': ['reid', 'Giants OC in 2026; Chiefs OC 2023–25 under Andy Reid and Bears head coach 2018–21.', 'Reid-tree West Coast with RPOs, screens and quick game; the TE is a key target.'],
+  'Frank Reich': ['westcoast', 'Jets OC in 2026; head coach of the Colts (2018–22) and Panthers (2023), and Eagles OC in their 2017 title season.', 'Spread-friendly West Coast offense with RPOs, a high pass rate and plenty of RB receiving work.'],
+  'Sean Mannion': ['shanahan', 'First-time play-caller; Packers QB coach under Matt LaFleur and a former NFL quarterback.', 'Expect a LaFleur-tree system of play-action and zone runs layered onto the Eagles’ heavy run game.'],
+  'Mike McCarthy': ['westcoast', 'First year as Steelers head coach; Cowboys head coach 2020–24 and Packers head coach 2006–18 (Super Bowl XLV).', 'West Coast quick-timing offense; his 2023 Dallas offense led the league in scoring and fed its WR1 and RB heavily.'],
+  'Kyle Shanahan': ['shanahan', '49ers head coach since 2017; Falcons OC in their record-scoring 2016 season.', 'Wide-zone runs, play-action and yards-after-catch crossers; the lead back is one of the most productive roles in fantasy.'],
+  'Brian Fleury': ['shanahan', 'First-time OC; 49ers tight ends coach and run-game coordinator under Kyle Shanahan.', 'Expect the Shanahan-tree outside zone and play-action Seattle ran under Klint Kubiak.'],
+  'Zac Robinson': ['mcvay', 'Buccaneers OC in 2026; Falcons OC 2024–25 and on McVay’s Rams staff before that.', 'McVay-tree play-action with condensed splits; in Atlanta he leaned on a workhorse back.'],
+  'Brian Daboll': ['spread', 'Titans OC in 2026; Giants head coach 2022–25 and Bills OC 2018–21 during Josh Allen’s development.', 'Spread, multiple formations with QB runs and a deep-shot passing game; spreads targets around.'],
+  'David Blough': ['spread', 'First-time play-caller; Commanders QB coach under Kliff Kingsbury in 2024–25.', 'Expect continuity with the Kingsbury system: shotgun spread, quick reads and Jayden Daniels’ designed runs.'],
+  // defensive play-callers
+  'Nick Rallis': ['fangio', 'Cardinals DC since 2023; came up under Jonathan Gannon in Philadelphia and on Minnesota’s linebacker staff.', 'Gannon-style two-high shell that limits explosive passes and dares offenses to run.'],
+  'Jeff Ulbrich': ['wide9', 'Falcons DC since 2025; Jets DC 2021–24 under Robert Saleh.', 'Saleh-tree 4-3: a wide-9 front that rushes four, single-high zone coverage behind it, and an emphasis on tackling.'],
+  'Jesse Minter': ['fangio', 'First year as Ravens head coach; Chargers DC 2024–25 (top scoring defense in 2024) and Michigan DC before that.', 'Disguised two-high shells, simulated pressures and sound run fits from the Fangio/Macdonald school.'],
+  'Jim Leonhard': ['blitz', 'First-year Bills DC; Broncos defensive pass-game coordinator, previously Wisconsin DC and interim head coach.', 'Wisconsin-style 3-4 with creative pressure packages and disguised coverages.'],
+  'Ejiro Evero': ['fangio', 'Panthers DC since 2023; Broncos DC in 2022, from the Fangio and McVay trees.', 'Fangio-style 3-4 two-high defense that limits big plays and keeps everything in front.'],
+  'Dennis Allen': ['blitz', 'Bears DC since 2025; Saints head coach 2022–24 and longtime Saints DC.', 'Aggressive multiple front with frequent blitzes and man coverage.'],
+  'Al Golden': ['multiple', 'Bengals DC since 2025; Notre Dame DC 2022–24 and former Miami (FL) head coach.', 'Multiple front with disguised coverages; still building a consistent identity in Cincinnati.'],
+  'Mike Rutenberg': ['multiple', 'First-time NFL DC; Falcons defensive pass-game coordinator in 2025.', 'No track record as a play-caller yet; treat his tendencies as unknown until a few games are in.'],
+  'Christian Parker': ['fangio', 'First-time DC; Eagles defensive backs coach under Vic Fangio, and on Fangio’s Broncos staff before that.', 'Fangio-tree two-high coverage that limits deep passes and invites runs and underneath throws.'],
+  'Vance Joseph': ['blitz', 'Broncos DC since 2023; Cardinals DC 2019–22 and Broncos head coach 2017–18.', 'Blitz-heavy, man-coverage defense that leads with pressure and sacks.'],
+  'Kelvin Sheppard': ['blitz', 'Lions DC since 2025, promoted from linebackers coach after Aaron Glenn left.', 'Aggressive, man-heavy defense carried over from Glenn’s system.'],
+  'Jonathan Gannon': ['fangio', 'Packers DC in 2026; Cardinals head coach 2023–25 and Eagles DC during their 2022 Super Bowl run.', 'Two-high shell, light boxes and a four-man rush that limits explosive passes.'],
+  'DeMeco Ryans': ['wide9', 'Texans head coach since 2023 and their defensive play-caller; 49ers DC 2021–22.', 'Shanahan/Saleh-tree 4-3: wide-9 pass rush with four, zone coverage behind it, fast linebackers.'],
+  'Lou Anarumo': ['multiple', 'Colts DC since 2025; Bengals DC 2019–24.', 'Disguised coverages and simulated pressures, with a plan that changes by opponent.'],
+  'Anthony Campanile': ['multiple', 'Jaguars DC since 2025; Packers linebackers coach and run-game coordinator, and a longtime Dolphins assistant.', 'Multiple front focused on stopping the run, with mixed zone coverage behind it.'],
+  'Steve Spagnuolo': ['blitz', 'Chiefs DC since 2019 (three Super Bowl titles); Giants DC in their Super Bowl XLII upset.', 'Exotic blitzes and simulated pressures, especially on third down; a tough week for opposing QBs.'],
+  'Rob Leonard': ['multiple', 'First-time DC; promoted from Raiders run-game coordinator.', 'No track record as a play-caller yet; treat his tendencies as unknown until a few games are in.'],
+  'Chris O’Leary': ['fangio', 'First-year NFL coordinator; Western Michigan DC in 2025.', 'Expected to keep the Minter-style disguised two-high system the Chargers ran.'],
+  'Chris Shula': ['fangio', 'Rams DC since 2024; longtime Rams linebackers coach under Raheem Morris.', 'Morris/Fangio-tree two-high coverage with a young, fast pass rush.'],
+  'Jeff Hafley': ['wide9', 'First year as Dolphins head coach; Packers DC 2024–25 and former Boston College head coach.', '4-3 front that rushes four and plays aggressive single-high coverage.'],
+  'Brian Flores': ['blitz', 'Vikings DC since 2023; Dolphins head coach 2019–21.', 'League-leading blitz rates and simulated pressures that hide who is rushing; creates sacks and turnovers but can give up big plays.'],
+  'Zak Kuhr': ['multiple', 'Patriots DC in 2026, promoted within Mike Vrabel’s staff.', 'Vrabel-style multiple front with man coverage and physical run defense.'],
+  'Brandon Staley': ['fangio', 'Saints DC since 2025; Chargers head coach 2021–23 and Rams DC in 2020.', 'Fangio-tree two-high, light-box defense that limits deep passes but can be run on.'],
+  'Dennard Wilson': ['multiple', 'Giants DC in 2026; Titans DC 2024–25 and Ravens defensive backs coach before that.', 'Aggressive press coverage on the outside with a lot of man looks.'],
+  'Brian Duker': ['fangio', 'First-time NFL DC; Dolphins defensive pass-game coordinator who worked under Vic Fangio in 2024.', 'Expect Fangio-influenced two-high coverage that limits explosive passes.'],
+  'Vic Fangio': ['fangio', 'Eagles DC since 2024 (Super Bowl LIX title); Broncos head coach 2019–21 and the architect of the modern two-high defense.', 'Two-high shell, disguised coverages and few blitzes; makes offenses drive the field with short throws.'],
+  'Patrick Graham': ['multiple', 'Steelers DC in 2026; Raiders DC 2022–25 and Giants DC before that.', 'Game-plan-specific defense with simulated pressures and frequent coverage changes.'],
+  'Raheem Morris': ['fangio', '49ers DC in 2026; Falcons head coach 2024–25 and Rams DC for their Super Bowl LVI title.', 'Two-high zone coverage with a four-man rush that keeps plays in front.'],
+  'Mike Macdonald': ['multiple', 'Seahawks head coach since 2024 and their defensive play-caller; Ravens DC 2022–23 (No. 1 scoring defense in 2023).', 'Disguise-heavy hybrid scheme that shows one coverage and plays another, with simulated pressures; hard on QBs.'],
+  'Todd Bowles': ['blitz', 'Buccaneers head coach since 2022 and their defensive play-caller; Bucs DC in their Super Bowl LV win.', 'One of the league’s most blitz-happy defenses, with man coverage behind the pressure.'],
+  'Robert Saleh': ['wide9', 'First year as Titans head coach; 49ers DC in 2025 and 2017–20, Jets head coach 2021–24.', 'Wide-9 4-3 that rushes four with single-high Cover-3 behind it, built to stop the run.'],
+  'Daronte Jones': ['blitz', 'First-time NFL DC; Vikings defensive pass-game coordinator under Brian Flores.', 'Expect Flores-influenced pressure looks and disguised coverages.'],
+};
+function teamUsage(T) {
+  // targets and carries for the current season, for a player's share of his team's volume
+  if (!D.usage) { D.usage = {}; for (const wk of D.weeks || []) for (const [, , t, , , , , , ra, , tg] of wk.P) { const u = D.usage[t] || (D.usage[t] = { tgt: 0, ra: 0 }); u.tgt += tg; u.ra += ra; } }
+  return D.usage[T] || { tgt: 0, ra: 0 };
+}
+function lean(n) { return n > 0.4 ? ['Helps', 'up'] : n < -0.4 ? ['Hurts', 'down'] : ['Neutral', '']; }
+function sideCard(kind, team, caller, title, statLines, famLean, dataLean, dataTxt, posLabel) {
+  const c = COACH[caller], fam = c ? (kind === 'O' ? OFF_FAM : DEF_FAM)[c[0]] : null;
+  const fl = fam ? fam[posLabel] || [0, ''] : [0, ''];
+  const score = (fam ? fl[0] * 0.6 : 0) + dataLean, [lab, dir] = lean(score);
+  const st = staffOf(team), isNew = kind === 'O' ? st.offNew : st.defNew;
+  return `<div class="side"><div class="row-head"><span class="label">${esc(title)}</span><span class="chip ${dir}">${lab} your ${posLabel === 'DEF' ? 'D/ST' : posLabel}</span></div>
+    <div><strong>${esc(caller || 'Unknown play-caller')}</strong>${isNew ? ' <span class="pill n">New</span>' : ''} <span class="small muted">${team} ${kind === 'O' ? 'offense' : 'defense'}${fam ? ' · ' + esc(fam.label) : ''}</span></div>
+    ${c ? `<div class="small">${esc(c[1])}</div><div class="small"><strong>How they run it:</strong> ${esc(c[2])}</div>` : `<div class="small muted">No profile for this play-caller. The numbers below still describe how ${team} plays.</div>`}
+    <ul class="tend">${statLines.map(s => `<li>${s}</li>`).join('')}</ul>
+    <div class="small"><strong>For your player:</strong> ${esc([fam && fl[1] ? 'Scheme: ' + fl[1] + '.' : '', dataTxt].filter(Boolean).join(' '))}</div></div>`;
+}
+function schemeBlock(r) {
+  if (!r.T || !D.B[r.T]) return '';
+  const pos = r.pos, T = r.T, O = r.O, L = D.L, tb = D.B[T], ob = O ? D.B[O] : null, cmp = (v, a, f) => `${f(v)} <span class="muted">(avg ${f(a)})</span>`;
+  const offTeam = pos === 'DEF' ? O : T, defTeam = pos === 'DEF' ? T : O;
+  const ofb = offTeam ? D.B[offTeam] : null, dfb = defTeam ? D.B[defTeam] : null;
+  const cards = [];
+  if (ofb) {
+    const u = teamUsage(offTeam), h = r.h, lines = [
+      `Pass rate ${cmp(ofb.passRate, L.passRate, pct)}, ${cmp(ofb.plays, L.plays, f1)} plays/game`,
+      `Target share: RB ${pct(ofb.tsRB)}, WR ${pct(ofb.tsWR)}, TE ${pct(ofb.tsTE)} <span class="muted">(avg ${pct(L.tsRB)} / ${pct(L.tsWR)} / ${pct(L.tsTE)})</span>`,
+      `Rushing ${cmp(ofb.ypc, L.ypc, f1)} yds/carry · ${cmp(ofb.sacksTaken, L.sacksTaken, f1)} sacks allowed/game`];
+    const tr = trendTxt(offTeam, 'passRate'); if (tr) lines.push(`Pass rate ${tr.replace(' · ', '')}`);
+    let dataLean = 0, txt = '';
+    if (pos === 'DEF') { dataLean = clamp(ratio(ofb.sacksTaken, L.sacksTaken) * 3 + ratio(ofb.fpaDEF, L.fpaDEF) * 2, -1, 1); txt = `${offTeam} gives up ${f1(ofb.sacksTaken)} sacks and ${f1(ofb.fpaDEF)} D/ST points per game.`; }
+    else if (pos === 'K') { dataLean = clamp(ratio(ofb.plays, L.plays) * 4, -1, 1); txt = `More plays mean more scoring chances; ${offTeam} runs ${f1(ofb.plays)} a game.`; }
+    else {
+      const posShare = { RB: ofb.tsRB, WR: ofb.tsWR, TE: ofb.tsTE }[pos], lgShare = { RB: L.tsRB, WR: L.tsWR, TE: L.tsTE }[pos];
+      dataLean = clamp((pos === 'RB' ? ratio(1 - ofb.passRate, 1 - L.passRate) : ratio(ofb.passRate, L.passRate)) * 3 + (posShare ? ratio(posShare, lgShare) * 1.5 : 0), -1, 1);
+      if (pos === 'QB') dataLean = clamp(ratio(ofb.passRate, L.passRate) * 3 + ratio(ofb.plays, L.plays) * 2 - ratio(ofb.sacksTaken, L.sacksTaken), -1, 1);
+      const share = h?.n && u.tgt ? (pos === 'RB' ? `${r.u.name} has ${pct(h.ra / Math.max(1, u.ra))} of ${offTeam}’s carries and ${pct(h.tgt / u.tgt)} of its targets.` : pos !== 'QB' ? `${r.u.name} has ${pct(h.tgt / u.tgt)} of ${offTeam}’s targets.` : '') : '';
+      txt = [share, pos === 'QB' ? `${offTeam} throws on ${pct(ofb.passRate)} of plays.` : posShare ? `${pos}s get ${pct(posShare)} of ${offTeam}’s targets (avg ${pct(lgShare)}).` : ''].filter(Boolean).join(' ');
+    }
+    const caller = staffOf(offTeam).offCaller || staffOf(offTeam).oc;
+    cards.push(sideCard('O', offTeam, caller, pos === 'DEF' ? 'Opponent offense' : 'Your offense', lines, 0, dataLean, txt, pos));
+  }
+  if (dfb) {
+    const fk = 'fpa' + (pos === 'DEF' ? 'DEF' : pos), rk = D.ranks[pos === 'DEF' ? 'sacks' : fk]?.[defTeam];
+    const lines = [
+      pos === 'DEF' ? `Gets ${cmp(dfb.sacks, L.sacks, f1)} sacks/game, ranked ${rk ? ord(rk) : '?'} of 32` : `Allows ${cmp(dfb[fk], L[fk], f1)} PPR pts/game to ${pos}s, the ${rk ? ord(rk) : '?'} most`,
+      `Pass yds allowed ${cmp(dfb.passYdA, L.passYdA, f0)}/game · ${cmp(dfb.ypcA, L.ypcA, f1)} yds/carry allowed`,
+      `${cmp(dfb.ptsA, L.ptsA, f1)} pts allowed/game · ${cmp(dfb.sacks, L.sacks, f1)} sacks/game`];
+    const tr = trendTxt(defTeam, fk, true); if (tr) lines.push(tr.trim());
+    let dataLean, txt;
+    if (pos === 'DEF') { dataLean = clamp(ratio(dfb.sacks, L.sacks) * 2 - ratio(dfb.ptsA, L.ptsA) * 2, -1, 1); txt = `${defTeam} allows ${f1(dfb.ptsA)} points a game (avg ${f1(L.ptsA)}).`; }
+    else { dataLean = clamp(ratio(dfb[fk], L[fk]) * 3 + (pos === 'RB' ? ratio(dfb.ypcA, L.ypcA) : ratio(dfb.passYdA, L.passYdA)) * 2 - (pos === 'QB' ? ratio(dfb.sacks, L.sacks) : 0), -1, 1); txt = `${defTeam} allows ${f1(dfb[fk])} points a game to ${pos}s (avg ${f1(L[fk])}).`; }
+    const caller = staffOf(defTeam).defCaller || staffOf(defTeam).dc;
+    cards.push(sideCard('D', defTeam, caller, pos === 'DEF' ? 'Your defense' : 'Opponent defense', lines, 0, dataLean, txt, pos));
+  }
+  return cards.length ? `<div class="schemes">${cards.join('')}</div><div class="small muted">Coach profiles describe each play-caller’s usual approach; the verdict weighs that against this season’s numbers. It’s context and doesn’t change the projection.</div>` : '';
+}
+
+/* ---------- waivers: add/drop equity ----------
+   Each player gets a per-game base (projection blended with season average), scaled week by week by how many
+   fantasy points that week's opponent allows to the position (fading toward neutral further out), zero on byes.
+   A move's equity is how much the best possible lineup gains, week by week, if the free agent replaces the dropped player. */
+const isLongInj = inj => /^(ir|pup|sus|na)/i.test(inj || '');
+function rosBase(id) {
+  const r = D.M[id]; if (!r) return 0;
+  if (state.overrides[id] != null && ok(+state.overrides[id])) return +state.overrides[id];
+  const avg = r.h?.n ? r.h.avg : null, pj = r.projPts, b = state.settings.blend;
+  return pj != null && avg != null ? b * pj + (1 - b) * avg : (pj ?? avg ?? 0);
+}
+function schedOpp(T, w) { const m = D.sched?.[w]; if (!m || !Object.keys(m).length) return { opp: null, bye: false, unknown: true }; const g = m[T]; return g ? { opp: g.opp, home: g.home, bye: false } : { opp: null, bye: true }; }
+function matchupMult(pos, opp, w) {
+  if (!opp) return 1; const k = pos === 'DEF' ? 'fpaDEF' : 'fpa' + pos, fade = clamp(1 - (w - D.week - 1) * 0.1, 0.4, 1);
+  return clamp(1 + state.settings.intensity * (state.settings.w.dvp ?? 1) * ratio(D.B[opp]?.[k], D.L[k]) * fade, 0.75, 1.25);
+}
+/* A backup filling in for an injured starter at his position: his current projection overstates his long-run value. */
+function fillInFor(id) {
+  const u = D.U.get(id); if (!u?.team || !['QB', 'RB', 'TE'].includes(u.pos)) return null; const n = D.H[id]?.n ?? 0;
+  return [...D.U.values()].find(x => x.id !== id && x.team === u.team && x.pos === u.pos && /^(out|ir|doubtful|pup)/i.test(x.inj || '') && (D.H[x.id]?.avg ?? 0) >= 10 && (D.H[x.id]?.n ?? 0) > n) || null;
+}
+function weekVals(id, weeks) {
+  const r = D.M[id]; if (!r) return weeks.map(() => 0);
+  const base = rosBase(id), u = r.u, fill = fillInFor(id);
+  return weeks.map((w, i) => {
+    if (isLongInj(u.inj) && i < 4) return 0;
+    if (w === D.week) return r.status !== 'ok' || r.locked ? 0 : r.mean;
+    const s = schedOpp(u.team, w); if (s.bye || !u.team) return 0;
+    return base * matchupMult(u.pos, s.opp, w) * (fill && i >= 2 ? 0.5 : 1);
+  });
+}
+function bestLineup(ids, wi, V, slots) {
+  const c = ids.filter(id => V[id] && V[id][wi] > 0), n = slots.length; if (!n) return { total: 0, starters: [] };
+  const cost = slots.map(s => { const row = c.map(id => s.elig.includes(D.U.get(id).pos) ? -V[id][wi] : 1e6); for (let i = 0; i < n; i++) row.push(1e5); return row; });
+  const asg = hungarian(cost); let total = 0; const starters = [];
+  asg.forEach((j, i) => { if (j >= 0 && j < c.length && cost[i][j] < 1e5) { total += V[c[j]][wi]; starters.push([slots[i], c[j]]); } });
+  return { total, starters };
+}
+function availablePool() {
+  const W = state.waivers, ros = new Set(state.roster);
+  const list = W.source === 'list' && W.faList.length ? new Set(W.faList) : null;
+  return [...D.U.values()].filter(u => D.M[u.id] && !ros.has(u.id) && !W.taken[u.id] && (D.proj[u.id]?.pts > 0 || D.H[u.id]?.n) && !isLongInj(u.inj)
+    && (list ? list.has(u.id) : (D.own.get(u.id) ?? 0) < W.ownMax)).map(u => u.id);
+}
+function computeWaivers() {
+  const W = state.waivers;
+  const key = JSON.stringify([state.roster, state.overrides, state.settings, state.slots, W, D.loadedAt?.getTime(), D.week]);
+  if (D.wCache && D.wCache.key === key) return D.wCache;
+  const weeks = []; for (let w = D.week; w <= 18; w++) weeks.push(w);
+  const H = W.horizon === 'ros' ? weeks.length : Math.min(W.horizon, weeks.length);
+  const slots = expandSlots(), roster = state.roster.filter(id => D.M[id]);
+  const pool = availablePool(), V = {};
+  for (const id of [...roster, ...pool]) V[id] = weekVals(id, weeks);
+  const sumH = id => V[id].slice(0, H).reduce((s, x) => s + x, 0), sumAll = id => V[id].reduce((s, x) => s + x, 0);
+  const base = weeks.map((_, wi) => bestLineup(roster, wi, V, slots));
+  // candidates: best 24 overall over the horizon plus the best 5 at each position
+  const byH = [...pool].sort((a, b) => sumH(b) - sumH(a)), cand = new Set(byH.slice(0, 24));
+  for (const p of POS) byH.filter(id => D.U.get(id).pos === p).slice(0, 5).forEach(id => cand.add(id));
+  const maxRoster = slots.length + 7, canAddFree = roster.length < maxRoster;
+  const moves = [];
+  for (const f of cand) {
+    let best = null;
+    const drops = canAddFree ? [null, ...roster] : roster;
+    for (const d of drops) {
+      if (d && sumAll(d) > 1.6 * sumAll(f) + 5) continue;
+      const nr = roster.filter(x => x !== d).concat(f);
+      let hz = 0, later = 0; const starts = [], lost = [];
+      for (let wi = 0; wi < weeks.length; wi++) {
+        const L2 = bestLineup(nr, wi, V, slots), diff = L2.total - base[wi].total;
+        if (wi < H) { hz += diff; const st = L2.starters.find(s => s[1] === f); if (st) starts.push([weeks[wi], st[0].label || st[0].k]); if (d && base[wi].starters.some(s => s[1] === d)) lost.push(weeks[wi]); }
+        else later += diff;
+      }
+      const score = hz + 0.35 * later;
+      if (!best || score > best.score) best = { f, d, hz, later, score, starts, lost };
+    }
+    if (best && (best.hz > 0.5 || best.score > 1)) moves.push(best);
+  }
+  moves.sort((a, b) => b.score - a.score);
+  const needs = teamNeeds(roster, V, weeks, H, slots, base);
+  return (D.wCache = { key, weeks, H, V, pool, moves: moves.slice(0, 12), needs, byH, sumH, base });
+}
+function teamNeeds(roster, V, weeks, H, slots, base) {
+  const W = state.waivers, out = [];
+  const share = { QB: { OP: .7 }, RB: { FLEX: .45, 'RB/WR': .5, OP: .1 }, WR: { FLEX: .45, 'RB/WR': .5, 'WR/TE': .75, OP: .1 }, TE: { FLEX: .1, 'WR/TE': .25, OP: .1 }, K: {}, DEF: {} };
+  for (const P of POS) {
+    const own = { QB: 'QB', RB: 'RB', WR: 'WR', TE: 'TE', K: 'K', DEF: 'D/ST' }[P];
+    const nSlots = (state.slots[own] || 0) + Object.entries(share[P]).reduce((s, [k, f]) => s + (state.slots[k] || 0) * f, 0);
+    if (nSlots <= 0) continue;
+    const all = [...D.U.values()].filter(u => u.pos === P && D.M[u.id] && (D.proj[u.id]?.pts > 0 || D.H[u.id]?.n)).sort((a, b) => rosBase(b.id) - rosBase(a.id));
+    const rank = new Map(all.map((u, i) => [u.id, i + 1]));
+    const mine = roster.filter(id => D.U.get(id).pos === P).sort((a, b) => rosBase(b) - rosBase(a));
+    const need = Math.max(1, Math.round(nSlots)); let worst = 0;
+    const rows = mine.slice(0, Math.max(need, 3)).map((id, i) => ({ id, rank: rank.get(id), starter: i < need }));
+    for (let i = 0; i < need; i++) { const r = rows[i]; const thr = W.teams * (i + 1) * (nSlots / need); worst = Math.max(worst, r && r.rank ? r.rank / thr : 3); }
+    const level = worst <= 0.7 ? 'Strong' : worst <= 1.15 ? 'OK' : 'Weak';
+    const st = mine.slice(0, need); let ms = [];
+    for (const id of st) for (let wi = 1; wi < H; wi++) { const s = schedOpp(D.U.get(id).team, weeks[wi]); if (s.opp) ms.push(matchupMult(P, s.opp, weeks[wi])); }
+    const sm = mean(ms), sched = sm == null ? null : sm >= 1.03 ? 'Easy' : sm <= 0.97 ? 'Hard' : 'Average';
+    const byes = []; for (const id of st) for (let wi = 0; wi < H; wi++) if (schedOpp(D.U.get(id).team, weeks[wi]).bye) byes.push(`wk ${weeks[wi]} ${D.U.get(id).name.split(' ').slice(-1)[0]}`);
+    out.push({ P, level, rows, sched, byes, worst });
+  }
+  const holes = []; for (let wi = 0; wi < H; wi++) { const miss = slots.length - base[wi].starters.length; if (miss > 0) holes.push(`Week ${weeks[wi]}: ${miss} empty slot${miss > 1 ? 's' : ''}`); }
+  return { list: out, holes };
+}
+function schedStrip(id, weeks, H) {
+  const u = D.U.get(id); if (!u) return '';
+  return `<span class="wks">${weeks.slice(0, H).map(w => { const s = schedOpp(u.team, w); if (s.bye) return `<span class="wk bye" title="Bye week">${w} BYE</span>`; if (!s.opp) return `<span class="wk">${w}</span>`; const m = matchupMult(u.pos, s.opp, w), d = m - 1, a = Math.min(36, Math.abs(d) * 220); return `<span class="wk" title="Week ${w}: ${s.home ? 'vs' : 'at'} ${s.opp}, matchup ${spct(d)}" style="background:color-mix(in srgb, var(${d >= 0 ? '--good' : '--bad'}) ${a.toFixed(0)}%, transparent)">${w} ${s.home ? '' : '@'}${s.opp}</span>`; }).join('')}</span>`;
+}
+function viewWaivers() {
+  const W = state.waivers;
+  if (!state.roster.length) return `<div class="card panel"><h2>Add your roster first</h2><p style="margin:0">Waiver suggestions compare free agents against your players. Paste your roster in <a href="#" data-tab="players">Players</a>.</p></div>`;
+  const R = computeWaivers(), { weeks, H, moves, needs } = R;
+  const hLab = H === 1 ? `week ${weeks[0]}` : `weeks ${weeks[0]}–${weeks[H - 1]}`;
+  const ownTxt = id => D.own.has(id) ? `${D.own.get(id) < 1 ? '<1' : Math.round(D.own.get(id))}% owned` : 'unowned';
+  const pl = id => { const u = D.U.get(id), r = D.M[id]; return `<span class="pname">${esc(u.name)}</span><span class="psub">${u.pos} · ${u.team || 'FA'} ${injPill(r)} · ${f1(rosBase(id))} pts/g</span>`; };
+  const src = W.source === 'list' && W.faList.length ? `your league’s free-agent list (${W.faList.length} players, pasted ${esc(new Date(W.faListAt).toLocaleDateString([], { month: 'short', day: 'numeric' }))})` : `players under ${W.ownMax}% owned across ESPN leagues`;
+  const warn = [];
+  if (W.source !== 'list' && !D.own.size) warn.push('ESPN ownership didn’t load, so every player not on your roster counts as available. Paste your league’s free agents below for accurate suggestions.');
+  if (state.example) warn.push('These suggestions are for the example roster. Paste your own roster in Players first.');
+  const levelCls = { Strong: 'n', OK: 'm', Weak: 'o' };
+  const needCards = needs.list.map(n => `<div class="need"><div class="row-head"><h3>${n.P === 'DEF' ? 'D/ST' : n.P}</h3><span class="pill ${levelCls[n.level]}">${n.level}</span></div>
+    ${n.rows.length ? n.rows.map(r => `<div class="small ${r.starter ? '' : 'muted'}">${esc(D.U.get(r.id).name)} <span class="muted">${n.P === 'DEF' ? 'DST' : n.P}${r.rank || '?'}</span></div>`).join('') : '<div class="small muted">Nobody at this position</div>'}
+    <div class="small muted">${n.sched ? `Schedule: <strong class="${n.sched === 'Easy' ? 'trend-up' : n.sched === 'Hard' ? 'trend-down' : ''}">${n.sched}</strong>` : ''}${n.byes.length ? ` · Bye: ${esc(n.byes.join(', '))}` : ''}</div></div>`).join('');
+  const moveRows = moves.length ? moves.map((m, i) => {
+    const fu = D.U.get(m.f), why = [];
+    const nd = needs.list.find(n => n.P === fu.pos); if (nd && nd.level === 'Weak') why.push(`fills your weak ${fu.pos === 'DEF' ? 'D/ST' : fu.pos} spot`);
+    if (m.starts.length) why.push(`starts in ${m.starts.length === H ? 'every week' : 'week' + (m.starts.length > 1 ? 's ' : ' ') + m.starts.map(s => s[0]).join(', ')} of the next ${H} (${[...new Set(m.starts.map(s => s[1]))].join('/')})`);
+    else why.push('adds depth for later weeks');
+    if (m.d && !m.lost.length) why.push(`${D.U.get(m.d).name} wouldn’t have started in that stretch`);
+    const fi = fillInFor(m.f); if (fi) why.push(`short-term: filling in for ${fi.name} (${fi.inj}), so later weeks count half`);
+    const sm = mean(weeks.slice(1, H).map(w => { const s = schedOpp(fu.team, w); return s.opp ? matchupMult(fu.pos, s.opp, w) : null; }).filter(ok));
+    if (sm && sm >= 1.04) why.push('soft upcoming schedule'); else if (sm && sm <= 0.96) why.push('tough upcoming schedule');
+    return `<div class="item move"><div class="mrank num">${i + 1}</div>
+      <div class="mside"><span class="pill n">Add</span> <div>${pl(m.f)}<span class="psub">${ownTxt(m.f)}</span></div>${schedStrip(m.f, weeks, H)}</div>
+      <div class="mside">${m.d ? `<span class="pill o">Drop</span> <div>${pl(m.d)}</div>${schedStrip(m.d, weeks, H)}` : `<span class="pill m">No drop</span> <div class="small muted">You have an open roster spot</div>`}</div>
+      <div class="mgain"><span class="num">+${f1(m.hz)}</span><span class="small muted">lineup pts, next ${H} wk${H > 1 ? 's' : ''}</span>${H < weeks.length ? `<span class="small ${m.later >= 0 ? 'trend-up' : 'trend-down'}">${m.later >= 0 ? '+' : ''}${f1(m.later)} after that</span>` : ''}</div>
+      <div class="mwhy small">${esc(why.join('; ').replace(/^./, c => c.toUpperCase()))}. <button type="button" class="btn sm" data-taken="${esc(m.f)}">Taken in my league</button></div></div>`;
+  }).join('') : `<div class="item" style="padding:14px"><span class="muted">No free agent improves your lineup over ${hLab}. Try a longer window or a higher ownership limit.</span></div>`;
+  const posBest = POS.map(p => { const top = R.byH.filter(id => D.U.get(id).pos === p).slice(0, 4); return top.map(id => `<tr><td><strong>${esc(D.U.get(id).name)}</strong> <span class="small muted">${p} · ${D.U.get(id).team}</span></td><td>${ownTxt(id)}</td><td>${f1(rosBase(id))}</td><td>${f1(R.sumH(id))}</td><td class="l">${schedStrip(id, weeks, Math.min(H, 6))}</td><td><button type="button" class="btn sm" data-taken="${esc(id)}">Taken</button></td></tr>`).join(''); }).join('');
+  const nTaken = Object.keys(W.taken).length;
+  return `<div class="section">
+  <div class="row-head"><h2>Waivers</h2><span class="small muted">Free agents from ${src}</span></div>
+  <div class="toolbar"><div class="seg" role="group" aria-label="Time window">${[[2, 'Next 2'], [4, 'Next 4'], [6, 'Next 6'], ['ros', 'Rest of season']].map(([k, l]) => `<button type="button" data-wh="${k}" aria-pressed="${W.horizon === k}">${l}</button>`).join('')}</div>
+    <label class="small muted" for="wTeams">League size</label><select class="sel" id="wTeams">${[8, 10, 12, 14, 16].map(n => `<option ${W.teams === n ? 'selected' : ''}>${n}</option>`).join('')}</select>
+    ${W.source === 'list' && W.faList.length ? `<button type="button" class="btn sm" data-wsrc="own">Use ESPN ownership instead</button>` : `<label class="small muted" for="wOwn">Owned under</label><input type="range" id="wOwn" min="5" max="90" step="5" value="${W.ownMax}" style="accent-color:var(--accent)"><span class="num" id="wOwn-v">${W.ownMax}%</span>`}
+    ${nTaken ? `<button type="button" class="btn sm" data-act="untake">Show ${nTaken} hidden</button>` : ''}</div>
+  ${warn.map(w => `<div class="banner small">${esc(w)}</div>`).join('')}
+  <h3>Your team, ${hLab}</h3>
+  <div class="needs">${needCards}</div>
+  ${needs.holes.length ? `<div class="banner small"><strong>Lineup holes:</strong> ${esc(needs.holes.join(' · '))}. A pickup at that position is worth more than usual.</div>` : ''}
+  <div class="row-head"><h2>Best moves</h2><span class="small muted">Gain = extra points your best lineup scores with the swap. Ranked by that gain plus a third of the gain after the window. Week chips: green is a soft matchup, red is tough.</span></div>
+  <div class="card list">${moveRows}</div>
+  <div class="row-head"><h2>Top free agents by position</h2><span class="small muted">Projected points over ${hLab}</span></div>
+  <div class="tscroll"><table><thead><tr><th class="l">Player</th><th>Owned</th><th>Pts/g</th><th>Next ${H}</th><th class="l">Schedule</th><th></th></tr></thead><tbody>${posBest}</tbody></table></div>
+  <div class="card panel"><h3>Use your league’s free agents</h3><p class="small muted" style="margin:0">Ownership across all ESPN leagues is only an estimate. For exact suggestions, open Players → Add Players in your ESPN league, copy the free-agent table (a few positions or pages is fine), and paste it here.</p>
+    <textarea class="inp" id="faPaste" placeholder="Paste ESPN's free-agent list"></textarea>
+    <div class="toolbar"><button type="button" class="btn primary" data-act="pastefa">Use these free agents</button>${W.faList.length ? `<button type="button" class="btn" data-act="clearfa">Clear pasted list</button>` : ''}<span class="small muted">${esc(D.faMsg || '')}</span></div></div>
+  </div>`;
+}
+
+/* ---------- rendering ---------- */
+const TABS = [['lineup','Lineup'],['compare','Compare'],['waivers','Waivers'],['defenses','Defenses'],['teams','Teams & Schemes'],['players','Players'],['settings','Settings']];
+function render() {
+  $('#tabs').innerHTML = TABS.map(([k, l]) => `<button role="tab" type="button" data-tab="${k}" aria-selected="${state.tab === k}">${l}</button>`).join('');
+  const ws = $('#weekSel');
+  ws.disabled = !!D.snapshot;
+  ws.innerHTML = D.snapshot ? `<option selected>${D.week}</option>` : Array.from({ length: 18 }, (_, i) => `<option value="${i + 1}" ${D.week === i + 1 ? 'selected' : ''}>${i + 1}${D.detWeek === i + 1 && D.season === D.detSeason ? ' (now)' : ''}</option>`).join('');
+  $('#asof').textContent = D.loadedAt && !D.loading ? `${D.season} season · ESPN PPR · ${D.snapshot ? 'snapshot saved' : 'data as of'} ${D.loadedAt.toLocaleString([], { weekday: 'short', month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' })}` : 'ESPN PPR · loading data…';
+  const msgs = [];
+  if (D.snapshot && !D.loading) msgs.push(`<div class="banner info"><strong>Saved snapshot for week ${D.week}.</strong> This published copy can’t reach Sleeper or ESPN, so it shows data saved ${esc(D.loadedAt.toLocaleString([], { weekday: 'short', month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' }))}. Injury news after that time isn’t included. For live data, open <code>index.html</code> from the FantasyOptimizer folder on your computer.</div>`);
+  if (D.errors.length) msgs.push(`<div class="banner err"><strong>Some data didn’t load.</strong> ${esc(D.errors.slice(0, 4).join(' '))}${D.errors.length > 4 ? ` (+${D.errors.length - 4} more)` : ''} The board uses whatever did load. Press Refresh data to try again.</div>`);
+  if (!D.loading && state.example && state.tab === 'lineup') msgs.push(`<div class="banner info"><strong>This is an example roster.</strong> ${D.snapshot ? `Paste your ESPN roster in <a href="#" data-tab="players">Players</a> to see your own lineup.` : `Import your ESPN team in <a href="#" data-tab="settings">Settings</a>, or paste your roster in <a href="#" data-tab="players">Players</a>.`}</div>`);
+  $('#msgs').innerHTML = msgs.join('');
+  const main = $('#main');
+  if (D.failed) { main.innerHTML = `<div class="card panel"><h2>No data loaded</h2><p style="margin:0">The board couldn’t reach Sleeper or ESPN and has no saved snapshot. Check your connection and press Refresh data. If you’re viewing the published copy, open <code>index.html</code> from the FantasyOptimizer folder on your computer instead.</p></div>`; return; }
+  if (D.loading) { main.innerHTML = `<div class="card loading"><h3>Loading week ${D.week || ''} data</h3><div class="small">Projections, weekly stats and schedules from Sleeper and ESPN. Past seasons are saved after the first load.</div><div class="bar"><span id="lbar" style="width:${Math.round(D.progress * 100)}%"></span></div></div>`; return; }
+  main.innerHTML = ({ lineup: viewLineup, compare: viewCompare, waivers: viewWaivers, defenses: viewDefenses, teams: viewTeams, players: viewPlayers, settings: viewSettings })[state.tab]();
+}
+function injPill(r) {
+  const i = r.inj || ''; if (!i) return '';
+  const cls = /^(out|ir|pup|sus|na|cov)/i.test(i) ? 'o' : 'q'; return `<span class="pill ${cls}">${esc(i === 'Questionable' ? 'Q' : i === 'Doubtful' ? 'D' : i)}</span>`;
+}
+function matchCell(r) {
+  if (r.status === 'bye') return `<span class="match muted">Bye week</span>`;
+  const g = r.game, at = D.tg[r.T].home ? 'vs' : '@';
+  const ln = g.fav ? (g.fav === r.T ? `−${g.line}` : `+${g.line}`) : (g.ou ? 'PK' : '');
+  const when = r.locked ? (ok(r.actual) ? `<span class="pill m">${g.state === 'post' ? 'Final' : 'Live'} ${f1(r.actual)}</span>` : `<span class="pill m">${esc(g.short)}</span>`) : '';
+  return `<span class="match"><span class="opp">${at} ${r.O}</span> <span class="muted">${D.rec[r.O] ? '(' + esc(D.rec[r.O]) + ') ' : ''}${ln}${g.ou ? ' · O/U ' + g.ou : ''}</span> ${when}${r.chip ? `<span style="display:block"><span class="chip ${r.chip.dir}">${esc(r.chip.text)}</span></span>` : ''}</span>`;
+}
+function espnNote(r, starting) {
+  const s = state.espn.slotOf?.[r.id]; if (s == null || state.example) return '';
+  const espnStarting = !(s === 20 || s === 21);
+  if (starting && !espnStarting) return `<span class="pill n">Start (benched on ESPN)</span>`;
+  if (!starting && espnStarting) return `<span class="pill q">Sit (starting on ESPN)</span>`;
+  return '';
+}
+function playerRow(r, slotLabel, starting) {
+  const open = D.open.has(r.id);
+  const reason = r.status === 'bye' ? '<span class="pill m">Bye</span>' : r.status === 'out' ? '<span class="pill o">Unavailable</span>' : '';
+  return `<div class="item"><button type="button" class="prow" data-expand="${esc(r.id)}" aria-expanded="${open}">
+    <span class="slot ${starting ? '' : 'bench'}">${esc(slotLabel)}</span>
+    <span class="pwho"><span class="pname">${esc(r.u.name)}</span><span class="psub">${r.pos} · ${r.T || 'FA'} ${injPill(r)} ${reason} ${r.override != null ? '<span class="pill n">Override</span>' : ''} ${espnNote(r, starting)}</span></span>
+    ${matchCell(r)}
+    <span class="grade g-${r.grade}" title="Matchup grade">${r.grade}</span>
+    <span class="proj num">${r.status === 'bye' ? '—' : f1(r.mean)}</span>
+    <span class="range">${r.status === 'bye' ? '' : f1(r.floor) + '–' + f1(r.ceil)}</span>
+    <span class="pav">${r.pAvg != null ? pct(r.pAvg) : '—'}</span>
+  </button>${open ? detailBlock(r) : ''}</div>`;
+}
+function factorList(r) {
+  if (!r.factors.length) return '<div class="small muted">No matchup factors (bye week or no game data).</div>';
+  return `<div class="factors">${r.factors.map(f => { const w = Math.min(50, Math.abs(f.pct) / 0.25 * 50); return `<div class="factor"><div><div class="fl">${esc(f.label)}</div><div class="fn">${esc(f.note)}</div></div><div class="fbar"><span class="${f.pct >= 0 ? 'pos' : 'neg'}" style="width:${w}%"></span></div><div class="fv" style="color:var(${f.pct > 0.005 ? '--good' : f.pct < -0.005 ? '--bad' : '--muted'})">${spct(f.pct)}</div></div>`; }).join('')}</div>`;
+}
+function detailBlock(r) {
+  const h = r.h;
+  return `<div class="detail"><div class="section">${factorList(r)}${r.scheme ? `<div class="scheme"><strong>Scheme:</strong> ${esc(r.scheme)}</div>` : ''}</div>
+  <div class="section"><div class="probs">
+    <div><span class="label">Beats season avg</span><span class="num">${r.pAvg != null ? pct(r.pAvg) : '—'}</span><span class="small muted">${h?.n ? 'avg ' + f1(h.avg) + ' over ' + h.n + ' g' : 'no games yet'}</span></div>
+    <div><span class="label">10+ pts</span><span class="num">${pct(r.p10)}</span><span class="small muted">15+: ${pct(r.p15)} · 20+: ${pct(r.p20)}</span></div>
+    <div><span class="label">Floor / ceiling</span><span class="num">${f1(r.floor)} / ${f1(r.ceil)}</span><span class="small muted">25th / 75th percentile</span></div>
+    <div><span class="label">Boom week</span><span class="num">${f1(r.boom)}</span><span class="small muted">90th percentile</span></div>
+  </div>
+  <div class="math">Sleeper projection ${f1(r.projPts)} · season avg ${f1(h?.avg)} → base ${f1(r.base)} × matchup ${f1(r.mult)} = <strong>${f1(r.base * r.mult)}</strong>${r.override != null ? ` · your override ${f1(r.override)}` : ''}${h?.n ? ` · weekly scores: ${h.pts.map(x => x.toFixed(1)).join(', ')}` : ''}</div>
+  <div class="ovr"><label for="ov-${esc(r.id)}">Override projection</label><input class="inp" id="ov-${esc(r.id)}" type="number" step="0.1" data-ovr="${esc(r.id)}" value="${r.override ?? ''}" placeholder="${f1(r.base * r.mult)}">${r.override != null ? `<button type="button" class="btn sm" data-clearovr="${esc(r.id)}">Clear</button>` : ''}</div></div>
+  <div class="section" style="grid-column:1/-1"><h3>Scheme matchup</h3>${schemeBlock(r)}</div></div>`;
+}
+function viewLineup() {
+  if (!state.roster.length) return `<div class="card panel"><h2>No players yet</h2><p>Import your ESPN team in Settings, or add players in the Players tab.</p></div>`;
+  const { starters, bench } = optimize();
+  const st = starters.filter(s => s.r), tot = st.reduce((s, x) => s + metricOf(x.r), 0), mu = st.reduce((s, x) => s + x.r.mean, 0), sdT = Math.sqrt(st.reduce((s, x) => s + x.r.sd ** 2, 0));
+  const flagged = st.filter(x => x.r.inj).length, empty = starters.length - st.length;
+  const strat = state.settings.strategy, sLab = { mean: 'Projected', floor: 'Safe (floor)', ceil: 'Boom (ceiling)' };
+  const head = `<div class="prow lhead" aria-hidden="true"><span class="label">Slot</span><span class="label">Player</span><span class="label">Matchup</span><span class="label">Gr</span><span class="label" style="text-align:right">Proj</span><span class="label" style="text-align:right">Range</span><span class="label" style="text-align:right">&gt; avg</span></div>`;
+  return `<div class="section">
+  <div class="summary">
+    <div><span class="label">Starters project</span><span class="big num">${f1(mu)}</span><span class="small muted">PPR points, week ${D.week}</span></div>
+    <div><span class="label">Likely range</span><span class="big num">${f0(mu - 0.674 * sdT)}–${f0(mu + 0.674 * sdT)}</span><span class="small muted">middle 50% of outcomes</span></div>
+    <div><span class="label">Optimizing for</span><span class="big num" style="font-size:24px">${sLab[strat]}</span><span class="small muted">${strat === 'mean' ? 'best average outcome' : strat === 'floor' ? 'use when you’re favored' : 'use when you’re the underdog'} · ${f1(tot)}</span></div>
+    <div><span class="label">Watch list</span><span class="big num">${flagged + empty}</span><span class="small muted">${flagged} injury tag${flagged === 1 ? '' : 's'}${empty ? ` · ${empty} empty slot${empty === 1 ? '' : 's'}` : ''}</span></div>
+  </div>
+  <div class="row-head"><h2>Start</h2><div class="seg" role="group" aria-label="Strategy">${['mean', 'floor', 'ceil'].map(k => `<button type="button" data-strategy="${k}" aria-pressed="${strat === k}">${{ mean: 'Projected', floor: 'Safe', ceil: 'Boom' }[k]}</button>`).join('')}</div></div>
+  <div class="card list">${head}${starters.map(s => s.r ? playerRow(s.r, s.slot.label || s.slot.k, true) : `<div class="item"><div class="prow"><span class="slot">${esc(s.slot.label || s.slot.k)}</span><span class="pwho muted">No eligible player available. Add one in Players.</span></div></div>`).join('')}</div>
+  <div class="row-head"><h2>Bench</h2><span class="small muted">Tap any player for the full matchup breakdown</span></div>
+  <div class="card list">${bench.length ? bench.map(r => playerRow(r, 'BN', false)).join('') : '<div class="item"><div class="prow"><span></span><span class="muted">Nobody on the bench.</span></div></div>'}</div>
+  </div>`;
+}
+function playerOptions() {
+  const ros = new Set(state.roster);
+  const all = [...D.U.values()].filter(u => D.M[u.id] && (ros.has(u.id) || D.M[u.id].mean > 2)).sort((a, b) => (ros.has(b.id) - ros.has(a.id)) || D.M[b.id].mean - D.M[a.id].mean);
+  return all.map(u => `<option value="${esc(u.name + ' · ' + u.pos + ' ' + (u.team || 'FA'))}"></option>`).join('');
+}
+function resolvePick(v) { const m = /^(.*) · (\w+) (\w+)$/.exec(v || ''); const nm = norm(m ? m[1] : v); const c = D.nameIdx.get(nm) || []; return c.find(id => !m || (D.U.get(id).pos === m[2])) || null; }
+function viewCompare() {
+  let [a, b] = state.compare;
+  if (!a || !D.M[a] || !b || !D.M[b]) { const ros = state.roster.map(id => D.M[id]).filter(r => r && r.status === 'ok'); const { bench } = optimize(); const nb = bench.find(r => r.status === 'ok'); if (nb) { const { starters } = optimize(); const st = starters.find(s => s.r && s.slot.elig.includes(nb.pos)); a = a && D.M[a] ? a : st?.r.id; b = b && D.M[b] ? b : nb.id; } else if (ros.length > 1) { a = a || ros[0].id; b = b || ros[1].id; } }
+  const A = D.M[a], Bp = D.M[b];
+  const pick = (k, r) => `<input class="inp" list="plist" id="cmp${k}" data-cmp="${k}" value="${r ? esc(r.u.name + ' · ' + r.pos + ' ' + (r.T || 'FA')) : ''}" placeholder="Search a player" style="width:100%">`;
+  let verdict = '';
+  if (A && Bp) {
+    const pA = A.sd || Bp.sd ? Phi((A.mean - Bp.mean) / Math.sqrt(A.sd ** 2 + Bp.sd ** 2)) : 0.5, w = pA >= 0.5 ? A : Bp, pw = Math.max(pA, 1 - pA);
+    verdict = `<div class="card verdict"><span class="num">${pct(pw)}</span><div style="flex:1 1 220px;min-width:0"><h3>Start ${esc(w.u.name)}</h3><div class="small muted">${pw < 0.55 ? 'Close call. Use the Safe or Boom view, or late injury news, to break the tie.' : `${esc(w.u.name)} outscores the other player in about ${Math.round(pw * 10)} of 10 simulated weeks.`}</div></div><div class="meter" aria-label="Win share"><span style="width:${pA * 100}%"></span></div></div>`;
+  }
+  const col = r => r ? `<div class="card"><div><div class="pname" style="font-size:18px">${esc(r.u.name)}</div><div class="psub">${r.pos} · ${r.T} ${injPill(r)}</div></div>${matchCell(r)}<div class="probs"><div><span class="label">Projection</span><span class="num">${r.status === 'bye' ? 'Bye' : f1(r.mean)}</span></div><div><span class="label">Floor / ceiling</span><span class="num">${f1(r.floor)} / ${f1(r.ceil)}</span></div><div><span class="label">Beats avg</span><span class="num">${pct(r.pAvg)}</span></div><div><span class="label">Grade</span><span class="num">${r.grade}</span></div></div>${factorList(r)}${r.scheme ? `<div class="scheme"><strong>Scheme:</strong> ${esc(r.scheme)}</div>` : ''}<h3>Scheme matchup</h3>${schemeBlock(r)}</div>` : `<div class="card small muted">Pick a player.</div>`;
+  return `<div class="section"><datalist id="plist">${playerOptions()}</datalist><div class="cmp"><div class="field"><label class="label" for="cmp0">Player A</label>${pick(0, A)}</div><div class="field"><label class="label" for="cmp1">Player B</label>${pick(1, Bp)}</div></div>${verdict}<div class="cmp">${col(A)}${col(Bp)}</div></div>`;
+}
+function heat(v, avg, invert) {
+  if (!ok(v) || !ok(avg) || !avg) return ''; let d = v / avg - 1; if (invert) d = -d;
+  const a = Math.min(40, Math.abs(d) * 110); return `background:color-mix(in srgb, var(${d > 0 ? '--good' : '--bad'}) ${a.toFixed(0)}%, transparent)`;
+}
+function viewDefenses() {
+  const [sk, dir] = D.defSort, L = D.L;
+  const cols = [['fpaQB', 'QB pts'], ['fpaRB', 'RB pts'], ['fpaWR', 'WR pts'], ['fpaTE', 'TE pts'], ['passYdA', 'Pass yds'], ['ypcA', 'YPC'], ['sacks', 'Sacks'], ['ptsA', 'Pts allowed']];
+  const rows = [...ABBR].sort((a, b) => sk === 'team' ? a.localeCompare(b) * dir : ((D.B[a][sk] ?? -1e9) - (D.B[b][sk] ?? -1e9)) * dir);
+  return `<div class="section"><div class="row-head"><h2>Defenses, week ${D.week}</h2><span class="small muted">Per game. Green = good for opposing offenses. Blends ${D.season} games with ${D.season - 1} by staff continuity.</span></div>
+  <div class="tscroll"><table><thead><tr><th class="l" data-sort="team">Team</th><th class="l">Record</th><th class="l">Wk ${D.week} opp</th>${cols.map(([k, l]) => `<th data-sort="${k}">${l}${sk === k ? (dir < 0 ? ' ↓' : ' ↑') : ''}</th>`).join('')}<th class="l">DC</th></tr></thead><tbody>
+  ${rows.map(T => { const b = D.B[T], s = staffOf(T), tg = D.tg[T]; return `<tr><td><strong>${T}</strong> <span class="muted small">${TEAMS[T][1]}</span></td><td class="l">${esc(D.rec[T] || '—')}</td><td class="l">${tg ? (tg.home ? 'vs ' : '@ ') + tg.opp : 'Bye'}</td>${cols.map(([k]) => `<td style="${heat(b[k], L[k], k === 'sacks')}">${k === 'ypcA' ? f1(b[k]) : k === 'passYdA' ? f0(b[k]) : f1(b[k])}</td>`).join('')}<td class="l">${esc(s.dc)}${s.defNew ? ' <span class="pill n">New</span>' : ''}</td></tr>`; }).join('')}
+  <tr><td><strong>League avg</strong></td><td></td><td></td>${cols.map(([k]) => `<td><strong>${k === 'passYdA' ? f0(L[k]) : f1(L[k])}</strong></td>`).join('')}<td></td></tr></tbody></table></div></div>`;
+}
+function spark(vals, fmt) {
+  const pts = vals.map((v, i) => [i, v]).filter(p => ok(p[1])); if (pts.length < 2) return '<span class="muted small">—</span>';
+  const W = 84, H = 26, P = 3, ys = pts.map(p => p[1]), lo = Math.min(...ys), hi = Math.max(...ys), sp = hi - lo || 1;
+  const x = i => P + i * (W - 2 * P) / (vals.length - 1), y = v => H - P - (v - lo) / sp * (H - 2 * P);
+  const line = pts.map(p => `${x(p[0]).toFixed(1)},${y(p[1]).toFixed(1)}`).join(' '), last = pts[pts.length - 1];
+  const area = `${x(pts[0][0]).toFixed(1)},${H - P} ${line} ${x(last[0]).toFixed(1)},${H - P}`;
+  return `<svg class="spark" width="${W}" height="${H}" viewBox="0 0 ${W} ${H}" role="img" aria-label="${esc(vals.map(fmt).join(', '))}"><polygon class="area" points="${area}"/><polyline points="${line}"/><circle cx="${x(last[0]).toFixed(1)}" cy="${y(last[1]).toFixed(1)}" r="2.6"/></svg>`;
+}
+function viewTeams() {
+  const seasons = [D.season - 3, D.season - 2, D.season - 1], P = D.prior, C = D.coaches;
+  const series = (T, k) => [...seasons.map(s => P[s]?.[T]?.[k]), D.cur[T]?.[k]];
+  const nb = (on) => on ? ' <span class="pill n">New</span>' : '';
+  const rows = ABBR.map(T => {
+    const s = staffOf(T), pr = series(T, 'passRate'), pl = series(T, 'plays'), fw = series(T, 'fpaWR'), c = C?.[T];
+    const d = ok(D.B[T].passRate) && ok(pr[2]) ? (D.B[T].passRate - pr[2]) * 100 : null;
+    const hcNote = c?.name && norm(c.name) !== norm(s.hc) ? ` <span class="pill q" title="ESPN lists ${esc(c.name)}">ESPN: ${esc(c.name)}</span>` : '';
+    const open = D.teamOpen === T;
+    return `<tr class="click" data-team="${T}"><td><strong>${T}</strong> <span class="small muted">${esc(D.rec[T] || '')}</span></td><td class="l">${esc(s.hc)}${nb(s.hcNew || c?.isNew)}${hcNote}</td><td class="l">${esc(s.offCaller || s.oc)}${nb(s.offNew)}</td><td class="l">${esc(s.defCaller || s.dc)}${nb(s.defNew)}</td>
+      <td>${spark(pr, v => pct(v))} ${pct(D.B[T].passRate)}${ok(d) && Math.abs(d) >= 3 ? ` <span class="${d > 0 ? 'trend-up' : 'trend-down'}">${d > 0 ? '↑' : '↓'}${Math.abs(d).toFixed(0)}</span>` : ''}</td><td>${spark(pl, f1)} ${f1(D.B[T].plays)}</td><td>${spark(fw, f1)} ${f1(D.B[T].fpaWR)}</td></tr>
+      ${open ? `<tr><td colspan="7" style="text-align:left;white-space:normal;background:var(--surface-2)">${teamDetail(T, seasons)}</td></tr>` : ''}`;
+  }).join('');
+  return `<div class="section"><div class="row-head"><h2>Teams &amp; schemes</h2><span class="small muted">Sparklines run ${seasons[0]}–${D.season}. Tap a team for the season-by-season table.</span></div>
+  <div class="banner info small">Coordinators and play-callers come from offseason hiring reports as of ${STAFF_AS_OF}. ${C ? 'Head coaches are checked against ESPN; a yellow tag means ESPN lists someone else.' : 'Checking head coaches against ESPN…'} Fix anything out of date in Settings.</div>
+  <div class="tscroll"><table><thead><tr><th class="l">Team</th><th class="l">Head coach</th><th class="l">Offense calls</th><th class="l">Defense calls</th><th>Pass rate</th><th>Plays/g</th><th>WR pts allowed</th></tr></thead><tbody>${rows}</tbody></table></div></div>`;
+}
+function teamDetail(T, seasons) {
+  const s = staffOf(T), all = [...seasons.map(y => [y, D.prior[y]?.[T]]), [D.season + ' so far', D.cur[T]], [D.season + ' model', D.B[T]]];
+  const ks = [['passRate', 'Pass rate', pct], ['plays', 'Plays/g', f1], ['ypc', 'Rush YPC', f1], ['sacksTaken', 'Sacks taken/g', f1], ['tsTE', 'TE target share', pct], ['tsRB', 'RB target share', pct], ['fpaQB', 'QB pts allowed', f1], ['fpaRB', 'RB pts allowed', f1], ['fpaWR', 'WR pts allowed', f1], ['fpaTE', 'TE pts allowed', f1], ['sacks', 'Sacks/g', f1], ['ptsA', 'Pts allowed/g', f1]];
+  return `<div class="section" style="padding:6px 0"><div class="small"><strong>${TEAMS[T][1]}:</strong> HC ${esc(s.hc)} · OC ${esc(s.oc)} · DC ${esc(s.dc)}${s.note ? ' · ' + esc(s.note) : ''}. ${s.offNew ? `New offensive play-caller, so ${D.season - 1} offense counts as ${D.B[T].kO.toFixed(1)} games` : `Offense continuity: ${D.season - 1} counts as ${D.B[T].kO.toFixed(1)} games`}; ${s.defNew ? `new defensive play-caller (${D.B[T].kD.toFixed(1)} games)` : `defense continuity (${D.B[T].kD.toFixed(1)} games)`}.</div>
+  <div class="tscroll"><table><thead><tr><th class="l">Metric</th>${all.map(([y]) => `<th>${y}</th>`).join('')}</tr></thead><tbody>${ks.map(([k, l, f]) => `<tr><td>${l}</td>${all.map(([, p]) => `<td>${p ? f(p[k]) : '—'}</td>`).join('')}</tr>`).join('')}</tbody></table></div></div>`;
+}
+function viewPlayers() {
+  return `<div class="section"><div class="row-head"><h2>Players</h2><span class="small muted">${state.roster.length} on your roster</span></div>
+  <div class="card panel"><h3>Paste your roster</h3><p class="small muted" style="margin:0">On ESPN, open My Team, select the roster table, copy it, and paste it here. A plain list of names, one per line, also works. Lines that aren’t player names are skipped. This replaces your current roster.</p>
+  <textarea class="inp" id="rosterPaste" placeholder="Joe Burrow&#10;Bijan Robinson&#10;Ja'Marr Chase&#10;Packers D/ST"></textarea><div class="toolbar"><button type="button" class="btn primary" data-act="pasteroster">Set my roster</button><span class="small muted">${esc(D.rosterMsg || '')}</span></div></div>
+  <div class="toolbar"><input class="inp" id="psearch" type="search" placeholder="Search name or team" value="${esc(D.psearch || '')}" style="flex:1 1 220px"><select class="sel" id="ppos">${['All', 'Roster', ...POS].map(p => `<option ${D.ppos === p ? 'selected' : ''}>${p}</option>`).join('')}</select></div>
+  <div class="card list" id="plistBox">${playerListHTML()}</div>
+  <div class="card panel"><h3>Bulk overrides</h3><p class="small muted" style="margin:0">Paste one player per line as <code>name,points</code>, for example from your own rankings. Overrides replace the model projection for that week.</p>
+  <textarea class="inp" id="csv" placeholder="Bijan Robinson,21.5&#10;Puka Nacua,18"></textarea><div class="toolbar"><button type="button" class="btn primary" data-act="applycsv">Apply overrides</button><button type="button" class="btn" data-act="clearovr">Clear all overrides</button><span class="small muted" id="csvmsg">${esc(D.csvMsg || '')}</span></div></div></div>`;
+}
+function playerListHTML() {
+  const q = norm(D.psearch || ''), pp = D.ppos || 'All', ros = new Set(state.roster);
+  let list = [...D.U.values()].filter(u => D.M[u.id]);
+  if (pp === 'Roster') list = list.filter(u => ros.has(u.id)); else if (pp !== 'All') list = list.filter(u => u.pos === pp);
+  if (q) list = list.filter(u => norm(u.name).includes(q) || (u.team || '').toLowerCase() === q);
+  else if (pp !== 'Roster') list = list.filter(u => ros.has(u.id) || D.M[u.id].mean > 1);
+  list.sort((a, b) => D.M[b.id].mean - D.M[a.id].mean); const shown = list.slice(0, 60);
+  if (!shown.length) return `<div class="item"><div class="prow"><span></span><span class="muted">No players match.</span></div></div>`;
+  return shown.map(u => { const r = D.M[u.id], on = ros.has(u.id); return `<div class="item" style="display:flex;flex-wrap:wrap;align-items:center;gap:10px;padding:8px 14px"><div style="flex:1 1 200px;min-width:0"><div class="pname">${esc(u.name)}</div><div class="psub">${u.pos} · ${u.team || 'FA'} ${injPill(r)} ${r.status === 'bye' ? '<span class="pill m">Bye</span>' : r.O ? `${D.tg[u.team].home ? 'vs' : '@'} ${r.O}` : ''} ${r.chip ? `<span class="chip ${r.chip.dir}">${esc(r.chip.text)}</span>` : ''}</div></div><div class="num" style="font-size:20px;min-width:52px;text-align:right">${r.status === 'bye' ? '—' : f1(r.mean)}</div><span class="grade g-${r.grade}">${r.grade}</span><input class="inp" type="number" step="0.1" data-ovr="${esc(u.id)}" value="${r.override ?? ''}" placeholder="Override" aria-label="Override projection for ${esc(u.name)}" style="width:96px"><button type="button" class="btn sm ${on ? 'danger' : 'primary'}" data-${on ? 'remove' : 'add'}="${esc(u.id)}">${on ? 'Remove' : 'Add'}</button></div>`; }).join('') + (list.length > 60 ? `<div class="item small muted" style="padding:8px 14px">${list.length - 60} more. Narrow the search to see them.</div>` : '');
+}
+function viewSettings() {
+  const S = state.settings, sl = (id, label, val, min, max, step, fmt) => `<div class="slider"><label for="${id}">${label}</label><input type="range" id="${id}" data-set="${id}" min="${min}" max="${max}" step="${step}" value="${val}"><span class="num" id="${id}-v">${fmt(val)}</span></div>`;
+  const tms = D.espnTeams;
+  return `<div class="section"><div class="grid2">
+  <div class="card panel"><h3>ESPN league</h3><p class="small muted" style="margin:0">Public leagues import directly. Find the ID in your league URL after <code>leagueId=</code>.</p>
+    <div class="toolbar"><input class="inp" id="leagueId" data-espn="leagueId" inputmode="numeric" placeholder="League ID" value="${esc(state.espn.leagueId)}" style="flex:1 1 140px"><button type="button" class="btn primary" data-act="loadleague">Load league</button></div>
+    ${tms ? `<div class="toolbar"><select class="sel" id="espnTeam" data-espn="teamId" style="flex:1 1 180px">${tms.map(t => `<option value="${t.id}" ${String(state.espn.teamId) === String(t.id) ? 'selected' : ''}>${esc(t.name)}</option>`).join('')}</select><button type="button" class="btn primary" data-act="useteam">Use this team</button></div>` : ''}
+    ${D.espnMsg ? `<div class="banner ${D.espnMsg[0]} small">${esc(D.espnMsg[1])}</div>` : ''}</div>
+  <div class="card panel"><h3>Season &amp; lineup slots</h3>
+    <div class="field inline"><label for="season">Season</label><input class="inp" id="season" type="number" data-season value="${D.season}" style="width:96px"></div>
+    <div class="slots">${SLOT_TYPES.map(t => `<label for="slot-${t.k}">${t.label || t.k}<input class="inp" id="slot-${t.k}" type="number" min="0" max="5" data-slot="${t.k}" value="${state.slots[t.k] || 0}"></label>`).join('')}</div></div>
+  </div>
+  <div class="card panel"><h3>Model weights</h3>
+    ${sl('blend', 'Weekly projection vs. season average', S.blend, 0, 1, 0.05, v => Math.round(v * 100) + '%')}
+    ${sl('intensity', 'Matchup strength', S.intensity, 0, 1.5, 0.05, v => Math.round(v * 100) + '%')}
+    ${sl('priorWeeks', `${D.season - 1} season counts as (games)`, S.priorWeeks, 0, 8, 0.5, v => (+v).toFixed(1))}
+    ${FACTOR_KEYS.map(([k, l]) => sl('w.' + k, l, S.w[k], 0, 2, 0.1, v => '×' + (+v).toFixed(1))).join('')}
+    <div class="small muted">Sleeper’s projection already accounts for some of the matchup, so matchup strength starts at 60% to avoid counting it twice.</div></div>
+  <div class="card panel"><h3>Coaching staffs</h3><p class="small muted" style="margin:0">From offseason hiring reports as of ${STAFF_AS_OF}. Check "new" when a team changes its offensive or defensive play-caller; add the coach’s previous team so the model borrows that team’s tendencies.</p>
+    <div class="tscroll staff"><table><thead><tr><th class="l">Team</th><th class="l">Head coach</th><th class="l">Offense play-caller</th><th class="l">New</th><th class="l">From</th><th class="l">Defense play-caller</th><th class="l">New</th><th class="l">From</th></tr></thead><tbody>
+    ${ABBR.map(T => { const s = staffOf(T); const ti = (f, cls = '') => `<input class="inp ${cls}" type="text" id="st-${T}-${f}" data-staff="${T}.${f}" value="${esc(s[f])}" aria-label="${T} ${f}">`; const cb = f => `<input type="checkbox" id="st-${T}-${f}" data-staff="${T}.${f}" ${s[f] ? 'checked' : ''} aria-label="${T} ${f}">`; return `<tr><td><strong>${T}</strong></td><td class="l">${ti('hc')}</td><td class="l">${ti('offCaller')}</td><td class="l">${cb('offNew')}</td><td class="l">${ti('offPrev', 'ab')}</td><td class="l">${ti('defCaller')}</td><td class="l">${cb('defNew')}</td><td class="l">${ti('defPrev', 'ab')}</td></tr>`; }).join('')}
+    </tbody></table></div><div class="toolbar"><button type="button" class="btn" data-act="resetstaff">Restore researched staffs</button></div></div>
+  <div class="card panel"><details class="how"><summary>How the projection works</summary>
+    <ol><li><strong>Base:</strong> Sleeper’s weekly PPR projection blended with the player’s season average (slider above).</li>
+    <li><strong>Matchup factors</strong>, each capped at ±25%: fantasy points the opponent allows to the position; secondary (pass yards allowed) or run defense (yards per carry allowed, plus the player’s own line); sacks allowed by the offense vs. sacks by the opposing defense; the team’s Vegas implied total and spread, with the opponent’s record; the offense’s pass rate and pace.</li>
+    <li><strong>Scheme history:</strong> each team’s numbers blend ${D.season} games with last season. When the play-caller is unchanged, last season counts as ${S.priorWeeks} games. When the play-caller is new, it counts as at most 1.5 games, mixed with the new coach’s old team, and the player’s range widens by 10%.</li>
+    <li><strong>Probabilities:</strong> scores are treated as a bell curve around the projection, with spread from the player’s weekly scores (shrunk toward a typical spread for the position).</li>
+    <li><strong>Lineup:</strong> an exact assignment fills every slot to maximize the chosen strategy. Bye weeks and players ruled Out or on IR sit automatically.</li></ol></details>
+    <div class="toolbar"><button type="button" class="btn danger" data-act="reset">${D.resetArm ? 'Press again to erase everything' : 'Reset all saved data'}</button><span class="small muted">Removes your roster, overrides, settings and cached stats from this browser.</span></div></div>
+  </div>`;
+}
+
+/* ---------- events ---------- */
+document.addEventListener('click', e => {
+  const t = e.target.closest('[data-tab],[data-expand],[data-add],[data-remove],[data-strategy],[data-act],[data-sort],[data-team],[data-clearovr],[data-wh],[data-wsrc],[data-taken]'); if (!t) return;
+  if (t.dataset.wh) { state.waivers.horizon = t.dataset.wh === 'ros' ? 'ros' : +t.dataset.wh; save(); render(); return; }
+  if (t.dataset.wsrc) { state.waivers.source = t.dataset.wsrc; save(); render(); return; }
+  if (t.dataset.taken) { state.waivers.taken[t.dataset.taken] = 1; save(); render(); return; }
+  if (t.dataset.tab) { e.preventDefault(); state.tab = t.dataset.tab; save(); render(); window.scrollTo(0, 0); return; }
+  if (t.dataset.expand) { const id = t.dataset.expand; D.open.has(id) ? D.open.delete(id) : D.open.add(id); render(); return; }
+  if (t.dataset.add) { if (state.example) { state.roster = []; state.example = false; } state.roster.push(t.dataset.add); save(); refreshPlayers(); return; }
+  if (t.dataset.remove) { state.roster = state.roster.filter(x => x !== t.dataset.remove); save(); refreshPlayers(); return; }
+  if (t.dataset.clearovr) { delete state.overrides[t.dataset.clearovr]; save(); computeAll(); render(); return; }
+  if (t.dataset.strategy) { state.settings.strategy = t.dataset.strategy; save(); render(); return; }
+  if (t.dataset.sort) { const k = t.dataset.sort; D.defSort = D.defSort[0] === k ? [k, -D.defSort[1]] : [k, -1]; render(); return; }
+  if (t.dataset.team) { D.teamOpen = D.teamOpen === t.dataset.team ? null : t.dataset.team; render(); return; }
+  const a = t.dataset.act;
+  if (a === 'reload') { for (let s = 0; s < 4; s++) store.del('fo1:coach:' + ((D.season || 0) - s)); load(); }
+  else if (a === 'loadleague') loadLeague();
+  else if (a === 'useteam') useEspnTeam();
+  else if (a === 'applycsv') applyCsv();
+  else if (a === 'pasteroster') pasteRoster();
+  else if (a === 'untake') { state.waivers.taken = {}; save(); render(); }
+  else if (a === 'clearfa') { state.waivers.faList = []; state.waivers.source = 'own'; D.faMsg = 'Back to ESPN ownership estimates.'; save(); render(); }
+  else if (a === 'pastefa') {
+    const { ids, miss } = matchPasted($('#faPaste')?.value || '');
+    const fa = ids.filter(id => !state.roster.includes(id));
+    if (fa.length) { state.waivers.faList = fa; state.waivers.faListAt = Date.now(); state.waivers.source = 'list'; state.waivers.taken = {}; save(); }
+    D.faMsg = fa.length ? `Using ${fa.length} free agents from your league.` + (miss.length ? ` Not matched: ${miss.slice(0, 4).join(', ')}${miss.length > 4 ? '…' : ''}` : '') : 'No player names found in that text.';
+    render();
+  }
+  else if (a === 'clearovr') { state.overrides = {}; save(); computeAll(); D.csvMsg = 'Cleared all overrides.'; render(); }
+  else if (a === 'resetstaff') { state.staffEdits = {}; save(); computeAll(); render(); }
+  else if (a === 'reset') {
+    if (!D.resetArm) { D.resetArm = true; render(); setTimeout(() => { D.resetArm = false; if (state.tab === 'settings') render(); }, 4000); return; }
+    try { Object.keys(localStorage).filter(k => k.startsWith('fo1:')).forEach(k => localStorage.removeItem(k)); } catch {}
+    state = JSON.parse(JSON.stringify(DEFAULT_STATE)); D.resetArm = false; D.open.clear(); load();
+  }
+});
+function refreshPlayers() { if (state.tab === 'players') { const b = $('#plistBox'); if (b) b.innerHTML = playerListHTML(); const h = $('.row-head .small'); if (h) h.textContent = state.roster.length + ' on your roster'; } else render(); }
+document.addEventListener('input', e => {
+  const t = e.target;
+  if (t.id === 'wOwn') { const o = $('#wOwn-v'); if (o) o.textContent = t.value + '%'; return; }
+  if (t.id === 'psearch') { D.psearch = t.value; $('#plistBox').innerHTML = playerListHTML(); }
+  else if (t.dataset.set) { const v = +t.value, o = $('#' + CSS.escape(t.id) + '-v'); if (o) o.textContent = t.id === 'priorWeeks' ? v.toFixed(1) : t.id.startsWith('w.') ? '×' + v.toFixed(1) : Math.round(v * 100) + '%'; }
+});
+document.addEventListener('change', e => {
+  const t = e.target;
+  if (t.id === 'weekSel') { state.settings.week = +t.value; if (state.settings.week === D.detWeek && D.season === D.detSeason) state.settings.week = null; save(); D.open.clear(); load(); return; }
+  if (t.id === 'wTeams') { state.waivers.teams = +t.value; save(); render(); return; }
+  if (t.id === 'wOwn') { state.waivers.ownMax = +t.value; save(); render(); return; }
+  if (t.id === 'ppos') { D.ppos = t.value; $('#plistBox').innerHTML = playerListHTML(); return; }
+  if (t.dataset.set) { const k = t.dataset.set, v = +t.value; if (k.startsWith('w.')) state.settings.w[k.slice(2)] = v; else state.settings[k] = v; save(); computeAll(); return; }
+  if (t.dataset.ovr != null && t.dataset.ovr !== undefined && t.hasAttribute('data-ovr')) { const id = t.dataset.ovr; if (t.value === '') delete state.overrides[id]; else state.overrides[id] = +t.value; save(); computeAll(); state.tab === 'players' ? refreshPlayers() : render(); return; }
+  if (t.dataset.cmp) { const id = resolvePick(t.value); if (id) { state.compare[+t.dataset.cmp] = id; save(); render(); } return; }
+  if (t.dataset.slot) { state.slots[t.dataset.slot] = clamp(Math.round(+t.value || 0), 0, 5); save(); return; }
+  if (t.hasAttribute('data-season')) { const s = Math.round(+t.value); if (s >= 2019 && s <= D.detSeason) { state.settings.season = s === D.detSeason ? null : s; state.settings.week = null; save(); load(); } return; }
+  if (t.dataset.espn) { state.espn[t.dataset.espn] = t.value; save(); return; }
+  if (t.dataset.staff) { const [T, f] = t.dataset.staff.split('.'); const v = t.type === 'checkbox' ? t.checked : (f.endsWith('Prev') ? fixAbbr(t.value.trim().toUpperCase()) || '' : t.value); state.staffEdits[T] = Object.assign({}, state.staffEdits[T], { [f]: v }); save(); computeAll(); return; }
+});
+/* Matches pasted text (ESPN's roster table, or one name per line) against every player with a projection or a game played.
+   Longest names are tried first so "Kenneth Walker" wins over "Ken Walker"-style partials. */
+function pasteRoster() {
+  const lines = ($('#rosterPaste')?.value || '').split(/\r?\n/).map(l => l.trim()).filter(Boolean);
+  const live = [...D.U.values()].filter(u => (D.proj[u.id]?.pts || 0) > 0 || D.H[u.id]);
+  const names = live.map(u => [norm(u.name), u]).filter(([n]) => n.includes(' ') && n.length >= 6).sort((a, b) => b[0].length - a[0].length || (D.M[b[1].id]?.mean || 0) - (D.M[a[1].id]?.mean || 0));
+  const ids = [], miss = [];
+  for (const l of lines) {
+    const k = norm(l); if (k.length < 4 || /^\d/.test(k)) continue;
+    let u = (D.nameIdx.get(k) || []).map(id => D.U.get(id)).sort((a, b) => (D.M[b.id]?.mean || 0) - (D.M[a.id]?.mean || 0))[0];
+    if (!u) u = names.find(([n]) => k.includes(n))?.[1];
+    if (!u && /d\/?st|defense|\bdef\b/.test(k)) { const T = ABBR.find(a => k.includes(TEAMS[a][1].toLowerCase())); if (T) u = D.U.get(T); }
+    if (u) { if (!ids.includes(u.id)) ids.push(u.id); } else if (/[a-z]{2,} [a-z]{2,}/.test(k) && k.length < 40) miss.push(l);
+  }
+  if (ids.length) { state.roster = ids; state.example = false; state.espn.slotOf = {}; save(); }
+  D.rosterMsg = ids.length ? `Set ${ids.length} players.` + (miss.length ? ` Not matched: ${miss.slice(0, 5).join(', ')}${miss.length > 5 ? '…' : ''}. Add them with the search below.` : '') : 'No player names found in that text.';
+  render();
+}
+/* Same matching as pasteRoster, returning matches instead of setting the roster (used for pasted free-agent lists). */
+function matchPasted(text) {
+  const lines = text.split(/\r?\n/).map(l => l.trim()).filter(Boolean);
+  const live = [...D.U.values()].filter(u => (D.proj[u.id]?.pts || 0) > 0 || D.H[u.id]);
+  const names = live.map(u => [norm(u.name), u]).filter(([n]) => n.includes(' ') && n.length >= 6).sort((a, b) => b[0].length - a[0].length || (D.M[b[1].id]?.mean || 0) - (D.M[a[1].id]?.mean || 0));
+  const ids = [], miss = [];
+  for (const l of lines) {
+    const k = norm(l); if (k.length < 4 || /^\d/.test(k)) continue;
+    let u = (D.nameIdx.get(k) || []).map(id => D.U.get(id)).sort((a, b) => (D.M[b.id]?.mean || 0) - (D.M[a.id]?.mean || 0))[0];
+    if (!u) u = names.find(([n]) => k.includes(n))?.[1];
+    if (!u && /d\/?st|defense|\bdef\b/.test(k)) { const T = ABBR.find(a => k.includes(TEAMS[a][1].toLowerCase())); if (T) u = D.U.get(T); }
+    if (u) { if (!ids.includes(u.id)) ids.push(u.id); } else if (/[a-z]{2,} [a-z]{2,}/.test(k) && k.length < 40) miss.push(l);
+  }
+  return { ids, miss };
+}
+function applyCsv() {
+  const lines = ($('#csv')?.value || '').split(/\r?\n/).map(l => l.trim()).filter(Boolean); let n = 0; const miss = [];
+  for (const l of lines) {
+    const m = /^(.+?)[,\t;]\s*(-?\d+(?:\.\d+)?)\s*$/.exec(l); if (!m) { miss.push(l); continue; }
+    const k = norm(m[1]); let c = D.nameIdx.get(k) || [];
+    if (!c.length) { const hit = [...D.nameIdx.keys()].filter(x => x.includes(k)); if (hit.length === 1) c = D.nameIdx.get(hit[0]); }
+    if (!c.length) { miss.push(m[1]); continue; }
+    const id = c.find(x => state.roster.includes(x)) || c.sort((a, b) => (D.M[b]?.mean || 0) - (D.M[a]?.mean || 0))[0];
+    state.overrides[id] = +m[2]; n++;
+  }
+  save(); computeAll();
+  D.csvMsg = `Applied ${n} override${n === 1 ? '' : 's'}.` + (miss.length ? ` Not matched: ${miss.slice(0, 6).join(', ')}${miss.length > 6 ? '…' : ''}` : '');
+  render();
+}
+
+{ const h = location.hash.slice(1); if (TABS.some(t => t[0] === h)) state.tab = h; }
+render();
+load();
+</script>
