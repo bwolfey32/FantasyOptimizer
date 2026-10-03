@@ -235,7 +235,9 @@ tr.click:hover td { background: color-mix(in srgb, var(--accent) 5%, transparent
 .cmp { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 14px; }
 .cmp .card { padding: 14px; display: flex; flex-direction: column; gap: 12px; min-width: 0; }
 /* Waiver Optimizer headline */
-.setup { scroll-margin-top: 12px; gap: 14px; border: 1px solid color-mix(in srgb, var(--accent) 40%, var(--line)); }
+@keyframes opened { from { box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 55%, transparent); } to { box-shadow: 0 0 0 3px transparent; } }
+.opened { animation: opened 1.2s ease-out; }
+.setup { gap: 14px; border: 1px solid color-mix(in srgb, var(--accent) 40%, var(--line)); }
 .setup-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 18px 20px; }
 .setup .opt { display: flex; flex-direction: column; gap: 8px; min-width: 0; }
 .setup .opt p { margin: 0; }
@@ -456,6 +458,14 @@ const FACTOR_KEYS = [['dvp','Defense vs. position'],['cover','Secondary / run de
 const $ = (s, r = document) => r.querySelector(s);
 // focus a field for mouse-and-keyboard users only; on phones it pops the keyboard up uninvited
 const deskFocus = (s, select) => { try { if (!matchMedia('(pointer: fine)').matches) return; const el = $(s); if (el) { el.focus(); if (select) el.select(); } } catch {} };
+/* Open a panel in place: scroll only if it starts below the top third of the screen, and only far enough that it begins about 140px
+   from the top, leaving the buttons above it in sight. A short border glow shows what opened. */
+function revealPanel(el) {
+  if (!el) return;
+  const reduce = matchMedia('(prefers-reduced-motion: reduce)').matches, r = el.getBoundingClientRect(), vh = innerHeight;
+  if (r.top < 0 || r.top > vh * 0.35) scrollTo({ top: Math.max(0, scrollY + r.top - Math.min(140, vh * 0.2)), behavior: reduce ? 'auto' : 'smooth' });
+  if (!reduce) { el.classList.remove('opened'); void el.offsetWidth; el.classList.add('opened'); }
+}
 const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const clamp = (x, a, b) => Math.max(a, Math.min(b, x));
 const ok = x => x != null && isFinite(x);
@@ -2182,11 +2192,11 @@ document.addEventListener('click', e => {
   else if (a === 'applycsv') applyCsv();
   else if (a === 'pasteroster') { pasteRoster(); if (state.roster.length && !state.example) { D.setupOpen = false; render(); } }
   // always opens (a second press shouldn't hide it) and brings the panel into view; on phones it sits well below the header
-  else if (a === 'setup') { D.setupOpen = true; D.ioOpen = false; D.ioInMsg = ''; state.tab = 'lineup'; save(); render(); const p = $('.setup'); if (p) p.scrollIntoView({ behavior: matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth', block: 'start' }); deskFocus('#slQuery'); }
+  else if (a === 'setup') { D.setupOpen = true; D.ioOpen = false; D.ioInMsg = ''; state.tab = 'lineup'; save(); render(); revealPanel($('.setup')); deskFocus('#slQuery'); }
   else if (a === 'setupclose') { D.setupOpen = false; render(); }
   else if (a === 'fresh') { D.freshOpen = !D.freshOpen; renderFresh(); }
   else if (a === 'toggleFa') { D.faOpen = !D.faOpen; render(); if (D.faOpen) deskFocus('#faPaste'); }
-  else if (a === 'toggleio') { D.ioOpen = !D.ioOpen; D.setupOpen = false; D.ioOutMsg = ''; D.ioInMsg = ''; render(); }
+  else if (a === 'toggleio') { D.ioOpen = !D.ioOpen; D.setupOpen = false; D.ioOutMsg = ''; D.ioInMsg = ''; render(); if (D.ioOpen) revealPanel($('.io')); }
   else if (a === 'iocopy') {
     const out = $('#ioOut'), code = out?.value || '', msg = $('#ioOutMsg');
     const fallback = () => { out.focus(); out.select(); if (msg) msg.textContent = 'Code selected. Press Ctrl+C (or Cmd+C) to copy it.'; };
