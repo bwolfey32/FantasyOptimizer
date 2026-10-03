@@ -101,6 +101,12 @@ a { color: var(--accent); }
 .tteam.add { min-width: 0; justify-content: center; align-items: center; border-style: dashed; color: var(--accent); font-weight: 600; }
 .tmanage { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
 .tmanage .inp { flex: 0 1 220px; }
+.io .iochecks { display: flex; flex-wrap: wrap; gap: 6px 16px; font-size: 14px; }
+.io .iochecks label { display: inline-flex; align-items: center; gap: 6px; }
+.io .iocode { min-height: 70px; font-size: 12px; word-break: break-all; }
+.io input[type=checkbox] { accent-color: var(--accent); }
+.vh { position: absolute; width: 1px; height: 1px; opacity: 0; overflow: hidden; }
+.btn:disabled { opacity: .5; cursor: default; }
 
 /* Lineup rows */
 .list { display: flex; flex-direction: column; }
@@ -1443,15 +1449,93 @@ function teamBar(manage) {
     return `<button type="button" class="tteam" data-fteam="${esc(t.id)}" aria-pressed="${on}"><span class="tn">${esc(t.name)}</span><span class="tm">${n ? `${n} players${pts != null ? ` · <span class="num">${f1(pts)}</span> proj` : ''}` : 'No players yet'}${t.example ? ' · example' : ''}</span></button>`;
   }).join('');
   return `<div class="teambar"><div class="tteams" role="group" aria-label="Your teams">${heads}<button type="button" class="tteam add" data-act="addteam">+ Add team</button></div>
-  ${manage ? `<div class="tmanage"><label class="small muted" for="teamName">Team name</label><input class="inp" id="teamName" type="text" maxlength="40" value="${esc(ct.name)}">${state.teams.length > 1 ? `<button type="button" class="btn sm danger" data-act="delteam">${D.delArm ? `Press again to delete ${esc(ct.name)}` : 'Delete team'}</button>` : ''}<span class="small muted">Each team keeps its own roster, lineup slots, ESPN league and waiver list.</span></div>` : ''}</div>`;
+  ${manage ? `<div class="tmanage"><label class="small muted" for="teamName">Team name</label><input class="inp" id="teamName" type="text" maxlength="40" value="${esc(ct.name)}">${state.teams.length > 1 ? `<button type="button" class="btn sm danger" data-act="delteam">${D.delArm ? `Press again to delete ${esc(ct.name)}` : 'Delete team'}</button>` : ''}<button type="button" class="btn sm" data-act="toggleio" aria-expanded="${!!D.ioOpen}">Import / export</button><span class="small muted">Each team keeps its own roster, lineup slots, ESPN league and waiver list.</span></div>` : ''}</div>`;
 }
 function rosterPasteBox() {
   return `<div class="card panel"><h3>Add ${esc(curTeam().name)}’s roster</h3><p class="small muted" style="margin:0">On ESPN, open My Team, select the roster table, copy it, and paste it here. A plain list of names, one per line, also works. You can also search and add players one at a time in <a href="#" data-tab="players">Players</a>.</p>
   <textarea class="inp" id="rosterPaste" placeholder="Joe Burrow&#10;Bijan Robinson&#10;Ja'Marr Chase&#10;Packers D/ST"></textarea><div class="toolbar"><button type="button" class="btn primary" data-act="pasteroster">Set roster</button><span class="small muted">${esc(D.rosterMsg || '')}</span></div></div>`;
 }
+/* ---------- team import / export ----------
+   A team travels as JSON: its name, roster (Sleeper ids plus name and position, so players can be re-matched by name
+   if an id is ever unknown), lineup slots, ESPN league, waiver settings, and your overrides and return weeks for its
+   players. The share code is that JSON in base64 behind an "SSB1:" tag, so it survives chat apps and email. */
+const IO_APP = 'start-sit-board';
+function exportBundle(ids) {
+  stashTeam();
+  const teams = state.teams.filter(t => ids.includes(t.id) && (t.roster || []).length);
+  const players = new Set(teams.flatMap(t => t.roster));
+  const mine = obj => Object.fromEntries(Object.entries(obj || {}).filter(([k]) => players.has(k)));
+  const wv = w => ({ horizon: w.horizon, teams: w.teams, ownMax: w.ownMax, source: w.source, faList: w.faList, faListAt: w.faListAt, taken: w.taken, allowDrop: w.allowDrop, forceKeep: w.forceKeep });
+  return { app: IO_APP, v: 1, exported: new Date().toISOString(), season: D.season,
+    teams: teams.map(t => ({ name: t.name, roster: t.roster.map(id => { const u = D.U.get(id); return [id, u?.name || '', u?.pos || '', u?.team || '']; }),
+      slots: t.slots, espn: { leagueId: t.espn?.leagueId || '', teamId: t.espn?.teamId ?? null }, waivers: wv(t.waivers || {}) })),
+    overrides: mine(state.overrides), returnWeek: mine(state.returnWeek) };
+}
+function toCode(obj) { let s = ''; for (const b of new TextEncoder().encode(JSON.stringify(obj))) s += String.fromCharCode(b); return 'SSB1:' + btoa(s); }
+function parseBundle(text) {
+  const t = (text || '').trim(); if (!t) throw new Error('Paste a team code or choose a file first.');
+  let obj;
+  try {
+    if (t.startsWith('{')) obj = JSON.parse(t);
+    else { const raw = atob(t.replace(/^SSB1:/i, '').replace(/\s+/g, '')); obj = JSON.parse(new TextDecoder().decode(Uint8Array.from(raw, c => c.charCodeAt(0)))); }
+  } catch { throw new Error('That code is incomplete or damaged. Copy the whole code, starting with SSB1:, and try again.'); }
+  if (obj?.app !== IO_APP || !Array.isArray(obj.teams) || !obj.teams.length) throw new Error('That isn’t a team code from this tool.');
+  return obj;
+}
+function importBundle(obj, replace) {
+  stashTeam();
+  let added = 0, replaced = 0, firstId = null; const missed = [];
+  for (const t of obj.teams) {
+    const roster = [];
+    for (const [id, name, pos] of t.roster || []) {
+      let pid = D.U.has(id) ? id : null;
+      if (!pid && name) { const c = D.nameIdx.get(norm(name)) || []; pid = c.find(x => D.U.get(x).pos === pos) || c[0] || null; }
+      if (pid) { if (!roster.includes(pid)) roster.push(pid); } else missed.push(name || id);
+    }
+    const name = String(t.name || 'Imported team').trim().slice(0, 40) || 'Imported team';
+    const data = { roster, example: false, compare: [null, null],
+      slots: Object.assign({}, DEFAULT_STATE.slots, t.slots || {}),
+      espn: Object.assign({}, DEFAULT_STATE.espn, t.espn || {}, { slotOf: {} }),
+      waivers: Object.assign(JSON.parse(JSON.stringify(DEFAULT_STATE.waivers)), t.waivers || {}) };
+    let target = replace ? state.teams.find(x => x.name.toLowerCase() === name.toLowerCase()) : null;
+    if (target) { Object.assign(target, data); replaced++; }
+    else {
+      let nm = name, n = 2; while (state.teams.some(x => x.name.toLowerCase() === nm.toLowerCase())) nm = `${name} (${n++})`;
+      let id; do id = 't' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6); while (state.teams.some(x => x.id === id));
+      target = Object.assign({ id, name: nm }, data); state.teams.push(target); added++;
+    }
+    firstId = firstId || target.id;
+  }
+  Object.assign(state.overrides, obj.overrides || {}); state.returnWeek = Object.assign(state.returnWeek || {}, obj.returnWeek || {});
+  // the starter example roster isn't worth keeping once real teams arrive
+  if (added) state.teams = state.teams.filter(t => !t.example);
+  state.activeTeam = firstId; applyTeam(curTeam());
+  D.open.clear(); D.wCache = null; D.delArm = false; computeAll(); save();
+  return `Imported ${added + replaced} team${added + replaced === 1 ? '' : 's'}${replaced ? ` (${replaced} replaced)` : ''}.` + (missed.length ? ` Not found this week: ${missed.slice(0, 5).join(', ')}${missed.length > 5 ? '…' : ''}.` : '');
+}
+const ioSelected = () => state.teams.filter(t => (t.roster || []).length && !D.ioSkip?.has(t.id)).map(t => t.id);
+// downloads work on a normal site; inside the claude.ai viewer (an iframe) they're blocked, so offer copy only there
+const canDownload = (() => { try { return window.self === window.top; } catch { return false; } })();
+function ioPanel() {
+  stashTeam();
+  const exportable = state.teams.filter(t => (t.roster || []).length), sel = ioSelected(), code = sel.length ? toCode(exportBundle(sel)) : '';
+  return `<div class="card panel io"><div class="row-head"><h3>Import / export teams</h3><button type="button" class="btn sm" data-act="toggleio">Close</button></div>
+  <div class="grid2">
+    <div class="section"><h3>Export</h3><p class="small muted" style="margin:0">Copy a code to paste on another device or send to a friend${canDownload ? ', or download a backup file' : ''}. It includes each team’s roster, lineup slots, ESPN league, waiver settings, and your overrides and return weeks for those players.</p>
+      ${exportable.length ? `<div class="iochecks">${exportable.map(t => `<label><input type="checkbox" data-iosel="${esc(t.id)}" ${sel.includes(t.id) ? 'checked' : ''}> ${esc(t.name)} <span class="muted">${t.roster.length} players${t.example ? ', example' : ''}</span></label>`).join('')}</div>
+      <div class="toolbar"><button type="button" class="btn primary" data-act="iocopy" ${sel.length ? '' : 'disabled'}>Copy code</button>${canDownload ? `<button type="button" class="btn" data-act="iodownload" ${sel.length ? '' : 'disabled'}>Download file</button>` : ''}<span class="small muted" id="ioOutMsg">${esc(D.ioOutMsg || '')}</span></div>
+      <textarea class="inp iocode" id="ioOut" readonly aria-label="Team code">${esc(code)}</textarea>` : '<p class="small muted" style="margin:0">Add players to a team first.</p>'}</div>
+    <div class="section"><h3>Import</h3><p class="small muted" style="margin:0">Paste a team code, or open a file exported from this tool. Imported teams are added next to yours.</p>
+      <textarea class="inp iocode" id="ioIn" placeholder="SSB1:…"></textarea>
+      <div class="toolbar"><label class="btn sm" for="ioFile">Open file…</label><input class="vh" type="file" id="ioFile" accept=".json,.txt,application/json,text/plain">
+        <label class="small"><input type="checkbox" id="ioReplace" ${D.ioReplace ? 'checked' : ''}> Replace teams with the same name</label></div>
+      <div class="toolbar"><button type="button" class="btn primary" data-act="ioimport">Import teams</button><span class="small muted">${esc(D.ioInMsg || '')}</span></div></div>
+  </div></div>`;
+}
 function viewLineup() {
-  if (!state.roster.length) return `<div class="section">${teamBar(true)}${rosterPasteBox()}</div>`;
-  return `<div class="section">${teamBar(true)}${lineupBody()}</div>`;
+  const io = D.ioOpen ? ioPanel() : '';
+  if (!state.roster.length) return `<div class="section">${teamBar(true)}${io}${rosterPasteBox()}</div>`;
+  return `<div class="section">${teamBar(true)}${io}${lineupBody()}</div>`;
 }
 function lineupBody() {
   const { starters, bench } = optimize();
@@ -1612,6 +1696,24 @@ document.addEventListener('click', e => {
   else if (a === 'useteam') useEspnTeam();
   else if (a === 'applycsv') applyCsv();
   else if (a === 'pasteroster') pasteRoster();
+  else if (a === 'toggleio') { D.ioOpen = !D.ioOpen; D.ioOutMsg = ''; D.ioInMsg = ''; render(); }
+  else if (a === 'iocopy') {
+    const out = $('#ioOut'), code = out?.value || '', msg = $('#ioOutMsg');
+    const fallback = () => { out.focus(); out.select(); if (msg) msg.textContent = 'Code selected. Press Ctrl+C (or Cmd+C) to copy it.'; };
+    try { navigator.clipboard.writeText(code).then(() => { if (msg) msg.textContent = 'Copied. Paste it into the Import box on the other device.'; }, fallback); } catch { fallback(); }
+  }
+  else if (a === 'iodownload') {
+    const sel = ioSelected(); if (!sel.length) return;
+    const blob = new Blob([JSON.stringify(exportBundle(sel), null, 2)], { type: 'application/json' }), url = URL.createObjectURL(blob);
+    const link = document.createElement('a'); link.href = url; link.download = `start-sit-teams-${new Date().toISOString().slice(0, 10)}.json`;
+    document.body.appendChild(link); link.click(); link.remove(); setTimeout(() => URL.revokeObjectURL(url), 2000);
+    const msg = $('#ioOutMsg'); if (msg) msg.textContent = 'Downloaded. Open it from Import on another device.';
+  }
+  else if (a === 'ioimport') {
+    try { D.ioInMsg = importBundle(parseBundle($('#ioIn')?.value), !!$('#ioReplace')?.checked); }
+    catch (err) { D.ioInMsg = err.message; }
+    render();
+  }
   else if (a === 'addteam') {
     stashTeam();
     let n = state.teams.length + 1; while (state.teams.some(t => t.name === 'Team ' + n)) n++;
@@ -1656,6 +1758,15 @@ document.addEventListener('input', e => {
 document.addEventListener('change', e => {
   const t = e.target;
   if (t.id === 'weekSel') { state.settings.week = +t.value; if (state.settings.week === D.detWeek && D.season === D.detSeason) state.settings.week = null; save(); D.open.clear(); load(); return; }
+  if (t.dataset.iosel) { const s = D.ioSkip || (D.ioSkip = new Set()); t.checked ? s.delete(t.dataset.iosel) : s.add(t.dataset.iosel); D.ioOutMsg = ''; render(); return; }
+  if (t.id === 'ioReplace') { D.ioReplace = t.checked; return; }
+  if (t.id === 'ioFile') {
+    const f = t.files?.[0]; if (!f) return;
+    const rd = new FileReader();
+    rd.onload = () => { const box = $('#ioIn'); if (box) box.value = String(rd.result || ''); D.ioInMsg = ''; const m = box?.closest('.section')?.querySelector('.toolbar:last-child .small'); if (m) m.textContent = `Loaded ${f.name}. Press Import teams.`; };
+    rd.onerror = () => { D.ioInMsg = 'Couldn’t read that file.'; render(); };
+    rd.readAsText(f); return;
+  }
   if (t.id === 'teamName') { const ct = curTeam(), v = t.value.trim(); if (ct && v) ct.name = v; save(); render(); return; }
   if (t.dataset.rw) { const rw = state.returnWeek || (state.returnWeek = {}); if (t.value === '') delete rw[t.dataset.rw]; else rw[t.dataset.rw] = +t.value; save(); render(); return; }
   if (t.id === 'wTeams') { state.waivers.teams = +t.value; save(); render(); return; }
