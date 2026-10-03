@@ -112,7 +112,22 @@ a { color: var(--accent); }
 .tabs .navlink { flex: 0 0 auto; text-decoration: none; border-bottom: 3px solid transparent; padding: 8px 14px; font-family: var(--font-display); font-size: 18px; font-weight: 600; text-transform: uppercase; letter-spacing: .03em; color: var(--muted); white-space: nowrap; text-align: center; }
 .tabs .navlink:hover { color: var(--ink); }
 .tabs .navlink[aria-current="page"] { color: var(--ink); border-bottom-color: var(--accent); }
-#settingsBtn[aria-pressed="true"] { border-color: var(--accent); color: var(--accent); }
+#settingsBtn[aria-pressed="true"], #acctBtn[aria-expanded="true"] { border-color: var(--accent); color: var(--accent); }
+#acctBtn { display: inline-flex; align-items: center; gap: 7px; }
+#acctBtn i { width: 8px; height: 8px; border-radius: 50%; background: var(--good); }
+#acctBtn i.busy { background: var(--accent); animation: pulse 1.2s ease-in-out infinite; }
+#acctBtn i.err, #acctBtn i.wait { background: var(--warn); }
+.acct-form { display: flex; flex-wrap: wrap; gap: 8px; }
+.acct-form .inp { flex: 1 1 220px; max-width: 360px; }
+.acct-or { display: flex; align-items: center; gap: 10px; max-width: 520px; color: var(--muted); font-size: 13px; }
+.acct-or::before, .acct-or::after { content: ""; flex: 1; border-top: 1px solid var(--line); }
+.acct-choice { display: flex; flex-wrap: wrap; gap: 8px; }
+.gbtn { display: inline-flex; align-items: center; gap: 10px; }
+.gbtn svg { flex: none; }
+.hist .hdet > td { padding: 4px 10px 12px; background: var(--surface-2); }
+.hist .hdet table { background: var(--surface); border: 1px solid var(--line); border-radius: 8px; margin-bottom: 6px; }
+.hist .hbench td { color: var(--muted); }
+@media (max-width: 600px) { .hist th, .hist td { padding: 6px 6px; } .hist .hdet > td { padding: 4px 4px 10px; } }
 @media (max-width: 600px) { .tabs { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 0; } .tabs .navlink { padding: 8px 2px; font-size: 14.5px; letter-spacing: .01em; white-space: normal; line-height: 1.1; } }
 
 /* Team context bar (every page) */
@@ -137,7 +152,7 @@ a { color: var(--accent); }
 
 /* Panels: setup flow, team settings, share */
 #panels:empty { display: none; }
-.flow, .tsp, .io { scroll-margin-top: 12px; border: 1px solid color-mix(in srgb, var(--accent) 40%, var(--line)); }
+.flow, .tsp, .io, .acct, .hist { scroll-margin-top: 12px; border: 1px solid color-mix(in srgb, var(--accent) 40%, var(--line)); }
 .seg.methods { display: grid; grid-template-columns: repeat(4, auto); max-width: 100%; }
 @media (max-width: 600px) { .seg.methods { grid-template-columns: repeat(2, minmax(0, 1fr)); align-self: stretch; } }
 .flow .seg, .tsp .seg { align-self: flex-start; }
@@ -443,6 +458,7 @@ td .wks { flex-wrap: nowrap; }
     <div class="controls">
       <button type="button" class="status" id="status" data-act="fresh" aria-expanded="false" aria-controls="fresh" title="When each kind of data was last updated"><i></i><span>Loading…</span></button>
       <button class="btn" data-act="reload" type="button" title="Get the newest projections, injuries and lines">Refresh projections</button>
+      <button class="btn" data-act="account" type="button" id="acctBtn" aria-expanded="false" hidden>Sign in</button>
       <button class="btn" data-tab="settings" type="button" id="settingsBtn">Settings</button>
     </div>
   </header>
@@ -623,8 +639,292 @@ function loadState() {
   return ensureTeams(st);
 }
 let state = loadState();
-const save = () => { stashTeam(); store.set('fo1:state', state); };
+const save = () => { stashTeam(); stampChanges(); store.set('fo1:state', state); queuePush(); };
 const D = { loading: true, progress: 0, errors: [], open: new Set(), U: new Map(), proj: {}, H: {}, tg: {}, rec: {}, prior: {}, cur: {}, B: {}, L: {}, ranks: {}, M: {}, coaches: null, espnTeams: null, defSort: ['fpaWR', -1], teamOpen: null, resetArm: false };
+
+/* ---------- accounts and sync ----------
+   Signing in is optional. This browser's copy (fo1:state) stays the working copy; a signed-in account keeps a mirror of
+   it in Supabase: one row with every team plus the overrides, model weights and coaching edits, and one row per saved
+   weekly lineup. A device pulls when it opens or comes back into view, and pushes a moment after each change.
+   Teams merge by id and the most recently edited copy wins (a deleted team leaves a dated marker so it stays deleted);
+   the settings shared by all teams go to whichever device changed them last. The Supabase library (about 200 KB) only
+   loads for people who sign in. */
+const CLOUD = { url: 'https://hwfppigktdpjmnfretgo.supabase.co', key: 'sb_publishable_SsduRo6wMk1OZvEJH-2zMw_eHF8ygC4' };   // project URL and publishable key, from Supabase → Project settings → API keys
+const SB_LIB = { src: 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.117.2/dist/umd/supabase.js', sri: 'sha384-Rj26LVGvoeRVR6+mwQmFfcR3QOBEwT+ZmuCWpuiqeTzJpCs0ER4ITAWGb4Hiy3Ok' };
+const acct = { on: !!(CLOUD.url && CLOUD.key) && location.hash !== '#export', sb: null, lib: null, user: null, ready: false, sync: 'ok', rev: 0, h: null, hs: {}, at: 0, pulledAt: 0, histAt: 0,
+  busy: false, again: false, retries: 0, pushT: null, choice: null, step: 'email', email: '', code: '', msg: null, delArm: false, toastNext: false };
+// JSON with sorted keys, so the same data always gives the same text (the database stores keys in its own order)
+const canon = v => JSON.stringify(v, (k, x) => x && typeof x === 'object' && !Array.isArray(x) ? Object.fromEntries(Object.keys(x).sort().map(j => [j, x[j]])) : x);
+function hash53(s) {
+  let h1 = 0xdeadbeef, h2 = 0x41c6ce57;
+  for (let i = 0; i < s.length; i++) { const c = s.charCodeAt(i); h1 = Math.imul(h1 ^ c, 2654435761); h2 = Math.imul(h2 ^ c, 1597334677); }
+  h1 = Math.imul(h1 ^ (h1 >>> 16), 2246822507) ^ Math.imul(h2 ^ (h2 >>> 13), 3266489909); h2 = Math.imul(h2 ^ (h2 >>> 16), 2246822507) ^ Math.imul(h1 ^ (h1 >>> 13), 3266489909);
+  return (4294967296 * (2097151 & h2) + (h1 >>> 0)).toString(36);
+}
+// what syncs: every team except the Demo team, plus the settings shared by all teams; the week and season being viewed stay per device
+const sharedPart = st => { const s = Object.assign({}, st.settings); delete s.season; delete s.week; return { overrides: st.overrides || {}, staffEdits: st.staffEdits || {}, returnWeek: st.returnWeek || {}, settings: s }; };
+const teamBody = t => { const o = Object.assign({}, t); delete o.mtime; return o; };
+/* Stamp each team with the time it last changed, and mark teams that disappeared as deleted. Runs on every save, so merges
+   between devices can tell which copy is newer. */
+function stampChanges() {
+  const now = Date.now(), sig = D.sigs || (D.sigs = {}), del = state.deleted || (state.deleted = {});
+  for (const t of state.teams) { const s = canon(teamBody(t)); if (sig[t.id] !== s) { t.mtime = now; sig[t.id] = s; } }
+  for (const id in sig) if (!state.teams.some(t => t.id === id)) { del[id] = now; delete sig[id]; }
+  for (const id in del) if (now - del[id] > 180 * 864e5) delete del[id];
+  const g = canon(sharedPart(state)); if (D.gsig !== g) { state.gmtime = now; D.gsig = g; }
+}
+function primeSigs() { stashTeam(); D.sigs = Object.fromEntries(state.teams.map(t => [t.id, canon(teamBody(t))])); D.gsig = canon(sharedPart(state)); }
+primeSigs();
+function cloudDoc() { stashTeam(); return { v: 1, teams: state.teams.filter(t => !t.example), deleted: state.deleted || {}, gmtime: state.gmtime || 0, shared: sharedPart(state) }; }
+const docHash = () => hash53(canon(cloudDoc()));
+function mergeDocs(a, b) {
+  const deleted = Object.assign({}, a.deleted); for (const [k, v] of Object.entries(b.deleted || {})) deleted[k] = Math.max(deleted[k] || 0, v);
+  const all = [...(a.teams || []), ...(b.teams || [])], best = new Map();
+  for (const t of all) { const o = best.get(t.id); if (!o || (t.mtime || 0) > (o.mtime || 0)) best.set(t.id, t); }
+  const teams = [...new Set(all.map(t => t.id))].map(id => best.get(id)).filter(t => !((deleted[t.id] || 0) >= (t.mtime || 0)));
+  const g = (b.gmtime || 0) > (a.gmtime || 0) ? b : a;
+  return { v: 1, teams, deleted, gmtime: g.gmtime || 0, shared: g.shared };
+}
+// replace this browser's teams and shared settings with a synced copy (the Demo team stays only if the copy has no teams)
+function applyDoc(doc) {
+  const demo = state.teams.filter(t => t.example), teams = JSON.parse(JSON.stringify(doc.teams || []));
+  state.teams = teams.length ? teams : demo.length ? demo : [{ id: newTeamId(), name: 'My team', roster: [] }];
+  if (!state.teams.some(t => t.id === state.activeTeam)) state.activeTeam = state.teams[0].id;
+  state.deleted = Object.assign({}, doc.deleted); state.gmtime = doc.gmtime || 0;
+  const g = doc.shared || {}, view = { season: state.settings.season, week: state.settings.week };
+  state.overrides = Object.assign({}, g.overrides); state.staffEdits = Object.assign({}, g.staffEdits); state.returnWeek = Object.assign({}, g.returnWeek);
+  state.settings = Object.assign({}, DEFAULT_STATE.settings, g.settings, view);
+  state.settings.w = Object.assign({}, DEFAULT_STATE.settings.w, g.settings?.w);
+  applyTeam(curTeam()); primeSigs(); store.set('fo1:state', state);
+  D.open.clear(); D.wCache = null; D.delArm = false; D.flow = null; D.tsOpen = false;
+  if (D.inp) { if (D.fmtLoaded !== fmtKey()) ingest(D.inp); else computeAll(); }
+  render();
+}
+const syncMeta = () => store.set('fo1:sync', { uid: acct.user?.id, rev: acct.rev, h: acct.h, hs: acct.hs });
+function setSync(s) { acct.sync = s; if (s === 'ok') acct.at = Date.now(); renderAcct(); }
+const queuePush = (ms = 1500) => { if (!acct.user || !acct.ready) return; clearTimeout(acct.pushT); acct.pushT = setTimeout(push, ms); };
+async function startSync() {
+  const m = store.get('fo1:sync') || {}, known = m.uid === acct.user.id;
+  acct.rev = known ? m.rev || 0 : 0; acct.h = known ? m.h || null : null; acct.hs = known ? m.hs || {} : {}; acct.ready = known;
+  await pull();
+  if (acct.ready) await pullHist();
+}
+/* Fetch the account's copy. A browser signing in for the first time either uploads its teams (new account), takes the
+   account's (nothing of its own yet), or asks how to combine the two. After that: no local changes → take the account's
+   copy; local changes too → merge both and push the result. */
+async function pull() {
+  if (!acct.user || acct.busy) return;
+  acct.busy = true; setSync('busy'); let then = null;
+  try {
+    const uid = acct.user.id;
+    const { data, error } = await acct.sb.from('user_state').select('state, rev').eq('user_id', uid).maybeSingle();
+    if (error) throw error;
+    acct.pulledAt = Date.now();
+    const local = cloudDoc(), dirty = hash53(canon(local)) !== acct.h;
+    if (!data) {
+      const { error: e2 } = await acct.sb.from('user_state').insert({ user_id: uid, state: local, rev: 1 });
+      if (e2) throw e2;
+      acct.rev = 1; acct.h = hash53(canon(local)); acct.ready = true; syncMeta(); setSync('ok'); then = pushHist;
+    } else {
+      const remote = data.state || {};
+      const first = !acct.ready, mine = local.teams.filter(t => (t.roster || []).length);
+      if (first && mine.length && (remote.teams || []).length) { acct.choice = { doc: remote, rev: data.rev }; D.acctOpen = true; setSync('wait'); render(); return; }
+      if (first) { acct.ready = true; acct.rev = -1; }   // nothing to choose: take the account's copy, or merge this browser's teams into an empty account
+      if (first && !mine.length) { acct.rev = data.rev; applyDoc(remote); acct.h = docHash(); syncMeta(); setSync('ok'); }
+      else if (data.rev === acct.rev && !dirty) setSync('ok');
+      else if (data.rev === acct.rev) { setSync('ok'); then = push; }
+      else if (!dirty) { acct.rev = data.rev; applyDoc(remote); acct.h = docHash(); syncMeta(); setSync('ok'); }
+      else { acct.rev = data.rev; applyDoc(mergeDocs(local, remote)); acct.h = null; syncMeta(); setSync('ok'); then = push; }
+    }
+  } catch { setSync('err'); }
+  finally { acct.busy = false; }
+  if (then) await then();
+  else if (acct.again) { acct.again = false; queuePush(0); }
+}
+async function push() {
+  clearTimeout(acct.pushT);
+  if (!acct.user || !acct.ready) return;
+  if (acct.busy) { acct.again = true; return; }
+  const doc = cloudDoc(), h = hash53(canon(doc)); let conflict = false;
+  if (h !== acct.h) {
+    acct.busy = true; setSync('busy');
+    try {
+      const { data, error } = await acct.sb.from('user_state').update({ state: doc, rev: acct.rev + 1 }).eq('user_id', acct.user.id).eq('rev', acct.rev).select('rev');
+      if (error) throw error;
+      if (data?.length) { acct.rev = data[0].rev; acct.h = h; acct.retries = 0; syncMeta(); setSync('ok'); } else conflict = true;
+    } catch { setSync('err'); }
+    acct.busy = false;
+  }
+  // another device saved first: pull merges both copies and pushes again (give up after a few rounds and say so)
+  if (conflict) { if (++acct.retries > 3) { acct.retries = 0; setSync('err'); } else await pull(); return; }
+  await pushHist();
+  if (acct.again) { acct.again = false; queuePush(0); }
+}
+async function pushHist() {
+  if (!acct.user || !acct.ready) return;
+  const rows = Object.entries(histAll()).filter(([k, s]) => acct.hs[k] !== s.savedAt).map(([k, s]) => { const [team_id, season, week] = k.split('|'); return { user_id: acct.user.id, team_id, season: +season, week: +week, data: s }; });
+  if (!rows.length) return;
+  try {
+    const { error } = await acct.sb.from('lineups').upsert(rows, { onConflict: 'user_id,team_id,season,week' });
+    if (error) throw error;
+    for (const r of rows) acct.hs[histKey(r.team_id, r.season, r.week)] = r.data.savedAt;
+    syncMeta();
+  } catch { setSync('err'); }
+}
+async function pullHist() {
+  if (!acct.user || !acct.ready) return;
+  try {
+    const { data, error } = await acct.sb.from('lineups').select('team_id, season, week, data').gte('season', (D.detSeason || new Date().getFullYear()) - 1);
+    if (error) throw error;
+    acct.histAt = Date.now();
+    const H = histAll(); let changed = false;
+    for (const r of data || []) {
+      const k = histKey(r.team_id, r.season, r.week), mine = H[k];
+      if (!mine || (r.data?.savedAt || 0) > (mine.savedAt || 0)) { H[k] = r.data; changed = true; }
+      if (H[k].savedAt === r.data?.savedAt) acct.hs[k] = r.data.savedAt;
+    }
+    if (changed) { store.set(HIST_KEY, H); if (D.histOpen) render(); }
+    syncMeta(); await pushHist();
+  } catch { setSync('err'); }
+}
+/* The first sign-in on a browser that has its own teams, when the account has teams too:
+   'both' combines them (the same Sleeper or ESPN team on both sides counts once), 'account' keeps the account's,
+   'device' makes this browser's teams the account's. */
+async function resolveChoice(how) {
+  const c = acct.choice; if (!c) return;
+  acct.choice = null; acct.ready = true; acct.rev = c.rev;
+  if (how === 'account') { applyDoc(c.doc); acct.h = docHash(); syncMeta(); setSync('ok'); }
+  else {
+    const local = JSON.parse(JSON.stringify(cloudDoc())), now = Date.now(); let doc;
+    if (how === 'device') {
+      for (const t of local.teams) t.mtime = now;
+      for (const t of c.doc.teams || []) if (!local.teams.some(x => x.id === t.id)) local.deleted[t.id] = now;
+      local.gmtime = now; doc = local;
+    } else {
+      const link = t => t.sleeper?.leagueId ? `s:${t.sleeper.leagueId}:${t.sleeper.rosterId}` : t.espn?.leagueId && t.espn?.teamId != null ? `e:${t.espn.leagueId}:${t.espn.teamId}` : null;
+      for (const t of local.teams) {
+        const same = link(t) && (c.doc.teams || []).find(r => link(r) === link(t));
+        const clash = (c.doc.teams || []).find(r => r.id === t.id);
+        const to = same ? same.id : clash && canon(teamBody(clash)) !== canon(teamBody(t)) ? newTeamId() : null;
+        if (to && to !== t.id) { moveHist(t.id, to); if (state.activeTeam === t.id) state.activeTeam = to; t.id = to; }
+      }
+      doc = mergeDocs(local, c.doc);
+      // this browser's teams take a "(2)" if the account already uses the name
+      const theirs = new Set((c.doc.teams || []).map(t => t.id)), seen = new Set((c.doc.teams || []).map(t => String(t.name).toLowerCase()));
+      for (const t of doc.teams) if (!theirs.has(t.id)) { let nm = t.name, n = 2; while (seen.has(nm.toLowerCase())) nm = `${t.name} (${n++})`; t.name = nm; seen.add(nm.toLowerCase()); }
+    }
+    applyDoc(doc); acct.h = null; syncMeta(); await push();
+  }
+  D.acctOpen = false; render(); toast('Signed in. Your teams now sync to this account.');
+  await pullHist();
+}
+
+/* auth: an emailed code, or Google (PKCE: Google sends people back with ?code=, which leaves the #page routes alone) */
+function cloudReady() {
+  if (acct.sb) return Promise.resolve(acct.sb);
+  acct.lib = acct.lib || new Promise((res, rej) => {
+    const s = document.createElement('script'); s.src = SB_LIB.src; s.integrity = SB_LIB.sri; s.crossOrigin = 'anonymous';
+    s.onload = () => window.supabase?.createClient ? res() : rej(new Error('lib')); s.onerror = () => { acct.lib = null; s.remove(); rej(new Error('lib')); };
+    document.head.appendChild(s);
+  });
+  return acct.lib.then(() => {
+    if (!acct.sb) {
+      acct.sb = window.supabase.createClient(CLOUD.url, CLOUD.key, { auth: { flowType: 'pkce', persistSession: true, autoRefreshToken: true, detectSessionInUrl: true } });
+      // Supabase asks that its own calls wait until this callback returns
+      acct.sb.auth.onAuthStateChange((ev, session) => setTimeout(() => onAuth(ev, session), 0));
+    }
+    return acct.sb;
+  });
+}
+function onAuth(ev, session) {
+  const u = session?.user || null;
+  if (u && u.id !== acct.user?.id) {
+    acct.user = u; acct.step = 'email'; acct.code = ''; acct.msg = null; stripAuthParams();
+    startSync().then(() => {
+      if (!acct.toastNext || acct.choice) return;
+      acct.toastNext = false; D.acctOpen = false; render(); toast('Signed in. Your teams now sync to this account.');
+    });
+    render();
+  } else if (!u && acct.user && ev === 'SIGNED_OUT') { acct.user = null; acct.ready = false; render(); }   // session ended elsewhere: keep this browser's copy
+  renderAcct();
+}
+function stripAuthParams() { if (/[?&](code|error|error_description)=/.test(location.search)) try { history.replaceState(null, '', location.pathname + location.hash); } catch {} }
+const authErr = e => !acct.sb ? 'Couldn’t reach the sign-in service. Check your connection and try again.'
+  : e?.status === 429 ? 'Too many tries. Wait a minute, then try again.'
+  : /expired|invalid|otp/i.test(e?.message || '') ? 'That code didn’t work. Check it, or send a new one.'
+  : (e?.message || 'Something went wrong. Try again.');
+async function sendCode() {
+  const email = (($('#acctEmail')?.value ?? acct.email) || '').trim(); acct.email = email;
+  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) { acct.msg = ['err', 'Enter your email address.']; render(); deskFocus('#acctEmail'); return; }
+  acct.msg = ['info', 'Sending a code…']; render();
+  try {
+    const sb = await cloudReady(), { error } = await sb.auth.signInWithOtp({ email, options: { shouldCreateUser: true } });
+    if (error) throw error;
+    acct.step = 'code'; acct.code = ''; acct.msg = ['info', `We emailed a code to ${email}. It can take a minute; check spam if it doesn’t arrive.`]; render(); deskFocus('#acctCode');
+  } catch (e) { acct.msg = ['err', authErr(e)]; render(); }
+}
+async function verifyCode() {
+  const token = (($('#acctCode')?.value ?? acct.code) || '').replace(/\D/g, ''); acct.code = token;
+  if (token.length < 6) { acct.msg = ['err', 'Enter the code from the email.']; render(); deskFocus('#acctCode'); return; }
+  acct.msg = ['info', 'Checking…']; render();
+  try {
+    const { error } = await acct.sb.auth.verifyOtp({ email: acct.email, token, type: 'email' });
+    if (error) throw error;
+    acct.toastNext = true; acct.msg = ['info', 'Signed in. Loading your teams…']; render();
+  } catch (e) { acct.msg = ['err', authErr(e)]; render(); }
+}
+async function googleSignIn() {
+  try {
+    const sb = await cloudReady();
+    try { sessionStorage.setItem('fo1:ret', location.hash); } catch {}
+    const { error } = await sb.auth.signInWithOAuth({ provider: 'google', options: { redirectTo: location.origin + location.pathname } });
+    if (error) throw error;
+  } catch (e) { acct.msg = ['err', authErr(e)]; render(); }
+}
+// sign out: send any last change, then remove the account's teams and lineups from this browser (they stay in the account)
+async function signOut(deleted) {
+  if (!deleted) await push().catch(() => {});
+  try { await acct.sb?.auth.signOut({ scope: 'local' }); } catch {}
+  acct.user = null; acct.ready = false; acct.choice = null; acct.delArm = false; acct.msg = null; acct.step = 'email'; clearTimeout(acct.pushT);
+  wipeLocal();
+  toast(deleted ? 'Account deleted. Everything it held is gone.' : 'Signed out. Your teams are in your account, not in this browser.');
+}
+function wipeLocal() {
+  ['fo1:state', HIST_KEY, 'fo1:sync'].forEach(k => store.del(k));
+  const tab = state.tab; state = ensureTeams(JSON.parse(JSON.stringify(DEFAULT_STATE))); state.tab = tab;
+  D.hist = null; D.acctOpen = false; D.histOpen = false; D.flow = null; D.tsOpen = false; D.ioOpen = false; D.open.clear(); D.wCache = null;
+  primeSigs();
+  if (D.inp) { if (D.fmtLoaded !== fmtKey()) ingest(D.inp); makeExampleRoster(); computeAll(); }
+  save(); render();
+}
+async function deleteAccount() {
+  acct.msg = ['info', 'Deleting your account…']; render();
+  try { const { error } = await acct.sb.rpc('delete_my_account'); if (error) throw error; }
+  catch (e) { acct.msg = ['err', 'Couldn’t delete the account. ' + authErr(e)]; render(); return; }
+  await signOut(true);
+}
+// on load: restore a saved session (or finish a Google sign-in) without making signed-out visitors download the library
+function acctBoot() {
+  if (!acct.on) return;
+  const q = new URLSearchParams(location.search), back = q.has('code') || q.has('error_description');
+  if (back) {
+    let ret = null; try { ret = sessionStorage.getItem('fo1:ret'); sessionStorage.removeItem('fo1:ret'); } catch {}
+    if (ret && !location.hash) try { history.replaceState(null, '', location.pathname + location.search + ret); } catch {}
+    if (q.has('error_description')) { acct.msg = ['err', 'Google sign-in didn’t finish: ' + q.get('error_description')]; D.acctOpen = true; stripAuthParams(); return; }
+    acct.toastNext = true;
+  }
+  let saved = false; try { saved = Object.keys(localStorage).some(k => /^sb-.+-auth-token$/.test(k)); } catch {}
+  if (!saved && !back) return;
+  cloudReady().then(sb => sb.auth.getSession()).then(({ data }) => {
+    if (back) { stripAuthParams(); if (!data?.session) { acct.msg = ['err', 'Google sign-in didn’t finish. Try again.']; D.acctOpen = true; render(); } }
+  }).catch(() => { if (saved) setSync('err'); });
+}
+document.addEventListener('visibilitychange', () => {
+  if (!acct.user || !acct.ready) return;
+  if (document.visibilityState === 'hidden') push();
+  else if (Date.now() - acct.pulledAt > 10000) pull().then(() => { if (Date.now() - acct.histAt > 60000) pullHist(); });
+});
+window.addEventListener('pagehide', () => { if (acct.user && acct.ready) push(); });
 
 function staffOf(T) {
   const b = STAFF_BASE[T] || ['','','','','',0,0,0,'','',''];
@@ -1113,16 +1413,96 @@ function hungarian(cost) {
   const ans = new Array(n).fill(-1); for (let j = 1; j <= m; j++) if (p[j]) ans[p[j] - 1] = j - 1; return ans;
 }
 function expandSlots() { const out = []; for (const t of SLOT_TYPES) for (let i = 0; i < (state.slots[t.k] || 0); i++) out.push(t); return out; }
+function assignSlots(slots, cands) {
+  if (!slots.length) return [];
+  const n = slots.length;
+  const cost = slots.map(s => { const row = cands.map(r => s.elig.includes(r.pos) ? -metricOf(r) : 1e6); for (let i = 0; i < n; i++) row.push(1e5); return row; });
+  const asg = hungarian(cost);
+  return slots.map((s, i) => { const j = asg[i]; return { slot: s, r: j >= 0 && j < cands.length && cost[i][j] < 1e5 ? cands[j] : null }; });
+}
 function optimize() {
   const slots = expandSlots(), roster = state.roster.map(id => D.M[id]).filter(Boolean);
-  const cands = roster.filter(r => r.status === 'ok');
   if (!slots.length) return { starters: [], bench: roster };
-  const n = slots.length, m = cands.length + n;
-  const cost = slots.map(s => { const row = cands.map(r => s.elig.includes(r.pos) ? -metricOf(r) : 1e6); for (let i = 0; i < n; i++) row.push(1e5); return row; });
-  const asg = hungarian(cost), used = new Set();
-  const starters = slots.map((s, i) => { const j = asg[i]; const r = j >= 0 && j < cands.length && cost[i][j] < 1e5 ? cands[j] : null; if (r) used.add(r.id); return { slot: s, r }; });
+  const starters = assignSlots(slots, roster.filter(r => r.status === 'ok')), used = new Set(starters.filter(s => s.r).map(s => s.r.id));
   const bench = roster.filter(r => !used.has(r.id)).sort((a, b) => (b.status === 'ok') - (a.status === 'ok') || metricOf(b) - metricOf(a));
   return { starters, bench };
+}
+
+/* ---------- lineup history ----------
+   Benny's lineup for each team is saved every week it's viewed (kept current until kickoff), so past weeks can be checked
+   against what the players scored. A starter's spot freezes once his game starts, so a late change doesn't rewrite a pick
+   that already played. Kept for this season and last, and synced to the account when signed in. */
+const HIST_KEY = 'fo1:hist';
+const histKey = (team, season, week) => `${team}|${season}|${week}`;
+const histAll = () => D.hist || (D.hist = store.get(HIST_KEY, {}) || {});
+function histPut(k, snap) {
+  const H = histAll(), min = (D.detSeason || D.season) - 1; H[k] = snap;
+  for (const key in H) if (+key.split('|')[1] < min) delete H[key];
+  store.set(HIST_KEY, H); queuePush();
+}
+function moveHist(from, to) { const H = histAll(); for (const k of Object.keys(H)) if (k.startsWith(from + '|')) { const nk = to + k.slice(from.length); if (!H[nk]) H[nk] = H[k]; delete H[k]; } store.set(HIST_KEY, H); }
+const slotOrder = k => SLOT_TYPES.findIndex(t => t.k === k);
+function recordLineup(starters) {
+  if (state.example || !state.roster.length || D.snapshot || D.season !== D.detSeason || D.week !== D.detWeek) return;
+  const k = histKey(state.activeTeam, D.season, D.week), prev = histAll()[k];
+  const ent = r => [r.id, r.u.name, r.pos, r.status === 'bye' ? 0 : Math.round(r.mean * 10) / 10];
+  const row = s => s.r ? [s.slot.k, ...ent(s.r)] : [s.slot.k, null, '', '', 0];
+  let st = starters.map(row);
+  if (prev && state.roster.some(id => D.M[id]?.locked)) {
+    // games have started: starters already playing stay put, and only the open slots are refilled from players yet to play
+    const frozen = (prev.starters || []).filter(e => e[1] && D.M[e[1]]?.locked), taken = new Set(frozen.map(e => e[1])), left = expandSlots();
+    for (const e of frozen) { const i = left.findIndex(s => s.k === e[0]); if (i >= 0) left.splice(i, 1); }
+    const cands = state.roster.map(id => D.M[id]).filter(r => r && r.status === 'ok' && !r.locked && !taken.has(r.id));
+    st = [...frozen, ...assignSlots(left, cands).map(row)].sort((a, b) => slotOrder(a[0]) - slotOrder(b[0]));
+  }
+  const on = new Set(st.map(e => e[1]).filter(Boolean));
+  const act = Object.assign({}, prev?.act);
+  for (const id of state.roster) { const r = D.M[id]; if (r?.locked && ok(r.actual)) act[id] = Math.round(r.actual * 10) / 10; }
+  const snap = { team: curTeam()?.name || '', fmt: fmtName(), strategy: state.settings.strategy, starters: st,
+    bench: state.roster.filter(id => !on.has(id) && D.M[id]).map(id => ent(D.M[id])), act };
+  if (prev && canon(Object.assign({}, prev, { savedAt: 0 })) === canon(Object.assign({}, snap, { savedAt: 0 }))) return;
+  histPut(k, Object.assign(snap, { savedAt: Date.now() }));
+}
+// points a saved player scored: recorded during the games, or from the season's weekly stats once the week is over
+function histPts(snap, season, week, id) {
+  if (ok(snap.act?.[id])) return snap.act[id];
+  if (season === D.season && week < D.week) { const h = D.H[id], i = h ? h.wks.indexOf(week) : -1; return i >= 0 ? h.pts[i] : null; }
+  return null;
+}
+const weekDone = (season, week) => season < D.detSeason || (season === D.detSeason && week < D.detWeek);
+// write finished weeks' scores into their saved lineups, so they stay after this season's stats are gone
+function gradeHist() {
+  const H = histAll();
+  for (const [k, s] of Object.entries(H)) {
+    const [team, season, week] = k.split('|'); if (team !== state.activeTeam || !weekDone(+season, +week)) continue;
+    const ids = [...(s.starters || []).map(e => e[1]), ...(s.bench || []).map(e => e[0])].filter(Boolean);
+    const add = {}; for (const id of ids) if (!ok(s.act?.[id])) { const p = histPts(s, +season, +week, id); if (ok(p)) add[id] = Math.round(p * 10) / 10; }
+    if (Object.keys(add).length) histPut(k, Object.assign({}, s, { act: Object.assign({}, s.act, add), savedAt: Date.now() }));
+  }
+}
+function histPanel() {
+  gradeHist();
+  const ct = curTeam(), H = histAll();
+  const weeks = Object.entries(H).filter(([k]) => k.startsWith(state.activeTeam + '|')).map(([k, s]) => { const [, season, week] = k.split('|'); return { k, s, season: +season, week: +week }; })
+    .sort((a, b) => b.season - a.season || b.week - a.week);
+  const signIn = acct.on && !acct.user ? ` <button type="button" class="linkbtn" data-act="account">Sign in</button> to keep them on all your devices.` : '';
+  const head = `<div class="row-head"><h2>Past weeks <span class="hsub">${esc(ct?.name || '')}</span></h2><button type="button" class="btn sm" data-act="hist">Close</button></div>`;
+  if (!weeks.length) return `<div class="card panel hist">${head}<p class="small muted" style="margin:0">Benny saves this team’s lineup each week you open Lineup, then fills in what every player scored. Check back after this week’s games.${signIn}</p></div>`;
+  const label = w => `Week ${w.week}${w.season !== D.detSeason ? ` · ${w.season}` : ''}`;
+  const rows = weeks.map(w => {
+    const st = (w.s.starters || []).filter(e => e[1]), proj = st.reduce((t, e) => t + (e[4] || 0), 0), pts = st.map(e => histPts(w.s, w.season, w.week, e[1]));
+    const known = pts.filter(ok), done = weekDone(w.season, w.week), tot = known.reduce((t, x) => t + x, 0);
+    const scored = done && known.length ? f1(tot) : known.length ? `${f1(tot)} <span class="muted">so far</span>` : '—';
+    const diff = done && known.length ? `<span class="${tot >= proj ? 'trend-up' : 'trend-down'}">${tot >= proj ? '+' : '−'}${f1(Math.abs(tot - proj))}</span>` : '';
+    const open = D.histWeek === w.k;
+    const detail = open ? `<tr class="hdet"><td colspan="4"><table><thead><tr><th class="l">Slot</th><th class="l">Player</th><th>Proj</th><th>Pts</th></tr></thead><tbody>
+      ${(w.s.starters || []).map(e => `<tr><td class="l"><span class="slot">${esc(SLOT_TYPES.find(t => t.k === e[0])?.label || e[0])}</span></td><td class="l">${e[1] ? `${esc(e[2])} <span class="muted">${esc(e[3])}</span>` : '<span class="muted">Empty</span>'}</td><td>${e[1] ? f1(e[4]) : ''}</td><td>${e[1] ? f1(histPts(w.s, w.season, w.week, e[1])) : ''}</td></tr>`).join('')}
+      ${(w.s.bench || []).map(e => `<tr class="hbench"><td class="l"><span class="slot bench">BN</span></td><td class="l">${esc(e[1])} <span class="muted">${esc(e[2])}</span></td><td>${f1(e[3])}</td><td>${f1(histPts(w.s, w.season, w.week, e[0]))}</td></tr>`).join('')}
+      </tbody></table><div class="small muted">${esc(w.s.fmt || '')} · saved ${esc(new Date(w.s.savedAt).toLocaleString([], { weekday: 'short', month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' }))}</div></td></tr>` : '';
+    return `<tr class="click" data-hweek="${esc(w.k)}" aria-expanded="${open}"><td class="l"><strong>${label(w)}</strong></td><td>${f1(proj)}</td><td>${scored}</td><td>${diff}</td></tr>${detail}`;
+  }).join('');
+  return `<div class="card panel hist">${head}<p class="small muted" style="margin:0">Benny’s lineup for each week, what it projected and what it scored. Tap a week for every player.${signIn}</p>
+    <div class="tscroll"><table><thead><tr><th class="l">Week</th><th>Projected</th><th>Scored</th><th title="Scored minus projected">+/−</th></tr></thead><tbody>${rows}</tbody></table></div></div>`;
 }
 
 /* ---------- example roster ---------- */
@@ -1829,9 +2209,9 @@ function render() {
   const nav = navOf(state.tab);
   $('#tabs').innerHTML = NAV.map(([k, l]) => `<a href="#${HASH[k]}" class="navlink" data-tab="${k}" ${nav === k ? 'aria-current="page"' : ''}>${l}</a>`).join('');
   $('#settingsBtn')?.setAttribute('aria-pressed', String(state.tab === 'settings'));
-  renderStatus();
+  renderStatus(); renderAcct();
   $('#teamctx').innerHTML = D.loading || D.failed ? '' : teamBar();
-  $('#panels').innerHTML = D.loading || D.failed ? '' : D.flow ? flowPanel() : D.tsOpen ? teamSettingsPanel() : D.ioOpen ? sharePanel() : '';
+  $('#panels').innerHTML = D.acctOpen && acct.on ? accountPanel() : D.loading || D.failed ? '' : D.flow ? flowPanel() : D.tsOpen ? teamSettingsPanel() : D.ioOpen ? sharePanel() : '';
   const msgs = [];
   if (D.flash && !D.loading) msgs.push(`<div class="banner info flash"><span>${D.flash.html}</span><button type="button" class="btn sm" data-act="flashclose" aria-label="Dismiss">Dismiss</button></div>`);
   // Only interrupt for problems that change the picks: missing projections or schedule, or data that's gone stale.
@@ -2051,6 +2431,49 @@ function sharePanel() {
     <div class="toolbar"><button type="button" class="btn primary" data-act="iocopy" ${sel.length ? '' : 'disabled'}>Copy code</button>${canDownload ? `<button type="button" class="btn" data-act="iodownload" ${sel.length ? '' : 'disabled'}>Download file</button>` : ''}<span class="small muted" id="ioOutMsg">${esc(D.ioOutMsg || '')}</span></div>
     <textarea class="inp iocode" id="ioOut" readonly aria-label="Team code">${esc(code)}</textarea>` : '<p class="small muted" style="margin:0">Add players to a team first.</p>'}</div>`;
 }
+/* ---------- account (header button and panel) ---------- */
+const syncText = () => ({ busy: 'Syncing…', err: 'Couldn’t reach your account. Changes are saved in this browser and will sync when it’s reachable again.', wait: 'Choose which teams to keep below.' })[acct.sync]
+  || (acct.at ? `Synced ${ago(acct.at)}.` : 'Synced.');
+function renderAcct() {
+  const b = $('#acctBtn'); if (!b) return;
+  b.hidden = !acct.on; if (!acct.on) return;
+  b.setAttribute('aria-expanded', String(!!D.acctOpen));
+  b.innerHTML = acct.user ? `<i class="${acct.sync}" aria-hidden="true"></i>Account` : 'Sign in';
+  b.title = acct.user ? syncText() : 'Sign in to use your teams on any device';
+  const s = $('#acctSync'); if (s) s.textContent = syncText();
+}
+function accountPanel() {
+  const msg = acct.msg ? `<div class="banner ${acct.msg[0] === 'err' ? 'err' : 'info'}" role="status">${esc(acct.msg[1])}</div>` : '';
+  const close = `<button type="button" class="btn sm" data-act="account">Close</button>`;
+  if (acct.user && acct.choice) {
+    const names = ts => ts.map(t => esc(t.name)).join(', ') || 'none';
+    const mine = state.teams.filter(t => !t.example && (t.roster || []).length);
+    return `<div class="card panel acct"><div class="row-head"><h2>Your teams <span class="hsub">${esc(acct.user.email || '')}</span></h2></div>
+      <p style="margin:0">This browser already has teams, and so does your account. Which should your account keep?</p>
+      <div class="small"><div><strong>This browser:</strong> ${names(mine)}</div><div><strong>Your account:</strong> ${names(acct.choice.doc.teams || [])}</div></div>
+      <div class="acct-choice">
+        <button type="button" class="btn primary" data-act="acctchoice" data-how="both">Keep both</button>
+        <button type="button" class="btn" data-act="acctchoice" data-how="account">Use my account’s teams</button>
+        <button type="button" class="btn" data-act="acctchoice" data-how="device">Use this browser’s teams</button>
+      </div>
+      <p class="small muted" style="margin:0">Keep both adds this browser’s teams to your account, and a Sleeper or ESPN team on both counts once. The other two choices replace the teams on one side.</p></div>`;
+  }
+  if (acct.user) return `<div class="card panel acct"><div class="row-head"><h2>Account <span class="hsub">${esc(acct.user.email || '')}</span></h2>${close}</div>
+    <p style="margin:0">Your teams, settings and Benny’s weekly lineups sync to this account. Sign in with the same email on your phone or computer to see them there. <span id="acctSync" class="muted">${esc(syncText())}</span></p>
+    ${msg}
+    <div class="toolbar"><button type="button" class="btn" data-act="acctsync">Sync now</button><button type="button" class="btn" data-act="acctout">Sign out</button>
+      <button type="button" class="btn danger" data-act="acctdel">${acct.delArm ? 'Press again to delete your account' : 'Delete account'}</button></div>
+    <p class="small muted" style="margin:0">Signing out removes your teams from this browser; they stay in your account. Deleting the account erases everything it holds.</p></div>`;
+  const form = acct.step === 'code'
+    ? `<div class="field"><label class="label" for="acctCode">Code from the email</label><div class="acct-form"><input class="inp" id="acctCode" type="text" inputmode="numeric" autocomplete="one-time-code" maxlength="10" value="${esc(acct.code)}" placeholder="123456"><button type="button" class="btn primary" data-act="acctverify">Sign in</button></div></div>
+       <div class="toolbar small"><button type="button" class="linkbtn" data-act="acctsend">Send a new code</button><button type="button" class="linkbtn" data-act="acctback">Use a different email</button></div>`
+    : `<div class="field"><label class="label" for="acctEmail">Email</label><div class="acct-form"><input class="inp" id="acctEmail" type="email" autocomplete="email" value="${esc(acct.email)}" placeholder="you@example.com"><button type="button" class="btn primary" data-act="acctsend">Email me a code</button></div></div>
+       <div class="acct-or">or</div><div><button type="button" class="btn gbtn" data-act="acctgoogle"><svg viewBox="0 0 48 48" width="18" height="18" aria-hidden="true"><path fill="#EA4335" d="M24 9.5c3.54 0 6.71 1.22 9.21 3.6l6.85-6.85C35.9 2.38 30.47 0 24 0 14.62 0 6.51 5.38 2.56 13.22l7.98 6.19C12.43 13.72 17.74 9.5 24 9.5z"/><path fill="#4285F4" d="M46.98 24.55c0-1.57-.15-3.09-.38-4.55H24v9.02h12.94c-.58 2.96-2.26 5.48-4.78 7.18l7.73 6c4.51-4.18 7.09-10.36 7.09-17.65z"/><path fill="#FBBC05" d="M10.53 28.59c-.48-1.45-.76-2.99-.76-4.59s.27-3.14.76-4.59l-7.98-6.19C.92 16.46 0 20.12 0 24c0 3.88.92 7.54 2.56 10.78l7.97-6.19z"/><path fill="#34A853" d="M24 48c6.48 0 11.93-2.13 15.89-5.81l-7.73-6c-2.15 1.45-4.92 2.3-8.16 2.3-6.26 0-11.57-4.22-13.47-9.91l-7.98 6.19C6.51 42.62 14.62 48 24 48z"/></svg>Continue with Google</button></div>`;
+  return `<div class="card panel acct"><div class="row-head"><h2>Sign in</h2>${close}</div>
+    <p style="margin:0">Keep your teams and Benny’s weekly lineups on every device, computer or phone. There’s no password: sign in with a code we email you, or with Google.</p>
+    ${msg}${form}
+    <p class="small muted" style="margin:0">Without an account, everything stays in this browser, and <button type="button" class="linkbtn" data-act="toggleio">Share / back up</button> still moves teams by code.</p></div>`;
+}
 
 /* ---------- one setup flow ----------
    Every way to bring a team in (the Demo banner, + Add team, Import / replace, Roster's Paste / import roster) opens
@@ -2058,7 +2481,7 @@ function sharePanel() {
 const FLOW_METHODS = [['sleeper', 'Connect Sleeper'], ['espn', 'Import ESPN'], ['manual', 'Build manually'], ['restore', 'Restore saved team']];
 D.drafts = D.drafts || {};   // unfinished text in the flow survives closing it and moving between pages
 function openFlow(method, dest, espnMode) {
-  D.tsOpen = false; D.ioOpen = false; D.flash = null;
+  D.tsOpen = false; D.ioOpen = false; D.acctOpen = false; D.flash = null;
   D.flow = { method: method || 'sleeper', dest: dest || 'replace', step: 'pick', espnMode: espnMode || D.flow?.espnMode || 'league', manual: D.flow?.manual || [], draft: null, msg: null };
   render(); revealPanel($('.flow'));
   deskFocus({ sleeper: '#slQuery', espn: D.flow.espnMode === 'paste' ? '#rosterPaste' : '#leagueId', manual: '#mq', restore: '#ioIn' }[D.flow.method]);
@@ -2294,6 +2717,7 @@ function viewResearch() {
 }
 function lineupBody() {
   const { starters, bench } = optimize();
+  recordLineup(starters);
   const st = starters.filter(s => s.r), tot = st.reduce((s, x) => s + metricOf(x.r), 0), mu = st.reduce((s, x) => s + x.r.mean, 0), sdT = Math.sqrt(st.reduce((s, x) => s + x.r.sd ** 2, 0));
   // injury alerts: starters and bench counted separately (out/IR players are already benched, so they show as bench alerts)
   const tagged = r => r && r.inj && r.status !== 'bye', empty = starters.length - st.length;
@@ -2308,7 +2732,8 @@ function lineupBody() {
     <div><span class="label">Optimizing for</span><span class="big num" style="font-size:24px">${sLab[strat]}</span><span class="small muted">${strat === 'mean' ? 'best average outcome' : strat === 'floor' ? 'use when you’re favored' : 'use when you’re the underdog'} · ${f1(tot)}</span></div>
     <div><span class="label">Injury alerts</span><span class="big num">${startTags.length}<span class="small muted" style="font-family:var(--font-body);font-size:14px;font-weight:400"> starter${startTags.length === 1 ? '' : 's'} · ${benchTags.length} bench</span></span><span class="small muted">${startTags.length ? 'Starting: ' + esc(tagTxt(startTags)) : 'No starters tagged'}${benchTags.length ? ' · Bench: ' + esc(tagTxt(benchTags)) : ''}${empty ? ` · ${empty} empty slot${empty === 1 ? '' : 's'}` : ''}</span></div>
   </div>
-  <div class="row-head"><h2>Start</h2><div class="seg" role="group" aria-label="Strategy">${['mean', 'floor', 'ceil'].map(k => `<button type="button" data-strategy="${k}" aria-pressed="${strat === k}">${{ mean: 'Projected', floor: 'Safe', ceil: 'Boom' }[k]}</button>`).join('')}</div></div>
+  ${D.histOpen ? histPanel() : ''}
+  <div class="row-head"><h2>Start</h2><span class="toolbar"><button type="button" class="btn sm" data-act="hist" aria-expanded="${!!D.histOpen}">Past weeks</button><span class="seg" role="group" aria-label="Strategy">${['mean', 'floor', 'ceil'].map(k => `<button type="button" data-strategy="${k}" aria-pressed="${strat === k}">${{ mean: 'Projected', floor: 'Safe', ceil: 'Boom' }[k]}</button>`).join('')}</span></span></div>
   <div class="card list">${head}${starters.map(s => s.r ? playerRow(s.r, s.slot.label || s.slot.k, true) : `<div class="item"><div class="prow"><span class="slot">${esc(s.slot.label || s.slot.k)}</span><span class="pwho muted">No eligible player. <a href="#roster" data-tab="players">Add one in Roster</a>.</span></div></div>`).join('')}</div>
   <div class="row-head"><h2>Bench</h2><span class="small muted">Tap any player for the full matchup breakdown</span></div>
   <div class="card list">${bench.length ? bench.map(r => playerRow(r, 'BN', false)).join('') : '<div class="item"><div class="prow"><span></span><span class="muted">Nobody on the bench.</span></div></div>'}</div>
@@ -2457,18 +2882,19 @@ function viewSettings() {
     <li><strong>Scheme history:</strong> each team’s numbers blend ${D.season} games with last season. When the play-caller is unchanged, last season counts as ${S.priorWeeks} games. When the play-caller is new, it counts as at most 1.5 games, mixed with the new coach’s old team, and the player’s range widens by 10%.</li>
     <li><strong>Probabilities:</strong> scores are treated as a bell curve around the projection, with spread from the player’s weekly scores (shrunk toward a typical spread for the position).</li>
     <li><strong>Lineup:</strong> an exact assignment fills every slot to maximize the chosen strategy. Bye weeks and players ruled Out or on IR sit automatically.</li></ol></details>
-    <div class="toolbar"><button type="button" class="btn danger" data-act="reset">${D.resetArm ? 'Press again to erase everything' : 'Reset all saved data'}</button><span class="small muted">Removes your roster, overrides, settings and cached stats from this browser.</span></div></div>
+    <div class="toolbar"><button type="button" class="btn danger" data-act="reset">${D.resetArm ? 'Press again to erase everything' : 'Reset all saved data'}</button><span class="small muted">Removes your roster, overrides, settings, saved lineups and cached stats from this browser${acct.user ? ', and signs you out (your account keeps its copy)' : ''}.</span></div></div>
   </div>`;
 }
 
 /* ---------- events ---------- */
 document.addEventListener('click', e => {
-  const t = e.target.closest('[data-tab],[data-expand],[data-add],[data-remove],[data-strategy],[data-act],[data-sort],[data-team],[data-fteam],[data-clearovr],[data-wh],[data-wsrc],[data-taken],[data-keepmode],[data-decide],[data-brief],[data-wrank],[data-acadd],[data-mrem],[data-flowmethod],[data-espnmode],[data-rview],[data-research]'); if (!t) return;
+  const t = e.target.closest('[data-tab],[data-expand],[data-add],[data-remove],[data-strategy],[data-act],[data-sort],[data-team],[data-fteam],[data-clearovr],[data-wh],[data-wsrc],[data-taken],[data-keepmode],[data-decide],[data-brief],[data-wrank],[data-acadd],[data-mrem],[data-flowmethod],[data-espnmode],[data-rview],[data-research],[data-hweek]'); if (!t) return;
   if (t.dataset.acadd) { e.preventDefault(); acPick(t.dataset.acadd, t.dataset.acmode); return; }
   if (t.dataset.mrem) { D.flow.manual = D.flow.manual.filter(x => x !== t.dataset.mrem); const ml = $('#manualList'); if (ml) ml.innerHTML = manualListHTML(); const rb = $('[data-act=flowmanual]'); if (rb) { const n = D.flow.manual.length; rb.disabled = !n; rb.textContent = `Review ${n || ''} player${n === 1 ? '' : 's'}`; } return; }
   if (t.dataset.flowmethod) { D.flow.method = t.dataset.flowmethod; D.flow.msg = null; render(); deskFocus({ sleeper: '#slQuery', espn: '#leagueId', manual: '#mq', restore: '#ioIn' }[D.flow.method]); return; }
   if (t.dataset.espnmode) { D.flow.espnMode = t.dataset.espnmode; render(); return; }
   if (t.dataset.rview) { D.rview = t.dataset.rview; render(); return; }
+  if (t.dataset.hweek) { D.histWeek = D.histWeek === t.dataset.hweek ? null : t.dataset.hweek; render(); return; }
   if (t.dataset.research) { e.preventDefault(); D.teamOpen = t.dataset.research; D.after = () => $(`[data-team="${D.teamOpen}"]`)?.scrollIntoView({ block: 'center' }); go('teams'); return; }
   if (t.dataset.wrank) { state.waivers.rank = t.dataset.wrank; save(); render(); return; }
   if (t.dataset.decide) { state.compare = t.dataset.decide.split('|'); save(); render(); return; }
@@ -2508,13 +2934,30 @@ document.addEventListener('click', e => {
   else if (a === 'flowpaste') flowPaste(t.dataset.src);
   else if (a === 'flowmanual') { if (D.flow.manual.length) makeDraft({ roster: D.flow.manual.slice(), unresolved: D.flow.manualMiss || [], source: 'players you picked' }); }
   else if (a === 'flowrestore') { try { D.flow.draft = { bundle: parseBundle($('#ioIn')?.value) }; D.flow.step = 'review'; D.flow.msg = null; } catch (err) { D.flow.msg = ['err', err.message]; } render(); }
-  else if (a === 'teamsettings') { D.tsOpen = !D.tsOpen; D.flow = null; D.ioOpen = false; D.delArm = false; render(); if (D.tsOpen) revealPanel($('.tsp')); }
+  else if (a === 'teamsettings') { D.tsOpen = !D.tsOpen; D.flow = null; D.ioOpen = false; D.acctOpen = false; D.delArm = false; render(); if (D.tsOpen) revealPanel($('.tsp')); }
   else if (a === 'copyteam') makeEditableCopy();
   else if (a === 'undo') { const u = D.undo; if (u && u.team === state.activeTeam && !state.roster.includes(u.id)) { state.roster.splice(Math.min(u.idx, state.roster.length), 0, u.id); D.wCache = null; save(); refreshPlayers(); toast(`Restored ${D.U.get(u.id)?.name || 'player'}.`); } D.undo = null; }
   else if (a === 'flashclose') { D.flash = null; render(); }
+  else if (a === 'hist') { D.histOpen = !D.histOpen; D.histWeek = null; render(); if (D.histOpen) revealPanel($('.hist')); }
+  else if (a === 'account') {
+    D.acctOpen = !D.acctOpen; D.flow = null; D.tsOpen = false; D.ioOpen = false; acct.delArm = false; if (!acct.user) acct.msg = null;
+    if (D.acctOpen && !acct.user) cloudReady().catch(() => {});   // start loading the sign-in library while they type
+    render(); if (D.acctOpen) { revealPanel($('.acct')); deskFocus(acct.step === 'code' ? '#acctCode' : '#acctEmail'); }
+  }
+  else if (a === 'acctsend') sendCode();
+  else if (a === 'acctverify') verifyCode();
+  else if (a === 'acctback') { acct.step = 'email'; acct.code = ''; acct.msg = null; render(); deskFocus('#acctEmail'); }
+  else if (a === 'acctgoogle') googleSignIn();
+  else if (a === 'acctchoice') resolveChoice(t.dataset.how);
+  else if (a === 'acctsync') { acct.msg = null; pull().then(() => acct.ready && push()).then(pullHist); }
+  else if (a === 'acctout') signOut();
+  else if (a === 'acctdel') {
+    if (!acct.delArm) { acct.delArm = true; render(); setTimeout(() => { if (acct.delArm) { acct.delArm = false; if (D.acctOpen) render(); } }, 4000); return; }
+    acct.delArm = false; deleteAccount();
+  }
   else if (a === 'fresh') { D.freshOpen = !D.freshOpen; renderFresh(); }
   else if (a === 'toggleFa') { D.faOpen = !D.faOpen; render(); if (D.faOpen) deskFocus('#faPaste'); }
-  else if (a === 'toggleio') { D.ioOpen = !D.ioOpen; D.flow = null; D.tsOpen = false; D.ioOutMsg = ''; D.ioInMsg = ''; render(); if (D.ioOpen) revealPanel($('.io')); }
+  else if (a === 'toggleio') { D.ioOpen = !D.ioOpen; D.flow = null; D.tsOpen = false; D.acctOpen = false; D.ioOutMsg = ''; D.ioInMsg = ''; render(); if (D.ioOpen) revealPanel($('.io')); }
   else if (a === 'iocopy') {
     const out = $('#ioOut'), code = out?.value || '', msg = $('#ioOutMsg');
     const fallback = () => { out.focus(); out.select(); if (msg) msg.textContent = 'Code selected. Press Ctrl+C (or Cmd+C) to copy it.'; };
@@ -2548,13 +2991,16 @@ document.addEventListener('click', e => {
   else if (a === 'reset') {
     if (!D.resetArm) { D.resetArm = true; render(); setTimeout(() => { D.resetArm = false; if (state.tab === 'settings') render(); }, 4000); return; }
     try { Object.keys(localStorage).filter(k => k.startsWith('fo1:')).forEach(k => localStorage.removeItem(k)); } catch {}
-    state = ensureTeams(JSON.parse(JSON.stringify(DEFAULT_STATE))); D.resetArm = false; D.open.clear(); load({ fresh: true });
+    if (acct.user) { acct.sb.auth.signOut({ scope: 'local' }).catch(() => {}); acct.user = null; acct.ready = false; acct.choice = null; clearTimeout(acct.pushT); }
+    state = ensureTeams(JSON.parse(JSON.stringify(DEFAULT_STATE))); D.hist = null; primeSigs(); D.resetArm = false; D.open.clear(); load({ fresh: true });
   }
 });
 document.addEventListener('keydown', e => {
   const t = e.target;
   if (e.key === 'Enter' && t.id === 'teamName') t.blur();
   if (e.key === 'Enter' && t.id === 'slQuery') { e.preventDefault(); slFind(); }
+  if (e.key === 'Enter' && t.id === 'acctEmail') { e.preventDefault(); sendCode(); }
+  if (e.key === 'Enter' && t.id === 'acctCode') { e.preventDefault(); verifyCode(); }
   // player search: arrows move through suggestions, Enter adds the highlighted one, Escape closes the list
   if ((t.id === 'addq' || t.id === 'mq') && D.ac?.input === t.id) {
     const n = D.ac.items.length;
@@ -2575,6 +3021,8 @@ document.addEventListener('input', e => {
   if (t.id === 'mq') { renderAc('mq'); return; }
   if (t.dataset.draft) { D.drafts[t.dataset.draft] = t.value; return; }
   if (t.id === 'slQuery') { D.sl = D.sl || {}; D.sl.q = t.value; return; }
+  if (t.id === 'acctEmail') { acct.email = t.value; return; }
+  if (t.id === 'acctCode') { acct.code = t.value; return; }
   if (t.id === 'psearch') { D.psearch = t.value; $('#plistBox').innerHTML = playerListHTML(); }
   else if (t.dataset.set) { const v = +t.value, o = $('#' + CSS.escape(t.id) + '-v'); if (o) o.textContent = t.id === 'priorWeeks' ? v.toFixed(1) : t.id.startsWith('w.') ? '×' + v.toFixed(1) : Math.round(v * 100) + '%'; }
 });
@@ -2637,6 +3085,7 @@ function applyCsv() {
   render();
 }
 
+acctBoot();
 { const tab = TAB_OF[location.hash.slice(1)]; if (tab) state.tab = tab; else if (location.hash !== '#export' && HASH[state.tab]) { try { history.replaceState(null, '', '#' + HASH[state.tab]); } catch {} } }
 render();
 load();
