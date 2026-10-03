@@ -29,7 +29,7 @@
   --surface: #ffffff;
   --surface-2: #e3e9e4;
   --ink: #13201a;
-  --muted: #56655d;
+  --muted: #4a5850;
   --line: #cfd8d1;
   --accent: #075b37;
   --gold: #8a6510;
@@ -43,17 +43,18 @@
 }
 @media (prefers-color-scheme: dark) {
   :root:not([data-theme="light"]) {
-    --bg: #0e1512; --surface: #151e1a; --surface-2: #1c2722; --ink: #e4ebe6; --muted: #91a198;
+    --bg: #0e1512; --surface: #151e1a; --surface-2: #1c2722; --ink: #e4ebe6; --muted: #a9b7af;
     --line: #29352f; --accent: #4fc38e; --accent-ink: #07130d; --good: #4fc38e; --bad: #f07a6e; --warn: #e3b052; --gold: #e2bb52;
     color-scheme: dark;
   }
 }
 :root[data-theme="dark"] {
-  --bg: #0e1512; --surface: #151e1a; --surface-2: #1c2722; --ink: #e4ebe6; --muted: #91a198;
+  --bg: #0e1512; --surface: #151e1a; --surface-2: #1c2722; --ink: #e4ebe6; --muted: #a9b7af;
   --line: #29352f; --accent: #4fc38e; --accent-ink: #07130d; --good: #4fc38e; --bad: #f07a6e; --warn: #e3b052; --gold: #e2bb52;
   color-scheme: dark;
 }
 * { box-sizing: border-box; }
+[hidden] { display: none !important; }
 body { margin: 0; background: var(--bg); color: var(--ink); font: 15px/1.5 var(--font-body); }
 .wrap { max-width: 1100px; margin: 0 auto; padding-inline: 16px; padding-block: 18px 56px; display: flex; flex-direction: column; gap: 16px; }
 h1, h2, h3 { font-family: var(--font-display); font-weight: 700; letter-spacing: .01em; margin: 0; text-wrap: balance; line-height: 1.1; }
@@ -62,8 +63,8 @@ h2 { font-size: 22px; text-transform: uppercase; }
 h3 { font-size: 17px; text-transform: uppercase; letter-spacing: .03em; }
 .num { font-family: var(--font-display); font-variant-numeric: tabular-nums; font-weight: 600; }
 .muted { color: var(--muted); }
-.small { font-size: 13px; }
-.label { font-size: 11.5px; text-transform: uppercase; letter-spacing: .08em; color: var(--muted); font-weight: 600; }
+.small { font-size: 13.5px; }
+.label { font-size: 12px; text-transform: uppercase; letter-spacing: .08em; color: var(--muted); font-weight: 600; }
 button, input, select, textarea { font: inherit; color: inherit; }
 button { cursor: pointer; }
 :focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
@@ -77,7 +78,11 @@ a { color: var(--accent); }
 .wordmark { display: flex; flex-direction: column; min-width: 0; }
 .wordmark h1 { font-size: 32px; }
 .tagline { font-size: 12px; font-weight: 600; letter-spacing: .14em; text-transform: uppercase; color: var(--muted); }
-.status { display: inline-flex; align-items: center; gap: 6px; font-size: 13px; color: var(--muted); margin-right: 4px; }
+.status { display: inline-flex; align-items: center; gap: 6px; font: inherit; font-size: 13.5px; color: var(--muted); margin-right: 4px; background: none; border: 1px solid transparent; border-radius: 999px; padding: 4px 10px; cursor: pointer; }
+.status:hover { border-color: var(--line); color: var(--ink); }
+.freshp { padding: 12px 16px; display: flex; flex-direction: column; gap: 8px; }
+.freshp table { font-size: 14px; }
+.freshp td { white-space: normal; vertical-align: top; }
 .status i { width: 8px; height: 8px; border-radius: 50%; background: var(--muted); }
 .status.live i { background: var(--good); }
 .status.busy i { background: var(--accent); animation: pulse 1.2s ease-in-out infinite; }
@@ -131,7 +136,7 @@ a { color: var(--accent); }
 .tteam { flex: 0 0 auto; display: flex; flex-direction: column; align-items: flex-start; gap: 1px; min-width: 128px; max-width: 260px; padding: 8px 14px 9px; background: var(--surface); border: 1px solid var(--line); border-radius: 8px; text-align: left; }
 .tteam:hover { border-color: var(--accent); }
 .tteam .tn { font-family: var(--font-display); font-weight: 700; font-size: 17px; line-height: 1.15; text-transform: uppercase; letter-spacing: .02em; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 100%; }
-.tteam .tm { font-size: 12.5px; color: var(--muted); white-space: normal; line-height: 1.4; }
+.tteam .tm { font-size: 13px; color: var(--muted); white-space: normal; line-height: 1.4; }
 .tteam .tb { white-space: nowrap; }
 .tteam .tm .num { color: var(--ink); }
 .tteam[aria-pressed="true"] { border-color: var(--accent); background: color-mix(in srgb, var(--accent) 9%, var(--surface)); box-shadow: inset 0 -3px 0 var(--accent); }
@@ -148,19 +153,20 @@ a { color: var(--accent); }
 /* Lineup rows */
 .list { display: flex; flex-direction: column; }
 .list .item + .item { border-top: 1px solid var(--line); }
-.prow { display: grid; grid-template-columns: 54px minmax(0, 1.5fr) minmax(0, 1.25fr) 38px 64px 86px 58px; align-items: center; gap: 12px; padding: 10px 14px; width: 100%; background: none; border: 0; text-align: left; }
+.prow { display: grid; grid-template-columns: 54px minmax(0, 1.5fr) minmax(0, 1.25fr) 62px 64px 92px 64px; align-items: center; gap: 12px; padding: 10px 14px; width: 100%; background: none; border: 0; text-align: left; }
 .prow:hover { background: color-mix(in srgb, var(--accent) 5%, transparent); }
 .lhead { padding-block: 8px; }
 .lhead:hover { background: none; }
 .slot { font-family: var(--font-display); font-weight: 700; font-size: 15px; letter-spacing: .04em; color: var(--accent); }
 .slot.bench { color: var(--muted); }
 .pname { display: block; font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.psub { font-size: 12.5px; color: var(--muted); display: flex; flex-wrap: wrap; gap: 4px 8px; align-items: center; }
+.psub { font-size: 13px; color: var(--muted); display: flex; flex-wrap: wrap; gap: 4px 8px; align-items: center; }
 .match { font-size: 13px; min-width: 0; }
 .match .opp { font-weight: 600; }
 .proj { font-size: 24px; text-align: right; line-height: 1; }
 .range { font-size: 13px; text-align: right; color: var(--muted); font-variant-numeric: tabular-nums; }
 .pav { text-align: right; font-size: 13px; font-variant-numeric: tabular-nums; }
+.prow > .grade { justify-self: center; }
 .grade { width: 30px; height: 30px; border-radius: 6px; display: grid; place-items: center; font-family: var(--font-display); font-weight: 700; font-size: 18px; border: 1px solid var(--line); }
 .g-A { background: color-mix(in srgb, var(--good) 22%, transparent); color: var(--good); border-color: color-mix(in srgb, var(--good) 45%, transparent); }
 .g-B { background: color-mix(in srgb, var(--good) 10%, transparent); color: var(--good); }
@@ -181,7 +187,7 @@ a { color: var(--accent); }
 .factors { display: flex; flex-direction: column; gap: 9px; }
 .factor { display: grid; grid-template-columns: minmax(0, 1fr) 120px 48px; gap: 10px; align-items: center; }
 .factor .fl { font-weight: 600; font-size: 13.5px; }
-.factor .fn { font-size: 12.5px; color: var(--muted); }
+.factor .fn { font-size: 13px; color: var(--muted); }
 .fbar { position: relative; height: 10px; background: var(--surface-2); border-radius: 3px; }
 .fbar::after { content: ""; position: absolute; left: 50%; top: -3px; bottom: -3px; width: 1px; background: var(--muted); }
 .fbar span { position: absolute; top: 0; bottom: 0; border-radius: 3px; }
@@ -192,7 +198,18 @@ a { color: var(--accent); }
 .probs { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
 .probs > div { border: 1px solid var(--line); border-radius: 8px; padding: 8px 10px; display: flex; flex-direction: column; gap: 2px; }
 .probs .num { font-size: 22px; line-height: 1; }
-.math { font-size: 12.5px; color: var(--muted); font-variant-numeric: tabular-nums; }
+.math { font-size: 13px; color: var(--muted); font-variant-numeric: tabular-nums; }
+.dh { font-size: 16px; }
+.reasons { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 6px; font-size: 14.5px; }
+.reasons li { display: grid; grid-template-columns: 48px minmax(0, 1fr); gap: 8px; align-items: baseline; }
+.reasons .rv { font-weight: 600; font-variant-numeric: tabular-nums; text-align: right; }
+.reasons li.up .rv { color: var(--good); } .reasons li.down .rv { color: var(--bad); }
+.detail details.more { grid-column: 1 / -1; }
+details.more { border-top: 1px solid var(--line); padding-top: 8px; }
+details.more > summary, details.model > summary { cursor: pointer; font-weight: 600; font-size: 14px; color: var(--accent); }
+details.more[open] > summary { margin-bottom: 8px; }
+details.model p { margin: 6px 0 0; max-width: 72ch; }
+.pick-note { font-size: 14px; padding: 8px 12px; border-radius: 8px; background: var(--surface-2); }
 .ovr { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; font-size: 13px; }
 .ovr input { width: 84px; }
 
@@ -218,6 +235,16 @@ tr.click:hover td { background: color-mix(in srgb, var(--accent) 5%, transparent
 .cmp { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 14px; }
 .cmp .card { padding: 14px; display: flex; flex-direction: column; gap: 12px; min-width: 0; }
 /* Waiver Optimizer headline */
+.setup { gap: 14px; border: 1px solid color-mix(in srgb, var(--accent) 40%, var(--line)); }
+.setup-grid { display: grid; grid-template-columns: minmax(0, 1.3fr) minmax(0, 1fr) minmax(0, 1fr); gap: 16px; }
+.setup .opt { display: flex; flex-direction: column; gap: 8px; min-width: 0; }
+.setup .opt p { margin: 0; }
+.setup .opt + .opt { border-left: 1px solid var(--line); padding-left: 16px; }
+.setup textarea.inp { min-height: 110px; }
+.exban { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 8px 14px; }
+@media (max-width: 780px) { .setup-grid { grid-template-columns: minmax(0, 1fr); } .setup .opt + .opt { border-left: 0; padding-left: 0; border-top: 1px solid var(--line); padding-top: 12px; } }
+.fasetup { padding: 10px 14px; display: flex; flex-direction: column; gap: 8px; }
+.fa-line { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 8px 14px; font-size: 14.5px; }
 .wbest { padding: 16px 20px; display: flex; flex-direction: column; gap: 10px; border: 1px solid color-mix(in srgb, var(--accent) 45%, var(--line)); border-left: 5px solid var(--accent); }
 .wbest .label { color: var(--gold); font-size: 13px; }
 .wb-row { display: flex; flex-wrap: wrap; align-items: center; gap: 12px 28px; }
@@ -335,12 +362,13 @@ td .wks { flex-wrap: nowrap; }
       </div>
     </div>
     <div class="controls">
-      <span class="status" id="status" aria-live="polite"><i></i><span>Loading…</span></span>
+      <button type="button" class="status" id="status" data-act="fresh" aria-expanded="false" aria-controls="fresh" title="When each kind of data was last updated"><i></i><span>Loading…</span></button>
       <label class="small muted" for="weekSel">Week</label>
       <select id="weekSel" class="sel"></select>
       <button class="btn" data-act="reload" type="button">Refresh</button>
     </div>
   </header>
+  <div class="freshp card" id="fresh" hidden></div>
   <section class="brief" id="brief" aria-label="This week at a glance"></section>
   <nav class="tabs" role="tablist" id="tabs"></nav>
   <div id="msgs" class="section"></div>
@@ -457,7 +485,7 @@ const DEFAULT_STATE = {
   settings: { season: null, week: null, blend: 0.6, intensity: 0.6, priorWeeks: 4, strategy: 'mean', w: { dvp: 1, cover: 1, protect: 1, script: 1, style: 1, pers: 1 } },
   slots: { QB:1, RB:2, WR:2, TE:1, FLEX:1, 'RB/WR':0, 'WR/TE':0, OP:0, 'D/ST':1, K:1 },
   espn: { leagueId: '', teamId: null, slotOf: {} },
-  waivers: { horizon: 4, teams: 12, ownMax: 50, source: 'own', faList: [], faListAt: null, taken: {}, allowDrop: {}, forceKeep: {} },
+  waivers: { horizon: 4, teams: 12, ownMax: 50, source: 'own', faList: [], faListAt: null, taken: {}, allowDrop: {}, forceKeep: {}, rank: 'window' },
   teams: [], activeTeam: null, returnWeek: {}, scoring: 'ppr',
 };
 /* Fantasy teams. The active team's fields live on `state` itself (state.roster, state.slots, ...) so the rest of the
@@ -695,12 +723,21 @@ async function gatherLive(err) {
 
   const [sbj, projRows, weeks, actual, priors, sched, own, , , idpRows] = await Promise.all([pSB, pProj, Promise.all(weekPs), pActual, Promise.all(priorPs), pSched, pOwn, pPPG, pIdpPrev, pIdpNow]);
   const sb = parseSB(sbj), now = parseSB(sb0), proj = [];
-  for (const r of projRows || []) { const p = r.player || {}; if (!POS.includes(p.position)) continue; proj.push([r.player_id, nameOf(r), p.position, fixAbbr(r.team || p.team), p.injury_status || null, r.stats?.pts_ppr ?? null, fixAbbr(r.opponent), r.stats?.rec ?? 0]); }
-  return { v: 1, createdAt: new Date().toISOString(), season, week, detSeason, detWeek, games: sb.games, rec: Object.assign({}, sb.rec, now.rec), proj, weeks, actual, priors, sched, own, prevPPG: prevPPG || {},
+  // when each input last changed at its source, for the freshness panel (not just when this page fetched it)
+  let projAt = 0, newsAt = 0; const nowMs = Date.now();
+  for (const r of projRows || []) {
+    const p = r.player || {}; if (!POS.includes(p.position)) continue;
+    proj.push([r.player_id, nameOf(r), p.position, fixAbbr(r.team || p.team), p.injury_status || null, r.stats?.pts_ppr ?? null, fixAbbr(r.opponent), r.stats?.rec ?? 0]);
+    const u = +(r.updated_at || r.last_modified || 0); if (u > projAt && u <= nowMs + 6e4) projAt = u;
+    const n = +(p.news_updated || 0); if (n > newsAt && n <= nowMs + 6e4) newsAt = n;
+  }
+  const fresh = { fetched: nowMs, proj: projAt || null, news: newsAt || null, lines: sb.games.some(g => g.ou != null) ? nowMs : null, own: own.length ? nowMs : null, stats: weeks.length ? nowMs : null };
+  return { v: 1, createdAt: new Date().toISOString(), fresh, season, week, detSeason, detWeek, games: sb.games, rec: Object.assign({}, sb.rec, now.rec), proj, weeks, actual, priors, sched, own, prevPPG: prevPPG || {},
     idp: { prev: idpPrev || [], now: idpCompactNow(idpRows, idpPrev), ret: prevRet || [] } };
 }
 function ingest(inp) {
   D.inp = inp; D.fmtLoaded = state.scoring;   // kept so a scoring change can rebuild everything without refetching
+  D.fresh = inp.fresh || null;
   D.season = inp.season; D.week = inp.week; D.detSeason = inp.detSeason; D.detWeek = inp.detWeek;
   D.games = inp.games.slice(); D.rec = inp.rec || {};
   D.tg = {}; for (const g of D.games) { D.tg[g.home] = { opp: g.away, home: true, g }; D.tg[g.away] = { opp: g.home, home: false, g }; }
@@ -1021,7 +1058,7 @@ async function checkCoaches(season) {
 async function loadLeague() {
   const id = (state.espn.leagueId || '').trim(); D.espnMsg = null;
   if (!/^\d+$/.test(id)) { D.espnMsg = ['err', 'Enter the number after leagueId= in your ESPN league URL.']; return render(); }
-  if (D.snapshot) { D.espnMsg = ['err', 'This published copy can’t reach ESPN. Paste your roster in the Players tab instead, or use index.html on your computer.']; return render(); }
+  if (D.snapshot && !D.refreshing) { D.espnMsg = ['err', 'ESPN can’t be reached from here right now. Paste your roster instead.']; return render(); }
   D.espnMsg = ['info', 'Loading league…']; render();
   try {
     const j = await fetchJSON(API.league(D.season, id));
@@ -1029,7 +1066,7 @@ async function loadLeague() {
     D.espnTeams = (j.teams || []).map(t => ({ id: t.id, name: t.name || [t.location, t.nickname].filter(Boolean).join(' ') || ('Team ' + t.id), entries: t.roster?.entries || [] }));
     D.espnMsg = D.espnTeams.length ? ['info', `Found ${D.espnTeams.length} teams. Pick yours and press Use this team.`] : ['err', 'ESPN returned no teams for that league and season.'];
   } catch (e) {
-    D.espnMsg = ['err', e.status === 401 || e.status === 403 ? 'This league is private, so ESPN won’t share it with this page. Copy your roster from ESPN and paste it in the Players tab (it stays saved here). Or ask your league manager to make the league viewable to the public in ESPN’s league settings, then load it again.' : e.status === 404 ? 'ESPN has no league with that ID for this season.' : 'Could not reach ESPN (' + e.message + '). Try again, or add players in the Players tab.'];
+    D.espnMsg = ['err', e.status === 401 || e.status === 403 ? 'This league is private, so ESPN won’t share it with this page. Paste your roster from ESPN instead (it stays saved here). Or ask your league manager to make the league viewable to the public in ESPN’s league settings, then load it again.' : e.status === 404 ? 'ESPN has no league with that ID for this season.' : 'Could not reach ESPN (' + e.message + '). Try again, or add players in the Players tab.'];
   }
   render();
 }
@@ -1049,7 +1086,7 @@ function useEspnTeam() {
   const ct = curTeam(); if (ct && /^(my team|team \d+)$/i.test(ct.name)) ct.name = t.name;
   save();
   D.espnMsg = ['info', `Imported ${ids.length} players from ${t.name}.` + (missed.length ? ` Not matched: ${missed.join(', ')}. Add them in the Players tab.` : '')];
-  state.tab = 'lineup'; render();
+  D.setupOpen = false; state.tab = 'lineup'; render();
 }
 
 /* ---------- coaching profiles (matchup breakdown) ----------
@@ -1311,7 +1348,7 @@ function computeWaivers() {
   const maxRoster = slots.length + 7, canAddFree = roster.length - irHeld < maxRoster;
   const stashes = roster.map(stashInfo).filter(Boolean), kept = new Set(stashes.filter(s => s.keep).map(s => s.id));
   const droppable = roster.filter(id => !kept.has(id));
-  const moves = [], posOf = id => D.U.get(id).pos;
+  const moves = [], posOf = id => D.U.get(id).pos, longTerm = W.rank === 'blend';
   const count = p => roster.filter(id => posOf(id) === p).length;
   for (const f of cand) {
     let best = null, bestSame = null;
@@ -1328,13 +1365,14 @@ function computeWaivers() {
         if (wi < H) { hz += diff; depLost += base[wi].depth - L2.depth; const st = L2.starters.find(s => s[1] === f); if (st) starts.push([weeks[wi], st[0].label || st[0].k]); if (d && base[wi].starters.some(s => s[1] === d)) lost.push(weeks[wi]); }
         else later += diff;
       }
-      const score = hz + 0.35 * later, mv = { f, d, hz, later, score, starts, lost, depLost };
+      // "window" ranks by the selected weeks only (later weeks just break ties); "blend" adds a third of the value after the window
+      const score = longTerm ? hz + 0.35 * later : hz + 0.001 * later, mv = { f, d, hz, later, score, starts, lost, depLost };
       if (!best || score > best.score) best = mv;
       if (single && d && posOf(d) === fp && (!bestSame || score > bestSame.score)) bestSame = mv;
     }
     // streaming a kicker or defense: swap for the one you have when that's nearly as good
     if (best && bestSame && bestSame !== best && bestSame.score >= 0.7 * best.score) best = bestSame;
-    if (best && (best.hz > 0.5 || best.score > 1)) moves.push(best);
+    if (best && (best.hz > 0.5 || (longTerm && best.score > 1))) moves.push(best);
   }
   moves.sort((a, b) => b.score - a.score);
   // keep the list varied: at most two moves of the same kind (same position added, same player dropped)
@@ -1469,26 +1507,31 @@ function waiversBody() {
       ${btn}</div>`;
   }).join('')}</div>` : '';
   const nTaken = Object.keys(W.taken).length;
+  const longTerm = W.rank === 'blend';
+  const faRow = `<div class="card fasetup"><div class="fa-line"><span><strong>Free agents:</strong> ${W.source === 'list' && W.faList.length ? `your league’s list (${W.faList.length} players)` : `estimated: players under ${W.ownMax}% owned across ESPN leagues`}.</span>
+      <button type="button" class="btn sm ${W.source === 'list' && W.faList.length ? '' : 'primary'}" data-act="toggleFa" aria-expanded="${!!D.faOpen}">${W.source === 'list' && W.faList.length ? 'Update my league’s free agents' : 'Use my league’s free agents'}</button></div>
+    ${D.faOpen ? `<p class="small muted" style="margin:0">On ESPN, open Players → Add Players in your league, copy the free-agent table (a few positions or pages is fine), and paste it here.</p>
+    <textarea class="inp" id="faPaste" placeholder="Paste ESPN's free-agent list"></textarea>
+    <div class="toolbar"><button type="button" class="btn primary" data-act="pastefa">Use these free agents</button>${W.faList.length ? `<button type="button" class="btn" data-act="clearfa">Go back to estimates</button>` : ''}<span class="small muted">${esc(D.faMsg || '')}</span></div>` : (D.faMsg ? `<span class="small muted">${esc(D.faMsg)}</span>` : '')}</div>`;
   return `<div class="section">
-  <div class="row-head"><h2>Waiver Optimizer</h2><span class="small muted">Add/drop moves ranked by expected lineup points gained. Free agents from ${src}</span></div>
-  <div class="toolbar"><div class="seg" role="group" aria-label="Time window">${[[2, 'Next 2'], [4, 'Next 4'], [6, 'Next 6'], ['ros', 'Rest of season']].map(([k, l]) => `<button type="button" data-wh="${k}" aria-pressed="${W.horizon === k}">${l}</button>`).join('')}</div>
+  <div class="row-head"><h2>Waiver Optimizer</h2><span class="small muted">Add/drop moves ranked by expected lineup points gained</span></div>
+  ${faRow}
+  <div class="toolbar"><span class="small muted">Window</span><div class="seg" role="group" aria-label="Time window">${[[2, 'Next 2'], [4, 'Next 4'], [6, 'Next 6'], ['ros', 'Rest of season']].map(([k, l]) => `<button type="button" data-wh="${k}" aria-pressed="${W.horizon === k}">${l}</button>`).join('')}</div>
     <label class="small muted" for="wTeams">League size</label><select class="sel" id="wTeams">${[8, 10, 12, 14, 16].map(n => `<option ${W.teams === n ? 'selected' : ''}>${n}</option>`).join('')}</select>
     ${W.source === 'list' && W.faList.length ? `<button type="button" class="btn sm" data-wsrc="own">Use ESPN ownership instead</button>` : `<label class="small muted" for="wOwn">Owned under</label><input type="range" id="wOwn" min="5" max="90" step="5" value="${W.ownMax}" style="accent-color:var(--accent)"><span class="num" id="wOwn-v">${W.ownMax}%</span>`}
     ${nTaken ? `<button type="button" class="btn sm" data-act="untake">Show ${nTaken} hidden</button>` : ''}</div>
+  <div class="toolbar"><span class="small muted">Rank by</span><div class="seg" role="group" aria-label="Rank moves by"><button type="button" data-wrank="window" aria-pressed="${!longTerm}">${hLab[0].toUpperCase() + hLab.slice(1)} only</button><button type="button" data-wrank="blend" aria-pressed="${longTerm}">+ long-term value</button></div></div>
   ${warn.map(w => `<div class="banner small">${esc(w)}</div>`).join('')}
   ${bestMoveCard(moves[0], weeks, H, ownTxt)}
   <h3>Your team, ${hLab}</h3>
   <div class="needs">${needCards}</div>
   ${needs.holes.length ? `<div class="banner small"><strong>Lineup holes:</strong> ${esc(needs.holes.join(' · '))}. A pickup at that position is worth more than usual.</div>` : ''}
   ${stashCard}
-  <div class="row-head"><h2>All moves, ranked</h2><span class="small muted">Gain = extra points your best lineup scores with the swap, counting bench players as injury cover. Ranked by that gain plus a third of the gain after the window. Week chips: green is a soft matchup, red is tough, • means the defense changed (see below).</span></div>
+  <div class="row-head"><h2>All moves, ranked</h2><span class="small muted">${longTerm ? `Ranked by expected lineup points over ${hLab}, plus a third of the gain after that. The big number is the ${hLab} gain only.` : `Ranked by expected lineup points over ${hLab}.`} Bench players count as injury cover. Week chips: green is a soft matchup, red is tough, • means the defense changed.</span></div>
   <div class="card list">${moveRows}</div>
   ${persSection(weeks, H)}
   <div class="row-head"><h2>Top free agents by position</h2><span class="small muted">Projected points over ${hLab}</span></div>
   <div class="tscroll"><table><thead><tr><th class="l">Player</th><th>Owned</th><th>Pts/g</th><th>Next ${H}</th><th class="l">Schedule</th><th></th></tr></thead><tbody>${posBest}</tbody></table></div>
-  <div class="card panel"><h3>Use your league’s free agents</h3><p class="small muted" style="margin:0">Ownership across all ESPN leagues is only an estimate. For exact suggestions, open Players → Add Players in your ESPN league, copy the free-agent table (a few positions or pages is fine), and paste it here.</p>
-    <textarea class="inp" id="faPaste" placeholder="Paste ESPN's free-agent list"></textarea>
-    <div class="toolbar"><button type="button" class="btn primary" data-act="pastefa">Use these free agents</button>${W.faList.length ? `<button type="button" class="btn" data-act="clearfa">Clear pasted list</button>` : ''}<span class="small muted">${esc(D.faMsg || '')}</span></div></div>
   </div>`;
 }
 
@@ -1517,11 +1560,11 @@ function renderBrief() {
   const el = $('#brief'); if (!el) return;
   if (D.loading || D.failed) { el.innerHTML = ''; return; }
   const team = esc(curTeam().name);
-  if (!state.roster.length) { el.innerHTML = `<span class="bteam">${team}:</span> add your roster to get Benny’s picks. <button type="button" class="blink" data-tab="players">Add players</button>`; return; }
+  if (!state.roster.length) { el.innerHTML = `<span class="bteam">${team}:</span> import your roster to get Benny’s picks. <button type="button" class="blink" data-tab="lineup">Import your team</button>`; return; }
   const { starters } = optimize(), proj = starters.reduce((s, x) => s + (x.r ? x.r.mean : 0), 0);
   const dec = reviewDecisions(), W = computeWaivers(), best = W.moves[0];
   const decTxt = dec.length ? `<button type="button" class="blink" data-brief="decide"><span class="n">${dec.length}</span> decision${dec.length === 1 ? '' : 's'} to review</button>` : `<span>no close calls</span>`;
-  const bestTxt = best ? `<button type="button" class="blink" data-tab="waivers">best waiver move <span class="n up">+${f1(best.hz)}</span> pts</button>` : `<span>no waiver move worth making</span>`;
+  const bestTxt = best ? `<button type="button" class="blink" data-tab="waivers">best waiver move <span class="n up">+${f1(best.hz)}</span> pts over ${W.H} week${W.H === 1 ? '' : 's'}</button>` : `<span>no waiver move worth making</span>`;
   el.innerHTML = `<span class="bteam">${state.example ? 'Example roster' : team}:</span> your optimal lineup projects for <button type="button" class="blink" data-tab="lineup"><span class="n">${f1(proj)}</span> points</button><span class="sep">·</span>${decTxt}<span class="sep">·</span>${bestTxt}`;
 }
 /* Freshness: "Updated 12 minutes ago", refreshed every minute. Live data is just-now; a saved copy shows its age. */
@@ -1542,6 +1585,25 @@ function renderStatus() {
     if (D.refreshing) txt = `${fmtName()} · Updated ${ago(D.loadedAt.getTime())} · refreshing…`;
   } else if (D.loading) cls = 'busy';
   el.className = 'status ' + cls; el.lastElementChild.textContent = txt;
+  renderFresh();
+}
+/* The freshness panel behind the status button: when each input last changed at its source, and when this page got it. */
+function renderFresh() {
+  const p = $('#fresh'), b = $('#status'); if (!p) return;
+  p.hidden = !D.freshOpen; if (b) b.setAttribute('aria-expanded', String(!!D.freshOpen)); if (!D.freshOpen) return;
+  const F = D.fresh || {}, at = t => t ? `${ago(t)} <span class="muted">(${new Date(t).toLocaleString([], { weekday: 'short', hour: 'numeric', minute: '2-digit' })})</span>` : '<span class="muted">not available</span>';
+  const rows = [
+    ['Projections', 'Sleeper last changed a projection', F.proj],
+    ['Injury news', 'Latest player news or injury update', F.news],
+    ['Vegas lines & scores', 'Checked with ESPN', F.lines],
+    ['Waiver ownership', 'Checked with ESPN', F.own],
+    ['Stats & defenses', 'Weekly stats and defensive rosters', F.stats],
+  ];
+  const page = D.snapshot ? `Showing the saved copy from ${ago(D.loadedAt.getTime())}${D.refreshing ? '; getting live data now' : '; live data couldn’t be reached'}.` : `Live data loaded ${ago(D.loadedAt?.getTime() || Date.now())}.`;
+  // saved copies made before timestamps were recorded have none; show only the page line for those
+  p.innerHTML = `<div class="row-head"><h3>Data freshness</h3><button type="button" class="btn sm" data-act="fresh">Close</button></div>
+    ${D.fresh ? `<table><tbody>${rows.filter(r => r[2]).map(([k, sub, t]) => `<tr><td class="l"><strong>${k}</strong><div class="small muted">${sub}</div></td><td class="l">${at(t)}</td></tr>`).join('')}</tbody></table>` : ''}
+    <div class="small">${page} The saved copy refreshes every three hours; Refresh pulls the newest data now.</div>`;
 }
 setInterval(renderStatus, 60000);
 const TABS = [['lineup','Lineup'],['compare','Benny’s Pick'],['waivers','Waiver Optimizer'],['defenses','Defenses'],['teams','Teams & Schemes'],['players','Players'],['settings','Settings']];
@@ -1556,7 +1618,7 @@ function render() {
   const age = D.loadedAt ? Date.now() - D.loadedAt.getTime() : 0;
   if (!D.loading && !D.failed && D.snapshot && !D.refreshing && age > 36e5 * 36) msgs.push(`<div class="banner">These numbers are from ${esc(D.loadedAt.toLocaleDateString([], { weekday: 'long', month: 'short', day: 'numeric' }))}, so injury news since then isn’t included. Press Refresh to try for newer data.</div>`);
   if (!D.loading && !D.snapshot && D.errors.some(e => /projections|schedule/i.test(e))) msgs.push(`<div class="banner err"><strong>Some of this week’s data didn’t load.</strong> Picks may be incomplete. Press Refresh to try again.</div>`);
-  if (!D.loading && state.example && state.tab === 'lineup') msgs.push(`<div class="banner info"><strong>This is an example roster.</strong> Paste your ESPN roster in <a href="#" data-tab="players">Players</a> to see your own lineup, or bring in a team with <strong>Import / export</strong> below.</div>`);
+  if (!D.loading && state.example && state.tab === 'lineup') msgs.push(`<div class="banner info exban"><span><strong>You’re looking at an example roster.</strong> Bring in your own team to get Benny’s picks for it.</span><button type="button" class="btn sm primary" data-act="setup">Import your team</button></div>`);
   $('#msgs').innerHTML = msgs.join('');
   const main = $('#main');
   if (D.failed) { renderBrief(); main.innerHTML = `<div class="card panel"><h2>Couldn’t load this week’s data</h2><p style="margin:0">Sleeper and ESPN didn’t respond. Check your connection and press Refresh.</p></div>`; return; }
@@ -1589,7 +1651,7 @@ function playerRow(r, slotLabel, starting) {
     <span class="slot ${starting ? '' : 'bench'}">${esc(slotLabel)}</span>
     <span class="pwho"><span class="pname">${esc(r.u.name)}</span><span class="psub">${r.pos} · ${r.T || 'FA'} ${injPill(r)} ${reason} ${r.override != null ? '<span class="pill n">Override</span>' : ''} ${espnNote(r, starting)}</span></span>
     ${matchCell(r)}
-    <span class="grade g-${r.grade}" title="Matchup grade">${r.grade}</span>
+    <span class="grade g-${r.grade}" title="${esc(gradeTip(r))}">${r.grade}</span>
     <span class="proj num">${r.status === 'bye' ? '—' : f1(r.mean)}</span>
     <span class="range">${r.status === 'bye' ? '' : f1(r.floor) + '–' + f1(r.ceil)}</span>
     <span class="pav">${r.pAvg != null ? pct(r.pAvg) : '—'}</span>
@@ -1599,18 +1661,38 @@ function factorList(r) {
   if (!r.factors.length) return '<div class="small muted">No matchup factors (bye week or no game data).</div>';
   return `<div class="factors">${r.factors.map(f => { const w = Math.min(50, Math.abs(f.pct) / 0.25 * 50); return `<div class="factor"><div><div class="fl">${esc(f.label)}</div><div class="fn">${esc(f.note)}</div></div><div class="fbar"><span class="${f.pct >= 0 ? 'pos' : 'neg'}" style="width:${w}%"></span></div><div class="fv" style="color:var(${f.pct > 0.005 ? '--good' : f.pct < -0.005 ? '--bad' : '--muted'})">${spct(f.pct)}</div></div>`; }).join('')}</div>`;
 }
-function detailBlock(r) {
+/* Expanded player: the three strongest reasons and the key odds first; every factor, the math and the coaching
+   profiles sit behind disclosures. */
+function topReasons(r, n = 3) {
+  return [...r.factors].filter(f => Math.abs(f.pct) >= 0.02).sort((a, b) => Math.abs(b.pct) - Math.abs(a.pct)).slice(0, n)
+    .map(f => ({ up: f.pct > 0, pct: f.pct, text: factorReason(r, f) || `${f.label}: ${String(f.note).split(' · ')[0]}` }));
+}
+function probTiles(r) {
   const h = r.h;
-  return `<div class="detail"><div class="section">${factorList(r)}${r.scheme ? `<div class="scheme"><strong>Scheme:</strong> ${esc(r.scheme)}</div>` : ''}</div>
-  <div class="section"><div class="probs">
-    <div><span class="label">Beats season avg</span><span class="num">${r.pAvg != null ? pct(r.pAvg) : '—'}</span><span class="small muted">${h?.n ? 'avg ' + f1(h.avg) + ' over ' + h.n + ' g' : 'no games yet'}</span></div>
-    <div><span class="label">10+ pts</span><span class="num">${pct(r.p10)}</span><span class="small muted">15+: ${pct(r.p15)} · 20+: ${pct(r.p20)}</span></div>
-    <div><span class="label">Floor / ceiling</span><span class="num">${f1(r.floor)} / ${f1(r.ceil)}</span><span class="small muted">25th / 75th percentile</span></div>
-    <div><span class="label">Boom week</span><span class="num">${f1(r.boom)}</span><span class="small muted">90th percentile</span></div>
+  return `<div class="probs">
+    <div><span class="label">Beats his season avg</span><span class="num">${r.pAvg != null ? pct(r.pAvg) : '—'}</span><span class="small muted">${h?.n ? 'avg ' + f1(h.avg) + ' over ' + h.n + ' games' : 'no games yet'}</span></div>
+    <div><span class="label">10+ points</span><span class="num">${pct(r.p10)}</span><span class="small muted">15+: ${pct(r.p15)} · 20+: ${pct(r.p20)}</span></div>
+    <div><span class="label">Likely range</span><span class="num">${f1(r.floor)}–${f1(r.ceil)}</span><span class="small muted">middle half of outcomes</span></div>
+    <div><span class="label">Big week</span><span class="num">${f1(r.boom)}+</span><span class="small muted">about 1 week in 10</span></div>
+  </div>`;
+}
+function modelNote() {
+  return `<details class="model small"><summary>Model estimate: how sure is this?</summary><p>Percentages and ranges come from Benny’s model, not from past results. Each player’s score is treated as a bell curve around his projection, with the spread taken from his weekly scores this season (pulled toward a typical spread for his position). The likely range is the middle half of outcomes, the 25th to 75th percentile, so real scores land outside it about half the time. A check of these estimates against past weeks isn’t available yet.</p></details>`;
+}
+function detailBlock(r) {
+  const h = r.h, why = topReasons(r);
+  return `<div class="detail"><div class="section">
+    <h3 class="dh">Why ${f1(r.mean)} points</h3>
+    ${r.status === 'bye' ? '<div class="small muted">Bye week.</div>' : `<div class="small muted">Baseline ${f1(r.base)} (Sleeper projection blended with his season average), ${spct(r.mult - 1)} for this matchup${r.override != null ? `; your override sets it to ${f1(r.override)}` : ''}.</div>
+    ${why.length ? `<ul class="reasons">${why.map(x => `<li class="${x.up ? 'up' : 'down'}"><span class="rv">${spct(x.pct)}</span> ${esc(x.text)}</li>`).join('')}</ul>` : '<div class="small muted">No matchup factor moves him much this week.</div>'}`}
   </div>
+  <div class="section">${probTiles(r)}${modelNote()}</div>
+  <details class="more"><summary>All matchup factors and the math</summary><div class="section">${factorList(r)}${r.scheme ? `<div class="scheme"><strong>Scheme:</strong> ${esc(r.scheme)}</div>` : ''}
   <div class="math">Sleeper projection ${f1(r.projPts)} · season avg ${f1(h?.avg)} → base ${f1(r.base)} × matchup ${f1(r.mult)} = <strong>${f1(r.base * r.mult)}</strong>${r.override != null ? ` · your override ${f1(r.override)}` : ''}${h?.n ? ` · weekly scores: ${h.pts.map(x => x.toFixed(1)).join(', ')}` : ''}</div>
-  <div class="ovr"><label for="ov-${esc(r.id)}">Override projection</label><input class="inp" id="ov-${esc(r.id)}" type="number" step="0.1" data-ovr="${esc(r.id)}" value="${r.override ?? ''}" placeholder="${f1(r.base * r.mult)}">${r.override != null ? `<button type="button" class="btn sm" data-clearovr="${esc(r.id)}">Clear</button>` : ''}</div></div>
-  <div class="section" style="grid-column:1/-1"><h3>Scheme matchup</h3>${schemeBlock(r)}</div></div>`;
+  </div></details>
+  <details class="more"><summary>Coaching and scheme matchup</summary><div class="section">${schemeBlock(r)}</div></details>
+  <div class="ovr" style="grid-column:1/-1"><label for="ov-${esc(r.id)}">Override projection</label><input class="inp" id="ov-${esc(r.id)}" type="number" step="0.1" data-ovr="${esc(r.id)}" value="${r.override ?? ''}" placeholder="${f1(r.base * r.mult)}">${r.override != null ? `<button type="button" class="btn sm" data-clearovr="${esc(r.id)}">Clear</button>` : ''}</div>
+  </div>`;
 }
 /* Projected starter total for any saved team, by running the optimizer against that team's roster and slots. */
 function teamProjection(t) {
@@ -1634,7 +1716,7 @@ function teamBar(manage) {
     return `<button type="button" class="tteam" data-fteam="${esc(t.id)}" aria-pressed="${on}" title="${esc(t.name)}"><span class="tn">${esc(t.name)}</span><span class="tm">${bits.map(b => `<span class="tb">${b}</span>`).join(' · ')}</span></button>`;
   }).join('');
   return `<div class="teambar"><div class="tteams" role="group" aria-label="Your teams">${heads}<button type="button" class="tteam add" data-act="addteam">+ Add team</button></div>
-  ${manage ? `<div class="tmanage"><label class="small muted" for="teamName">Team name</label><input class="inp" id="teamName" type="text" maxlength="40" value="${esc(ct.name)}">${scoringSelect('teamScoring')}${state.teams.length > 1 ? `<button type="button" class="btn sm danger" data-act="delteam">${D.delArm ? `Press again to delete ${esc(ct.name)}` : 'Delete team'}</button>` : ''}<button type="button" class="btn sm" data-act="toggleio" aria-expanded="${!!D.ioOpen}">Import / export</button><span class="small muted">Each team keeps its own roster, lineup slots, ESPN league and waiver list.</span></div>` : ''}</div>`;
+  ${manage ? `<div class="tmanage"><label class="small muted" for="teamName">Team name</label><input class="inp" id="teamName" type="text" maxlength="40" value="${esc(ct.name)}">${scoringSelect('teamScoring')}${state.teams.length > 1 ? `<button type="button" class="btn sm danger" data-act="delteam">${D.delArm ? `Press again to delete ${esc(ct.name)}` : 'Delete team'}</button>` : ''}<button type="button" class="btn sm primary" data-act="setup" aria-expanded="${!!D.setupOpen}">Import your team</button><button type="button" class="btn sm" data-act="toggleio" aria-expanded="${!!D.ioOpen}">Share / back up</button><span class="small muted">Each team keeps its own roster, lineup slots, ESPN league and waiver list.</span></div>` : ''}</div>`;
 }
 function rosterPasteBox() {
   return `<div class="card panel"><h3>Add ${esc(curTeam().name)}’s roster</h3><p class="small muted" style="margin:0">On ESPN, open My Team, select the roster table, copy it, and paste it here. A plain list of names, one per line, also works. You can also search and add players one at a time in <a href="#" data-tab="players">Players</a>.</p>
@@ -1704,36 +1786,62 @@ const canDownload = (() => { try { return window.self === window.top; } catch { 
 function ioPanel() {
   stashTeam();
   const exportable = state.teams.filter(t => (t.roster || []).length), sel = ioSelected(), code = sel.length ? toCode(exportBundle(sel)) : '';
-  return `<div class="card panel io"><div class="row-head"><h3>Import / export teams</h3><button type="button" class="btn sm" data-act="toggleio">Close</button></div>
+  return `<div class="card panel io"><div class="row-head"><h3>Share or back up teams</h3><button type="button" class="btn sm" data-act="toggleio">Close</button></div>
   <div class="grid2">
     <div class="section"><h3>Export</h3><p class="small muted" style="margin:0">Copy a code to paste on another device or send to a friend${canDownload ? ', or download a backup file' : ''}. It includes each team’s roster, lineup slots, ESPN league, waiver settings, and your overrides and return weeks for those players.</p>
       ${exportable.length ? `<div class="iochecks">${exportable.map(t => `<label><input type="checkbox" data-iosel="${esc(t.id)}" ${sel.includes(t.id) ? 'checked' : ''}> ${esc(t.name)} <span class="muted">${t.roster.length} players${t.example ? ', example' : ''}</span></label>`).join('')}</div>
       <div class="toolbar"><button type="button" class="btn primary" data-act="iocopy" ${sel.length ? '' : 'disabled'}>Copy code</button>${canDownload ? `<button type="button" class="btn" data-act="iodownload" ${sel.length ? '' : 'disabled'}>Download file</button>` : ''}<span class="small muted" id="ioOutMsg">${esc(D.ioOutMsg || '')}</span></div>
       <textarea class="inp iocode" id="ioOut" readonly aria-label="Team code">${esc(code)}</textarea>` : '<p class="small muted" style="margin:0">Add players to a team first.</p>'}</div>
     <div class="section"><h3>Import</h3><p class="small muted" style="margin:0">Paste a team code, or open a file exported from Benny’s Picks. Imported teams are added next to yours.</p>
-      <textarea class="inp iocode" id="ioIn" placeholder="BP1:…"></textarea>
-      <div class="toolbar"><label class="btn sm" for="ioFile">Open file…</label><input class="vh" type="file" id="ioFile" accept=".json,.txt,application/json,text/plain">
-        <label class="small"><input type="checkbox" id="ioReplace" ${D.ioReplace ? 'checked' : ''}> Replace teams with the same name</label></div>
-      <div class="toolbar"><button type="button" class="btn primary" data-act="ioimport">Import teams</button><span class="small muted">${esc(D.ioInMsg || '')}</span></div></div>
+      ${importControls()}</div>
   </div></div>`;
 }
+/* Shared controls, used by the Import-your-team panel, Settings and Import / export. */
+function espnLeagueControls() {
+  const tms = D.espnTeams;
+  return `<div class="toolbar"><input class="inp" id="leagueId" data-espn="leagueId" inputmode="numeric" placeholder="League ID" aria-label="ESPN league ID" value="${esc(state.espn.leagueId)}" style="flex:1 1 140px"><button type="button" class="btn" data-act="loadleague">Load league</button></div>
+    ${tms ? `<div class="toolbar"><select class="sel" id="espnTeam" data-espn="teamId" aria-label="Your ESPN team" style="flex:1 1 180px">${tms.map(t => `<option value="${t.id}" ${String(state.espn.teamId) === String(t.id) ? 'selected' : ''}>${esc(t.name)}</option>`).join('')}</select><button type="button" class="btn primary" data-act="useteam">Use this team</button></div>` : ''}
+    ${D.espnMsg ? `<div class="banner ${D.espnMsg[0]} small">${esc(D.espnMsg[1])}</div>` : ''}`;
+}
+function importControls() {
+  return `<textarea class="inp iocode" id="ioIn" placeholder="BP1:…" aria-label="Team code"></textarea>
+      <div class="toolbar"><label class="btn sm" for="ioFile">Open file…</label><input class="vh" type="file" id="ioFile" accept=".json,.txt,application/json,text/plain">
+        <label class="small"><input type="checkbox" id="ioReplace" ${D.ioReplace ? 'checked' : ''}> Replace teams with the same name</label></div>
+      <div class="toolbar"><button type="button" class="btn" data-act="ioimport">Import teams</button><span class="small muted">${esc(D.ioInMsg || '')}</span></div>`;
+}
+/* Import your team: every way to get a roster in, in one place. Opens by itself for a team with no players. */
+function setupPanel() {
+  const ct = curTeam(), empty = !state.roster.length;
+  return `<div class="card panel setup"><div class="row-head"><h2>Import your team <span class="small muted" style="font-family:var(--font-body);text-transform:none;font-weight:400">for ${esc(ct.name)}</span></h2>${empty ? '' : '<button type="button" class="btn sm" data-act="setup">Close</button>'}</div>
+  <div class="setup-grid">
+    <section class="opt main"><h3>Paste your ESPN roster</h3><p class="small muted">Works for any league. On ESPN, open <strong>My Team</strong>, select the roster table, copy it, and paste it here. A list of names, one per line, works too.</p>
+      <textarea class="inp" id="rosterPaste" placeholder="Joe Burrow&#10;Bijan Robinson&#10;Ja'Marr Chase&#10;Packers D/ST"></textarea>
+      <div class="toolbar"><button type="button" class="btn primary" data-act="pasteroster">Set roster</button><span class="small muted">${esc(D.rosterMsg || '')}</span></div></section>
+    <section class="opt"><h3>Load a public ESPN league</h3><p class="small muted">If your league is viewable by the public, enter the number after <code>leagueId=</code> in its web address. This also sets your lineup slots.</p>${espnLeagueControls()}</section>
+    <section class="opt"><h3>Use a team code or file</h3><p class="small muted">From a friend, or from Benny’s Picks on another device.</p>${importControls()}</section>
+  </div>
+  <div class="small muted">${state.example ? 'Not ready? Close this to keep exploring the example roster.' : 'You can also add or remove single players in the Players tab.'}</div></div>`;
+}
 function viewLineup() {
-  const io = D.ioOpen ? ioPanel() : '';
-  if (!state.roster.length) return `<div class="section">${teamBar(true)}${io}${rosterPasteBox()}</div>`;
-  return `<div class="section">${teamBar(true)}${io}${lineupBody()}</div>`;
+  const panel = D.ioOpen ? ioPanel() : (D.setupOpen || !state.roster.length) ? setupPanel() : '';
+  if (!state.roster.length) return `<div class="section">${teamBar(true)}${panel}</div>`;
+  return `<div class="section">${teamBar(true)}${panel}${lineupBody()}</div>`;
 }
 function lineupBody() {
   const { starters, bench } = optimize();
   const st = starters.filter(s => s.r), tot = st.reduce((s, x) => s + metricOf(x.r), 0), mu = st.reduce((s, x) => s + x.r.mean, 0), sdT = Math.sqrt(st.reduce((s, x) => s + x.r.sd ** 2, 0));
-  const flagged = st.filter(x => x.r.inj).length, empty = starters.length - st.length;
-  const strat = state.settings.strategy, sLab = { mean: 'Projected', floor: 'Safe (floor)', ceil: 'Boom (ceiling)' };
-  const head = `<div class="prow lhead" aria-hidden="true"><span class="label">Slot</span><span class="label">Player</span><span class="label">Matchup</span><span class="label">Gr</span><span class="label" style="text-align:right">Proj</span><span class="label" style="text-align:right">Range</span><span class="label" style="text-align:right">&gt; avg</span></div>`;
+  // injury alerts: starters and bench counted separately (out/IR players are already benched, so they show as bench alerts)
+  const tagged = r => r && r.inj && r.status !== 'bye', empty = starters.length - st.length;
+  const startTags = st.filter(x => tagged(x.r)).map(x => x.r), benchTags = bench.filter(tagged);
+  const tagTxt = list => list.slice(0, 3).map(r => `${shortName(r.id)} ${r.inj === 'Questionable' ? 'Q' : r.inj === 'Doubtful' ? 'D' : r.inj}`).join(', ') + (list.length > 3 ? '…' : '');
+  const strat = state.settings.strategy, sLab = { mean: 'Projected', floor: 'Safe (low end)', ceil: 'Boom (high end)' };
+  const head = `<div class="prow lhead" aria-hidden="true"><span class="label">Slot</span><span class="label">Player</span><span class="label">Opponent</span><span class="label" title="Matchup grade: how this week’s matchup moves each player from his own baseline. It doesn’t rank players.">Matchup</span><span class="label" style="text-align:right">Proj</span><span class="label" style="text-align:right" title="Middle half of outcomes (25th–75th percentile). Scores can land outside it.">Likely range</span><span class="label" style="text-align:right" title="Model estimate of the chance he beats his season average">Beat avg</span></div>`;
   return `<div class="section">
   <div class="summary">
     <div><span class="label">Starters project</span><span class="big num">${f1(mu)}</span><span class="small muted">${fmtName()} points, week ${D.week}</span></div>
     <div><span class="label">Likely range</span><span class="big num">${f0(mu - 0.674 * sdT)}–${f0(mu + 0.674 * sdT)}</span><span class="small muted">middle 50% of outcomes</span></div>
     <div><span class="label">Optimizing for</span><span class="big num" style="font-size:24px">${sLab[strat]}</span><span class="small muted">${strat === 'mean' ? 'best average outcome' : strat === 'floor' ? 'use when you’re favored' : 'use when you’re the underdog'} · ${f1(tot)}</span></div>
-    <div><span class="label">Watch list</span><span class="big num">${flagged + empty}</span><span class="small muted">${flagged} injury tag${flagged === 1 ? '' : 's'}${empty ? ` · ${empty} empty slot${empty === 1 ? '' : 's'}` : ''}</span></div>
+    <div><span class="label">Injury alerts</span><span class="big num">${startTags.length}<span class="small muted" style="font-family:var(--font-body);font-size:14px;font-weight:400"> starter${startTags.length === 1 ? '' : 's'} · ${benchTags.length} bench</span></span><span class="small muted">${startTags.length ? 'Starting: ' + esc(tagTxt(startTags)) : 'No starters tagged'}${benchTags.length ? ' · Bench: ' + esc(tagTxt(benchTags)) : ''}${empty ? ` · ${empty} empty slot${empty === 1 ? '' : 's'}` : ''}</span></div>
   </div>
   <div class="row-head"><h2>Start</h2><div class="seg" role="group" aria-label="Strategy">${['mean', 'floor', 'ceil'].map(k => `<button type="button" data-strategy="${k}" aria-pressed="${strat === k}">${{ mean: 'Projected', floor: 'Safe', ceil: 'Boom' }[k]}</button>`).join('')}</div></div>
   <div class="card list">${head}${starters.map(s => s.r ? playerRow(s.r, s.slot.label || s.slot.k, true) : `<div class="item"><div class="prow"><span class="slot">${esc(s.slot.label || s.slot.k)}</span><span class="pwho muted">No eligible player available. Add one in Players.</span></div></div>`).join('')}</div>
@@ -1758,18 +1866,25 @@ function viewCompare() {
   if (A && Bp) {
     const pA = pBeats(A, Bp), w = pA >= 0.5 ? A : Bp, l = w === A ? Bp : A, pw = Math.max(pA, 1 - pA), edge = w.mean - l.mean;
     const call = pw < 0.55 ? 'Toss-up' : pw < 0.65 ? 'Lean' : pw < 0.8 ? 'Start' : 'Easy call';
-    const why = pickReasons(w, l);
+    const why = pickReasons(w, l), gnote = gradeNote(w, l);
     verdict = `<div class="card pick"><div class="pick-head"><span class="label">Benny’s Pick</span><span class="pill ${pw < 0.55 ? 'm' : 'n'}">${call}</span></div>
-      <div class="pick-main"><div class="pick-who"><div class="pick-name">Start ${esc(w.u.name)}</div><div class="small muted">over ${esc(l.u.name)} · ${w.pos} · ${w.T || 'FA'}</div></div>
+      <div class="pick-main"><div class="pick-who"><div class="pick-name">Start ${esc(w.u.name)}</div><div class="small muted">over ${esc(l.u.name)} · ${w.pos} · ${w.T || 'FA'} · matchup grades ${w.grade} vs ${l.grade}</div></div>
         <div class="pick-stat"><span class="num">${pct(pw)}</span><span class="small muted">chance to outscore</span></div>
         <div class="pick-stat"><span class="num">${edge >= 0.05 ? '+' : ''}${f1(edge)}</span><span class="small muted">projected pts edge</span></div></div>
       <div class="meter" aria-label="${esc(A.u.name)} ${pct(pA)}, ${esc(Bp.u.name)} ${pct(1 - pA)}"><span style="width:${pA * 100}%"></span></div>
       <div class="small muted pick-odds">${esc(shortName(A.id))} ${pct(pA)} · ${esc(shortName(Bp.id))} ${pct(1 - pA)}. ${pw < 0.55 ? 'Too close to call on projections alone; Benny leans this way. Check late injury news, or use Safe or Boom on the Lineup tab to break the tie.' : `${esc(w.u.name)} comes out ahead in roughly ${Math.round(pw * 10)} of 10 comparable outcomes.`}</div>
-      ${why.length ? `<ul class="pick-why">${why.map(x => `<li>${esc(x)}</li>`).join('')}</ul>` : ''}</div>`;
+      ${why.length ? `<ul class="pick-why">${why.map(x => `<li>${esc(x)}</li>`).join('')}</ul>` : ''}
+      ${gnote ? `<div class="pick-note">${esc(gnote)}</div>` : ''}
+      ${modelNote()}</div>`;
   }
   const dec = reviewDecisions();
   const decBar = dec.length ? `<div class="decisions"><span class="label">Decisions to review</span>${dec.map(d => { const s = D.M[d.start], b = D.M[d.alt], on = a === d.start && Bp?.id === d.alt; return `<button type="button" class="chip dchip" data-decide="${esc(d.start)}|${esc(d.alt)}" aria-pressed="${on}">${esc(d.slot)}: ${esc(shortName(s.id))} or ${esc(shortName(b.id))}${d.tagged ? ` <span class="pill q">${esc(s.inj === 'Questionable' ? 'Q' : 'D')}</span>` : ''}</button>`; }).join('')}</div>` : '';
-  const col = r => r ? `<div class="card"><div><div class="pname" style="font-size:18px">${esc(r.u.name)}</div><div class="psub">${r.pos} · ${r.T} ${injPill(r)}</div></div>${matchCell(r)}<div class="probs"><div><span class="label">Projection</span><span class="num">${r.status === 'bye' ? 'Bye' : f1(r.mean)}</span></div><div><span class="label">Floor / ceiling</span><span class="num">${f1(r.floor)} / ${f1(r.ceil)}</span></div><div><span class="label">Beats avg</span><span class="num">${pct(r.pAvg)}</span></div><div><span class="label">Grade</span><span class="num">${r.grade}</span></div></div>${factorList(r)}${r.scheme ? `<div class="scheme"><strong>Scheme:</strong> ${esc(r.scheme)}</div>` : ''}<h3>Scheme matchup</h3>${schemeBlock(r)}</div>` : `<div class="card small muted">Pick a player.</div>`;
+  const col = r => { if (!r) return `<div class="card small muted">Pick a player.</div>`; const why = topReasons(r);
+    return `<div class="card"><div><div class="pname" style="font-size:18px">${esc(r.u.name)}</div><div class="psub">${r.pos} · ${r.T} ${injPill(r)} · <span title="${esc(gradeTip(r))}">matchup grade ${r.grade}</span></div></div>${matchCell(r)}
+    <div class="probs"><div><span class="label">Projection</span><span class="num">${r.status === 'bye' ? 'Bye' : f1(r.mean)}</span></div><div><span class="label">Likely range</span><span class="num">${f1(r.floor)}–${f1(r.ceil)}</span></div></div>
+    ${why.length ? `<ul class="reasons">${why.map(x => `<li class="${x.up ? 'up' : 'down'}"><span class="rv">${spct(x.pct)}</span> ${esc(x.text)}</li>`).join('')}</ul>` : ''}
+    <details class="more"><summary>All factors</summary>${factorList(r)}${r.scheme ? `<div class="scheme"><strong>Scheme:</strong> ${esc(r.scheme)}</div>` : ''}</details>
+    <details class="more"><summary>Coaching and scheme matchup</summary>${schemeBlock(r)}</details></div>`; };
   return `<div class="section"><datalist id="plist">${playerOptions()}</datalist>${decBar}<div class="cmp"><div class="field"><label class="label" for="cmp0">Player A</label>${pick(0, A)}</div><div class="field"><label class="label" for="cmp1">Player B</label>${pick(1, Bp)}</div></div>${verdict}<h2>Side by side</h2><div class="cmp">${col(A)}${col(Bp)}</div></div>`;
 }
 /* Two or three plain reasons for a pick: the projection gap, then the biggest matchup factors in the winner's favor
@@ -1790,6 +1905,16 @@ function factorReason(r, f) {
   }
   return null;
 }
+const GRADE_ORDER = 'ABCDF';
+function gradeTip(r) {
+  if (r.status === 'bye') return 'Bye week';
+  return `Matchup grade ${r.grade}: this week’s matchup moves ${r.u.name} ${spct(r.mult - 1)} from his own baseline (A = +12% or better, F = −12% or worse). It grades the matchup, not the player, so a strong player with an F can still outscore a weaker player with an A.`;
+}
+/* When Benny picks the player with the worse matchup grade, say why in plain words. */
+function gradeNote(w, l) {
+  if (GRADE_ORDER.indexOf(w.grade) <= GRADE_ORDER.indexOf(l.grade) || w.status === 'bye' || l.status === 'bye') return '';
+  return `Why the lower matchup grade? Grades only measure how this week’s matchup moves each player from his own baseline. ${shortName(w.id)}’s matchup is tougher (${w.grade} vs ${l.grade}), but his baseline of ${f1(w.base)} points is high enough that he still projects ${f1(w.mean - l.mean)} more.`;
+}
 function pickReasons(w, l) {
   const last = r => shortName(r.id), out = [];
   const edge = w.mean - l.mean;
@@ -1797,7 +1922,7 @@ function pickReasons(w, l) {
   for (const f of w.factors) if (f.pct >= 0.03) { const t = factorReason(w, f); if (t) out.push({ s: f.pct, t }); }
   for (const f of l.factors) if (f.pct <= -0.03) { const t = factorReason(l, f); if (t) out.push({ s: -f.pct, t: `${last(l)}: ${t}` }); }
   if (/^(questionable|doubtful)/i.test(l.inj || '')) out.push({ s: 0.2, t: `${l.u.name} is ${l.inj.toLowerCase()} for this week` });
-  if (w.floor > l.floor + 2) out.push({ s: 0.035, t: `Safer floor: ${f1(w.floor)} points on a bad day, vs ${f1(l.floor)}` });
+  if (w.floor > l.floor + 2) out.push({ s: 0.035, t: `Higher low end: ${f1(w.floor)} points in a below-average week, vs ${f1(l.floor)}` });
   const first = out.find(x => x.s === 1), rest = out.filter(x => x !== first).sort((a, b) => b.s - a.s);
   return [...(first ? [first] : []), ...rest].slice(0, 3).map(x => x.t);
 }
@@ -1869,9 +1994,7 @@ function viewSettings() {
   const tms = D.espnTeams;
   return `<div class="section"><div class="grid2">
   <div class="card panel"><h3>ESPN league</h3><p class="small muted" style="margin:0">Public leagues import directly. Find the ID in your league URL after <code>leagueId=</code>.</p>
-    <div class="toolbar"><input class="inp" id="leagueId" data-espn="leagueId" inputmode="numeric" placeholder="League ID" value="${esc(state.espn.leagueId)}" style="flex:1 1 140px"><button type="button" class="btn primary" data-act="loadleague">Load league</button></div>
-    ${tms ? `<div class="toolbar"><select class="sel" id="espnTeam" data-espn="teamId" style="flex:1 1 180px">${tms.map(t => `<option value="${t.id}" ${String(state.espn.teamId) === String(t.id) ? 'selected' : ''}>${esc(t.name)}</option>`).join('')}</select><button type="button" class="btn primary" data-act="useteam">Use this team</button></div>` : ''}
-    ${D.espnMsg ? `<div class="banner ${D.espnMsg[0]} small">${esc(D.espnMsg[1])}</div>` : ''}</div>
+    ${espnLeagueControls()}</div>
   <div class="card panel"><h3>Season, scoring &amp; lineup slots</h3>
     <div class="field inline"><label for="season">Season</label><input class="inp" id="season" type="number" data-season value="${D.season}" style="width:96px"></div>
     <div class="field inline"><span>${esc(curTeam().name)}</span><span class="toolbar">${scoringSelect('setScoring')}</span></div>
@@ -1900,7 +2023,8 @@ function viewSettings() {
 
 /* ---------- events ---------- */
 document.addEventListener('click', e => {
-  const t = e.target.closest('[data-tab],[data-expand],[data-add],[data-remove],[data-strategy],[data-act],[data-sort],[data-team],[data-fteam],[data-clearovr],[data-wh],[data-wsrc],[data-taken],[data-keepmode],[data-decide],[data-brief]'); if (!t) return;
+  const t = e.target.closest('[data-tab],[data-expand],[data-add],[data-remove],[data-strategy],[data-act],[data-sort],[data-team],[data-fteam],[data-clearovr],[data-wh],[data-wsrc],[data-taken],[data-keepmode],[data-decide],[data-brief],[data-wrank]'); if (!t) return;
+  if (t.dataset.wrank) { state.waivers.rank = t.dataset.wrank; save(); render(); return; }
   if (t.dataset.decide) { state.compare = t.dataset.decide.split('|'); save(); render(); return; }
   if (t.dataset.brief === 'decide') { const d = reviewDecisions()[0]; if (d) state.compare = [d.start, d.alt]; state.tab = 'compare'; save(); render(); window.scrollTo(0, 0); return; }
   if (t.dataset.fteam) { switchTeam(t.dataset.fteam); return; }
@@ -1925,8 +2049,11 @@ document.addEventListener('click', e => {
   else if (a === 'loadleague') loadLeague();
   else if (a === 'useteam') useEspnTeam();
   else if (a === 'applycsv') applyCsv();
-  else if (a === 'pasteroster') pasteRoster();
-  else if (a === 'toggleio') { D.ioOpen = !D.ioOpen; D.ioOutMsg = ''; D.ioInMsg = ''; render(); }
+  else if (a === 'pasteroster') { pasteRoster(); if (state.roster.length && !state.example) { D.setupOpen = false; render(); } }
+  else if (a === 'setup') { D.setupOpen = !D.setupOpen; D.ioOpen = false; D.ioInMsg = ''; state.tab = 'lineup'; save(); render(); if (D.setupOpen) { window.scrollTo(0, 0); $('#rosterPaste')?.focus(); } }
+  else if (a === 'fresh') { D.freshOpen = !D.freshOpen; renderFresh(); }
+  else if (a === 'toggleFa') { D.faOpen = !D.faOpen; render(); if (D.faOpen) $('#faPaste')?.focus(); }
+  else if (a === 'toggleio') { D.ioOpen = !D.ioOpen; D.setupOpen = false; D.ioOutMsg = ''; D.ioInMsg = ''; render(); }
   else if (a === 'iocopy') {
     const out = $('#ioOut'), code = out?.value || '', msg = $('#ioOutMsg');
     const fallback = () => { out.focus(); out.select(); if (msg) msg.textContent = 'Code selected. Press Ctrl+C (or Cmd+C) to copy it.'; };
@@ -1940,7 +2067,7 @@ document.addEventListener('click', e => {
     const msg = $('#ioOutMsg'); if (msg) msg.textContent = 'Downloaded. Open it from Import on another device.';
   }
   else if (a === 'ioimport') {
-    try { D.ioInMsg = importBundle(parseBundle($('#ioIn')?.value), !!$('#ioReplace')?.checked); }
+    try { D.ioInMsg = importBundle(parseBundle($('#ioIn')?.value), !!$('#ioReplace')?.checked); D.setupOpen = false; }
     catch (err) { D.ioInMsg = err.message; }
     render();
   }
@@ -1961,11 +2088,11 @@ document.addEventListener('click', e => {
     D.open.clear(); D.wCache = null; D.rosterMsg = ''; save(); render();
   }
   else if (a === 'untake') { state.waivers.taken = {}; save(); render(); }
-  else if (a === 'clearfa') { state.waivers.faList = []; state.waivers.source = 'own'; D.faMsg = 'Back to ESPN ownership estimates.'; save(); render(); }
+  else if (a === 'clearfa') { D.faOpen = false; state.waivers.faList = []; state.waivers.source = 'own'; D.faMsg = 'Back to ESPN ownership estimates.'; save(); render(); }
   else if (a === 'pastefa') {
     const { ids, miss } = matchPasted($('#faPaste')?.value || '');
     const fa = ids.filter(id => !state.roster.includes(id));
-    if (fa.length) { state.waivers.faList = fa; state.waivers.faListAt = Date.now(); state.waivers.source = 'list'; state.waivers.taken = {}; save(); }
+    if (fa.length) { state.waivers.faList = fa; state.waivers.faListAt = Date.now(); state.waivers.source = 'list'; state.waivers.taken = {}; D.faOpen = false; save(); }
     D.faMsg = fa.length ? `Using ${fa.length} free agents from your league.` + (miss.length ? ` Not matched: ${miss.slice(0, 4).join(', ')}${miss.length > 4 ? '…' : ''}` : '') : 'No player names found in that text.';
     render();
   }
