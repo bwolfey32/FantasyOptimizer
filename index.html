@@ -86,6 +86,19 @@ a { color: var(--accent); }
 .seg button { border: 0; background: none; padding: 6px 12px; font-weight: 500; font-size: 14px; }
 .seg button[aria-pressed="true"] { background: var(--accent); color: var(--accent-ink); }
 
+/* Fantasy team headers */
+.teambar { display: flex; flex-direction: column; gap: 8px; min-width: 0; }
+.tteams { display: flex; gap: 6px; overflow-x: auto; scrollbar-width: thin; padding-bottom: 2px; }
+.tteam { flex: 0 0 auto; display: flex; flex-direction: column; align-items: flex-start; gap: 1px; min-width: 128px; max-width: 220px; padding: 8px 14px 9px; background: var(--surface); border: 1px solid var(--line); border-radius: 8px; text-align: left; }
+.tteam:hover { border-color: var(--accent); }
+.tteam .tn { font-family: var(--font-display); font-weight: 700; font-size: 17px; line-height: 1.15; text-transform: uppercase; letter-spacing: .02em; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 100%; }
+.tteam .tm { font-size: 12.5px; color: var(--muted); white-space: nowrap; }
+.tteam .tm .num { color: var(--ink); }
+.tteam[aria-pressed="true"] { border-color: var(--accent); background: color-mix(in srgb, var(--accent) 9%, var(--surface)); box-shadow: inset 0 -3px 0 var(--accent); }
+.tteam.add { min-width: 0; justify-content: center; align-items: center; border-style: dashed; color: var(--accent); font-weight: 600; }
+.tmanage { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+.tmanage .inp { flex: 0 1 220px; }
+
 /* Lineup rows */
 .list { display: flex; flex-direction: column; }
 .list .item + .item { border-top: 1px solid var(--line); }
@@ -201,6 +214,20 @@ details.how p, details.how li { max-width: 72ch; }
 .move .mgain { grid-area: gain; display: flex; flex-direction: column; align-items: flex-end; text-align: right; }
 .move .mgain .num { font-size: 28px; line-height: 1; color: var(--good); }
 .move .mwhy { grid-area: why; color: var(--muted); }
+.prs { display: grid; grid-template-columns: 170px minmax(0, 1fr); gap: 6px 14px; padding: 10px 14px; align-items: start; }
+.prs .pteam { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 8px; }
+.prs .pbody { display: flex; flex-direction: column; gap: 3px; min-width: 0; }
+.prs .pchips { display: flex; flex-wrap: wrap; gap: 4px; }
+.prs .chip { white-space: normal; }
+.prs-more { padding: 0; }
+.prs-more > summary { padding: 10px 14px; cursor: pointer; color: var(--accent); font-weight: 600; }
+.prs-more .prs { border-top: 1px solid var(--line); }
+.wk .pmark { font-style: normal; margin-left: 2px; color: var(--ink); }
+@media (max-width: 780px) { .prs { grid-template-columns: minmax(0, 1fr); } }
+.stash { display: grid; grid-template-columns: minmax(0, 1.6fr) auto minmax(0, 1fr) auto; gap: 8px 14px; align-items: center; padding: 10px 14px; }
+.stash .sinfo { display: flex; flex-direction: column; min-width: 0; }
+.stash .sctl { display: flex; align-items: center; gap: 6px; }
+@media (max-width: 780px) { .stash { grid-template-columns: minmax(0, 1fr) auto; } .stash .sinfo { grid-column: 1 / -1; } }
 .move .mwhy .btn { margin-left: 6px; }
 .wks { display: flex; flex-wrap: wrap; gap: 3px; flex-basis: 100%; }
 .wk { font-size: 11px; font-variant-numeric: tabular-nums; padding: 1px 5px; border-radius: 4px; border: 1px solid var(--line); white-space: nowrap; }
@@ -262,6 +289,7 @@ const API = {
   tot: s => `https://api.sleeper.com/stats/nfl/${s}?season_type=regular&${POSQ}`,
   wkQB: (s, w) => `https://api.sleeper.com/stats/nfl/${s}/${w}?season_type=regular&position[]=QB`,
   sched: s => `https://api.sleeper.com/schedule/nfl/regular/${s}`,
+  idp: s => `https://api.sleeper.com/stats/nfl/${s}?season_type=regular&position[]=DL&position[]=LB&position[]=DB`,
   own: s => `https://lm-api-reads.fantasy.espn.com/apis/v3/games/ffl/seasons/${s}/segments/0/leaguedefaults/3?view=players_wl`,
   ownFilter: JSON.stringify({ players: { filterActive: { value: true }, filterSlotIds: { value: [0, 2, 4, 6, 16, 17] }, limit: 450, sortPercOwned: { sortPriority: 1, sortAsc: false } } }),
   league: (s, id) => `https://lm-api-reads.fantasy.espn.com/apis/v3/games/ffl/seasons/${s}/segments/0/leagues/${encodeURIComponent(id)}?view=mRoster&view=mTeam&view=mSettings`,
@@ -353,8 +381,34 @@ const DEFAULT_STATE = {
   settings: { season: null, week: null, blend: 0.6, intensity: 0.6, priorWeeks: 4, strategy: 'mean', w: { dvp: 1, cover: 1, protect: 1, script: 1, style: 1 } },
   slots: { QB:1, RB:2, WR:2, TE:1, FLEX:1, 'RB/WR':0, 'WR/TE':0, OP:0, 'D/ST':1, K:1 },
   espn: { leagueId: '', teamId: null, slotOf: {} },
-  waivers: { horizon: 4, teams: 12, ownMax: 50, source: 'own', faList: [], faListAt: null, taken: {} },
+  waivers: { horizon: 4, teams: 12, ownMax: 50, source: 'own', faList: [], faListAt: null, taken: {}, allowDrop: {}, forceKeep: {} },
+  teams: [], activeTeam: null, returnWeek: {},
 };
+/* Fantasy teams. The active team's fields live on `state` itself (state.roster, state.slots, ...) so the rest of the
+   app reads one team at a time; save() copies them back into state.teams, and switching loads another team's copy.
+   Overrides, model weights and coaching edits stay shared across teams. */
+const TEAM_FIELDS = ['roster', 'example', 'slots', 'espn', 'waivers', 'compare'];
+const curTeam = () => state.teams.find(t => t.id === state.activeTeam);
+function stashTeam() { const t = curTeam(); if (t) for (const k of TEAM_FIELDS) t[k] = state[k]; }
+function ensureTeams(st) {
+  if (!Array.isArray(st.teams) || !st.teams.length) { st.teams = [{ id: 't1', name: 'My team' }]; st.activeTeam = 't1'; }
+  if (!st.teams.some(t => t.id === st.activeTeam)) st.activeTeam = st.teams[0].id;
+  const t = st.teams.find(t => t.id === st.activeTeam); for (const k of TEAM_FIELDS) t[k] = st[k];
+  return st;
+}
+function applyTeam(t) {
+  state.roster = (t.roster || []).slice(); state.example = !!t.example;
+  state.slots = Object.assign({}, DEFAULT_STATE.slots, t.slots || {});
+  state.espn = Object.assign({}, DEFAULT_STATE.espn, t.espn || {});
+  state.waivers = Object.assign(JSON.parse(JSON.stringify(DEFAULT_STATE.waivers)), t.waivers || {});
+  state.compare = Array.isArray(t.compare) ? t.compare.slice() : [null, null];
+}
+function switchTeam(id) {
+  if (id === state.activeTeam || !state.teams.some(t => t.id === id)) return;
+  stashTeam(); state.activeTeam = id; applyTeam(curTeam());
+  D.open.clear(); D.wCache = null; D.rosterMsg = ''; D.faMsg = ''; D.espnMsg = null; D.espnTeams = null; D.delArm = false;
+  save(); render();
+}
 function loadState() {
   const s = store.get('fo1:state');
   const st = JSON.parse(JSON.stringify(DEFAULT_STATE));
@@ -366,10 +420,10 @@ function loadState() {
     st.espn = Object.assign({}, DEFAULT_STATE.espn, s.espn || {});
     st.waivers = Object.assign(JSON.parse(JSON.stringify(DEFAULT_STATE.waivers)), s.waivers || {});
   }
-  return st;
+  return ensureTeams(st);
 }
 let state = loadState();
-const save = () => store.set('fo1:state', state);
+const save = () => { stashTeam(); store.set('fo1:state', state); };
 const D = { loading: true, progress: 0, errors: [], open: new Set(), U: new Map(), proj: {}, H: {}, tg: {}, rec: {}, prior: {}, cur: {}, B: {}, L: {}, ranks: {}, M: {}, coaches: null, espnTeams: null, defSort: ['fpaWR', -1], teamOpen: null, resetArm: false };
 
 function staffOf(T) {
@@ -421,6 +475,43 @@ function deriveTotals(rows, qbWeeks) {
     const a = ga(T); a.passAtt += s.pass_att||0; a.sacksTaken += s.pass_sack||0; a.rushAtt += s.rush_att||0; a.rushYd += s.rush_yd||0;
   }
   const out = {}; for (const T in A) { const d = derive(A[T]); if (d) out[T] = d; } return out;
+}
+/* Last season's PPR points per game for each player (from the same season-total rows), kept when 2+ games and 4+ pts/g. */
+function playerPPG(rows) {
+  const out = {};
+  for (const r of rows || []) {
+    const s = r.stats || {}, pos = r.player?.position;
+    if (!['QB', 'RB', 'WR', 'TE', 'K'].includes(pos) || !(s.gp >= 2)) continue;
+    const ppg = (s.pts_ppr || 0) / s.gp; if (ppg >= 4) out[r.player_id] = [+ppg.toFixed(1), s.gp];
+  }
+  return out;
+}
+/* Defensive players. Each defender's season is reduced to three impact totals:
+   pass rush = 4×sacks + QB hits + 2×forced fumbles; coverage = 5×INT + 1.5×passes defended;
+   run defense = tackles for loss + 0.1×tackles. Kick and punt return yards (and return TDs) feed special teams. */
+const idpImpact = s => [+(4 * (s.idp_sack || 0) + (s.idp_qb_hit || 0) + 2 * (s.idp_ff || 0)).toFixed(1), +(5 * (s.idp_int || 0) + 1.5 * (s.idp_pass_def || 0)).toFixed(1), +((s.idp_tkl_loss || 0) + 0.1 * (s.idp_tkl || 0)).toFixed(1)];
+const retYds = s => (s.kr_yd || 0) + (s.pr_yd || 0);
+// last season: [id, name, pos, team then, games, rush, cover, run, return yds, return TDs]
+function idpCompactPrev(rows) {
+  const out = [];
+  for (const r of rows || []) { const s = r.stats || {}, T = fixAbbr(r.team); if (!(s.gp > 0) || !TEAMS[T]) continue; const [a, b, c] = idpImpact(s); if (a + b + c < 2 && retYds(s) < 150) continue; out.push([r.player_id, [r.player?.first_name, r.player?.last_name].filter(Boolean).join(' '), r.player?.position || '', T, s.gp, a, b, c, retYds(s), s.st_td || 0]); }
+  return out;
+}
+// this season, everyone who played or who mattered last season: [id, name, pos, team now, injury, games, rush, cover, run, team on the stat row]
+function idpCompactNow(rows, prev) {
+  const known = new Set((prev || []).map(p => p[0])), out = [];
+  for (const r of rows || []) {
+    const s = r.stats || {}; if (!(s.gp > 0) && !known.has(r.player_id)) continue;
+    const now = fixAbbr(r.player?.team) || null, [a, b, c] = idpImpact(s);
+    out.push([r.player_id, [r.player?.first_name, r.player?.last_name].filter(Boolean).join(' '), r.player?.position || '', TEAMS[now] ? now : null, r.player?.injury_status || null, s.gp || 0, a, b, c, fixAbbr(r.team) || null]);
+  }
+  return out;
+}
+// offensive players who returned kicks or punts last season: [id, name, team then, games, return yds, return TDs]
+function returnersPrev(rows) {
+  const out = [];
+  for (const r of rows || []) { const s = r.stats || {}, T = fixAbbr(r.team); if (!(s.gp > 0) || !TEAMS[T] || retYds(s) < 150) continue; out.push([r.player_id, [r.player?.first_name, r.player?.last_name].filter(Boolean).join(' '), T, s.gp, retYds(s), s.st_td || 0]); }
+  return out;
 }
 function aggWeeks(weeks) {
   const A = {}; const ga = T => A[T] || (A[T] = blankAgg());
@@ -483,21 +574,36 @@ async function gatherLive(err) {
     weekPs.push(cached ? Promise.resolve(cached) : T(fetchJSON(API.wk(season, w)).then(rows => { const c = compactWeek(rows); if (w <= completedThrough && c.D.length) store.set(key, c); return c; }).catch(e => { err('Sleeper stats week ' + w, e); return { P: [], D: [] }; })));
   }
   const pActual = week <= (past ? 18 : detWeek) ? T(fetchJSON(API.wk(season, week)).then(compactWeek).catch(() => ({ P: [], D: [] }))) : Promise.resolve({ P: [], D: [] });
+  const ppgKey = `fo1:ppg:${season - 1}`, retKey = `fo1:ret:${season - 1}`; let prevPPG = store.get(ppgKey), prevRet = store.get(retKey);
+  const keepPrevPlayers = rows => {
+    if (!prevPPG) { prevPPG = playerPPG(rows); if (Object.keys(prevPPG).length > 100) store.set(ppgKey, prevPPG); }
+    if (!prevRet) { prevRet = returnersPrev(rows); if (prevRet.length > 20) store.set(retKey, prevRet); }
+  };
+  // defensive players: last season is cached after the first load; this season is fetched every time (injuries, trades)
+  const idpKey = `fo1:idp:${season - 1}`; let idpPrev = store.get(idpKey);
+  const pIdpPrev = idpPrev ? Promise.resolve() : T(fetchJSON(API.idp(season - 1)).then(rows => { idpPrev = idpCompactPrev(rows); if (idpPrev.length > 300) store.set(idpKey, idpPrev); }).catch(e => err(`${season - 1} defensive players`, e)));
+  const pIdpNow = T(fetchJSON(API.idp(season)).catch(e => { err('Defensive players', e); return []; }));
   const priorPs = [1, 2, 3].map(k => {
     const s = season - k, key = `fo1:prior2:${s}`, cached = store.get(key);
     if (cached) return Promise.resolve([s, cached]);
     const qb = k === 1 ? pool(Array.from({ length: 18 }, (_, i) => i + 1), 6, w => fetchJSON(API.wkQB(s, w))) : Promise.resolve(null);
-    return T(Promise.all([fetchJSON(API.tot(s)), qb]).then(([rows, qbw]) => { const d = deriveTotals(rows, qbw); if (Object.keys(d).length > 20) store.set(key, d); return [s, d]; }).catch(e => { err(s + ' season history', e); return [s, {}]; }));
+    return T(Promise.all([fetchJSON(API.tot(s)), qb]).then(([rows, qbw]) => {
+      if (k === 1) keepPrevPlayers(rows);
+      const d = deriveTotals(rows, qbw); if (Object.keys(d).length > 20) store.set(key, d); return [s, d];
+    }).catch(e => { err(s + ' season history', e); return [s, {}]; }));
   });
+  // team history cached by an older version of this page: fetch last season's totals once for the per-player numbers
+  const pPPG = prevPPG && prevRet ? Promise.resolve() : (store.get(`fo1:prior2:${season - 1}`) ? T(fetchJSON(API.tot(season - 1)).then(keepPrevPlayers).catch(e => err(`${season - 1} player history`, e))) : Promise.resolve());
   const schedKey = `fo1:sched:${season}`, schedCached = store.get(schedKey);
   const pSched = schedCached ? Promise.resolve(schedCached) : T(fetchJSON(API.sched(season)).then(rows => { const c = (rows || []).filter(g => g.week && g.home && g.away).map(g => [g.week, fixAbbr(g.home), fixAbbr(g.away)]); if (c.length > 200) store.set(schedKey, c); return c; }).catch(e => { err('Season schedule', e); return []; }));
   const pOwn = T(fetchJSON(API.own(season), 30000, { 'x-fantasy-filter': API.ownFilter }).then(j => (j.players || []).map(e => e.player).filter(p => p && ESPN_POS[p.defaultPositionId]).map(p => [p.fullName, p.defaultPositionId, p.proTeamId, p.ownership?.percentOwned ?? 0])).catch(e => { err('ESPN ownership', e); return []; }));
   if (!tasks.length) tasks.push(Promise.resolve());
 
-  const [sbj, projRows, weeks, actual, priors, sched, own] = await Promise.all([pSB, pProj, Promise.all(weekPs), pActual, Promise.all(priorPs), pSched, pOwn]);
+  const [sbj, projRows, weeks, actual, priors, sched, own, , , idpRows] = await Promise.all([pSB, pProj, Promise.all(weekPs), pActual, Promise.all(priorPs), pSched, pOwn, pPPG, pIdpPrev, pIdpNow]);
   const sb = parseSB(sbj), now = parseSB(sb0), proj = [];
   for (const r of projRows || []) { const p = r.player || {}; if (!POS.includes(p.position)) continue; proj.push([r.player_id, nameOf(r), p.position, fixAbbr(r.team || p.team), p.injury_status || null, r.stats?.pts_ppr ?? null, fixAbbr(r.opponent)]); }
-  return { v: 1, createdAt: new Date().toISOString(), season, week, detSeason, detWeek, games: sb.games, rec: Object.assign({}, sb.rec, now.rec), proj, weeks, actual, priors, sched, own };
+  return { v: 1, createdAt: new Date().toISOString(), season, week, detSeason, detWeek, games: sb.games, rec: Object.assign({}, sb.rec, now.rec), proj, weeks, actual, priors, sched, own, prevPPG: prevPPG || {},
+    idp: { prev: idpPrev || [], now: idpCompactNow(idpRows, idpPrev), ret: prevRet || [] } };
 }
 function ingest(inp) {
   D.season = inp.season; D.week = inp.week; D.detSeason = inp.detSeason; D.detWeek = inp.detWeek;
@@ -538,6 +644,8 @@ function ingest(inp) {
     else { const c = D.nameIdx.get(norm(name)) || []; id = c.find(x => D.U.get(x)?.pos === pos && D.U.get(x)?.team === T) || c.find(x => D.U.get(x)?.pos === pos) || null; }
     if (id && !D.own.has(id)) D.own.set(id, pct);
   }
+  D.prevPPG = inp.prevPPG || {};
+  D.idp = inp.idp && inp.idp.now?.length ? inp.idp : null;
   D.wCache = null; D.usage = null;
   computeAll();
 }
@@ -551,12 +659,12 @@ async function load() {
   }
   if (!inp) { D.loading = false; D.failed = true; render(); return; }
   ingest(inp);
-  if (!state.roster.length && D.U.size) makeExampleRoster();
+  if (!state.roster.length && state.teams.length === 1 && D.U.size) makeExampleRoster();
   D.loading = false; render();
   if (D.snapshot) return;
   if (location.hash === '#export') {
     await checkCoaches(D.season);
-    const snap = Object.assign({}, inp, { coaches: D.coaches, proj: inp.proj.filter(p => (p[5] || 0) > 0 || D.H[p[0]]) });
+    const snap = Object.assign({}, inp, { coaches: D.coaches, proj: inp.proj.filter(p => (p[5] || 0) > 0 || D.H[p[0]] || D.prevPPG[p[0]]) });
     const pre = document.createElement('pre'); pre.id = 'snapshot-out'; pre.hidden = true; pre.textContent = JSON.stringify(snap); document.body.appendChild(pre);
   } else checkCoaches(D.season);
 }
@@ -660,8 +768,75 @@ function finish(r) {
   r.chip = top ? { text: top.short(top.pct), dir: top.pct > 0 ? 'up' : 'down' } : null;
   return r;
 }
+/* ---------- defensive & special-teams personnel ----------
+   The team model sees each defense through a blend of last season (worth kD games) and this season. For every defender
+   connected to a team, compare how much of him that blend contains with whether he's on the team and healthy now:
+   a signing, a trade, a player back from injury or a rookie adds strength the numbers don't show yet; a departure or a
+   new injury takes it away. Summed per area (pass rush, coverage, run defense) and divided by the league-average
+   unit, that becomes a % change in points the defense allows to each position. Returners do the same for D/ST scoring. */
+const PERS_MIX = { QB: [.5, .5, 0], RB: [.2, 0, .8], WR: [.35, .65, 0], TE: [.35, .65, 0], K: [.34, .33, .33], DEF: [.5, .5, 0] };
+const defOut = inj => /^(out|ir|pup|sus|na|doubtful)/i.test(inj || '');
+function computePersonnel() {
+  D.pers = null; if (!D.idp) return;
+  const prev = new Map(D.idp.prev.map(r => [r[0], r])), now = new Map(D.idp.now.map(r => [r[0], r]));
+  const P = {}, team = T => P[T] || (P[T] = { d: [0, 0, 0], cur: [0, 0, 0], pct: [0, 0, 0], moves: [], st: 0, stMoves: [] });
+  const wPrior = T => { const kD = D.B[T]?.kD ?? state.settings.priorWeeks, g = D.cur[T]?.g || 0; return kD / (g + kD); };
+  for (const id of new Set([...prev.keys(), ...now.keys()])) {
+    const a = prev.get(id), b = now.get(id), g25 = a ? a[4] : 0, g26 = b ? b[5] : 0, w25 = a ? Math.min(4, g25) : 0;
+    // per-game impact: this season's games count fully, last season's rate counts as up to 4 games
+    const rate = [0, 1, 2].map(k => { const den = g26 + w25; return den ? ((b ? b[6 + k] : 0) + (a ? a[5 + k] / g25 * w25 : 0)) / den : 0; });
+    const tot = rate[0] + rate[1] + rate[2]; if (tot < 0.15) continue;
+    const teamNow = b ? b[3] : null, inj = b ? b[4] : null, avail = teamNow ? (defOut(inj) ? 0 : /^q/i.test(inj || '') ? 0.85 : 1) : 0;
+    for (const T of new Set([a && a[3], b && b[9], teamNow].filter(t => TEAMS[t]))) {
+      const wp = wPrior(T), g = D.cur[T]?.g || 0;
+      const model = wp * (a && a[3] === T ? Math.min(1, g25 / 17) : 0) + (1 - wp) * (b && b[9] === T && g ? Math.min(1, g26 / g) : 0);
+      const here = teamNow === T ? avail : 0, diff = here - model, t = team(T);
+      for (let k = 0; k < 3; k++) { t.d[k] += diff * rate[k]; t.cur[k] += here * rate[k]; }
+      if (Math.abs(diff * tot) < 0.5) continue;
+      const kind = teamNow !== T ? (teamNow ? `left for ${teamNow}` : 'no longer on a roster')
+        : avail === 0 ? inj : a && a[3] && a[3] !== T ? `added from ${a[3]}` : !a ? 'rookie or new starter' : diff > 0 ? 'back from injury' : 'questionable';
+      const area = ['pass rush', 'coverage', 'run defense'][rate.indexOf(Math.max(...rate))];
+      t.moves.push({ id, name: (b && b[1]) || a[1], pos: (b && b[2]) || a[2], val: diff * tot, kind, area });
+    }
+  }
+  // returners: last season's return production, wherever they play now
+  const rets = [...D.idp.ret.map(r => ({ id: r[0], name: r[1], from: r[2], g: r[3], yds: r[4], td: r[5] })),
+    ...D.idp.prev.filter(r => r[8] >= 150).map(r => ({ id: r[0], name: r[1], from: r[3], g: r[4], yds: r[8], td: r[9] }))];
+  for (const r of rets) {
+    const u = D.U.get(r.id), b = now.get(r.id), to = u ? u.team : b ? b[3] : null, inj = u ? u.inj : b ? b[4] : null;
+    const val = 6 * r.td / r.g + 0.001 * r.yds / r.g;   // D/ST points per game: return TDs score; yards only hint at more TDs
+    for (const T of new Set([r.from, to].filter(t => TEAMS[t]))) {
+      const here = to === T && !defOut(inj) ? 1 : 0, diff = (here - (r.from === T ? 1 : 0)) * wPrior(T); if (!diff) continue;
+      const t = team(T); t.st += diff * val;
+      if (Math.abs(diff * val) >= 0.08) t.stMoves.push({ id: r.id, name: r.name, val: diff * val, kind: to !== T ? (to ? `left for ${to}` : 'no longer on a roster') : here ? `added from ${r.from}` : inj, yds: r.yds / r.g, td: r.td });
+    }
+  }
+  // Every current roster counts all healthy players for every game, while last season's numbers include the usual
+  // injuries, so all teams look stronger than their stats by a similar amount. Measure each team against the league
+  // average change instead, which keeps the real differences (signings, departures, unusual injury luck).
+  for (const T of ABBR) team(T);
+  const L = [0, 1, 2].map(k => mean(ABBR.map(T => P[T].cur[k]).filter(x => x > 0)) || 1);
+  const raw = T => P[T].d.map((x, k) => x / L[k]);
+  const avg = [0, 1, 2].map(k => mean(ABBR.map(T => raw(T)[k]))), stAvg = mean(ABBR.map(T => P[T].st));
+  for (const T of ABBR) {
+    const t = P[T], r = raw(T);
+    t.pct = r.map((x, k) => clamp(x - avg[k], -0.35, 0.35)); t.st -= stAvg;
+    t.moves.sort((x, y) => Math.abs(y.val) - Math.abs(x.val)); t.stMoves.sort((x, y) => Math.abs(y.val) - Math.abs(x.val));
+  }
+  D.pers = P;
+}
+/* Multiplier on fantasy points a defense allows to a position: a stronger unit (positive pct) allows fewer. */
+function persMult(T, pos) {
+  const t = D.pers?.[T]; if (!t || pos === 'DEF') return 1;
+  const m = PERS_MIX[pos] || PERS_MIX.K; return clamp(1 - 0.45 * (m[0] * t.pct[0] + m[1] * t.pct[1] + m[2] * t.pct[2]), 0.9, 1.1);
+}
+/* A team's own D/ST: [multiplier from its defenders, extra points per game from returners]. */
+function persOwn(T) {
+  const t = D.pers?.[T]; if (!t) return [1, 0];
+  return [clamp(1 + 0.5 * (0.5 * t.pct[0] + 0.5 * t.pct[1]), 0.9, 1.1), clamp(t.st, -1, 1)];
+}
 function computeAll() {
-  computeTeams(); D.M = {};
+  computeTeams(); computePersonnel(); D.M = {};
   for (const id of D.U.keys()) { const r = evalPlayer(id); if (r) D.M[id] = r; }
 }
 const metricOf = r => { if (r.locked && ok(r.actual)) return r.actual; const s = state.settings.strategy; return s === 'floor' ? r.floor : s === 'ceil' ? r.ceil : r.mean; };
@@ -748,7 +923,9 @@ function useEspnTeam() {
   }
   const sc = D.espnLeague?.settings?.rosterSettings?.lineupSlotCounts;
   if (sc) { const s = Object.fromEntries(SLOT_TYPES.map(t => [t.k, 0])); for (const k in sc) if (ESPN_SLOT[k]) s[ESPN_SLOT[k]] += sc[k]; if (Object.values(s).some(Boolean)) state.slots = s; }
-  state.roster = ids; state.example = false; state.espn.slotOf = slotOf; save();
+  state.roster = ids; state.example = false; state.espn.slotOf = slotOf;
+  const ct = curTeam(); if (ct && /^(my team|team \d+)$/i.test(ct.name)) ct.name = t.name;
+  save();
   D.espnMsg = ['info', `Imported ${ids.length} players from ${t.name}.` + (missed.length ? ` Not matched: ${missed.join(', ')}. Add them in the Players tab.` : '')];
   state.tab = 'lineup'; render();
 }
@@ -905,16 +1082,49 @@ function schemeBlock(r) {
    fantasy points that week's opponent allows to the position (fading toward neutral further out), zero on byes.
    A move's equity is how much the best possible lineup gains, week by week, if the free agent replaces the dropped player. */
 const isLongInj = inj => /^(ir|pup|sus|na)/i.test(inj || '');
+/* Injured players: 'long' (IR, PUP, suspended, NFI) or 'short' (Out, Doubtful). They score 0 until their expected
+   return week (default: next week for short, four weeks out for long, editable in Waivers), then at their healthy level. */
+const injKind = inj => isLongInj(inj) ? 'long' : /^(out|doubtful)/i.test(inj || '') ? 'short' : null;
+function returnWeek(id) {
+  const k = injKind(D.U.get(id)?.inj); if (!k) return D.week;
+  const set = state.returnWeek?.[id]; if (set != null) return set;
+  return Math.min(19, D.week + (k === 'long' ? 4 : 1));
+}
+/* Healthy per-game value: this season's average blended with last season's (last season counts as 4 games). */
+function healthyBase(id) {
+  const prev = D.prevPPG?.[id]?.[0] ?? null, h = D.H[id], cur = h?.n ? h.avg : null;
+  if (cur != null && prev != null) return (cur * h.n + prev * 4) / (h.n + 4);
+  return cur ?? prev ?? 0;
+}
 function rosBase(id) {
   const r = D.M[id]; if (!r) return 0;
   if (state.overrides[id] != null && ok(+state.overrides[id])) return +state.overrides[id];
+  if (injKind(r.u.inj)) return healthyBase(id);
   const avg = r.h?.n ? r.h.avg : null, pj = r.projPts, b = state.settings.blend;
   return pj != null && avg != null ? b * pj + (1 - b) * avg : (pj ?? avg ?? 0);
+}
+const SLOT_SHARE = { QB: { OP: .7 }, RB: { FLEX: .45, 'RB/WR': .5, OP: .1 }, WR: { FLEX: .45, 'RB/WR': .5, 'WR/TE': .75, OP: .1 }, TE: { FLEX: .1, 'WR/TE': .25, OP: .1 }, K: {}, DEF: {} };
+/* How many lineup spots a position fills per team, counting its share of flex slots. */
+function posSlots(P) { const own = { QB: 'QB', RB: 'RB', WR: 'WR', TE: 'TE', K: 'K', DEF: 'D/ST' }[P]; return (state.slots[own] || 0) + Object.entries(SLOT_SHARE[P]).reduce((s, [k, f]) => s + (state.slots[k] || 0) * f, 0); }
+/* An injured player worth keeping: he returns this season and, healthy, ranks as a startable player at his
+   position in a league of this size (top teams × lineup spots × 1.25). Ranking uses the better of last season's
+   pts/game and the blended healthy value, because the game a player got hurt in drags this season's average down.
+   You can override either way: Keep protects anyone, Allow dropping releases a protected player. */
+function stashInfo(id) {
+  const u = D.U.get(id); if (!u || !injKind(u.inj)) return null;
+  const rw = returnWeek(id), hv = rosBase(id), P = u.pos, prev = D.prevPPG?.[id];
+  const rv = state.overrides[id] != null ? hv : Math.max(hv, prev?.[0] ?? 0);
+  const better = [...D.U.values()].filter(x => x.pos === P && x.id !== id && D.M[x.id] && rosBase(x.id) > rv).length;
+  const cut = Math.ceil(state.waivers.teams * Math.max(1, posSlots(P)) * 1.25), rank = better + 1;
+  const auto = rw <= 18 && rank <= cut, W = state.waivers;
+  const keep = W.forceKeep?.[id] ? true : W.allowDrop?.[id] ? false : auto;
+  return { id, rw, hv, rv, rank, cut, prev, auto, keep };
 }
 function schedOpp(T, w) { const m = D.sched?.[w]; if (!m || !Object.keys(m).length) return { opp: null, bye: false, unknown: true }; const g = m[T]; return g ? { opp: g.opp, home: g.home, bye: false } : { opp: null, bye: true }; }
 function matchupMult(pos, opp, w) {
   if (!opp) return 1; const k = pos === 'DEF' ? 'fpaDEF' : 'fpa' + pos, fade = clamp(1 - (w - D.week - 1) * 0.1, 0.4, 1);
-  return clamp(1 + state.settings.intensity * (state.settings.w.dvp ?? 1) * ratio(D.B[opp]?.[k], D.L[k]) * fade, 0.75, 1.25);
+  // the opponent's defensive personnel changes apply on top of its stats (D/ST players face offenses, so not to them)
+  return clamp((1 + state.settings.intensity * (state.settings.w.dvp ?? 1) * ratio(D.B[opp]?.[k], D.L[k]) * fade) * persMult(opp, pos), 0.7, 1.3);
 }
 /* A backup filling in for an injured starter at his position: his current projection overstates his long-run value. */
 function fillInFor(id) {
@@ -923,12 +1133,15 @@ function fillInFor(id) {
 }
 function weekVals(id, weeks) {
   const r = D.M[id]; if (!r) return weeks.map(() => 0);
-  const base = rosBase(id), u = r.u, fill = fillInFor(id);
+  const u = r.u, fill = fillInFor(id), own = u.pos === 'DEF' ? persOwn(u.team) : [1, 0];
+  const base = rosBase(id) * own[0] + own[1];   // a D/ST also gains or loses from its own defenders and returners
+  const back = injKind(u.inj) ? returnWeek(id) : null;
   return weeks.map((w, i) => {
-    if (isLongInj(u.inj) && i < 4) return 0;
-    if (w === D.week) return r.status !== 'ok' || r.locked ? 0 : r.mean;
+    if (back != null && w < back) return 0;
+    if (w === D.week && back == null) return r.status !== 'ok' || r.locked ? 0 : r.mean;
+    if (w === D.week && r.locked) return 0;
     const s = schedOpp(u.team, w); if (s.bye || !u.team) return 0;
-    return base * matchupMult(u.pos, s.opp, w) * (fill && i >= 2 ? 0.5 : 1);
+    return Math.max(0, base * matchupMult(u.pos, s.opp, w) * (fill && i >= 2 ? 0.5 : 1));
   });
 }
 function bestLineup(ids, wi, V, slots) {
@@ -936,7 +1149,20 @@ function bestLineup(ids, wi, V, slots) {
   const cost = slots.map(s => { const row = c.map(id => s.elig.includes(D.U.get(id).pos) ? -V[id][wi] : 1e6); for (let i = 0; i < n; i++) row.push(1e5); return row; });
   const asg = hungarian(cost); let total = 0; const starters = [];
   asg.forEach((j, i) => { if (j >= 0 && j < c.length && cost[i][j] < 1e5) { total += V[c[j]][wi]; starters.push([slots[i], c[j]]); } });
-  return { total, starters };
+  return { total, starters, depth: depthValue(c, starters, wi, V) };
+}
+/* Bench insurance: each week a starter has some chance of a late scratch or in-game injury. When that happens the
+   best healthy bench player who fits his slot plays instead, so a backup is worth (miss chance × his points)
+   for each starter he could replace. Without this, a bench player who never starts looks worthless. */
+const PMISS = { QB: .05, RB: .09, WR: .07, TE: .07, K: .02, DEF: .01 };
+function depthValue(ids, starters, wi, V) {
+  const used = new Set(starters.map(s => s[1])), bench = ids.filter(id => !used.has(id));
+  let dep = 0;
+  for (const [slot, id] of starters) {
+    let rep = 0; for (const b of bench) if (slot.elig.includes(D.U.get(b).pos) && V[b][wi] > rep) rep = V[b][wi];
+    dep += PMISS[D.U.get(id).pos] * rep;
+  }
+  return dep;
 }
 function availablePool() {
   const W = state.waivers, ros = new Set(state.roster);
@@ -946,7 +1172,7 @@ function availablePool() {
 }
 function computeWaivers() {
   const W = state.waivers;
-  const key = JSON.stringify([state.roster, state.overrides, state.settings, state.slots, W, D.loadedAt?.getTime(), D.week]);
+  const key = JSON.stringify([state.roster, state.overrides, state.settings, state.slots, W, state.returnWeek, state.staffEdits, D.loadedAt?.getTime(), D.week]);
   if (D.wCache && D.wCache.key === key) return D.wCache;
   const weeks = []; for (let w = D.week; w <= 18; w++) weeks.push(w);
   const H = W.horizon === 'ros' ? weeks.length : Math.min(W.horizon, weeks.length);
@@ -958,41 +1184,54 @@ function computeWaivers() {
   // candidates: best 24 overall over the horizon plus the best 5 at each position
   const byH = [...pool].sort((a, b) => sumH(b) - sumH(a)), cand = new Set(byH.slice(0, 24));
   for (const p of POS) byH.filter(id => D.U.get(id).pos === p).slice(0, 5).forEach(id => cand.add(id));
-  const maxRoster = slots.length + 7, canAddFree = roster.length < maxRoster;
-  const moves = [];
+  // one injured player can sit in ESPN's IR slot without taking a bench spot
+  const irHeld = Math.min(1, roster.filter(id => /^ir/i.test(D.U.get(id).inj || '')).length);
+  const maxRoster = slots.length + 7, canAddFree = roster.length - irHeld < maxRoster;
+  const stashes = roster.map(stashInfo).filter(Boolean), kept = new Set(stashes.filter(s => s.keep).map(s => s.id));
+  const droppable = roster.filter(id => !kept.has(id));
+  const moves = [], posOf = id => D.U.get(id).pos;
+  const count = p => roster.filter(id => posOf(id) === p).length;
   for (const f of cand) {
-    let best = null;
-    const drops = canAddFree ? [null, ...roster] : roster;
+    let best = null, bestSame = null;
+    const fp = posOf(f), single = fp === 'K' || fp === 'DEF';
+    // kickers and defenses: never suggest carrying three
+    const mustSwap = single && count(fp) >= 2;
+    const drops = (canAddFree && !mustSwap ? [null, ...droppable] : droppable).filter(d => !mustSwap || posOf(d) === fp);
     for (const d of drops) {
       if (d && sumAll(d) > 1.6 * sumAll(f) + 5) continue;
       const nr = roster.filter(x => x !== d).concat(f);
-      let hz = 0, later = 0; const starts = [], lost = [];
+      let hz = 0, later = 0, depLost = 0; const starts = [], lost = [];
       for (let wi = 0; wi < weeks.length; wi++) {
-        const L2 = bestLineup(nr, wi, V, slots), diff = L2.total - base[wi].total;
-        if (wi < H) { hz += diff; const st = L2.starters.find(s => s[1] === f); if (st) starts.push([weeks[wi], st[0].label || st[0].k]); if (d && base[wi].starters.some(s => s[1] === d)) lost.push(weeks[wi]); }
+        const L2 = bestLineup(nr, wi, V, slots), diff = (L2.total + L2.depth) - (base[wi].total + base[wi].depth);
+        if (wi < H) { hz += diff; depLost += base[wi].depth - L2.depth; const st = L2.starters.find(s => s[1] === f); if (st) starts.push([weeks[wi], st[0].label || st[0].k]); if (d && base[wi].starters.some(s => s[1] === d)) lost.push(weeks[wi]); }
         else later += diff;
       }
-      const score = hz + 0.35 * later;
-      if (!best || score > best.score) best = { f, d, hz, later, score, starts, lost };
+      const score = hz + 0.35 * later, mv = { f, d, hz, later, score, starts, lost, depLost };
+      if (!best || score > best.score) best = mv;
+      if (single && d && posOf(d) === fp && (!bestSame || score > bestSame.score)) bestSame = mv;
     }
+    // streaming a kicker or defense: swap for the one you have when that's nearly as good
+    if (best && bestSame && bestSame !== best && bestSame.score >= 0.7 * best.score) best = bestSame;
     if (best && (best.hz > 0.5 || best.score > 1)) moves.push(best);
   }
   moves.sort((a, b) => b.score - a.score);
+  // keep the list varied: at most two moves of the same kind (same position added, same player dropped)
+  const seen = {}, shown = moves.filter(m => { const k = posOf(m.f) + '|' + m.d; seen[k] = (seen[k] || 0) + 1; return seen[k] <= 2; }).slice(0, 12);
   const needs = teamNeeds(roster, V, weeks, H, slots, base);
-  return (D.wCache = { key, weeks, H, V, pool, moves: moves.slice(0, 12), needs, byH, sumH, base });
+  return (D.wCache = { key, weeks, H, V, pool, moves: shown, needs, byH, sumH, base, stashes });
 }
 function teamNeeds(roster, V, weeks, H, slots, base) {
-  const W = state.waivers, out = [];
-  const share = { QB: { OP: .7 }, RB: { FLEX: .45, 'RB/WR': .5, OP: .1 }, WR: { FLEX: .45, 'RB/WR': .5, 'WR/TE': .75, OP: .1 }, TE: { FLEX: .1, 'WR/TE': .25, OP: .1 }, K: {}, DEF: {} };
+  const W = state.waivers, out = [], mid = weeks[Math.floor((H - 1) / 2)];
   for (const P of POS) {
-    const own = { QB: 'QB', RB: 'RB', WR: 'WR', TE: 'TE', K: 'K', DEF: 'D/ST' }[P];
-    const nSlots = (state.slots[own] || 0) + Object.entries(share[P]).reduce((s, [k, f]) => s + (state.slots[k] || 0) * f, 0);
+    const nSlots = posSlots(P);
     if (nSlots <= 0) continue;
-    const all = [...D.U.values()].filter(u => u.pos === P && D.M[u.id] && (D.proj[u.id]?.pts > 0 || D.H[u.id]?.n)).sort((a, b) => rosBase(b.id) - rosBase(a.id));
+    const all = [...D.U.values()].filter(u => u.pos === P && D.M[u.id] && (D.proj[u.id]?.pts > 0 || D.H[u.id]?.n || D.prevPPG?.[u.id])).sort((a, b) => rosBase(b.id) - rosBase(a.id));
     const rank = new Map(all.map((u, i) => [u.id, i + 1]));
-    const mine = roster.filter(id => D.U.get(id).pos === P).sort((a, b) => rosBase(b) - rosBase(a));
+    // players still out past the middle of the window don't count as starters for it
+    const away = id => injKind(D.U.get(id).inj) && returnWeek(id) > mid;
+    const mine = roster.filter(id => D.U.get(id).pos === P).sort((a, b) => (away(a) - away(b)) || rosBase(b) - rosBase(a));
     const need = Math.max(1, Math.round(nSlots)); let worst = 0;
-    const rows = mine.slice(0, Math.max(need, 3)).map((id, i) => ({ id, rank: rank.get(id), starter: i < need }));
+    const rows = mine.slice(0, Math.max(need, 3)).map((id, i) => ({ id, rank: away(id) ? null : rank.get(id), starter: i < need && !away(id), away: away(id) }));
     for (let i = 0; i < need; i++) { const r = rows[i]; const thr = W.teams * (i + 1) * (nSlots / need); worst = Math.max(worst, r && r.rank ? r.rank / thr : 3); }
     const level = worst <= 0.7 ? 'Strong' : worst <= 1.15 ? 'OK' : 'Weak';
     const st = mine.slice(0, need); let ms = [];
@@ -1004,11 +1243,46 @@ function teamNeeds(roster, V, weeks, H, slots, base) {
   const holes = []; for (let wi = 0; wi < H; wi++) { const miss = slots.length - base[wi].starters.length; if (miss > 0) holes.push(`Week ${weeks[wi]}: ${miss} empty slot${miss > 1 ? 's' : ''}`); }
   return { list: out, holes };
 }
+const INJ_WORDS = { IR: 'on IR', Out: 'out', PUP: 'on PUP', Sus: 'suspended', Doubtful: 'doubtful', NA: 'not active', questionable: 'questionable' };
+const moveText = mv => `${mv.name} ${/^(added|left|back|rookie|no longer)/.test(mv.kind) ? mv.kind : INJ_WORDS[mv.kind] || mv.kind}`;
+/* One line on why a defense plays differently than its stats, from the point of view of a player at `pos`. */
+function persNote(T, pos) {
+  const t = D.pers?.[T], m = persMult(T, pos) - 1; if (!t || Math.abs(m) < 0.02) return '';
+  const top = t.moves.find(x => (m < 0 ? x.val > 0 : x.val < 0));
+  return `${T} defense ${m < 0 ? 'stronger' : 'weaker'} than its stats (${spct(m)} pts allowed)${top ? ': ' + moveText(top) : ''}`;
+}
 function schedStrip(id, weeks, H) {
   const u = D.U.get(id); if (!u) return '';
-  return `<span class="wks">${weeks.slice(0, H).map(w => { const s = schedOpp(u.team, w); if (s.bye) return `<span class="wk bye" title="Bye week">${w} BYE</span>`; if (!s.opp) return `<span class="wk">${w}</span>`; const m = matchupMult(u.pos, s.opp, w), d = m - 1, a = Math.min(36, Math.abs(d) * 220); return `<span class="wk" title="Week ${w}: ${s.home ? 'vs' : 'at'} ${s.opp}, matchup ${spct(d)}" style="background:color-mix(in srgb, var(${d >= 0 ? '--good' : '--bad'}) ${a.toFixed(0)}%, transparent)">${w} ${s.home ? '' : '@'}${s.opp}</span>`; }).join('')}</span>`;
+  return `<span class="wks">${weeks.slice(0, H).map(w => { const s = schedOpp(u.team, w); if (s.bye) return `<span class="wk bye" title="Bye week">${w} BYE</span>`; if (!s.opp) return `<span class="wk">${w}</span>`; const m = matchupMult(u.pos, s.opp, w), d = m - 1, a = Math.min(36, Math.abs(d) * 220), note = persNote(s.opp, u.pos); return `<span class="wk" title="Week ${w}: ${s.home ? 'vs' : 'at'} ${s.opp}, matchup ${spct(d)}${note ? '. ' + esc(note) : ''}" style="background:color-mix(in srgb, var(${d >= 0 ? '--good' : '--bad'}) ${a.toFixed(0)}%, transparent)">${w} ${s.home ? '' : '@'}${s.opp}${note ? '<i class="pmark" aria-hidden="true">•</i>' : ''}</span>`; }).join('')}</span>`;
 }
-function viewWaivers() {
+/* Waivers section: every defense whose personnel changed enough to matter, teams you face first. */
+function persSection(weeks, H) {
+  if (!D.pers) return '';
+  const faced = {};
+  for (const id of state.roster) { const u = D.U.get(id); if (!u || u.pos === 'DEF' || !D.M[id]) continue; for (const w of weeks.slice(0, H)) { const o = schedOpp(u.team, w).opp; if (o) (faced[o] = faced[o] || []).push([w, u.name.split(' ').slice(-1)[0]]); } }
+  const eff = T => ({ QB: persMult(T, 'QB') - 1, RB: persMult(T, 'RB') - 1, WR: persMult(T, 'WR') - 1, TE: persMult(T, 'TE') - 1 });
+  const rows = ABBR.filter(D.pers.hasOwnProperty.bind(D.pers)).map(T => { const e = eff(T), own = persOwn(T); return { T, e, own, size: Math.max(...Object.values(e).map(Math.abs), Math.abs(own[0] - 1), Math.abs(own[1]) / 8), faced: faced[T] || null }; })
+    .filter(r => r.size >= 0.015 || D.pers[r.T].moves.length || D.pers[r.T].stMoves.length)
+    .sort((a, b) => (!!b.faced - !!a.faced) || b.size - a.size);
+  if (!rows.length) return '';
+  const row = r => {
+    const t = D.pers[r.T], allow = Object.entries(r.e).filter(([, v]) => Math.abs(v) >= 0.01).map(([p, v]) => `${p}s ${v >= 0 ? '+' : '−'}${Math.abs(Math.round(v * 100))}%`).join(' · ');
+    const stronger = Object.values(r.e).reduce((s, v) => s + v, 0) < 0;
+    const chips = [...t.moves.slice(0, 4).map(mv => `<span class="chip">${mv.val > 0 ? '+' : '−'} ${esc(moveText(mv))} <span class="muted">${esc(mv.pos)}, ${mv.area}</span></span>`),
+      ...t.stMoves.slice(0, 2).map(mv => `<span class="chip">${mv.val > 0 ? '+' : '−'} ${esc(moveText(mv))} <span class="muted">returner, ${f0(mv.yds)} yds/g${mv.td ? `, ${mv.td} TD` : ''}</span></span>`)].join(' ');
+    return `<div class="item prs"><div class="pteam"><strong>${r.T}</strong> <span class="small muted">${esc(D.rec[r.T] || '')}</span>
+      ${r.size >= 0.015 ? `<span class="pill ${stronger ? 'n' : 'q'}">${stronger ? 'Stronger' : 'Weaker'}</span>` : ''}</div>
+      <div class="pbody small">${allow ? `<div>Points allowed: ${allow}</div>` : ''}${Math.abs(r.own[0] - 1) >= 0.01 || Math.abs(r.own[1]) >= 0.05 ? `<div>${r.T} D/ST: ${spct(r.own[0] - 1)}${Math.abs(r.own[1]) >= 0.05 ? `, returns ${r.own[1] > 0 ? '+' : '−'}${f1(Math.abs(r.own[1]))} pts/g` : ''}</div>` : ''}
+      ${r.faced ? `<div class="muted">You face them: ${esc(r.faced.slice(0, 4).map(([w, n]) => `wk ${w} ${n}`).join(', '))}${r.faced.length > 4 ? '…' : ''}</div>` : ''}
+      <div class="pchips">${chips || '<span class="muted">Small changes only</span>'}</div></div></div>`;
+  };
+  const top = rows.slice(0, 8), rest = rows.slice(8);
+  return `<div class="row-head"><h2>Defense &amp; special-teams changes</h2><span class="small muted">Signings, trades, injuries and returns the season stats don’t show yet. Already applied to the week chips (marked •) and schedule ratings.</span></div>
+  <div class="card list">${top.map(row).join('')}${rest.length ? `<details class="item prs-more"><summary class="small">Show ${rest.length} more teams</summary><div class="list">${rest.map(row).join('')}</div></details>` : ''}</div>`;
+}
+function viewWaivers() { return `<div class="section">${teamBar(false)}${waiversBody()}</div>`; }
+function viewPlayers() { return `<div class="section">${teamBar(false)}${playersBody()}</div>`; }
+function waiversBody() {
   const W = state.waivers;
   if (!state.roster.length) return `<div class="card panel"><h2>Add your roster first</h2><p style="margin:0">Waiver suggestions compare free agents against your players. Paste your roster in <a href="#" data-tab="players">Players</a>.</p></div>`;
   const R = computeWaivers(), { weeks, H, moves, needs } = R;
@@ -1021,7 +1295,7 @@ function viewWaivers() {
   if (state.example) warn.push('These suggestions are for the example roster. Paste your own roster in Players first.');
   const levelCls = { Strong: 'n', OK: 'm', Weak: 'o' };
   const needCards = needs.list.map(n => `<div class="need"><div class="row-head"><h3>${n.P === 'DEF' ? 'D/ST' : n.P}</h3><span class="pill ${levelCls[n.level]}">${n.level}</span></div>
-    ${n.rows.length ? n.rows.map(r => `<div class="small ${r.starter ? '' : 'muted'}">${esc(D.U.get(r.id).name)} <span class="muted">${n.P === 'DEF' ? 'DST' : n.P}${r.rank || '?'}</span></div>`).join('') : '<div class="small muted">Nobody at this position</div>'}
+    ${n.rows.length ? n.rows.map(r => `<div class="small ${r.starter ? '' : 'muted'}">${esc(D.U.get(r.id).name)} <span class="muted">${r.away ? (returnWeek(r.id) > 18 ? 'out for season' : 'out until wk ' + returnWeek(r.id)) : (n.P === 'DEF' ? 'DST' : n.P) + (r.rank || '?')}</span></div>`).join('') : '<div class="small muted">Nobody at this position</div>'}
     <div class="small muted">${n.sched ? `Schedule: <strong class="${n.sched === 'Easy' ? 'trend-up' : n.sched === 'Hard' ? 'trend-down' : ''}">${n.sched}</strong>` : ''}${n.byes.length ? ` · Bye: ${esc(n.byes.join(', '))}` : ''}</div></div>`).join('');
   const moveRows = moves.length ? moves.map((m, i) => {
     const fu = D.U.get(m.f), why = [];
@@ -1029,9 +1303,14 @@ function viewWaivers() {
     if (m.starts.length) why.push(`starts in ${m.starts.length === H ? 'every week' : 'week' + (m.starts.length > 1 ? 's ' : ' ') + m.starts.map(s => s[0]).join(', ')} of the next ${H} (${[...new Set(m.starts.map(s => s[1]))].join('/')})`);
     else why.push('adds depth for later weeks');
     if (m.d && !m.lost.length) why.push(`${D.U.get(m.d).name} wouldn’t have started in that stretch`);
+    if (m.d && m.depLost > 0.5) why.push(`costs ${f1(m.depLost)} pts of injury cover as a backup ${D.U.get(m.d).pos === 'DEF' ? 'D/ST' : D.U.get(m.d).pos} (already counted in the gain)`);
     const fi = fillInFor(m.f); if (fi) why.push(`short-term: filling in for ${fi.name} (${fi.inj}), so later weeks count half`);
     const sm = mean(weeks.slice(1, H).map(w => { const s = schedOpp(fu.team, w); return s.opp ? matchupMult(fu.pos, s.opp, w) : null; }).filter(ok));
     if (sm && sm >= 1.04) why.push('soft upcoming schedule'); else if (sm && sm <= 0.96) why.push('tough upcoming schedule');
+    if (fu.pos === 'DEF' && D.pers?.[fu.team]) {
+      const [om, st] = persOwn(fu.team), net = om - 1 + st / 8, t = D.pers[fu.team], mv = t.moves.find(x => (net > 0 ? x.val > 0 : x.val < 0)) || t.stMoves.find(x => (net > 0 ? x.val > 0 : x.val < 0));
+      if (Math.abs(net) >= 0.02) why.push(`${fu.team} defense ${net > 0 ? 'improved' : 'weakened'} (${spct(om - 1)}${mv ? ', ' + moveText(mv) : ''})`);
+    }
     return `<div class="item move"><div class="mrank num">${i + 1}</div>
       <div class="mside"><span class="pill n">Add</span> <div>${pl(m.f)}<span class="psub">${ownTxt(m.f)}</span></div>${schedStrip(m.f, weeks, H)}</div>
       <div class="mside">${m.d ? `<span class="pill o">Drop</span> <div>${pl(m.d)}</div>${schedStrip(m.d, weeks, H)}` : `<span class="pill m">No drop</span> <div class="small muted">You have an open roster spot</div>`}</div>
@@ -1039,6 +1318,24 @@ function viewWaivers() {
       <div class="mwhy small">${esc(why.join('; ').replace(/^./, c => c.toUpperCase()))}. <button type="button" class="btn sm" data-taken="${esc(m.f)}">Taken in my league</button></div></div>`;
   }).join('') : `<div class="item" style="padding:14px"><span class="muted">No free agent improves your lineup over ${hLab}. Try a longer window or a higher ownership limit.</span></div>`;
   const posBest = POS.map(p => { const top = R.byH.filter(id => D.U.get(id).pos === p).slice(0, 4); return top.map(id => `<tr><td><strong>${esc(D.U.get(id).name)}</strong> <span class="small muted">${p} · ${D.U.get(id).team}</span></td><td>${ownTxt(id)}</td><td>${f1(rosBase(id))}</td><td>${f1(R.sumH(id))}</td><td class="l">${schedStrip(id, weeks, Math.min(H, 6))}</td><td><button type="button" class="btn sm" data-taken="${esc(id)}">Taken</button></td></tr>`).join(''); }).join('');
+  const stashCard = R.stashes.length ? `<div class="row-head"><h2>Injured players you’re holding</h2><span class="small muted">Players set to Keep are never suggested as drops. Startable players who’ll be back start on Keep.</span></div>
+  <div class="card list">${[...R.stashes].sort((a, b) => b.keep - a.keep || a.rank - b.rank).map(s => {
+    const u = D.U.get(s.id), auto = Math.min(19, D.week + (injKind(u.inj) === 'long' ? 4 : 1)), set = state.returnWeek?.[s.id];
+    const opts = [`<option value="" ${set == null ? 'selected' : ''}>Auto (${auto > 18 ? 'out for season' : 'wk ' + auto})</option>`]
+      .concat(Array.from({ length: 18 - D.week }, (_, i) => D.week + 1 + i).map(w => `<option value="${w}" ${set === w ? 'selected' : ''}>Week ${w}</option>`), `<option value="19" ${set === 19 ? 'selected' : ''}>Out for season</option>`).join('');
+    const W = state.waivers;
+    // One switch per player. Picking what the automatic rule would pick clears your override.
+    const mine = W.forceKeep?.[s.id] || W.allowDrop?.[s.id];
+    const why = s.auto ? `top-${s.cut} ${u.pos} when healthy` : s.rw > 18 ? 'out for the season' : `not a top-${s.cut} ${u.pos} when healthy`;
+    const status = `<span class="small muted">${mine ? `Your choice (automatic: ${s.auto ? 'keep' : 'can drop'})` : `Automatic: ${why}`}</span>`;
+    const btn = `<div class="seg" role="group" aria-label="Drop suggestions for ${esc(u.name)}">
+      <button type="button" data-keepmode="${esc(s.id)}" data-mode="${s.auto ? 'auto' : 'keep'}" aria-pressed="${s.keep}">Keep</button>
+      <button type="button" data-keepmode="${esc(s.id)}" data-mode="${s.auto ? 'drop' : 'auto'}" aria-pressed="${!s.keep}">Can drop</button></div>`;
+    return `<div class="item stash"><div class="sinfo"><span class="pname">${esc(u.name)}</span><span class="psub">${u.pos} · ${u.team || 'FA'} ${injPill(D.M[s.id])}</span><span class="small muted">${s.prev ? `${f1(s.prev[0])} pts/g over ${s.prev[1]} games in ${D.season - 1}` : `No ${D.season - 1} stats`} · ${u.pos}${s.rank} when healthy (ranked on ${f1(s.rv)} pts/g)</span></div>
+      <div class="sctl"><label class="small muted" for="rw-${esc(s.id)}">Expected back</label><select class="sel" id="rw-${esc(s.id)}" data-rw="${esc(s.id)}">${opts}</select></div>
+      <div class="sstat">${status}</div>
+      ${btn}</div>`;
+  }).join('')}</div>` : '';
   const nTaken = Object.keys(W.taken).length;
   return `<div class="section">
   <div class="row-head"><h2>Waivers</h2><span class="small muted">Free agents from ${src}</span></div>
@@ -1050,8 +1347,10 @@ function viewWaivers() {
   <h3>Your team, ${hLab}</h3>
   <div class="needs">${needCards}</div>
   ${needs.holes.length ? `<div class="banner small"><strong>Lineup holes:</strong> ${esc(needs.holes.join(' · '))}. A pickup at that position is worth more than usual.</div>` : ''}
-  <div class="row-head"><h2>Best moves</h2><span class="small muted">Gain = extra points your best lineup scores with the swap. Ranked by that gain plus a third of the gain after the window. Week chips: green is a soft matchup, red is tough.</span></div>
+  ${stashCard}
+  <div class="row-head"><h2>Best moves</h2><span class="small muted">Gain = extra points your best lineup scores with the swap, counting bench players as injury cover. Ranked by that gain plus a third of the gain after the window. Week chips: green is a soft matchup, red is tough, • means the defense changed (see below).</span></div>
   <div class="card list">${moveRows}</div>
+  ${persSection(weeks, H)}
   <div class="row-head"><h2>Top free agents by position</h2><span class="small muted">Projected points over ${hLab}</span></div>
   <div class="tscroll"><table><thead><tr><th class="l">Player</th><th>Owned</th><th>Pts/g</th><th>Next ${H}</th><th class="l">Schedule</th><th></th></tr></thead><tbody>${posBest}</tbody></table></div>
   <div class="card panel"><h3>Use your league’s free agents</h3><p class="small muted" style="margin:0">Ownership across all ESPN leagues is only an estimate. For exact suggestions, open Players → Add Players in your ESPN league, copy the free-agent table (a few positions or pages is fine), and paste it here.</p>
@@ -1126,8 +1425,32 @@ function detailBlock(r) {
   <div class="ovr"><label for="ov-${esc(r.id)}">Override projection</label><input class="inp" id="ov-${esc(r.id)}" type="number" step="0.1" data-ovr="${esc(r.id)}" value="${r.override ?? ''}" placeholder="${f1(r.base * r.mult)}">${r.override != null ? `<button type="button" class="btn sm" data-clearovr="${esc(r.id)}">Clear</button>` : ''}</div></div>
   <div class="section" style="grid-column:1/-1"><h3>Scheme matchup</h3>${schemeBlock(r)}</div></div>`;
 }
+/* Projected starter total for any saved team, by running the optimizer against that team's roster and slots. */
+function teamProjection(t) {
+  if (t.id === state.activeTeam) { const { starters } = optimize(); return starters.reduce((s, x) => s + (x.r ? x.r.mean : 0), 0); }
+  const keep = [state.roster, state.slots];
+  state.roster = t.roster || []; state.slots = Object.assign({}, DEFAULT_STATE.slots, t.slots || {});
+  try { const { starters } = optimize(); return starters.reduce((s, x) => s + (x.r ? x.r.mean : 0), 0); }
+  finally { [state.roster, state.slots] = keep; }
+}
+function teamBar(manage) {
+  const ct = curTeam();
+  const heads = state.teams.map(t => {
+    const n = (t.roster || []).length, on = t.id === state.activeTeam, pts = n && !D.loading ? teamProjection(t) : null;
+    return `<button type="button" class="tteam" data-fteam="${esc(t.id)}" aria-pressed="${on}"><span class="tn">${esc(t.name)}</span><span class="tm">${n ? `${n} players${pts != null ? ` · <span class="num">${f1(pts)}</span> proj` : ''}` : 'No players yet'}${t.example ? ' · example' : ''}</span></button>`;
+  }).join('');
+  return `<div class="teambar"><div class="tteams" role="group" aria-label="Your teams">${heads}<button type="button" class="tteam add" data-act="addteam">+ Add team</button></div>
+  ${manage ? `<div class="tmanage"><label class="small muted" for="teamName">Team name</label><input class="inp" id="teamName" type="text" maxlength="40" value="${esc(ct.name)}">${state.teams.length > 1 ? `<button type="button" class="btn sm danger" data-act="delteam">${D.delArm ? `Press again to delete ${esc(ct.name)}` : 'Delete team'}</button>` : ''}<span class="small muted">Each team keeps its own roster, lineup slots, ESPN league and waiver list.</span></div>` : ''}</div>`;
+}
+function rosterPasteBox() {
+  return `<div class="card panel"><h3>Add ${esc(curTeam().name)}’s roster</h3><p class="small muted" style="margin:0">On ESPN, open My Team, select the roster table, copy it, and paste it here. A plain list of names, one per line, also works. You can also search and add players one at a time in <a href="#" data-tab="players">Players</a>.</p>
+  <textarea class="inp" id="rosterPaste" placeholder="Joe Burrow&#10;Bijan Robinson&#10;Ja'Marr Chase&#10;Packers D/ST"></textarea><div class="toolbar"><button type="button" class="btn primary" data-act="pasteroster">Set roster</button><span class="small muted">${esc(D.rosterMsg || '')}</span></div></div>`;
+}
 function viewLineup() {
-  if (!state.roster.length) return `<div class="card panel"><h2>No players yet</h2><p>Import your ESPN team in Settings, or add players in the Players tab.</p></div>`;
+  if (!state.roster.length) return `<div class="section">${teamBar(true)}${rosterPasteBox()}</div>`;
+  return `<div class="section">${teamBar(true)}${lineupBody()}</div>`;
+}
+function lineupBody() {
   const { starters, bench } = optimize();
   const st = starters.filter(s => s.r), tot = st.reduce((s, x) => s + metricOf(x.r), 0), mu = st.reduce((s, x) => s + x.r.mean, 0), sdT = Math.sqrt(st.reduce((s, x) => s + x.r.sd ** 2, 0));
   const flagged = st.filter(x => x.r.inj).length, empty = starters.length - st.length;
@@ -1209,7 +1532,7 @@ function teamDetail(T, seasons) {
   return `<div class="section" style="padding:6px 0"><div class="small"><strong>${TEAMS[T][1]}:</strong> HC ${esc(s.hc)} · OC ${esc(s.oc)} · DC ${esc(s.dc)}${s.note ? ' · ' + esc(s.note) : ''}. ${s.offNew ? `New offensive play-caller, so ${D.season - 1} offense counts as ${D.B[T].kO.toFixed(1)} games` : `Offense continuity: ${D.season - 1} counts as ${D.B[T].kO.toFixed(1)} games`}; ${s.defNew ? `new defensive play-caller (${D.B[T].kD.toFixed(1)} games)` : `defense continuity (${D.B[T].kD.toFixed(1)} games)`}.</div>
   <div class="tscroll"><table><thead><tr><th class="l">Metric</th>${all.map(([y]) => `<th>${y}</th>`).join('')}</tr></thead><tbody>${ks.map(([k, l, f]) => `<tr><td>${l}</td>${all.map(([, p]) => `<td>${p ? f(p[k]) : '—'}</td>`).join('')}</tr>`).join('')}</tbody></table></div></div>`;
 }
-function viewPlayers() {
+function playersBody() {
   return `<div class="section"><div class="row-head"><h2>Players</h2><span class="small muted">${state.roster.length} on your roster</span></div>
   <div class="card panel"><h3>Paste your roster</h3><p class="small muted" style="margin:0">On ESPN, open My Team, select the roster table, copy it, and paste it here. A plain list of names, one per line, also works. Lines that aren’t player names are skipped. This replaces your current roster.</p>
   <textarea class="inp" id="rosterPaste" placeholder="Joe Burrow&#10;Bijan Robinson&#10;Ja'Marr Chase&#10;Packers D/ST"></textarea><div class="toolbar"><button type="button" class="btn primary" data-act="pasteroster">Set my roster</button><span class="small muted">${esc(D.rosterMsg || '')}</span></div></div>
@@ -1262,10 +1585,16 @@ function viewSettings() {
 
 /* ---------- events ---------- */
 document.addEventListener('click', e => {
-  const t = e.target.closest('[data-tab],[data-expand],[data-add],[data-remove],[data-strategy],[data-act],[data-sort],[data-team],[data-clearovr],[data-wh],[data-wsrc],[data-taken]'); if (!t) return;
+  const t = e.target.closest('[data-tab],[data-expand],[data-add],[data-remove],[data-strategy],[data-act],[data-sort],[data-team],[data-fteam],[data-clearovr],[data-wh],[data-wsrc],[data-taken],[data-keepmode]'); if (!t) return;
+  if (t.dataset.fteam) { switchTeam(t.dataset.fteam); return; }
   if (t.dataset.wh) { state.waivers.horizon = t.dataset.wh === 'ros' ? 'ros' : +t.dataset.wh; save(); render(); return; }
   if (t.dataset.wsrc) { state.waivers.source = t.dataset.wsrc; save(); render(); return; }
   if (t.dataset.taken) { state.waivers.taken[t.dataset.taken] = 1; save(); render(); return; }
+  if (t.dataset.keepmode) {
+    const id = t.dataset.keepmode, W = state.waivers, a = W.allowDrop || (W.allowDrop = {}), k = W.forceKeep || (W.forceKeep = {});
+    delete a[id]; delete k[id]; if (t.dataset.mode === 'drop') a[id] = 1; else if (t.dataset.mode === 'keep') k[id] = 1;
+    save(); render(); return;
+  }
   if (t.dataset.tab) { e.preventDefault(); state.tab = t.dataset.tab; save(); render(); window.scrollTo(0, 0); return; }
   if (t.dataset.expand) { const id = t.dataset.expand; D.open.has(id) ? D.open.delete(id) : D.open.add(id); render(); return; }
   if (t.dataset.add) { if (state.example) { state.roster = []; state.example = false; } state.roster.push(t.dataset.add); save(); refreshPlayers(); return; }
@@ -1280,6 +1609,22 @@ document.addEventListener('click', e => {
   else if (a === 'useteam') useEspnTeam();
   else if (a === 'applycsv') applyCsv();
   else if (a === 'pasteroster') pasteRoster();
+  else if (a === 'addteam') {
+    stashTeam();
+    let n = state.teams.length + 1; while (state.teams.some(t => t.name === 'Team ' + n)) n++;
+    let id; do id = 't' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6); while (state.teams.some(t => t.id === id));
+    state.teams.push({ id, name: 'Team ' + n }); state.activeTeam = id; applyTeam({});
+    D.open.clear(); D.wCache = null; D.rosterMsg = ''; D.faMsg = ''; D.espnMsg = null; D.espnTeams = null; D.delArm = false;
+    state.tab = 'lineup'; save(); render();
+    const nm = $('#teamName'); if (nm) { nm.focus(); nm.select(); }
+  }
+  else if (a === 'delteam') {
+    if (!D.delArm) { D.delArm = true; render(); setTimeout(() => { if (D.delArm) { D.delArm = false; if (state.tab === 'lineup') render(); } }, 4000); return; }
+    D.delArm = false;
+    state.teams = state.teams.filter(t => t.id !== state.activeTeam);
+    state.activeTeam = state.teams[0].id; applyTeam(state.teams[0]);
+    D.open.clear(); D.wCache = null; D.rosterMsg = ''; save(); render();
+  }
   else if (a === 'untake') { state.waivers.taken = {}; save(); render(); }
   else if (a === 'clearfa') { state.waivers.faList = []; state.waivers.source = 'own'; D.faMsg = 'Back to ESPN ownership estimates.'; save(); render(); }
   else if (a === 'pastefa') {
@@ -1294,10 +1639,11 @@ document.addEventListener('click', e => {
   else if (a === 'reset') {
     if (!D.resetArm) { D.resetArm = true; render(); setTimeout(() => { D.resetArm = false; if (state.tab === 'settings') render(); }, 4000); return; }
     try { Object.keys(localStorage).filter(k => k.startsWith('fo1:')).forEach(k => localStorage.removeItem(k)); } catch {}
-    state = JSON.parse(JSON.stringify(DEFAULT_STATE)); D.resetArm = false; D.open.clear(); load();
+    state = ensureTeams(JSON.parse(JSON.stringify(DEFAULT_STATE))); D.resetArm = false; D.open.clear(); load();
   }
 });
-function refreshPlayers() { if (state.tab === 'players') { const b = $('#plistBox'); if (b) b.innerHTML = playerListHTML(); const h = $('.row-head .small'); if (h) h.textContent = state.roster.length + ' on your roster'; } else render(); }
+document.addEventListener('keydown', e => { if (e.key === 'Enter' && e.target.id === 'teamName') e.target.blur(); });
+function refreshPlayers() { if (state.tab === 'players') { const b = $('#plistBox'); if (b) b.innerHTML = playerListHTML(); const tb = $('.teambar'); if (tb) tb.outerHTML = teamBar(false); const h = $('.row-head .small'); if (h) h.textContent = state.roster.length + ' on your roster'; } else render(); }
 document.addEventListener('input', e => {
   const t = e.target;
   if (t.id === 'wOwn') { const o = $('#wOwn-v'); if (o) o.textContent = t.value + '%'; return; }
@@ -1307,6 +1653,8 @@ document.addEventListener('input', e => {
 document.addEventListener('change', e => {
   const t = e.target;
   if (t.id === 'weekSel') { state.settings.week = +t.value; if (state.settings.week === D.detWeek && D.season === D.detSeason) state.settings.week = null; save(); D.open.clear(); load(); return; }
+  if (t.id === 'teamName') { const ct = curTeam(), v = t.value.trim(); if (ct && v) ct.name = v; save(); render(); return; }
+  if (t.dataset.rw) { const rw = state.returnWeek || (state.returnWeek = {}); if (t.value === '') delete rw[t.dataset.rw]; else rw[t.dataset.rw] = +t.value; save(); render(); return; }
   if (t.id === 'wTeams') { state.waivers.teams = +t.value; save(); render(); return; }
   if (t.id === 'wOwn') { state.waivers.ownMax = +t.value; save(); render(); return; }
   if (t.id === 'ppos') { D.ppos = t.value; $('#plistBox').innerHTML = playerListHTML(); return; }
@@ -1322,7 +1670,7 @@ document.addEventListener('change', e => {
    Longest names are tried first so "Kenneth Walker" wins over "Ken Walker"-style partials. */
 function pasteRoster() {
   const lines = ($('#rosterPaste')?.value || '').split(/\r?\n/).map(l => l.trim()).filter(Boolean);
-  const live = [...D.U.values()].filter(u => (D.proj[u.id]?.pts || 0) > 0 || D.H[u.id]);
+  const live = [...D.U.values()].filter(u => (D.proj[u.id]?.pts || 0) > 0 || D.H[u.id] || D.prevPPG?.[u.id]);
   const names = live.map(u => [norm(u.name), u]).filter(([n]) => n.includes(' ') && n.length >= 6).sort((a, b) => b[0].length - a[0].length || (D.M[b[1].id]?.mean || 0) - (D.M[a[1].id]?.mean || 0));
   const ids = [], miss = [];
   for (const l of lines) {
@@ -1339,7 +1687,7 @@ function pasteRoster() {
 /* Same matching as pasteRoster, returning matches instead of setting the roster (used for pasted free-agent lists). */
 function matchPasted(text) {
   const lines = text.split(/\r?\n/).map(l => l.trim()).filter(Boolean);
-  const live = [...D.U.values()].filter(u => (D.proj[u.id]?.pts || 0) > 0 || D.H[u.id]);
+  const live = [...D.U.values()].filter(u => (D.proj[u.id]?.pts || 0) > 0 || D.H[u.id] || D.prevPPG?.[u.id]);
   const names = live.map(u => [norm(u.name), u]).filter(([n]) => n.includes(' ') && n.length >= 6).sort((a, b) => b[0].length - a[0].length || (D.M[b[1].id]?.mean || 0) - (D.M[a[1].id]?.mean || 0));
   const ids = [], miss = [];
   for (const l of lines) {
