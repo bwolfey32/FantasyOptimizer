@@ -2516,7 +2516,7 @@ function computeWaivers() {
   const seen = {}, shown = moves.filter(m => { const k = posOf(m.f) + '|' + m.d; seen[k] = (seen[k] || 0) + 1; return seen[k] <= 2; }).slice(0, 12);
   const needs = teamNeeds(roster, V, weeks, H, slotsAt, base);
   for (const m of shown) m.whyText = waiverWhy(m, needs, weeks, H);
-  return (D.wCache = { key, weeks, H, V, pool, moves: shown, needs, byH, sumH, base, stashes });
+  return (D.wCache = { key, weeks, H, V, pool, moves: shown, needs, byH, sumH, base, stashes, VS });
 }
 // why a waiver move helps, in one line (shown on Waivers and in Benny's Moves)
 function waiverWhy(m, needs, weeks, H) {
@@ -2640,8 +2640,19 @@ function waiversBody() {
   const warn = [];
   if (W.source === 'own' && !D.own.size) warn.push('ESPN ownership didn’t load, so every player not on your roster counts as available. Paste your league’s free agents below for accurate suggestions.');
   const levelCls = { Strong: 'n', OK: 'm', Weak: 'o' };
+  /* A weak position no free agent fixes: say so, with the best one available against your weakest starter there, so
+     a weak spot with no pickup suggested doesn't look overlooked. Compared on usual-week value, as moves are ranked. */
+  const noFix = n => {
+    if (n.level !== 'Weak' || moves.some(m => D.U.get(m.f).pos === n.P && m.strength >= 1)) return '';
+    const P = posLabel(n.P), top = R.pool.filter(id => D.U.get(id).pos === n.P).sort((a, b) => R.VS[b][0] - R.VS[a][0])[0];
+    const st = n.rows.filter(r => r.starter).map(r => R.VS[r.id]?.[0] ?? 0), mine = st.length ? Math.min(...st) : 0;
+    if (top && R.VS[top][0] > mine + 0.5) return '';
+    const fix = n.P === 'K' || n.P === 'DEF' ? 'Stream one week to week when a matchup is better.' : 'Target one by trade.';
+    return `<div class="small"><strong>No free agent beats your ${P}s</strong>${top ? ` (best: ${esc(D.U.get(top).name)}, ${f1(R.VS[top][0])} pts a week${st.length ? ` vs your ${f1(mine)}` : ''})` : ''}. ${fix}</div>`;
+  };
   const needCards = needs.list.map(n => `<div class="need"><div class="row-head"><h3>${n.P === 'DEF' ? 'D/ST' : n.P}</h3><span class="pill ${levelCls[n.level]}">${n.level}</span></div>
     ${n.rows.length ? n.rows.map(r => `<div class="small ${r.starter ? '' : 'muted'}">${esc(D.U.get(r.id).name)} <span class="muted">${r.away ? (returnWeek(r.id) > 18 ? 'out for season' : 'out until wk ' + returnWeek(r.id)) : (n.P === 'DEF' ? 'DST' : n.P) + (r.rank || '?')}</span></div>`).join('') : '<div class="small muted">Nobody at this position</div>'}
+    ${noFix(n)}
     <div class="small muted">${n.sched ? `Schedule: <strong class="${n.sched === 'Easy' ? 'trend-up' : n.sched === 'Hard' ? 'trend-down' : ''}">${n.sched}</strong>` : ''}${n.byes.length ? ` · Bye: ${esc(n.byes.join(', '))}` : ''}</div></div>`).join('');
   // free: the best move and the next one; Pro: all of them
   const shownMoves = isPro() ? moves : moves.slice(0, 2);
