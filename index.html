@@ -831,7 +831,7 @@ function anStart() {
 const flowMethod = () => { const F = D.flow; return !F ? null : F.method === 'espn' ? (F.espnMode === 'paste' ? 'espn_paste' : 'espn_league') : F.method; };
 function flowTry() {
   const F = D.flow, m = flowMethod(); if (!F) return; F.tried = F.tried || new Set();
-  if (!F.tried.has(m)) { F.tried.add(m); track('import_started', { method: m, first_team: needsTeam() }); }
+  if (!F.tried.has(m)) { F.tried.add(m); track('import_started', { method: m, first_team: needsTeam(), intent: D.intent || 'lineup' }); }
 }
 function flowFail(error) { if (D.flow) track('import_failed', { method: flowMethod(), error }); }
 // JSON with sorted keys, so the same data always gives the same text (the database stores keys in its own order)
@@ -1007,7 +1007,7 @@ async function resolveChoice(how) {
 // signed in and synced: close the sign-in UI (finishing the walkthrough if it was step 2) and say so
 function signedInDone() {
   acct.toastNext = false; D.acctOpen = false; D.wSignin = false;
-  if (D.onboard === 'account') { D.onboard = null; go('lineup', { keepFlash: true }); } else render();
+  if (D.onboard === 'account') { D.onboard = null; goIntended({ keepFlash: true }); } else render();
   toast('Signed in. Your teams now sync to this account.');
   // they picked a Pro plan before signing in: carry on to checkout
   let buy = null; try { buy = sessionStorage.getItem('fo1:buy'); sessionStorage.removeItem('fo1:buy'); } catch {}
@@ -2457,10 +2457,22 @@ function schedStrip(id, weeks, H) {
 function bestMoveCard(m, weeks, H, ownTxt) {
   if (!m) return `<div class="card wbest"><span class="label">Best move</span><div class="wb-none">Your roster is already the best Benny can build from these free agents. Check back after this week’s games.</div></div>`;
   const side = (kind, id) => { const u = D.U.get(id); return `<div class="wb-side"><span class="wb-kind ${kind}">${kind === 'add' ? 'Add' : 'Drop'}</span><span class="wb-name">${esc(u.name)}</span><span class="small muted">${u.pos === 'DEF' ? 'D/ST' : u.pos} · ${u.team || 'FA'}${kind === 'add' ? ' · ' + ownTxt(id) : ''}</span></div>`; };
-  return `<div class="card wbest"><span class="label">Best move</span>
+  return `<div class="card wbest"><div class="row-head"><span class="label">Best move</span><button type="button" class="btn sm" data-act="sharemove">Share</button></div>
     <div class="wb-row">${side('add', m.f)}${m.d ? side('drop', m.d) : `<div class="wb-side"><span class="wb-kind keep">No drop</span><span class="small muted">You have an open roster spot</span></div>`}
       <div class="wb-gain"><span class="num">+${f1(m.hz)}</span><span class="small muted">expected lineup pts over the next ${H} week${H > 1 ? 's' : ''}</span></div></div>
     ${m.whyText ? `<div class="small">${esc(m.whyText)}.</div>` : ''}</div>`;
+}
+/* Share the best move as a short line of text plus a link that opens Waivers (for a new visitor, the waivers welcome).
+   Phones get the share sheet; elsewhere it's copied. The analytics event says only that a move was shared. */
+async function shareMove() {
+  const R = D.wCache, m = R?.moves?.[0]; if (!m) return;
+  const nm = id => D.U.get(id)?.name || id, H = R.H;
+  const text = `Benny’s Picks: add ${nm(m.f)}${m.d ? `, drop ${nm(m.d)}` : ''}, +${f1(m.hz)} expected lineup points over the next ${H} week${H === 1 ? '' : 's'} (week ${D.week}).`;
+  const url = 'https://bennyspicks.us/?utm_source=share&utm_medium=waiver_move#waivers';
+  const done = how => track('result_shared', { kind: 'waiver_move', how, gain: Math.round(m.hz), pos: D.U.get(m.f)?.pos });
+  if (navigator.share) { try { await navigator.share({ text, url }); done('share_sheet'); } catch {} return; }   // cancelled: nothing shared
+  try { await navigator.clipboard.writeText(`${text} ${url}`); done('copy'); toast('Copied. Paste it anywhere.'); }
+  catch { window.prompt('Copy this:', `${text} ${url}`); }
 }
 /* Waivers section: every defense whose personnel changed enough to matter, teams you face first. */
 function persSection(weeks, H) {
@@ -2734,6 +2746,7 @@ function go(tab, opts = {}) {
 window.addEventListener('hashchange', () => {
   const tab = TAB_OF[location.hash.slice(1)]; if (!tab) return;
   track('screen_viewed', { screen: HASH[tab], has_team: !needsTeam() });
+  if (D.welcome && tab !== 'pro') D.intent = INTENT_TABS.has(tab) ? tab : null;   // on the welcome, a link changes where setup lands
   state.tab = tab; save(); render(); if (D.navScroll !== false) window.scrollTo(0, 0); D.navScroll = true; runAfter();
 });
 // a one-shot step to run after the next page renders (scroll to a team, highlight the best move)
@@ -2746,6 +2759,7 @@ function render() {
   const welcome = D.welcome = needsTeam() || D.onboard === 'account';
   // the Pro page (from the footer link) also opens before there's a team, with a way back to the setup
   const wpro = welcome && state.tab === 'pro' && D.onboard !== 'account';
+  if (!welcome && !D.flow) D.intent = null;   // set up some other way (a synced account, say): the link's destination no longer applies
   document.body.classList.toggle('welcome', welcome); document.body.classList.toggle('wpro', wpro);
   if (welcome) {
     for (const s of ['#tabs', '#teamctx', '#panels', '#brief', '#msgs']) $(s).innerHTML = '';
@@ -3036,6 +3050,15 @@ const acctMsgHTML = () => acct.msg ? `<div class="banner ${acct.msg[0] === 'err'
    Shown full screen, with no navigation, whenever no team has players yet: a first visit, after signing out, or after
    Reset. Step 1 brings the team in through the same setup flow as + Add team; step 2 offers an account so it follows
    them to their phone. People who already have an account sign in at the top and get their teams straight back. */
+/* The welcome matches what the link promised: a link to Waivers or Start / Sit (D.intent) gets its own headline, and
+   after setup lands on that page instead of Lineup (goIntended). */
+const WELCOME_HERO = {
+  lineup: ['Your best lineup, every week', 'Bring in your fantasy team and Benny sets your starters, makes the close start/sit calls and finds the waiver pickups that add the most points, using live projections, matchups and weather.'],
+  waivers: ['Your best waiver pickup, for your roster', 'Bring in your team and Benny ranks free agents by how many points they’d add to your lineup, for your scoring and your roster’s needs. With a Sleeper league, it uses your league’s real free agents.'],
+  compare: ['Start or sit? Benny’s Pick for your players', 'Bring in your team and Benny makes your close start/sit calls: the chance each player outscores the other, and why.'],
+};
+const INTENT_TABS = new Set(['waivers', 'compare', 'players', 'defenses', 'teams', 'weather', 'settings']);
+function goIntended(opts) { const t = D.intent && HASH[D.intent] ? D.intent : 'lineup'; D.intent = null; go(t, opts); }
 const WELCOME_METHODS = [
   ['sleeper', 'Connect Sleeper', 'Enter your username or league ID. Benny stays in sync with your league and finds its real free agents.', 'Recommended'],
   ['espn', 'Import from ESPN', 'Load a public league by its ID, or copy your roster from any ESPN league and paste it.'],
@@ -3067,8 +3090,8 @@ function viewWelcome() {
   else body = `<div class="wl-methods">${WELCOME_METHODS.map(([k, t, d, tag]) => `<button type="button" class="wl-method" data-act="flow" data-method="${k}" data-dest="replace"><span class="wl-mt"><strong>${t}</strong>${tag ? ` <span class="pill n">${tag}</span>` : ''}</span><span class="small muted">${d}</span></button>`).join('')}</div>`;
   return `<div class="wl">
     <div class="wl-top">${top}</div>${signIn}
-    <div class="wl-hero"><h2>Your best lineup, every week</h2>
-      <p>Bring in your fantasy team and Benny sets your starters, makes the close start/sit calls and finds the waiver pickups that add the most points, using live projections, matchups and weather.</p></div>
+    <div class="wl-hero"><h2>${(WELCOME_HERO[D.intent] || WELCOME_HERO.lineup)[0]}</h2>
+      <p>${(WELCOME_HERO[D.intent] || WELCOME_HERO.lineup)[1]}</p></div>
     ${step(1, 'Bring in your team', 'Pick how your league is set up. You’ll review everything before it’s saved.', true)}
     ${body}
     ${acct.on && !acct.user ? step(2, 'Keep it on all your devices', 'Optional: sign in after your team is saved.', false) : ''}
@@ -3231,14 +3254,14 @@ function reviewHTML() {
 // after the first team on the welcome walkthrough, offer an account before the app opens; otherwise straight to Lineup
 function afterSave() {
   if (D.welcome && acct.on && !acct.user) { D.onboard = 'account'; acct.msg = null; acct.step = 'email'; render(); scrollTo(0, 0); return; }
-  D.onboard = null; go('lineup', { keepFlash: true });
+  D.onboard = null; goIntended({ keepFlash: true });
 }
 function commitDraft() {
   const F = D.flow, d = F?.draft; if (!d) return;
   const first = needsTeam(), method = flowMethod();
   if (d.bundle) {
     let msg; try { msg = importBundle(d.bundle, !!$('#ioReplace')?.checked); } catch (err) { flowFail('bad_code'); F.msg = ['err', err.message]; return render(); }
-    track('team_saved', { method, teams: d.bundle.teams.length, first_team: first });
+    track('team_saved', { method, teams: d.bundle.teams.length, first_team: first, intent: D.intent || 'lineup' });
     D.drafts.code = ''; D.flow = null; D.flash = { html: `<strong>${esc(msg)}</strong> <a href="#roster" data-tab="players">Edit roster</a>` }; slAutoSync(true); return afterSave();
   }
   if (!d.roster.length) return;
@@ -3255,7 +3278,7 @@ function commitDraft() {
   } else Object.assign(curTeam(), data, { name });
   applyTeam(curTeam()); syncScoring();
   if (d.src) D.drafts[d.src] = '';
-  track('team_saved', { method, scoring: data.scoring, te_premium: data.tePrem > 0, players: data.roster.length, unmatched: d.unresolved.length, new_team: dest === 'new', first_team: first });
+  track('team_saved', { method, scoring: data.scoring, te_premium: data.tePrem > 0, players: data.roster.length, unmatched: d.unresolved.length, new_team: dest === 'new', first_team: first, intent: D.intent || 'lineup' });
   D.flow = null; D.open.clear(); D.wCache = null; D.sl = null; save();
   D.flash = { html: `<strong>Saved ${esc(curTeam().name)}:</strong> ${data.roster.length} players, ${esc(fmtName(true))} scoring${d.unresolved.length ? `; ${d.unresolved.length} name${d.unresolved.length === 1 ? '' : 's'} not found` : ''}. <a href="#roster" data-tab="players">Edit roster</a>` };
   afterSave();
@@ -3674,6 +3697,7 @@ document.addEventListener('click', e => {
   if (t.dataset.team) { D.teamOpen = D.teamOpen === t.dataset.team ? null : t.dataset.team; render(); return; }
   const a = t.dataset.act;
   if (a === 'reload') { for (let s = 0; s < 4; s++) store.del('fo1:coach:' + ((D.season || 0) - s)); load({ manual: true }); }
+  else if (a === 'sharemove') shareMove();
   else if (a === 'defcols') { D.colsOpen = !D.colsOpen; render(); }
   else if (a === 'defcolsreset') { store.del('fo1:defcols'); render(); }
   else if (a === 'loadleague') loadLeague();
@@ -3704,7 +3728,7 @@ document.addEventListener('click', e => {
   else if (a === 'wsignin') { D.wSignin = !D.wSignin; acct.msg = null; if (D.wSignin) cloudReady().catch(() => {}); render(); if (D.wSignin) deskFocus(acct.step === 'code' ? '#acctCode' : '#acctEmail'); }
   else if (a === 'buy') goPro(t.dataset.plan);
   else if (a === 'billing') openBilling();
-  else if (a === 'wskip') { store.set('fo1:nudge', 'show'); D.onboard = null; go('lineup', { keepFlash: true }); }
+  else if (a === 'wskip') { store.set('fo1:nudge', 'show'); D.onboard = null; goIntended({ keepFlash: true }); }
   else if (a === 'nudgeoff') { store.set('fo1:nudge', 'done'); render(); }
   else if (a === 'acctsend') sendCode();
   else if (a === 'acctverify') verifyCode();
@@ -3850,7 +3874,7 @@ function applyCsv() {
 }
 
 acctBoot();
-{ const tab = TAB_OF[location.hash.slice(1)]; if (tab) state.tab = tab; else if (location.hash !== '#export' && HASH[state.tab]) { try { history.replaceState(null, '', '#' + HASH[state.tab]); } catch {} } }
+{ const tab = TAB_OF[location.hash.slice(1)]; if (tab && needsTeam() && INTENT_TABS.has(tab)) D.intent = tab; if (tab) state.tab = tab; else if (location.hash !== '#export' && HASH[state.tab]) { try { history.replaceState(null, '', '#' + HASH[state.tab]); } catch {} } }
 render();
 load();
 setTimeout(anStart, 1500);
