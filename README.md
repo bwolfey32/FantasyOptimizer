@@ -28,15 +28,15 @@ A team bar on every page shows the selected team, week, scoring and where the ro
 
 ## Getting started
 
-1. Open the site. It starts with the **Demo team**.
-2. Press **Import your team** and pick a method:
-   - **Connect Sleeper:** enter your username or league ID and pick your team. It re-syncs every time you open the site, flags lineup differences from Sleeper, and the Waivers section uses your league's exact free agents.
-   - **Import ESPN:** load a public league by its ID, or, for any league, copy the roster table from **My Team** and paste it.
-   - **Build manually:** search for each player, or paste a list of names.
-   - **Restore saved team:** paste a team code or open a file from **Share / back up**.
-3. Review what was found (players, any names that didn't match, scoring and lineup slots), choose whether to create a new team or replace the selected one, and save. Benny opens your lineup.
-4. Use **Waivers** for pickups. For exact suggestions in an ESPN league, use **Use my league's free agents** at the top of that section.
-5. Optional: press **Sign in** (next to Settings) to use your teams on your phone and computer. Enter your email and type in the code it sends, or use Google. There's no password. The first time you sign in on a browser that already has its own teams, Benny asks whether to keep both sets or one.
+1. Open the site. The first visit is a short walkthrough. Already have an account? Press **Already have an account? Sign in** at the top and your teams come straight back.
+2. **Bring in your team** by picking a method:
+   - **Connect Sleeper** (recommended): enter your username or league ID and pick your team. It re-syncs every time you open the site, flags lineup differences from Sleeper, and the Waivers section uses your league's exact free agents.
+   - **Import from ESPN:** load a public league by its ID, or, for any league, copy the roster table from **My Team** and paste it.
+   - **Build it yourself:** search for each player, or paste a list of names.
+   - **Restore a saved team:** paste a team code or open a file from **Share / back up**.
+3. Review what was found (players, any names that didn't match, scoring and lineup slots) and save.
+4. **Keep it on all your devices** (optional): sign in with your email, typing in the code it sends, or with Google. There's no password. You can skip this and sign in later from the top of the page. Benny then opens your lineup.
+5. Use **+ Add team** for more leagues, and **Waivers** for pickups. For exact suggestions in an ESPN league, use **Use my league's free agents** at the top of that section.
 
 Each section has its own address (for example `#start-sit` or `#roster`), so the browser's Back button, refreshing, and shared links all land where you expect.
 

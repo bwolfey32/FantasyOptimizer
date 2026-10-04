@@ -127,6 +127,29 @@ a { color: var(--accent); }
 .hist .hdet > td { padding: 4px 10px 12px; background: var(--surface-2); }
 .hist .hdet table { background: var(--surface); border: 1px solid var(--line); border-radius: 8px; margin-bottom: 6px; }
 .hist .hbench td { color: var(--muted); }
+/* Welcome walkthrough: full screen, no navigation */
+body.welcome .controls, body.welcome #tabs, body.welcome #teamctx, body.welcome #panels, body.welcome #brief, body.welcome #msgs, body.welcome #fresh { display: none !important; }
+.wl { width: 100%; max-width: 760px; margin: 0 auto; display: flex; flex-direction: column; gap: 16px; }
+.wl-top { display: flex; justify-content: flex-end; min-height: 22px; font-size: 14.5px; }
+.wl-hero { padding: 8px 0 4px; }
+.wl-hero h2 { font-size: 38px; line-height: 1.05; }
+.wl-hero p { margin: 10px 0 0; font-size: 16.5px; max-width: 62ch; }
+.wl-h { display: flex; align-items: center; gap: 12px; margin-top: 6px; }
+.wl-h h2 { font-size: 22px; }
+.wl-num { flex: none; width: 30px; height: 30px; border-radius: 50%; display: grid; place-items: center; background: var(--accent); color: var(--accent-ink); font-family: var(--font-display); font-weight: 700; font-size: 17px; }
+.wl-h.later { opacity: .6; }
+.wl-h.later .wl-num { background: var(--surface-2); color: var(--muted); }
+.wl-methods { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
+.wl-method { display: flex; flex-direction: column; gap: 4px; padding: 14px 16px; text-align: left; background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius); }
+.wl-method:hover { border-color: var(--accent); }
+.wl-mt { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; font-size: 16.5px; }
+.wl-card { border: 1px solid color-mix(in srgb, var(--accent) 40%, var(--line)); }
+.wl-loading { align-items: flex-start; }
+.wl-loading .bar { width: 100%; max-width: 320px; height: 4px; background: var(--surface-2); border-radius: 2px; overflow: hidden; }
+.wl-loading .bar span { display: block; height: 100%; background: var(--accent); transition: width .2s; }
+.wl-saved { display: flex; align-items: center; gap: 12px; font-size: 16px; }
+.wl-num.ok { background: var(--good); }
+@media (max-width: 600px) { .wl-methods { grid-template-columns: minmax(0, 1fr); } .wl-hero h2 { font-size: 30px; } .wl-top { justify-content: flex-start; } }
 .wxt td { white-space: normal; vertical-align: top; }
 .wxt td:first-child, .wxt td:nth-child(2) { white-space: nowrap; }
 .wxt .wxc { min-width: 230px; }
@@ -624,7 +647,7 @@ async function pool(items, n, fn) { const out = new Array(items.length); let i =
 
 /* ---------- state ---------- */
 const DEFAULT_STATE = {
-  v: 1, tab: 'lineup', roster: [], example: false, overrides: {}, staffEdits: {}, compare: [null, null],
+  v: 1, tab: 'lineup', roster: [], overrides: {}, staffEdits: {}, compare: [null, null],
   settings: { season: null, week: null, blend: 0.6, intensity: 0.6, priorWeeks: 4, strategy: 'mean', w: { dvp: 1, cover: 1, protect: 1, script: 1, style: 1, pers: 1, wx: 1 } },
   slots: { QB:1, RB:2, WR:2, TE:1, FLEX:1, 'RB/WR':0, 'WR/TE':0, OP:0, 'D/ST':1, K:1 },
   espn: { leagueId: '', teamId: null, slotOf: {} },
@@ -634,17 +657,17 @@ const DEFAULT_STATE = {
 /* Fantasy teams. The active team's fields live on `state` itself (state.roster, state.slots, ...) so the rest of the
    app reads one team at a time; save() copies them back into state.teams, and switching loads another team's copy.
    Overrides, model weights and coaching edits stay shared across teams. */
-const TEAM_FIELDS = ['roster', 'example', 'slots', 'espn', 'waivers', 'compare', 'scoring', 'tePrem', 'sleeper'];
+const TEAM_FIELDS = ['roster', 'slots', 'espn', 'waivers', 'compare', 'scoring', 'tePrem', 'sleeper'];
 const curTeam = () => state.teams.find(t => t.id === state.activeTeam);
 function stashTeam() { const t = curTeam(); if (t) for (const k of TEAM_FIELDS) t[k] = state[k]; }
 function ensureTeams(st) {
-  if (!Array.isArray(st.teams) || !st.teams.length) { st.teams = [{ id: 't1', name: 'My team' }]; st.activeTeam = 't1'; }
+  if (!Array.isArray(st.teams) || !st.teams.length) { const id = 't' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6); st.teams = [{ id, name: 'My team' }]; st.activeTeam = id; }
   if (!st.teams.some(t => t.id === st.activeTeam)) st.activeTeam = st.teams[0].id;
   const t = st.teams.find(t => t.id === st.activeTeam); for (const k of TEAM_FIELDS) t[k] = st[k];
   return st;
 }
 function applyTeam(t) {
-  state.roster = (t.roster || []).slice(); state.example = !!t.example;
+  state.roster = (t.roster || []).slice();
   state.slots = Object.assign({}, DEFAULT_STATE.slots, t.slots || {});
   state.espn = Object.assign({}, DEFAULT_STATE.espn, t.espn || {});
   state.waivers = Object.assign(JSON.parse(JSON.stringify(DEFAULT_STATE.waivers)), t.waivers || {});
@@ -671,6 +694,17 @@ function loadState() {
     st.slots = Object.assign({}, DEFAULT_STATE.slots, s.slots || {});
     st.espn = Object.assign({}, DEFAULT_STATE.espn, s.espn || {});
     st.waivers = Object.assign(JSON.parse(JSON.stringify(DEFAULT_STATE.waivers)), s.waivers || {});
+    // the old Demo team (random players) is retired: drop it, and with no team left the welcome walkthrough starts
+    const teams = Array.isArray(st.teams) ? st.teams : [];
+    if (st.example || teams.some(t => t.example)) {
+      const keep = teams.filter(t => !t.example);
+      if (st.example || !keep.some(t => t.id === st.activeTeam)) {
+        for (const k of TEAM_FIELDS) st[k] = JSON.parse(JSON.stringify(DEFAULT_STATE[k]));
+        if (keep[0]) { st.activeTeam = keep[0].id; for (const k of TEAM_FIELDS) if (keep[0][k] !== undefined) st[k] = keep[0][k]; }
+      }
+      st.teams = keep; delete st.example;
+    }
+    for (const t of st.teams || []) delete t.example;
   }
   return ensureTeams(st);
 }
@@ -697,21 +731,26 @@ function hash53(s) {
   h1 = Math.imul(h1 ^ (h1 >>> 16), 2246822507) ^ Math.imul(h2 ^ (h2 >>> 13), 3266489909); h2 = Math.imul(h2 ^ (h2 >>> 16), 2246822507) ^ Math.imul(h1 ^ (h1 >>> 13), 3266489909);
   return (4294967296 * (2097151 & h2) + (h1 >>> 0)).toString(36);
 }
-// what syncs: every team except the Demo team, plus the settings shared by all teams; the week and season being viewed stay per device
+// what syncs: every team except an empty placeholder, plus the settings shared by all teams; the week and season being viewed stay per device
 const sharedPart = st => { const s = Object.assign({}, st.settings); delete s.season; delete s.week; return { overrides: st.overrides || {}, staffEdits: st.staffEdits || {}, returnWeek: st.returnWeek || {}, settings: s }; };
 const teamBody = t => { const o = Object.assign({}, t); delete o.mtime; return o; };
 /* Stamp each team with the time it last changed, and mark teams that disappeared as deleted. Runs on every save, so merges
    between devices can tell which copy is newer. */
 function stampChanges() {
-  const now = Date.now(), sig = D.sigs || (D.sigs = {}), del = state.deleted || (state.deleted = {});
+  const now = Date.now(), sig = D.sigs || (D.sigs = {}), del = state.deleted || (state.deleted = {}), ph = D.ph || new Set();
   for (const t of state.teams) { const s = canon(teamBody(t)); if (sig[t.id] !== s) { t.mtime = now; sig[t.id] = s; } }
-  for (const id in sig) if (!state.teams.some(t => t.id === id)) { del[id] = now; delete sig[id]; }
+  // an empty placeholder never synced, so it leaves no deleted marker behind
+  for (const id in sig) if (!state.teams.some(t => t.id === id)) { if (!ph.has(id)) del[id] = now; delete sig[id]; }
+  D.ph = new Set(state.teams.filter(isPlaceholder).map(t => t.id));
   for (const id in del) if (now - del[id] > 180 * 864e5) delete del[id];
   const g = canon(sharedPart(state)); if (D.gsig !== g) { state.gmtime = now; D.gsig = g; }
 }
-function primeSigs() { stashTeam(); D.sigs = Object.fromEntries(state.teams.map(t => [t.id, canon(teamBody(t))])); D.gsig = canon(sharedPart(state)); }
+function primeSigs() { stashTeam(); D.sigs = Object.fromEntries(state.teams.map(t => [t.id, canon(teamBody(t))])); D.gsig = canon(sharedPart(state)); D.ph = new Set(state.teams.filter(isPlaceholder).map(t => t.id)); }
+// the empty "My team" a new visitor starts with: not synced, and the welcome walkthrough fills it
+function isPlaceholder(t) { return !(t.roster || []).length && !t.sleeper?.leagueId; }
+function needsTeam() { return !state.roster.length && !state.teams.some(t => t.id !== state.activeTeam && (t.roster || []).length); }
 primeSigs();
-function cloudDoc() { stashTeam(); return { v: 1, teams: state.teams.filter(t => !t.example), deleted: state.deleted || {}, gmtime: state.gmtime || 0, shared: sharedPart(state) }; }
+function cloudDoc() { stashTeam(); return { v: 1, teams: state.teams.filter(t => !isPlaceholder(t)), deleted: state.deleted || {}, gmtime: state.gmtime || 0, shared: sharedPart(state) }; }
 const docHash = () => hash53(canon(cloudDoc()));
 function mergeDocs(a, b) {
   const deleted = Object.assign({}, a.deleted); for (const [k, v] of Object.entries(b.deleted || {})) deleted[k] = Math.max(deleted[k] || 0, v);
@@ -721,10 +760,10 @@ function mergeDocs(a, b) {
   const g = (b.gmtime || 0) > (a.gmtime || 0) ? b : a;
   return { v: 1, teams, deleted, gmtime: g.gmtime || 0, shared: g.shared };
 }
-// replace this browser's teams and shared settings with a synced copy (the Demo team stays only if the copy has no teams)
+// replace this browser's teams and shared settings with a synced copy (an empty placeholder stays only if the copy has no teams)
 function applyDoc(doc) {
-  const demo = state.teams.filter(t => t.example), teams = JSON.parse(JSON.stringify(doc.teams || []));
-  state.teams = teams.length ? teams : demo.length ? demo : [{ id: newTeamId(), name: 'My team', roster: [] }];
+  const blank = state.teams.filter(isPlaceholder), teams = JSON.parse(JSON.stringify(doc.teams || []));
+  state.teams = teams.length ? teams : blank.length ? blank : [{ id: newTeamId(), name: 'My team', roster: [] }];
   if (!state.teams.some(t => t.id === state.activeTeam)) state.activeTeam = state.teams[0].id;
   state.deleted = Object.assign({}, doc.deleted); state.gmtime = doc.gmtime || 0;
   const g = doc.shared || {}, view = { season: state.settings.season, week: state.settings.week };
@@ -851,8 +890,14 @@ async function resolveChoice(how) {
     }
     applyDoc(doc); acct.h = null; syncMeta(); await push();
   }
-  D.acctOpen = false; render(); toast('Signed in. Your teams now sync to this account.');
+  signedInDone();
   await pullHist();
+}
+// signed in and synced: close the sign-in UI (finishing the walkthrough if it was step 2) and say so
+function signedInDone() {
+  acct.toastNext = false; D.acctOpen = false; D.wSignin = false;
+  if (D.onboard === 'account') { D.onboard = null; go('lineup', { keepFlash: true }); } else render();
+  toast('Signed in. Your teams now sync to this account.');
 }
 
 /* auth: an emailed code, or Google (PKCE: Google sends people back with ?code=, which leaves the #page routes alone) */
@@ -878,7 +923,7 @@ function onAuth(ev, session) {
     acct.user = u; acct.step = 'email'; acct.code = ''; acct.msg = null; stripAuthParams();
     startSync().then(() => {
       if (!acct.toastNext || acct.choice) return;
-      acct.toastNext = false; D.acctOpen = false; render(); toast('Signed in. Your teams now sync to this account.');
+      signedInDone();
     });
     render();
   } else if (!u && acct.user && ev === 'SIGNED_OUT') { acct.user = null; acct.ready = false; render(); }   // session ended elsewhere: keep this browser's copy
@@ -928,10 +973,10 @@ async function signOut(deleted) {
 function wipeLocal() {
   ['fo1:state', HIST_KEY, 'fo1:sync'].forEach(k => store.del(k));
   const tab = state.tab; state = ensureTeams(JSON.parse(JSON.stringify(DEFAULT_STATE))); state.tab = tab;
-  D.hist = null; D.acctOpen = false; D.histOpen = false; D.flow = null; D.tsOpen = false; D.ioOpen = false; D.open.clear(); D.wCache = null;
+  D.hist = null; D.acctOpen = false; D.histOpen = false; D.flow = null; D.tsOpen = false; D.ioOpen = false; D.onboard = null; D.open.clear(); D.wCache = null;
   primeSigs();
-  if (D.inp) { if (D.fmtLoaded !== fmtKey()) ingest(D.inp); makeExampleRoster(); computeAll(); }
-  save(); render();
+  if (D.inp) { if (D.fmtLoaded !== fmtKey()) ingest(D.inp); computeAll(); }
+  save(); render();   // no team now, so the welcome walkthrough shows
 }
 async function deleteAccount() {
   acct.msg = ['info', 'Deleting your account…']; render();
@@ -1325,7 +1370,7 @@ async function load(opts = {}) {
   const exporting = location.hash === '#export';
   if (opts.fresh) D.inp = null;
   D.failed = false; D.errors = []; D.progress = 0;
-  const useSaved = snap => { D.snapshot = snap; D.coaches = snap.coaches || D.coaches; ingest(snap); if (!state.roster.length && state.teams.length === 1 && D.U.size) makeExampleRoster(); };
+  const useSaved = snap => { D.snapshot = snap; D.coaches = snap.coaches || D.coaches; ingest(snap); };
   if (!exporting && !opts.fresh && !D.inp && !state.settings.season && !state.settings.week) {
     const snap = await fetchJSON('snapshot.json', 8000).catch(() => null);
     if (snap?.v === 1) { useSaved(snap); D.loading = false; }
@@ -1334,7 +1379,7 @@ async function load(opts = {}) {
   const err = (what, e) => D.errors.push(`${what}: ${e.status === 404 ? 'not published yet' : (e.message || 'request failed')}.`);
   const inp = await gatherLive(err);
   D.refreshing = false;
-  if (inp) { D.snapshot = null; ingest(inp); if (!state.roster.length && state.teams.length === 1 && D.U.size) makeExampleRoster(); }
+  if (inp) { D.snapshot = null; ingest(inp); }
   else if (!D.inp) { const snap = await fetchJSON('snapshot.json').catch(() => null); if (snap?.v === 1) useSaved(snap); }
   if (!D.inp) { D.loading = false; D.failed = true; render(); return; }
   D.loading = false; render();
@@ -1630,7 +1675,7 @@ function histPut(k, snap) {
 function moveHist(from, to) { const H = histAll(); for (const k of Object.keys(H)) if (k.startsWith(from + '|')) { const nk = to + k.slice(from.length); if (!H[nk]) H[nk] = H[k]; delete H[k]; } store.set(HIST_KEY, H); }
 const slotOrder = k => SLOT_TYPES.findIndex(t => t.k === k);
 function recordLineup(starters) {
-  if (state.example || !state.roster.length || D.snapshot || D.season !== D.detSeason || D.week !== D.detWeek) return;
+  if (!state.roster.length || D.snapshot || D.season !== D.detSeason || D.week !== D.detWeek) return;
   const k = histKey(state.activeTeam, D.season, D.week), prev = histAll()[k];
   const ent = r => [r.id, r.u.name, r.pos, r.status === 'bye' ? 0 : Math.round(r.mean * 10) / 10];
   const row = s => s.r ? [s.slot.k, ...ent(s.r)] : [s.slot.k, null, '', '', 0];
@@ -1690,15 +1735,6 @@ function histPanel() {
   }).join('');
   return `<div class="card panel hist">${head}<p class="small muted" style="margin:0">Benny’s lineup for each week, what it projected and what it scored. Tap a week for every player.${signIn}</p>
     <div class="tscroll"><table><thead><tr><th class="l">Week</th><th>Projected</th><th>Scored</th><th title="Scored minus projected">+/−</th></tr></thead><tbody>${rows}</tbody></table></div></div>`;
-}
-
-/* ---------- example roster ---------- */
-function makeExampleRoster() {
-  const byPos = {}; for (const id in D.proj) { const u = D.U.get(id); if (!u || !D.tg[u.team] && D.games.length) continue; (byPos[u.pos] = byPos[u.pos] || []).push([id, D.proj[id].pts]); }
-  for (const p in byPos) byPos[p].sort((a, b) => b[1] - a[1]);
-  const pick = { QB: [5, 13], RB: [3, 12, 21, 29, 37], WR: [4, 11, 19, 27, 35], TE: [6, 14], K: [4], DEF: [3, 11] };
-  const ids = []; for (const p in pick) for (const i of pick[p]) { const e = byPos[p]?.[i]; if (e) ids.push(e[0]); }
-  if (ids.length) { state.roster = ids; state.example = true; const ct = curTeam(); if (ct && /^my team$/i.test(ct.name)) ct.name = 'Demo team'; save(); }
 }
 
 /* ---------- coaches (ESPN head-coach check, cached 24h) ---------- */
@@ -1808,7 +1844,7 @@ async function slAutoSync(force) {
       if (!lg?.league_id || !Array.isArray(ros)) continue;
       for (const t of teams) {
         const a = slApply(lg, ros, t.sleeper.rosterId); if (!a) continue;
-        Object.assign(t, { roster: a.roster, slots: a.slots, scoring: a.scoring, tePrem: a.tePrem, example: false });
+        Object.assign(t, { roster: a.roster, slots: a.slots, scoring: a.scoring, tePrem: a.tePrem });
         t.sleeper = Object.assign({}, t.sleeper, { rostered: a.rostered, starters: a.starters, rosterMax: a.rosterMax, reserve: a.reserve, syncedAt: Date.now(), leagueName: lg.name, notes: slNotes(lg) });
         t.waivers = Object.assign({}, t.waivers, { teams: a.size });
       }
@@ -2222,7 +2258,6 @@ function waiversBody() {
   const src = W.source === 'list' && W.faList.length ? `your league’s free-agent list (${W.faList.length} players, pasted ${esc(new Date(W.faListAt).toLocaleDateString([], { month: 'short', day: 'numeric' }))})` : `players under ${W.ownMax}% owned across ESPN leagues`;
   const warn = [];
   if (W.source === 'own' && !D.own.size) warn.push('ESPN ownership didn’t load, so every player not on your roster counts as available. Paste your league’s free agents below for accurate suggestions.');
-  if (state.example) warn.push('These suggestions are for the Demo team. Import your team to see moves for your roster.');
   const levelCls = { Strong: 'n', OK: 'm', Weak: 'o' };
   const needCards = needs.list.map(n => `<div class="need"><div class="row-head"><h3>${n.P === 'DEF' ? 'D/ST' : n.P}</h3><span class="pill ${levelCls[n.level]}">${n.level}</span></div>
     ${n.rows.length ? n.rows.map(r => `<div class="small ${r.starter ? '' : 'muted'}">${esc(D.U.get(r.id).name)} <span class="muted">${r.away ? (returnWeek(r.id) > 18 ? 'out for season' : 'out until wk ' + returnWeek(r.id)) : (n.P === 'DEF' ? 'DST' : n.P) + (r.rank || '?')}</span></div>`).join('') : '<div class="small muted">Nobody at this position</div>'}
@@ -2329,7 +2364,7 @@ function renderBrief() {
   const dec = reviewDecisions(), W = computeWaivers(), best = W.moves[0];
   const decTxt = dec.length ? `<button type="button" class="blink" data-brief="decide"><span class="n">${dec.length}</span> decision${dec.length === 1 ? '' : 's'} to review</button>` : `<span>no close calls</span>`;
   const bestTxt = best ? `<button type="button" class="blink" data-brief="waiver">best waiver move <span class="n up">+${f1(best.hz)}</span> pts over ${W.H} week${W.H === 1 ? '' : 's'}</button>` : `<span>no waiver move worth making</span>`;
-  el.innerHTML = `<span class="bteam">${state.example ? 'Demo team' : team}:</span> your optimal lineup projects for <button type="button" class="blink" data-tab="lineup"><span class="n">${f1(proj)}</span> points</button><span class="sep">·</span>${decTxt}<span class="sep">·</span>${bestTxt}`;
+  el.innerHTML = `<span class="bteam">${team}:</span> your optimal lineup projects for <button type="button" class="blink" data-tab="lineup"><span class="n">${f1(proj)}</span> points</button><span class="sep">·</span>${decTxt}<span class="sep">·</span>${bestTxt}`;
 }
 /* Freshness: "Updated 12 minutes ago", refreshed every minute. Live data is just-now; a saved copy shows its age. */
 function ago(t) {
@@ -2394,6 +2429,13 @@ function weekOptions() {
   return D.snapshot ? `<option selected>${D.week}</option>` : Array.from({ length: 18 }, (_, i) => `<option value="${i + 1}" ${D.week === i + 1 ? 'selected' : ''}>${i + 1}${D.detWeek === i + 1 && D.season === D.detSeason ? ' (now)' : ''}</option>`).join('');
 }
 function render() {
+  // no team yet (or finishing the walkthrough): the welcome takes the whole page, with no navigation
+  const welcome = D.welcome = needsTeam() || D.onboard === 'account';
+  document.body.classList.toggle('welcome', welcome);
+  if (welcome) {
+    for (const s of ['#tabs', '#teamctx', '#panels', '#brief', '#msgs']) $(s).innerHTML = '';
+    renderStatus(); renderAcct(); $('#main').innerHTML = viewWelcome(); return;
+  }
   const nav = navOf(state.tab);
   $('#tabs').innerHTML = NAV.map(([k, l]) => `<a href="#${HASH[k]}" class="navlink" data-tab="${k}" ${nav === k ? 'aria-current="page"' : ''}>${l}</a>`).join('');
   $('#settingsBtn')?.setAttribute('aria-pressed', String(state.tab === 'settings'));
@@ -2402,11 +2444,12 @@ function render() {
   $('#panels').innerHTML = D.acctOpen && acct.on ? accountPanel() : D.loading || D.failed ? '' : D.flow ? flowPanel() : D.tsOpen ? teamSettingsPanel() : D.ioOpen ? sharePanel() : '';
   const msgs = [];
   if (D.flash && !D.loading) msgs.push(`<div class="banner info flash"><span>${D.flash.html}</span><button type="button" class="btn sm" data-act="flashclose" aria-label="Dismiss">Dismiss</button></div>`);
+  // skipped the account step on the walkthrough: one reminder on Lineup until they sign in or dismiss it
+  if (!D.loading && state.tab === 'lineup' && acct.on && !acct.user && store.get('fo1:nudge') === 'show') msgs.push(`<div class="banner info exban"><span><strong>Keep ${esc(curTeam()?.name || 'your team')} on your phone too.</strong> Sign in and your teams and weekly lineups follow you to any device.</span><span class="toolbar"><button type="button" class="btn sm primary" data-act="account">Sign in</button><button type="button" class="btn sm" data-act="nudgeoff">Not now</button></span></div>`);
   // Only interrupt for problems that change the picks: missing projections or schedule, or data that's gone stale.
   const age = D.loadedAt ? Date.now() - D.loadedAt.getTime() : 0;
   if (!D.loading && !D.failed && D.snapshot && !D.refreshing && age > 36e5 * 36) msgs.push(`<div class="banner">These numbers are from ${esc(D.loadedAt.toLocaleDateString([], { weekday: 'long', month: 'short', day: 'numeric' }))}, so injury news since then isn’t included. Press Refresh to try for newer data.</div>`);
   if (!D.loading && !D.snapshot && D.errors.some(e => /projections|schedule/i.test(e))) msgs.push(`<div class="banner err"><strong>Some of this week’s data didn’t load.</strong> Picks may be incomplete. Press Refresh to try again.</div>`);
-  if (!D.loading && state.example && state.tab === 'lineup' && !D.flow) msgs.push(`<div class="banner info exban"><span><strong>You’re viewing the Demo team.</strong> Import or build your own team to get Benny’s picks for it.</span><button type="button" class="btn sm primary" data-act="flow" data-method="sleeper" data-dest="replace">Import your team</button></div>`);
   $('#msgs').innerHTML = msgs.join('');
   const main = $('#main');
   if (D.failed) { renderBrief(); main.innerHTML = `<div class="card panel"><h2>Couldn’t load this week’s data</h2><p style="margin:0">Sleeper and ESPN didn’t respond. Check your connection and press Refresh projections.</p></div>`; return; }
@@ -2428,7 +2471,6 @@ function matchCell(r) {
 }
 /* Where Benny's lineup differs from the one set in the league app (Sleeper starters, or ESPN slots from an import). */
 function espnNote(r, starting) {
-  if (state.example) return '';
   let appStarting, app;
   if (state.sleeper?.starters) { appStarting = state.sleeper.starters.includes(r.id); app = 'Sleeper'; }
   else { const s = state.espn.slotOf?.[r.id]; if (s == null) return ''; appStarting = !(s === 20 || s === 21); app = 'ESPN'; }
@@ -2535,7 +2577,7 @@ function parseBundle(text) {
 }
 function importBundle(obj, replace) {
   stashTeam();
-  let added = 0, replaced = 0, firstId = null; const missed = [];
+  let added = 0, replaced = 0, firstId = null; const missed = [], got = new Set();
   for (const t of obj.teams) {
     const roster = [];
     for (const [id, name, pos] of t.roster || []) {
@@ -2544,7 +2586,7 @@ function importBundle(obj, replace) {
       if (pid) { if (!roster.includes(pid)) roster.push(pid); } else missed.push(name || id);
     }
     const name = String(t.name || 'Imported team').trim().slice(0, 40) || 'Imported team';
-    const data = { roster, example: false, compare: [null, null], scoring: SCORING[t.scoring] ? t.scoring : 'ppr', tePrem: +t.tePrem || 0,
+    const data = { roster, compare: [null, null], scoring: SCORING[t.scoring] ? t.scoring : 'ppr', tePrem: +t.tePrem || 0,
       sleeper: t.sleeper?.leagueId ? Object.assign({}, t.sleeper, { syncedAt: 0, rostered: null, starters: null }) : null,
       slots: Object.assign({}, DEFAULT_STATE.slots, t.slots || {}),
       espn: Object.assign({}, DEFAULT_STATE.espn, t.espn || {}, { slotOf: {} }),
@@ -2556,11 +2598,11 @@ function importBundle(obj, replace) {
       let id; do id = 't' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6); while (state.teams.some(x => x.id === id));
       target = Object.assign({ id, name: nm }, data); state.teams.push(target); added++;
     }
-    firstId = firstId || target.id;
+    firstId = firstId || target.id; got.add(target.id);
   }
   Object.assign(state.overrides, obj.overrides || {}); state.returnWeek = Object.assign(state.returnWeek || {}, obj.returnWeek || {});
-  // the starter example roster isn't worth keeping once real teams arrive
-  if (added) state.teams = state.teams.filter(t => !t.example);
+  // the empty starting team isn't worth keeping once real teams arrive
+  if (added) state.teams = state.teams.filter(t => got.has(t.id) || !isPlaceholder(t));
   state.activeTeam = firstId; applyTeam(curTeam());
   D.open.clear(); D.wCache = null; D.delArm = false; computeAll(); syncScoring(); save();
   return `Imported ${added + replaced} team${added + replaced === 1 ? '' : 's'}${replaced ? ` (${replaced} replaced)` : ''}.` + (missed.length ? ` Not found this week: ${missed.slice(0, 5).join(', ')}${missed.length > 5 ? '…' : ''}.` : '');
@@ -2570,14 +2612,13 @@ function importBundle(obj, replace) {
    actions (add, settings, import/replace, share). */
 const newTeamId = () => { let id; do id = 't' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6); while (state.teams.some(t => t.id === id)); return id; };
 function sourceLabel() {
-  if (state.example) return '<span class="pill m">Demo team</span>';
   const s = state.sleeper;
   if (s) return `<span class="src"><span class="sl-dot"></span>Sleeper · ${D.slSyncing ? 'syncing…' : 'synced ' + ago(s.syncedAt || 0)}</span> <button type="button" class="linkbtn" data-act="slsync">Sync roster</button>`;
   return `<span class="src">${Object.keys(state.espn.slotOf || {}).length ? 'ESPN import' : 'Manual roster'}</span>`;
 }
 function teamBar() {
   const chips = state.teams.map(t => {
-    const tag = t.example ? 'Demo' : t.sleeper?.leagueId ? 'Sleeper' : `${(t.roster || []).length} players`;
+    const tag = t.sleeper?.leagueId ? 'Sleeper' : `${(t.roster || []).length} players`;
     return `<button type="button" class="tchip" data-fteam="${esc(t.id)}" aria-pressed="${t.id === state.activeTeam}" title="${esc(t.name)}"><span class="tn">${esc(t.name)}</span><span class="tm">${esc(tag)}</span></button>`;
   }).join('');
   return `<div class="tb-teams" role="group" aria-label="Your teams">${chips}<button type="button" class="tchip add" data-act="flow" data-method="sleeper" data-dest="new">+ Add team</button></div>
@@ -2616,7 +2657,7 @@ function sharePanel() {
   const exportable = state.teams.filter(t => (t.roster || []).length), sel = ioSelected(), code = sel.length ? toCode(exportBundle(sel)) : '';
   return `<div class="card panel io"><div class="row-head"><h2>Share or back up</h2><button type="button" class="btn sm" data-act="toggleio">Close</button></div>
     <p class="small muted" style="margin:0">Copy a code to use on another device or send to a friend${canDownload ? ', or download a backup file' : ''}. It includes each team’s roster, scoring, lineup slots, league link and waiver settings, plus your overrides for those players. To bring one in, use <button type="button" class="linkbtn" data-act="flow" data-method="restore" data-dest="new">Restore saved team</button>.</p>
-    ${exportable.length ? `<div class="iochecks">${exportable.map(t => `<label><input type="checkbox" data-iosel="${esc(t.id)}" ${sel.includes(t.id) ? 'checked' : ''}> ${esc(t.name)} <span class="muted">${t.roster.length} players${t.example ? ', demo' : ''}</span></label>`).join('')}</div>
+    ${exportable.length ? `<div class="iochecks">${exportable.map(t => `<label><input type="checkbox" data-iosel="${esc(t.id)}" ${sel.includes(t.id) ? 'checked' : ''}> ${esc(t.name)} <span class="muted">${t.roster.length} players</span></label>`).join('')}</div>
     <div class="toolbar"><button type="button" class="btn primary" data-act="iocopy" ${sel.length ? '' : 'disabled'}>Copy code</button>${canDownload ? `<button type="button" class="btn" data-act="iodownload" ${sel.length ? '' : 'disabled'}>Download file</button>` : ''}<span class="small muted" id="ioOutMsg">${esc(D.ioOutMsg || '')}</span></div>
     <textarea class="inp iocode" id="ioOut" readonly aria-label="Team code">${esc(code)}</textarea>` : '<p class="small muted" style="margin:0">Add players to a team first.</p>'}</div>`;
 }
@@ -2636,7 +2677,7 @@ function accountPanel() {
   const close = `<button type="button" class="btn sm" data-act="account">Close</button>`;
   if (acct.user && acct.choice) {
     const names = ts => ts.map(t => esc(t.name)).join(', ') || 'none';
-    const mine = state.teams.filter(t => !t.example && (t.roster || []).length);
+    const mine = state.teams.filter(t => (t.roster || []).length);
     return `<div class="card panel acct"><div class="row-head"><h2>Your teams <span class="hsub">${esc(acct.user.email || '')}</span></h2></div>
       <p style="margin:0">This browser already has teams, and so does your account. Which should your account keep?</p>
       <div class="small"><div><strong>This browser:</strong> ${names(mine)}</div><div><strong>Your account:</strong> ${names(acct.choice.doc.teams || [])}</div></div>
@@ -2653,19 +2694,66 @@ function accountPanel() {
     <div class="toolbar"><button type="button" class="btn" data-act="acctsync">Sync now</button><button type="button" class="btn" data-act="acctout">Sign out</button>
       <button type="button" class="btn danger" data-act="acctdel">${acct.delArm ? 'Press again to delete your account' : 'Delete account'}</button></div>
     <p class="small muted" style="margin:0">Signing out removes your teams from this browser; they stay in your account. Deleting the account erases everything it holds.</p></div>`;
-  const form = acct.step === 'code'
+  return `<div class="card panel acct"><div class="row-head"><h2>Sign in</h2>${close}</div>
+    <p style="margin:0">Keep your teams and Benny’s weekly lineups on every device, computer or phone. There’s no password: sign in with a code we email you, or with Google.</p>
+    ${msg}${signInForm()}
+    <p class="small muted" style="margin:0">Without an account, everything stays in this browser, and <button type="button" class="linkbtn" data-act="toggleio">Share / back up</button> still moves teams by code.</p></div>`;
+}
+// the email-code / Google form, shared by the account panel and the welcome walkthrough
+function signInForm() {
+  return acct.step === 'code'
     ? `<div class="field"><label class="label" for="acctCode">Code from the email</label><div class="acct-form"><input class="inp" id="acctCode" type="text" inputmode="numeric" autocomplete="one-time-code" maxlength="10" value="${esc(acct.code)}" placeholder="123456"><button type="button" class="btn primary" data-act="acctverify">Sign in</button></div></div>
        <div class="toolbar small"><button type="button" class="linkbtn" data-act="acctsend">Send a new code</button><button type="button" class="linkbtn" data-act="acctback">Use a different email</button></div>`
     : `<div class="field"><label class="label" for="acctEmail">Email</label><div class="acct-form"><input class="inp" id="acctEmail" type="email" autocomplete="email" value="${esc(acct.email)}" placeholder="you@example.com"><button type="button" class="btn primary" data-act="acctsend">Email me a code</button></div></div>
        <div class="acct-or">or</div><div><button type="button" class="btn gbtn" data-act="acctgoogle"><svg viewBox="0 0 48 48" width="18" height="18" aria-hidden="true"><path fill="#EA4335" d="M24 9.5c3.54 0 6.71 1.22 9.21 3.6l6.85-6.85C35.9 2.38 30.47 0 24 0 14.62 0 6.51 5.38 2.56 13.22l7.98 6.19C12.43 13.72 17.74 9.5 24 9.5z"/><path fill="#4285F4" d="M46.98 24.55c0-1.57-.15-3.09-.38-4.55H24v9.02h12.94c-.58 2.96-2.26 5.48-4.78 7.18l7.73 6c4.51-4.18 7.09-10.36 7.09-17.65z"/><path fill="#FBBC05" d="M10.53 28.59c-.48-1.45-.76-2.99-.76-4.59s.27-3.14.76-4.59l-7.98-6.19C.92 16.46 0 20.12 0 24c0 3.88.92 7.54 2.56 10.78l7.97-6.19z"/><path fill="#34A853" d="M24 48c6.48 0 11.93-2.13 15.89-5.81l-7.73-6c-2.15 1.45-4.92 2.3-8.16 2.3-6.26 0-11.57-4.22-13.47-9.91l-7.98 6.19C6.51 42.62 14.62 48 24 48z"/></svg>Continue with Google</button></div>`;
-  return `<div class="card panel acct"><div class="row-head"><h2>Sign in</h2>${close}</div>
-    <p style="margin:0">Keep your teams and Benny’s weekly lineups on every device, computer or phone. There’s no password: sign in with a code we email you, or with Google.</p>
-    ${msg}${form}
-    <p class="small muted" style="margin:0">Without an account, everything stays in this browser, and <button type="button" class="linkbtn" data-act="toggleio">Share / back up</button> still moves teams by code.</p></div>`;
+}
+const acctMsgHTML = () => acct.msg ? `<div class="banner ${acct.msg[0] === 'err' ? 'err' : 'info'}" role="status">${esc(acct.msg[1])}</div>` : '';
+
+/* ---------- welcome walkthrough ----------
+   Shown full screen, with no navigation, whenever no team has players yet: a first visit, after signing out, or after
+   Reset. Step 1 brings the team in through the same setup flow as + Add team; step 2 offers an account so it follows
+   them to their phone. People who already have an account sign in at the top and get their teams straight back. */
+const WELCOME_METHODS = [
+  ['sleeper', 'Connect Sleeper', 'Enter your username or league ID. Benny stays in sync with your league and finds its real free agents.', 'Recommended'],
+  ['espn', 'Import from ESPN', 'Load a public league by its ID, or copy your roster from any ESPN league and paste it.'],
+  ['manual', 'Build it yourself', 'Search for each player, or paste a list of names.'],
+  ['restore', 'Restore a saved team', 'Paste a team code or open a backup file from Benny’s Picks.'],
+];
+function viewWelcome() {
+  const done = D.onboard === 'account';
+  const step = (n, title, sub, on) => `<div class="wl-h ${on ? '' : 'later'}"><span class="wl-num">${n}</span><div><h2>${title}</h2>${sub ? `<div class="small muted">${sub}</div>` : ''}</div></div>`;
+  if (done) {
+    const ct = curTeam(), n = (ct?.roster || state.roster).length;
+    const body = acct.user && acct.choice ? accountPanel()
+      : `<div class="card panel wl-card"><p style="margin:0">Sign in to see <strong>${esc(ct?.name || 'your team')}</strong> and Benny’s weekly lineups on your phone and computer. There’s no password: we email you a code, or use Google.</p>
+          ${acctMsgHTML()}${signInForm()}</div>`;
+    return `<div class="wl">
+      <div class="wl-saved"><span class="wl-num ok" aria-hidden="true">✓</span><span><strong>Saved ${esc(ct?.name || 'your team')}</strong> · ${n} player${n === 1 ? '' : 's'}</span></div>
+      ${step(2, 'Keep it on all your devices', 'Optional. Your team is already saved in this browser.', true)}
+      ${body}
+      ${acct.user && acct.choice ? '' : `<div class="toolbar"><button type="button" class="btn" data-act="wskip">Skip for now</button><span class="small muted">You can sign in any time from the top of the page.</span></div>`}
+    </div>`;
+  }
+  const top = !acct.on ? '' : acct.user ? `<span class="small muted">Signed in as ${esc(acct.user.email || '')}. Your team will save to your account.</span>`
+    : `<button type="button" class="linkbtn" data-act="wsignin" aria-expanded="${!!D.wSignin}">Already have an account? Sign in</button>`;
+  const signIn = D.wSignin && acct.on && !acct.user ? `<div class="card panel wl-card"><div class="row-head"><h3>Sign in to get your teams back</h3><button type="button" class="btn sm" data-act="wsignin">Close</button></div>${acctMsgHTML()}${signInForm()}</div>` : '';
+  let body;
+  if (D.failed) body = `<div class="card panel"><p style="margin:0">This week’s player data didn’t load, and Benny needs it to find your players. Check your connection and try again.</p><div class="toolbar"><button type="button" class="btn primary" data-act="reload">Try again</button></div></div>`;
+  else if (D.loading) body = `<div class="card panel wl-loading"><span class="small muted">Loading this week’s players…</span><div class="bar"><span id="lbar" style="width:${Math.round(D.progress * 100)}%"></span></div></div>`;
+  else if (D.flow) body = flowPanel();
+  else body = `<div class="wl-methods">${WELCOME_METHODS.map(([k, t, d, tag]) => `<button type="button" class="wl-method" data-act="flow" data-method="${k}" data-dest="replace"><span class="wl-mt"><strong>${t}</strong>${tag ? ` <span class="pill n">${tag}</span>` : ''}</span><span class="small muted">${d}</span></button>`).join('')}</div>`;
+  return `<div class="wl">
+    <div class="wl-top">${top}</div>${signIn}
+    <div class="wl-hero"><h2>Your best lineup, every week</h2>
+      <p>Bring in your fantasy team and Benny sets your starters, makes the close start/sit calls and finds the waiver pickups that add the most points, using live projections, matchups and weather.</p></div>
+    ${step(1, 'Bring in your team', 'Pick how your league is set up. You’ll review everything before it’s saved.', true)}
+    ${body}
+    ${acct.on && !acct.user ? step(2, 'Keep it on all your devices', 'Optional: sign in after your team is saved.', false) : ''}
+  </div>`;
 }
 
 /* ---------- one setup flow ----------
-   Every way to bring a team in (the Demo banner, + Add team, Import / replace, Roster's Paste / import roster) opens
+   Every way to bring a team in (the welcome walkthrough, + Add team, Import / replace, Roster's Paste / import roster) opens
    this flow with a method preselected. Pick a method, review exactly what was found and where it goes, then save. */
 const FLOW_METHODS = [['sleeper', 'Connect Sleeper'], ['espn', 'Import ESPN'], ['manual', 'Build manually'], ['restore', 'Restore saved team']];
 D.drafts = D.drafts || {};   // unfinished text in the flow survives closing it and moving between pages
@@ -2677,7 +2765,7 @@ function openFlow(method, dest, espnMode) {
 }
 function flowPanel() {
   const F = D.flow;
-  const title = F.step === 'review' ? 'Review and save' : F.dest === 'new' ? 'Add a team' : `Import into ${esc(curTeam().name)}`;
+  const title = F.step === 'review' ? 'Review and save' : D.welcome ? 'Set up your team' : F.dest === 'new' ? 'Add a team' : `Import into ${esc(curTeam().name)}`;
   const head = `<div class="row-head"><h2>${title}</h2><button type="button" class="btn sm" data-act="flowclose">Cancel</button></div>`;
   if (F.step === 'review') return `<div class="card panel flow">${head}${reviewHTML()}</div>`;
   const methods = `<div class="seg methods" role="group" aria-label="How to bring in your team">${FLOW_METHODS.map(([k, l]) => `<button type="button" data-flowmethod="${k}" aria-pressed="${F.method === k}">${l}</button>`).join('')}</div>`;
@@ -2719,8 +2807,9 @@ function flowRestore() {
 }
 /* Turn a method's result into a draft for review. Defaults come from the team being replaced, or standard ESPN settings. */
 function makeDraft(fields) {
-  const base = D.flow.dest === 'replace' && !state.example ? { scoring: state.scoring, tePrem: tePrem(), slots: state.slots } : { scoring: 'ppr', tePrem: 0, slots: DEFAULT_STATE.slots };
-  D.flow.draft = Object.assign({ name: D.flow.dest === 'replace' && !state.example ? curTeam().name : 'My team', unresolved: [] }, base, fields);
+  const keep = D.flow.dest === 'replace' && state.roster.length;   // replacing a real team keeps its settings; the empty starting team starts from ESPN's standard ones
+  const base = keep ? { scoring: state.scoring, tePrem: tePrem(), slots: state.slots } : { scoring: 'ppr', tePrem: 0, slots: DEFAULT_STATE.slots };
+  D.flow.draft = Object.assign({ name: D.flow.dest === 'replace' ? curTeam().name : 'My team', unresolved: [] }, base, fields);
   D.flow.step = 'review'; D.flow.msg = null; render(); revealPanel($('.flow'));
 }
 function reviewHTML() {
@@ -2744,21 +2833,26 @@ function reviewHTML() {
       <div class="field"><span class="label">Scoring</span><span class="toolbar"><select class="sel" id="flowScoring" aria-label="Scoring">${Object.entries(SCORING).map(([k, [l]]) => `<option value="${k}" ${d.scoring === k ? 'selected' : ''}>${l}</option>`).join('')}</select>
         <label class="small muted" for="flowTep">TE premium</label><select class="sel" id="flowTep">${[0, 0.25, 0.5, 0.75, 1].map(v => `<option value="${v}" ${+d.tePrem === v ? 'selected' : ''}>${v ? '+' + v : 'None'}</option>`).join('')}</select></span></div>
       <div class="field"><span class="label">Lineup slots</span><div class="small">${esc(slotsSummary(d.slots))}</div><div class="small muted">Change these anytime in Team settings.</div></div>
-      <fieldset class="field rv-dest"><legend class="label">Save to</legend>
+      ${needsTeam() ? '' : `<fieldset class="field rv-dest"><legend class="label">Save to</legend>
         <label><input type="radio" name="flowDest" value="new" ${destReplace ? '' : 'checked'}> Create a new team</label>
-        <label><input type="radio" name="flowDest" value="replace" ${destReplace ? 'checked' : ''}> Replace ${ct.example ? 'the Demo team' : `${esc(ct.name)}’s roster (${state.roster.length} players)`}</label></fieldset>
+        <label><input type="radio" name="flowDest" value="replace" ${destReplace ? 'checked' : ''}> Replace ${esc(ct.name)}’s roster (${state.roster.length} players)</label></fieldset>`}
     </div></div>
     <div class="toolbar"><button type="button" class="btn primary" data-act="flowsave" ${d.roster.length ? '' : 'disabled'}>Save team</button><button type="button" class="btn" data-act="flowback">Back</button></div>`;
+}
+// after the first team on the welcome walkthrough, offer an account before the app opens; otherwise straight to Lineup
+function afterSave() {
+  if (D.welcome && acct.on && !acct.user) { D.onboard = 'account'; acct.msg = null; acct.step = 'email'; render(); scrollTo(0, 0); return; }
+  D.onboard = null; go('lineup', { keepFlash: true });
 }
 function commitDraft() {
   const F = D.flow, d = F?.draft; if (!d) return;
   if (d.bundle) {
     let msg; try { msg = importBundle(d.bundle, !!$('#ioReplace')?.checked); } catch (err) { F.msg = ['err', err.message]; return render(); }
-    D.drafts.code = ''; D.flow = null; D.flash = { html: `<strong>${esc(msg)}</strong> <a href="#roster" data-tab="players">Edit roster</a>` }; slAutoSync(true); return go('lineup', { keepFlash: true });
+    D.drafts.code = ''; D.flow = null; D.flash = { html: `<strong>${esc(msg)}</strong> <a href="#roster" data-tab="players">Edit roster</a>` }; slAutoSync(true); return afterSave();
   }
   if (!d.roster.length) return;
-  const dest = $('input[name=flowDest]:checked')?.value || F.dest, name = ($('#flowName')?.value || d.name || 'My team').trim().slice(0, 40) || 'My team';
-  const data = { roster: d.roster.slice(), example: false, compare: [null, null], scoring: $('#flowScoring')?.value || d.scoring, tePrem: +($('#flowTep')?.value ?? d.tePrem) || 0,
+  const dest = D.welcome ? 'replace' : $('input[name=flowDest]:checked')?.value || F.dest, name = ($('#flowName')?.value || d.name || 'My team').trim().slice(0, 40) || 'My team';
+  const data = { roster: d.roster.slice(), compare: [null, null], scoring: $('#flowScoring')?.value || d.scoring, tePrem: +($('#flowTep')?.value ?? d.tePrem) || 0,
     slots: Object.assign({}, DEFAULT_STATE.slots, d.slots), sleeper: d.sleeper || null, espn: Object.assign({}, DEFAULT_STATE.espn, d.espn || {}),
     waivers: Object.assign(JSON.parse(JSON.stringify(DEFAULT_STATE.waivers)), dest === 'replace' ? JSON.parse(JSON.stringify(state.waivers)) : {}, d.waivers || {}) };
   if (!data.sleeper && data.waivers.source === 'sleeper') data.waivers.source = 'own';
@@ -2766,13 +2860,13 @@ function commitDraft() {
   if (dest === 'new') {
     let nm = name, n = 2; while (state.teams.some(x => x.name.toLowerCase() === nm.toLowerCase())) nm = `${name} (${n++})`;
     const id = newTeamId(); state.teams.push(Object.assign({ id, name: nm }, data)); state.activeTeam = id;
-    state.teams = state.teams.filter(t => !t.example);   // the Demo team goes once you have a real one
+    state.teams = state.teams.filter(t => t.id === id || !isPlaceholder(t));   // the empty starting team goes once you have a real one
   } else Object.assign(curTeam(), data, { name });
   applyTeam(curTeam()); syncScoring();
   if (d.src) D.drafts[d.src] = '';
   D.flow = null; D.open.clear(); D.wCache = null; D.sl = null; save();
   D.flash = { html: `<strong>Saved ${esc(curTeam().name)}:</strong> ${data.roster.length} players, ${esc(fmtName(true))} scoring${d.unresolved.length ? `; ${d.unresolved.length} name${d.unresolved.length === 1 ? '' : 's'} not found` : ''}. <a href="#roster" data-tab="players">Edit roster</a>` };
-  go('lineup', { keepFlash: true });
+  afterSave();
 }
 function flowPaste(src) {
   const text = $(src === 'paste' ? '#rosterPaste' : '#manualPaste')?.value || '';
@@ -2824,7 +2918,6 @@ function acPick(id, mode) {
 /* ---------- Roster ---------- */
 function editRosterGuard() {
   if (state.sleeper) { toast('This roster syncs from Sleeper, so edits here would be replaced. Make an editable copy to experiment.', 'Make a copy', 'copyteam'); return false; }
-  if (state.example) { state.example = false; const ct = curTeam(); if (ct && ct.name === 'Demo team') ct.name = 'My team'; }   // editing the demo makes it yours
   return true;
 }
 function addToRoster(id) {
@@ -2840,7 +2933,7 @@ function removeFromRoster(id) {
 }
 function makeEditableCopy() {
   stashTeam(); const src = curTeam(); if (!src) return;
-  const copy = JSON.parse(JSON.stringify(src)); copy.id = newTeamId(); copy.sleeper = null; copy.example = false;
+  const copy = JSON.parse(JSON.stringify(src)); copy.id = newTeamId(); copy.sleeper = null;
   let nm = `${src.name} (copy)`, n = 2; while (state.teams.some(x => x.name === nm)) nm = `${src.name} (copy ${n++})`; copy.name = nm.slice(0, 40);
   if (copy.waivers?.source === 'sleeper') copy.waivers.source = 'own';
   state.teams.push(copy); state.activeTeam = copy.id; applyTeam(copy); D.tsOpen = false; save();
@@ -3155,6 +3248,9 @@ document.addEventListener('click', e => {
     if (D.acctOpen && !acct.user) cloudReady().catch(() => {});   // start loading the sign-in library while they type
     render(); if (D.acctOpen) { revealPanel($('.acct')); deskFocus(acct.step === 'code' ? '#acctCode' : '#acctEmail'); }
   }
+  else if (a === 'wsignin') { D.wSignin = !D.wSignin; acct.msg = null; if (D.wSignin) cloudReady().catch(() => {}); render(); if (D.wSignin) deskFocus(acct.step === 'code' ? '#acctCode' : '#acctEmail'); }
+  else if (a === 'wskip') { store.set('fo1:nudge', 'show'); D.onboard = null; go('lineup', { keepFlash: true }); }
+  else if (a === 'nudgeoff') { store.set('fo1:nudge', 'done'); render(); }
   else if (a === 'acctsend') sendCode();
   else if (a === 'acctverify') verifyCode();
   else if (a === 'acctback') { acct.step = 'email'; acct.code = ''; acct.msg = null; render(); deskFocus('#acctEmail'); }
