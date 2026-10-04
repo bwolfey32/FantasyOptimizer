@@ -94,7 +94,7 @@ a { color: var(--accent); }
 @keyframes pulse { 50% { opacity: .3; } }
 
 /* This week at a glance */
-.brief { background: var(--surface); border: 1px solid var(--line); border-left: 4px solid var(--accent); border-radius: var(--radius); padding: 12px 16px; font-size: 16px; line-height: 1.6; }
+.brief { background: var(--surface); border: 2px solid var(--accent); border-radius: var(--radius); padding: 12px 16px; font-size: 16px; line-height: 1.6; }
 .brief:empty { display: none; }
 .brief .bteam { font-weight: 600; }
 .brief .sep { color: var(--muted); margin: 0 6px; }
@@ -367,9 +367,9 @@ body.welcome.wsign #acctBtn .acct-txt { position: static; width: auto; height: a
 .toast { position: fixed; left: 50%; transform: translateX(-50%); bottom: calc(16px + env(safe-area-inset-bottom, 0px)); z-index: 50; display: flex; align-items: center; gap: 12px; max-width: min(560px, calc(100vw - 32px)); padding: 10px 12px 10px 16px; border-radius: 10px; background: var(--ink); color: var(--bg); box-shadow: 0 10px 28px rgba(0, 0, 0, .25); font-size: 14.5px; }
 .toast .btn { background: transparent; color: var(--bg); border-color: color-mix(in srgb, var(--bg) 45%, transparent); }
 
-.banner { border: 1px solid var(--line); border-left: 4px solid var(--warn); background: var(--surface); border-radius: 8px; padding: 10px 14px; font-size: 14px; }
-.banner.info { border-left-color: var(--accent); }
-.banner.err { border-left-color: var(--bad); }
+.banner { border: 2px solid var(--warn); background: var(--surface); border-radius: 8px; padding: 10px 14px; font-size: 14px; }
+.banner.info { border-color: var(--accent); }
+.banner.err { border-color: var(--bad); }
 
 .card { background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius); }
 .wrap > *, .section > *, #main { min-width: 0; max-width: 100%; }
@@ -523,7 +523,7 @@ tr.click:hover td { background: color-mix(in srgb, var(--accent) 5%, transparent
 @media (max-width: 780px) { .setup-grid { grid-template-columns: minmax(0, 1fr); } .setup .opt:nth-child(2) { border-top: 1px solid var(--line); padding-top: 12px; } }
 .fasetup { padding: 10px 14px; display: flex; flex-direction: column; gap: 8px; }
 .fa-line { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 8px 14px; font-size: 14.5px; }
-.wbest { padding: 16px 20px; display: flex; flex-direction: column; gap: 10px; border: 1px solid color-mix(in srgb, var(--accent) 45%, var(--line)); border-left: 5px solid var(--accent); }
+.wbest { padding: 16px 20px; display: flex; flex-direction: column; gap: 10px; border: 2px solid var(--accent); }
 .wbest .label { color: var(--gold); font-size: 13px; }
 .wb-row { display: flex; flex-wrap: wrap; align-items: center; gap: 12px 28px; }
 .wb-side { display: flex; flex-direction: column; min-width: 0; flex: 1 1 180px; }
@@ -535,7 +535,7 @@ tr.click:hover td { background: color-mix(in srgb, var(--accent) 5%, transparent
 .wb-none { font-size: 15px; }
 @media (max-width: 780px) { .wb-gain { align-items: flex-start; text-align: left; margin-left: 0; } .wordmark h1 { font-size: 26px; } .pick-name { font-size: 28px; } }
 /* Benny's Pick */
-.pick { padding: 18px 20px; display: flex; flex-direction: column; gap: 12px; border: 1px solid color-mix(in srgb, var(--accent) 45%, var(--line)); border-left: 5px solid var(--accent); }
+.pick { padding: 18px 20px; display: flex; flex-direction: column; gap: 12px; border: 2px solid var(--accent); }
 .pick-head { display: flex; align-items: center; gap: 10px; }
 .pick-head .label { color: var(--gold); font-size: 13px; }
 .pick-main { display: flex; flex-wrap: wrap; align-items: flex-end; gap: 12px 32px; }
