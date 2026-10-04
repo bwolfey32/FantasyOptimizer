@@ -60,7 +60,7 @@
 * { box-sizing: border-box; }
 [hidden] { display: none !important; }
 body { margin: 0; background: var(--bg); color: var(--ink); font: 15px/1.5 var(--font-body); }
-.wrap { max-width: 1100px; margin: 0 auto; padding-inline: 16px; padding-block: 18px 56px; display: flex; flex-direction: column; gap: 16px; }
+.wrap { max-width: 1100px; min-height: 100vh; min-height: 100dvh; margin: 0 auto; padding-inline: 16px; padding-block: 18px 56px; display: flex; flex-direction: column; gap: 16px; }
 h1, h2, h3 { font-family: var(--font-display); font-weight: 700; letter-spacing: .01em; margin: 0; text-wrap: balance; line-height: 1.1; }
 h1 { font-size: 30px; text-transform: uppercase; }
 h2 { font-size: 22px; text-transform: uppercase; }
@@ -219,25 +219,32 @@ a { color: var(--accent); }
 .house .ad-label { flex-basis: 100%; color: var(--gold); }
 .house strong { font-size: 16px; }
 .house .btn { margin-left: auto; }
-.foot { display: flex; flex-wrap: wrap; gap: 6px 16px; padding-top: 8px; border-top: 1px solid var(--line); }
+.foot { display: flex; flex-wrap: wrap; gap: 6px 16px; margin-top: auto; padding-top: 8px; border-top: 1px solid var(--line); }   /* kept at the bottom of the page on short pages */
 .foot a { color: var(--muted); }
 body.welcome .adslot { display: none !important; }
 /* Welcome walkthrough: full screen, no navigation */
 body.welcome .controls, body.welcome #tabs, body.welcome #teamctx, body.welcome #panels, body.welcome #brief, body.welcome #msgs, body.welcome #fresh { display: none !important; }
 body.welcome.wpro #panels { display: block !important; }   /* the sign-in panel when buying Pro before setting up a team */
-/* phones: on the welcome, Sign in sits top right in the header (only that button), in place of the link above the headline */
-@media (max-width: 600px) {
-  body.welcome.wsign .top > .controls { display: contents !important; }
-  body.welcome.wsign .top #status, body.welcome.wsign .top [data-act="reload"], body.welcome.wsign #proBtn, body.welcome.wsign .wl-top { display: none !important; }
-  body.welcome.wsign #acctBtn { margin-left: 0; border-radius: 8px; }
-  body.welcome.wsign #acctBtn .acct-ico { display: none; }
-  body.welcome.wsign #acctBtn .acct-txt { position: static; width: auto; height: auto; overflow: visible; clip: auto; }
-}
+/* on the welcome, Sign in sits top right in the header (only that button), in place of the link above the headline */
+body.welcome.wsign .top { align-items: center; }
+body.welcome.wsign .top > .controls { display: flex !important; }
+body.welcome.wsign .top #status, body.welcome.wsign .top [data-act="reload"], body.welcome.wsign #proBtn, body.welcome.wsign .wl-top { display: none !important; }
+body.welcome.wsign #acctBtn { margin-left: 0; border-radius: 8px; background: var(--accent); color: var(--accent-ink); border-color: var(--accent); font-weight: 600; }
+body.welcome.wsign #acctBtn:hover, body.welcome.wsign #acctBtn[aria-expanded="true"] { background: color-mix(in srgb, var(--accent) 85%, var(--ink)); border-color: color-mix(in srgb, var(--accent) 85%, var(--ink)); color: var(--accent-ink); }
+body.welcome.wsign #acctBtn .acct-ico { display: none; }
+body.welcome.wsign #acctBtn .acct-txt { position: static; width: auto; height: auto; overflow: visible; clip: auto; }
+@media (max-width: 600px) { body.welcome.wsign .top > .controls { display: contents !important; } }
 .wl-back { font-size: 14.5px; }
 .wl { width: 100%; max-width: 760px; margin: 0 auto; display: flex; flex-direction: column; gap: 16px; }
 .wl-top { display: flex; justify-content: flex-end; min-height: 22px; font-size: 14.5px; }
 .wl-hero h2 { font-size: 38px; line-height: 1.05; }
 .wl-hero p { margin: 10px 0 0; font-size: 16.5px; max-width: 62ch; }
+/* the landing reads centered on wider screens; phones keep the left-aligned stack */
+@media (min-width: 681px) {
+  .wl-hero, .wl-q, .wl-alt, .wl-legal { text-align: center; } .wl-hero p { margin-inline: auto; }
+  /* the choice of how to add a team sits in the middle of the space between header and footer, a little above center */
+  body.welcome #main:has(.wl-methods) { flex: 1 0 auto; display: flex; flex-direction: column; justify-content: center; padding-bottom: 6vh; }
+}
 .wl-q { font-size: 22px; margin-top: 8px; }
 .wl-methods { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; }
 /* each card in its platform's colors (Sleeper navy, ESPN red); Find your players in Benny's green */
@@ -2900,7 +2907,7 @@ function render() {
   const wpro = welcome && state.tab === 'pro';
   if (!welcome && !D.flow) D.intent = null;   // set up some other way (a synced account, say): the link's destination no longer applies
   document.body.classList.toggle('welcome', welcome); document.body.classList.toggle('wpro', wpro);
-  document.body.classList.toggle('wsign', welcome && !wpro && acct.on && !acct.user);   // phones: the header's Sign in stands in for the welcome's own link
+  document.body.classList.toggle('wsign', welcome && !wpro && acct.on && !acct.user);   // the header's Sign in stands in for the welcome's own link
   if (welcome) {
     for (const s of ['#tabs', '#teamctx', '#panels', '#brief', '#msgs']) $(s).innerHTML = '';
     if (wpro && D.acctOpen && acct.on) $('#panels').innerHTML = accountPanel();   // buying Pro signs in first
@@ -3230,13 +3237,13 @@ function viewWelcome() {
   else if (D.flow) body = flowPanel();
   else body = `<h2 class="wl-q">How would you like to add your team?</h2>
     <div class="wl-methods">${WELCOME_METHODS.map(([k, t, d]) => `<button type="button" class="wl-method wl-${k}" data-act="flow" data-method="${k}" data-dest="replace"><span class="wl-ico">${WL_LOGOS[k] ? `<img src="${WL_LOGOS[k]}" alt="" width="32" height="32">` : WL_ICONS[k]}</span><span class="wl-mt"><strong>${t}</strong><span class="small muted">${d}</span></span><span class="wl-mark">${WL_ICONS[k]}</span><span class="wl-go">${WL_GO}</span></button>`).join('')}</div>
-    <div><button type="button" class="linkbtn small" data-act="flow" data-method="restore" data-dest="replace">Restore a saved team</button></div>`;
+    <div class="wl-alt"><button type="button" class="linkbtn small" data-act="flow" data-method="restore" data-dest="replace">Restore a saved team</button></div>`;
   return `<div class="wl">
     <div class="wl-top">${top}</div>${signIn}
     <div class="wl-hero"><h2>${(WELCOME_HERO[D.intent] || WELCOME_HERO.lineup)[0]}</h2>
       <p>${(WELCOME_HERO[D.intent] || WELCOME_HERO.lineup)[1]}</p></div>
     ${body}
-    <div class="small muted">By using Benny’s Picks you agree to the <a href="terms.html">Terms</a>. <a href="privacy.html">Privacy</a>.${Object.keys(WL_LOGOS).length ? ' Not affiliated with Sleeper or ESPN.' : ''}</div>
+    <div class="small muted wl-legal">By using Benny’s Picks you agree to the <a href="terms.html">Terms</a>. <a href="privacy.html">Privacy</a>.${Object.keys(WL_LOGOS).length ? ' Not affiliated with Sleeper or ESPN.' : ''}</div>
   </div>`;
 }
 
