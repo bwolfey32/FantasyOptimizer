@@ -1192,13 +1192,15 @@ function deriveTotals(rows, qbWeeks) {
   }
   const out = {}; for (const T in A) { const d = derive(A[T]); if (d) out[T] = d; } return out;
 }
-/* Last season's PPR points per game (and catches per game, to convert to other formats) for each player, kept when 2+ games and 4+ pts/g. */
+/* Last season's PPR points per game (and catches per game, to convert to other formats) for each player, kept when 2+ games
+   and 4+ pts/g. Every D/ST is kept: its rest-of-season value leans on last season (see rosBase). */
 function playerPPG(rows) {
   const out = {};
   for (const r of rows || []) {
     const s = r.stats || {}, pos = r.player?.position;
-    if (!['QB', 'RB', 'WR', 'TE', 'K'].includes(pos) || !(s.gp >= 2)) continue;
-    const ppg = (s.pts_ppr || 0) / s.gp; if (ppg >= 4) out[r.player_id] = [+ppg.toFixed(1), s.gp, +((s.rec || 0) / s.gp).toFixed(2)];
+    if (!['QB', 'RB', 'WR', 'TE', 'K', 'DEF'].includes(pos) || !(s.gp >= 2)) continue;
+    const ppg = (s.pts_ppr || 0) / s.gp, id = pos === 'DEF' ? fixAbbr(r.player_id) : r.player_id;
+    if (ppg >= 4 || pos === 'DEF') out[id] = [+ppg.toFixed(1), s.gp, +((s.rec || 0) / s.gp).toFixed(2)];
   }
   return out;
 }
@@ -1392,7 +1394,7 @@ async function gatherLive(err) {
     weekPs.push(cached ? Promise.resolve(cached) : T(fetchJSON(API.wk(season, w)).then(rows => { const c = compactWeek(rows); if (w <= completedThrough && c.D.length) store.set(key, c); return c; }).catch(e => { err('Sleeper stats week ' + w, e); return { P: [], D: [] }; })));
   }
   const pActual = week <= (past ? 18 : detWeek) ? T(fetchJSON(API.wk(season, week)).then(compactWeek).catch(() => ({ P: [], D: [] }))) : Promise.resolve({ P: [], D: [] });
-  const ppgKey = `fo1:ppg2:${season - 1}`, retKey = `fo1:ret:${season - 1}`; let prevPPG = store.get(ppgKey), prevRet = store.get(retKey);
+  const ppgKey = `fo1:ppg3:${season - 1}`, retKey = `fo1:ret:${season - 1}`; let prevPPG = store.get(ppgKey), prevRet = store.get(retKey);
   const keepPrevPlayers = rows => {
     if (!prevPPG) { prevPPG = playerPPG(rows); if (Object.keys(prevPPG).length > 100) store.set(ppgKey, prevPPG); }
     if (!prevRet) { prevRet = returnersPrev(rows); if (prevRet.length > 20) store.set(retKey, prevRet); }
@@ -1705,8 +1707,9 @@ function computePersonnel() {
   const wPrior = T => { const kD = D.B[T]?.kD ?? state.settings.priorWeeks, g = D.cur[T]?.g || 0; return kD / (g + kD); };
   for (const id of new Set([...prev.keys(), ...now.keys()])) {
     const a = prev.get(id), b = now.get(id), g25 = a ? a[4] : 0, g26 = b ? b[5] : 0, w25 = a ? Math.min(4, g25) : 0;
-    // per-game impact: this season's games count fully, last season's rate counts as up to 4 games
-    const rate = [0, 1, 2].map(k => { const den = g26 + w25; return den ? ((b ? b[6 + k] : 0) + (a ? a[5 + k] / g25 * w25 : 0)) / den : 0; });
+    // per-game impact: this season's games count fully, last season's rate counts as up to 4 games, and two empty games
+    // pull small samples down (a rookie's two-interception game shouldn't read as his weekly level)
+    const rate = [0, 1, 2].map(k => { const den = g26 + w25; return den ? ((b ? b[6 + k] : 0) + (a ? a[5 + k] / g25 * w25 : 0)) / (den + 2) : 0; });
     const tot = rate[0] + rate[1] + rate[2]; if (tot < 0.15) continue;
     const teamNow = b ? b[3] : null, inj = b ? b[4] : null, avail = teamNow ? (defOut(inj) ? 0 : /^q/i.test(inj || '') ? 0.85 : 1) : 0;
     for (const T of new Set([a && a[3], b && b[9], teamNow].filter(t => TEAMS[t]))) {
@@ -1752,13 +1755,17 @@ function persMult(T, pos) {
   const t = D.pers?.[T]; if (!t || pos === 'DEF') return 1;
   const m = PERS_MIX[pos] || PERS_MIX.K; return clamp(1 - 0.45 * (m[0] * t.pct[0] + m[1] * t.pct[1] + m[2] * t.pct[2]), 0.9, 1.1);
 }
-/* A team's own D/ST: [multiplier from its defenders, extra points per game from returners]. */
-function persOwn(T) {
+/* A team's own D/ST: [multiplier from its defenders, extra points per game from returners]. A D/ST's value blends
+   Sleeper's projection, which already reflects the current roster, with its scoring average, which doesn't yet; so
+   personnel changes apply only to the average's share of that blend (all of it when the value is the average alone). */
+function persOwn(T, share = 1 - state.settings.blend) {
   const t = D.pers?.[T]; if (!t) return [1, 0];
-  return [clamp(1 + 0.5 * (0.5 * t.pct[0] + 0.5 * t.pct[1]), 0.9, 1.1), clamp(t.st, -1, 1)];
+  return [1 + share * (clamp(1 + 0.5 * (0.5 * t.pct[0] + 0.5 * t.pct[1]), 0.9, 1.1) - 1), share * clamp(t.st, -1, 1)];
 }
 function computeAll() {
   computeTeams(); computePersonnel(); D.M = {};
+  // this season's average score of a regular D/ST and kicker (2+ games), for seasonAvg
+  D.posAvg = {}; for (const P of ['DEF', 'K']) D.posAvg[P] = mean(Object.entries(D.H).filter(([id, h]) => h.n >= 2 && D.U.get(id)?.pos === P).map(([, h]) => h.avg));
   for (const id of D.U.keys()) { const r = evalPlayer(id); if (r) D.M[id] = r; }
 }
 // Safe (floor) and Boom (ceiling) lineups are Pro; free lineups optimize the projection
@@ -2187,11 +2194,22 @@ function healthyBase(id) {
   if (cur != null && prev != null) return (cur * h.n + prev * 4) / (h.n + 4);
   return cur ?? prev ?? 0;
 }
+/* Season average for rest-of-season value. D/ST and kicker scores swing a lot from week to week, so for them this
+   season's games are blended with last season (worth 4 games) and this season's league average at the position (3 games). */
+function seasonAvg(id) {
+  const r = D.M[id], h = r?.h, avg = h?.n ? h.avg : null;
+  if (r?.pos !== 'DEF' && r?.pos !== 'K') return avg;
+  const prev = D.prevPPG?.[id]?.[0], lg = D.posAvg?.[r.pos]; let s = 0, n = 0;
+  if (avg != null) { s += avg * h.n; n += h.n; }
+  if (ok(prev)) { s += prev * 4; n += 4; }
+  if (ok(lg) && n) { s += lg * 3; n += 3; }
+  return n ? s / n : null;
+}
 function rosBase(id) {
   const r = D.M[id]; if (!r) return 0;
   if (state.overrides[id] != null && ok(+state.overrides[id])) return +state.overrides[id];
   if (injKind(r.u.inj)) return healthyBase(id);
-  const avg = r.h?.n ? r.h.avg : null, pj = r.projPts, b = state.settings.blend;
+  const avg = seasonAvg(id), pj = r.projPts, b = state.settings.blend;
   return pj != null && avg != null ? b * pj + (1 - b) * avg : (pj ?? avg ?? 0);
 }
 const SLOT_SHARE = { QB: { OP: .7 }, RB: { FLEX: .45, 'RB/WR': .5, OP: .1 }, WR: { FLEX: .45, 'RB/WR': .5, 'WR/TE': .75, OP: .1 }, TE: { FLEX: .1, 'WR/TE': .25, OP: .1 }, K: {}, DEF: {} };
@@ -2224,8 +2242,17 @@ function fillInFor(id) {
 }
 function weekVals(id, weeks) {
   const r = D.M[id]; if (!r) return weeks.map(() => 0);
-  const u = r.u, fill = fillInFor(id), own = u.pos === 'DEF' ? persOwn(u.team) : [1, 0];
-  const base = rosBase(id) * own[0] + own[1];   // a D/ST also gains or loses from its own defenders and returners
+  const u = r.u, fill = fillInFor(id);
+  // The projection in rosBase is for this week's opponent. Take that matchup back out, so later weeks get only their own.
+  // A D/ST's or kicker's projection is mostly matchup, and Sleeper's read of it can differ from this model's, so for
+  // them later weeks start from the blended scoring average alone.
+  let rb = rosBase(id), avgOnly = false; const curOpp = u.team ? D.tg[u.team]?.opp : null, sa = seasonAvg(id);
+  if (r.projPts != null && curOpp && !injKind(u.inj) && !(state.overrides[id] != null && ok(+state.overrides[id]))) {
+    if ((u.pos === 'DEF' || u.pos === 'K') && sa != null) { rb = sa; avgOnly = true; }
+    else rb += (sa != null ? state.settings.blend : 1) * r.projPts * (1 / matchupMult(u.pos, curOpp, D.week) - 1);
+  }
+  const own = u.pos === 'DEF' ? (avgOnly ? persOwn(u.team, 1) : persOwn(u.team)) : [1, 0];
+  const base = rb * own[0] + own[1];   // a D/ST also gains or loses from its own defenders and returners
   const back = injKind(u.inj) ? returnWeek(id) : null;
   return weeks.map((w, i) => {
     if (back != null && w < back) return 0;
@@ -2307,6 +2334,8 @@ function computeWaivers() {
     }
     // streaming a kicker or defense: swap for the one you have when that's nearly as good
     if (best && bestSame && bestSame !== best && bestSame.score >= 0.7 * best.score) best = bestSame;
+    // a kicker or D/ST for another: keep the week-by-week difference, so the reason can compare them head to head
+    if (best && single && best.d && posOf(best.d) === fp) best.h2h = weeks.slice(0, H).map((_, wi) => V[f][wi] - V[best.d][wi]);
     if (best && (best.hz > 0.5 || (longTerm && best.score > 1))) moves.push(best);
   }
   moves.sort((a, b) => b.score - a.score);
@@ -2320,7 +2349,15 @@ function computeWaivers() {
 function waiverWhy(m, needs, weeks, H) {
   const fu = D.U.get(m.f), why = [];
   const nd = needs.list.find(n => n.P === fu.pos); if (nd && nd.level === 'Weak') why.push(`fills your weak ${fu.pos === 'DEF' ? 'D/ST' : fu.pos} spot`);
-  if (m.starts.length) why.push(`starts in ${m.starts.length === H ? 'every week' : 'week' + (m.starts.length > 1 ? 's ' : ' ') + m.starts.map(s => s[0]).join(', ')} of the next ${H} (${[...new Set(m.starts.map(s => s[1]))].join('/')})`);
+  if (m.h2h) {
+    // one kicker or D/ST for another: which scores more, week by week, and how settled each one's average is
+    const nm = id => { const u = D.U.get(id); return u.pos === 'DEF' ? u.team : shortName(id); }, F = nm(m.f), X = nm(m.d), n = m.h2h.length;
+    const wins = m.h2h.filter(x => x > 0.05).length, avg = m.h2h.reduce((s, x) => s + x, 0) / n, now = m.h2h[0], s = schedOpp(fu.team, weeks[0]);
+    why.push(`${F} projects more than ${X} in ${wins} of ${n} week${n === 1 ? '' : 's'}, ${avg >= 0 ? '+' : '−'}${f1(Math.abs(avg))} pts a week on average`);
+    if (n > 1 && Math.abs(now) >= 0.3) why.push(`${now < 0 ? 'worse' : 'better'} this week (${now < 0 ? '−' : '+'}${f1(Math.abs(now))}${s.opp ? `, ${s.home ? 'vs' : 'at'} ${s.opp}` : ''})`);
+    const hist = id => { const h = D.H[id], p = D.prevPPG?.[id]?.[0]; return h?.n ? `${nm(id)} ${f1(h.avg)} in ${h.n} game${h.n === 1 ? '' : 's'}${ok(p) ? ` (${f1(p)} last season)` : ''}` : null; };
+    const hs = [hist(m.f), hist(m.d)].filter(Boolean); if (hs.length) why.push(`scoring averages ${hs.join(', ')}; small samples are blended with last season`);
+  } else if (m.starts.length) why.push(`starts in ${m.starts.length === H ? 'every week' : 'week' + (m.starts.length > 1 ? 's ' : ' ') + m.starts.map(s => s[0]).join(', ')} of the next ${H} (${[...new Set(m.starts.map(s => s[1]))].join('/')})`);
   else why.push('adds depth for later weeks');
   if (m.d && !m.lost.length) why.push(`${D.U.get(m.d).name} wouldn’t have started in that stretch`);
   if (m.d && m.depLost > 0.5) why.push(`costs ${f1(m.depLost)} pts of injury cover as a backup ${D.U.get(m.d).pos === 'DEF' ? 'D/ST' : D.U.get(m.d).pos} (already counted in the gain)`);
@@ -2328,8 +2365,9 @@ function waiverWhy(m, needs, weeks, H) {
   const sm = mean(weeks.slice(1, H).map(w => { const s = schedOpp(fu.team, w); return s.opp ? matchupMult(fu.pos, s.opp, w) : null; }).filter(ok));
   if (sm && sm >= 1.04) why.push('soft upcoming schedule'); else if (sm && sm <= 0.96) why.push('tough upcoming schedule');
   if (fu.pos === 'DEF' && D.pers?.[fu.team]) {
-    const [om, st] = persOwn(fu.team), net = om - 1 + st / 8, t = D.pers[fu.team], mv = t.moves.find(x => (net > 0 ? x.val > 0 : x.val < 0)) || t.stMoves.find(x => (net > 0 ? x.val > 0 : x.val < 0));
-    if (Math.abs(net) >= 0.02) why.push(`${fu.team} defense ${net > 0 ? 'improved' : 'weakened'} (${spct(om - 1)}${mv ? ', ' + moveText(mv) : ''})`);
+    const [om, st] = persOwn(fu.team, 1), net = om - 1 + st / 8, t = D.pers[fu.team], same = x => (net > 0 ? x.val > 0 : x.val < 0);
+    const mvs = [...t.moves.filter(same).slice(0, 2), ...t.stMoves.filter(same)].slice(0, 2);
+    if (Math.abs(net) >= 0.02) why.push(`${fu.team} defense ${net > 0 ? 'improved' : 'weakened'} (${spct(om - 1)}${mvs.length ? ': ' + mvs.map(moveText).join(', ') : ''})`);
   }
   return why.join('; ').replace(/^./, c => c.toUpperCase());
 }
@@ -2383,7 +2421,7 @@ function persSection(weeks, H) {
   const faced = {};
   for (const id of state.roster) { const u = D.U.get(id); if (!u || u.pos === 'DEF' || !D.M[id]) continue; for (const w of weeks.slice(0, H)) { const o = schedOpp(u.team, w).opp; if (o) (faced[o] = faced[o] || []).push([w, u.name.split(' ').slice(-1)[0]]); } }
   const eff = T => ({ QB: persMult(T, 'QB') - 1, RB: persMult(T, 'RB') - 1, WR: persMult(T, 'WR') - 1, TE: persMult(T, 'TE') - 1 });
-  const rows = ABBR.filter(D.pers.hasOwnProperty.bind(D.pers)).map(T => { const e = eff(T), own = persOwn(T); return { T, e, own, size: Math.max(...Object.values(e).map(Math.abs), Math.abs(own[0] - 1), Math.abs(own[1]) / 8), faced: faced[T] || null }; })
+  const rows = ABBR.filter(D.pers.hasOwnProperty.bind(D.pers)).map(T => { const e = eff(T), own = persOwn(T, 1); return { T, e, own, size: Math.max(...Object.values(e).map(Math.abs), Math.abs(own[0] - 1), Math.abs(own[1]) / 8), faced: faced[T] || null }; })
     .filter(r => r.size >= 0.015 || D.pers[r.T].moves.length || D.pers[r.T].stMoves.length)
     .sort((a, b) => (!!b.faced - !!a.faced) || b.size - a.size);
   if (!rows.length) return '';
