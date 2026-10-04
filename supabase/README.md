@@ -20,16 +20,9 @@ You only do this once. It takes about 20 minutes.
 
 Sign-in by email uses a code people type in. Links are a poor fit on phones: they open in the mail app's own browser, and the person ends up signed in there instead of where they started.
 
-**Authentication → Emails → Templates.** Change both **Magic link** and **Confirm signup** so the email shows the code. For example:
+**Authentication → Emails → Templates.** Change both **Magic link** and **Confirm signup** so the email shows the code: set the subject to `Your Benny's Picks sign-in code`, and paste all of [`email/sign-in-code.html`](email/sign-in-code.html) into the body. It's a dark, on-brand email built to stay out of spam (tables and inline styles, one small logo from bennyspicks.us, one link to the site).
 
-```html
-<h2>Your Benny's Picks code</h2>
-<p>Enter this code to sign in:</p>
-<p style="font-size:28px;font-weight:700;letter-spacing:4px">{{ .Token }}</p>
-<p>It expires in an hour. If you didn't ask for it, ignore this email.</p>
-```
-
-New users get **Confirm signup** and returning users get **Magic link**, so both need the code.
+New users get **Confirm signup** and returning users get **Magic link**, so both need the code. Keep **Email OTP Length** at 6 (Authentication → Sign In / Providers → Email).
 
 ## 4. Turn on Google sign-in
 
@@ -43,6 +36,12 @@ New users get **Confirm signup** and returning users get **Magic link**, so both
 ## 5. Send email through your own mail service (recommended)
 
 Supabase's built-in email sender allows only a few emails an hour, which is fine for testing but not for real use. Under **Authentication → Emails → SMTP Settings**, connect a mail service. Resend, Postmark and Amazon SES all work, and Resend's free tier covers a hobby site.
+
+To keep the emails out of spam:
+- Verify `bennyspicks.us` with the mail service (its DKIM and sending-subdomain records go in GoDaddy DNS), and keep a DMARC record (`_dmarc` TXT, `v=DMARC1; p=none;` to start).
+- In SMTP Settings, send from an address on that domain with a clear name: sender email `signin@bennyspicks.us`, sender name `Benny's Picks`.
+- Test the score: open mail-tester.com, copy the address it shows, and enter it in the site's sign-in form. Aim for 9/10 or better.
+- Once a few weeks of email look clean, tighten DMARC to `v=DMARC1; p=quarantine;`.
 
 ## 6. Connect the site
 
@@ -126,7 +125,14 @@ Then open **stripe-webhook → Details** and turn **Enforce JWT verification** *
 
 Switch Stripe to **Live mode** and recreate the two products there; live and test products are separate. Then, in Supabase:
 - update `STRIPE_SECRET_KEY` (`sk_live_…`), `PRICE_MONTHLY` and `PRICE_SEASON`;
-- add a live-mode webhook endpoint the same way, and update `STRIPE_WEBHOOK_SECRET` with its new signing secret.
+- add a live-mode webhook endpoint the same way, and update `STRIPE_WEBHOOK_SECRET` with its new signing secret;
+- clear the Pro records left by test purchases. Their Stripe customer IDs exist only in test mode, so in live mode checkout and Manage billing fail for those accounts ("No such customer"). If nobody has paid in live mode yet, run this in **SQL Editor**:
+
+  ```sql
+  delete from public.entitlements;   -- test-mode Pro records only; anyone who bought Pro in test mode loses it
+  ```
+
+  If live purchases already exist, delete only the test rows, by their customer IDs from Stripe's test-mode **Customers** page: `delete from public.entitlements where stripe_customer_id in ('cus_…', 'cus_…');`
 
 Before taking real payments, fill in the bracketed parts of `privacy.html` and `terms.html`: your name, a contact email and the refund policy.
 
@@ -134,6 +140,17 @@ Before taking real payments, fill in the bracketed parts of `privacy.html` and `
 
 1. Update `SEASON_END` in Supabase and `SEASON_END_LABEL` in `index.html`.
 2. If the season pass price changes, update the Stripe price, the `PRICE_SEASON` secret and `PRO_PRICE` in `index.html`.
+
+# Before promoting the site
+
+Check these once, before real traffic arrives:
+
+1. **Sign-in email.** Supabase's built-in sender allows only a few emails an hour for the whole project, so codes stop arriving once several people sign in in the same hour. Connect a mail service (step 5 of account setup) and send yourself a code to test it.
+2. **Google sign-in is published.** In Google Cloud Console → **OAuth consent screen**, the publishing status must be **In production**. In "Testing", only listed test users can sign in with Google.
+3. **Stripe is in live mode,** with the test-mode Pro records cleared (Pro payments, step 7).
+4. **Latest database rules.** Run [`schema.sql`](schema.sql) again in **SQL Editor** (it's safe to re-run). It adds limits so one account can't fill the database.
+5. **Latest functions.** Redeploy `checkout`, `billing-portal` and `stripe-webhook` from `functions/` whenever they change. `checkout` and `billing-portal` accept browser calls only from `https://bennyspicks.us` (and `http://localhost:8000` for testing). Keep **Enforce JWT verification** off for `stripe-webhook` only.
+6. **Free-plan limits.** Free projects pause after about a week without activity (sign-in and the Stripe webhook stop until it's restored), and backups are limited. Once Pro revenue covers it, the Pro plan removes the pausing and adds daily backups.
 
 # Ads (Google AdSense)
 

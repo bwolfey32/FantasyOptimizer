@@ -21,6 +21,21 @@ create table if not exists public.lineups (
   primary key (user_id, team_id, season, week)
 );
 
+-- Limits, so one account can't fill the database: a sane season, and at most 1,000 saved lineups per person (real use is
+-- one per team per week, a few dozen a season). Updating a lineup that's already saved is always allowed.
+alter table public.lineups drop constraint if exists lineups_season_range;
+alter table public.lineups add constraint lineups_season_range check (season between 2019 and 2100);
+create or replace function public.cap_lineups() returns trigger language plpgsql set search_path = '' as $$
+begin
+  if not exists (select 1 from public.lineups l where l.user_id = new.user_id and l.team_id = new.team_id and l.season = new.season and l.week = new.week)
+     and (select count(*) from public.lineups l where l.user_id = new.user_id) >= 1000 then
+    raise exception 'This account has too many saved lineups' using errcode = 'check_violation';
+  end if;
+  return new;
+end $$;
+drop trigger if exists lineups_cap on public.lineups;
+create trigger lineups_cap before insert on public.lineups for each row execute function public.cap_lineups();
+
 create or replace function public.touch_updated_at() returns trigger language plpgsql set search_path = '' as $$
 begin new.updated_at = now(); return new; end $$;
 drop trigger if exists user_state_touch on public.user_state;

@@ -1,0 +1,58 @@
+<!doctype html>
+<!-- Benny's Picks sign-in code email. Paste into Supabase → Authentication → Emails → Templates, for both
+     "Magic link" and "Confirm signup". Supabase fills in {{ .Token }}.
+     Built for email clients: tables and inline styles only, no web fonts or external CSS, one small image hosted on
+     bennyspicks.us, and a single link back to the site's own domain. Dark colors match the site's dark theme. -->
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="color-scheme" content="dark">
+<meta name="supported-color-schemes" content="dark">
+<title>Your Benny's Picks sign-in code</title>
+</head>
+<body style="margin:0;padding:0;background-color:#0e1512;">
+<!-- inbox preview text -->
+<div style="display:none;max-height:0;overflow:hidden;opacity:0;color:#0e1512;">Your sign-in code is {{ .Token }}. It expires in an hour.</div>
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="background-color:#0e1512;">
+  <tr>
+    <td align="center" style="padding:32px 16px;">
+      <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="max-width:480px;">
+        <!-- brand -->
+        <tr>
+          <td style="padding:0 4px 20px 4px;">
+            <table role="presentation" cellpadding="0" cellspacing="0" border="0">
+              <tr>
+                <td style="vertical-align:middle;padding-right:12px;"><img src="https://bennyspicks.us/assets/icon-192.png" width="44" height="44" alt="BP" style="display:block;border:0;border-radius:10px;"></td>
+                <td style="vertical-align:middle;font-family:'Arial Narrow','Helvetica Neue',Arial,sans-serif;font-size:22px;font-weight:700;letter-spacing:0.5px;text-transform:uppercase;color:#e4ebe6;">Benny&#8217;s Picks</td>
+              </tr>
+            </table>
+          </td>
+        </tr>
+        <!-- card -->
+        <tr>
+          <td style="background-color:#151e1a;border:1px solid #29352f;border-radius:12px;padding:28px 28px 24px 28px;font-family:'Helvetica Neue',Helvetica,Arial,sans-serif;color:#e4ebe6;">
+            <p style="margin:0 0 6px 0;font-size:12px;font-weight:700;letter-spacing:1.5px;text-transform:uppercase;color:#e2bb52;">Sign in</p>
+            <h1 style="margin:0 0 14px 0;font-family:'Arial Narrow','Helvetica Neue',Arial,sans-serif;font-size:26px;line-height:1.15;font-weight:700;text-transform:uppercase;color:#e4ebe6;">Your sign-in code</h1>
+            <p style="margin:0 0 20px 0;font-size:15px;line-height:1.5;color:#a9b7af;">Enter this code on Benny&#8217;s Picks to sign in. It expires in an hour.</p>
+            <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0">
+              <tr>
+                <td align="center" style="background-color:#1c2722;border:1px solid #29352f;border-left:4px solid #4fc38e;border-radius:8px;padding:18px 12px 18px 20px;font-family:'SFMono-Regular',Menlo,Consolas,'Courier New',monospace;font-size:34px;line-height:1;font-weight:700;letter-spacing:8px;color:#4fc38e;">{{ .Token }}</td>
+              </tr>
+            </table>
+            <p style="margin:20px 0 0 0;font-size:13px;line-height:1.5;color:#a9b7af;">Didn&#8217;t ask for this? You can ignore this email. Nobody can sign in without the code.</p>
+          </td>
+        </tr>
+        <!-- footer -->
+        <tr>
+          <td style="padding:18px 4px 0 4px;font-family:'Helvetica Neue',Helvetica,Arial,sans-serif;font-size:12px;line-height:1.5;color:#6f7d75;">
+            Benny&#8217;s Picks, fantasy football lineup help · <a href="https://bennyspicks.us/" style="color:#4fc38e;text-decoration:none;">bennyspicks.us</a><br>
+            You got this email because someone entered this address to sign in.
+          </td>
+        </tr>
+      </table>
+    </td>
+  </tr>
+</table>
+</body>
+</html>
