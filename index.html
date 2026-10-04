@@ -787,7 +787,10 @@ function erf(x) { const s = Math.sign(x); x = Math.abs(x); const t = 1 / (1 + 0.
 const Phi = z => 0.5 * (1 + erf(z / Math.SQRT2));
 const pAbove = (x, m, sd) => sd > 0 ? 1 - Phi((x - m) / sd) : (m >= x ? 1 : 0);
 const mean = a => a.length ? a.reduce((s, x) => s + x, 0) / a.length : null;
-const store = {
+/* index.html#selftest (with ?fixture=path) loads only that saved data bundle, for tests/selftest.html: no live data, account,
+   analytics or Sleeper sync, and nothing read from or written to this browser's storage. */
+const SELFTEST = location.hash === '#selftest';
+const store = SELFTEST ? { get: (k, d = null) => d, set: () => true, del() {} } : {
   get(k, d = null) { try { const v = localStorage.getItem(k); return v == null ? d : JSON.parse(v); } catch { return d; } },
   set(k, v) { try { localStorage.setItem(k, JSON.stringify(v)); return true; } catch { return false; } },
   del(k) { try { localStorage.removeItem(k); } catch {} },
@@ -881,7 +884,7 @@ const D = { loading: true, progress: 0, errors: [], open: new Set(), U: new Map(
    loads for people who sign in. */
 const CLOUD = { url: 'https://hwfppigktdpjmnfretgo.supabase.co', key: 'sb_publishable_SsduRo6wMk1OZvEJH-2zMw_eHF8ygC4' };   // project URL and publishable key, from Supabase → Project settings → API keys
 const SB_LIB = { src: 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.117.2/dist/umd/supabase.js', sri: 'sha384-Rj26LVGvoeRVR6+mwQmFfcR3QOBEwT+ZmuCWpuiqeTzJpCs0ER4ITAWGb4Hiy3Ok' };
-const acct = { on: !!(CLOUD.url && CLOUD.key) && location.hash !== '#export', sb: null, lib: null, user: null, ready: false, sync: 'ok', rev: 0, h: null, hs: {}, at: 0, pulledAt: 0, histAt: 0,
+const acct = { on: !!(CLOUD.url && CLOUD.key) && location.hash !== '#export' && !SELFTEST, sb: null, lib: null, user: null, ready: false, sync: 'ok', rev: 0, h: null, hs: {}, at: 0, pulledAt: 0, histAt: 0,
   busy: false, again: false, retries: 0, pushT: null, choice: null, step: 'email', email: '', code: '', msg: null, delArm: false, toastNext: false };
 
 /* ---------- analytics ----------
@@ -895,7 +898,7 @@ const PH = { key: 'phc_w2pVgo7e9LxeAKLXUemtyXDRWZfgVE29UtvBm3fKX3HQ', host: 'htt
 const anFlag = new URLSearchParams(location.search).get('analytics');
 if (anFlag === 'off') store.set('fo1:noan', 1); else if (anFlag === 'on') store.del('fo1:noan');
 const an = { ph: null, q: [], qp: [], user: null, once: new Set(), loading: false,
-  on: !!PH.key && location.hash !== '#export' && /^https?:$/.test(location.protocol) && !/^(localhost|127\.|\[::1\])/.test(location.hostname)
+  on: !!PH.key && location.hash !== '#export' && !SELFTEST && /^https?:$/.test(location.protocol) && !/^(localhost|127\.|\[::1\])/.test(location.hostname)
     && !store.get('fo1:noan') && navigator.doNotTrack !== '1' && !navigator.globalPrivacyControl };
 const anCtx = () => ({ device: matchMedia('(pointer: coarse)').matches || innerWidth < 700 ? 'mobile' : 'desktop', tier: isPro() ? 'pro' : 'free', signed_in: !!acct.user, nfl_week: D.week || null });
 function track(ev, props, now) {
@@ -1652,6 +1655,11 @@ function ingest(inp) {
    the saved copy stays and the status line shows its age. `fresh` (a week or season change) skips the saved copy. */
 async function load(opts = {}) {
   const exporting = location.hash === '#export';
+  if (SELFTEST) {
+    const snap = await fetchJSON(new URLSearchParams(location.search).get('fixture') || 'snapshot.json').catch(() => null);
+    if (snap?.v === 1) { D.coaches = snap.coaches || D.coaches; ingest(snap); }
+    D.loading = false; D.failed = !D.inp; render(); window.__ready = true; return;
+  }
   if (opts.fresh) D.inp = null;
   D.failed = false; D.errors = []; D.progress = 0;
   const useSaved = snap => { D.snapshot = snap; D.coaches = snap.coaches || D.coaches; ingest(snap); };
@@ -4047,7 +4055,7 @@ function applyCsv() {
 }
 
 acctBoot();
-{ const tab = TAB_OF[location.hash.slice(1)]; if (tab && needsTeam() && INTENT_TABS.has(tab)) D.intent = tab; if (tab) state.tab = tab; else if (location.hash !== '#export' && HASH[state.tab]) { try { history.replaceState(null, '', '#' + HASH[state.tab]); } catch {} } }
+{ const tab = TAB_OF[location.hash.slice(1)]; if (tab && needsTeam() && INTENT_TABS.has(tab)) D.intent = tab; if (tab) state.tab = tab; else if (location.hash !== '#export' && !SELFTEST && HASH[state.tab]) { try { history.replaceState(null, '', '#' + HASH[state.tab]); } catch {} } }
 render();
 load();
 setTimeout(anStart, 1500);

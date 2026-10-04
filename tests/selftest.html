@@ -1,0 +1,79 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Benny's Picks self-test</title>
+<style>
+  body { font: 14px/1.5 system-ui, sans-serif; margin: 16px; background: #fff; color: #111; }
+  pre { white-space: pre-wrap; }
+  iframe { width: 1200px; height: 900px; border: 1px solid #ccc; }
+</style>
+</head>
+<body>
+<h1>Benny's Picks self-test</h1>
+<p>Loads the site on a frozen data bundle (week 4 of 2026, taken mid-games) and checks the model's rules. Run it with
+<code>scripts/selftest.ps1</code>, or serve the repo folder and open this page. Results land in the block below; any line
+starting with FAIL fails the run.</p>
+<pre id="selftest-out">running…</pre>
+<iframe id="app" src="../index.html?fixture=tests/fixture-2026w4.json#selftest" title="App under test"></iframe>
+<script>
+const out = [], frame = document.getElementById('app');
+let W;
+const ev = s => W.eval(s);                       // the app's top-level let/const aren't on window, so reach them by eval
+const pass = name => out.push('PASS ' + name);
+const fail = (name, why) => out.push('FAIL ' + name + (why ? ': ' + why : ''));
+function check(name, fn) {
+  try { const r = fn(); if (r === true || r === undefined) pass(name); else fail(name, r === false ? '' : String(r)); }
+  catch (e) { fail(name, 'threw ' + (e && e.stack || e)); }
+}
+const near = (a, b, tol = 1e-6) => Math.abs(a - b) <= tol;
+
+// The reviewer's roster (Oct 4, 2026): 12 teams, PPR, 1 QB / 2 RB / 2 WR / 1 TE / 1 FLEX / D/ST / K, 4-week window.
+const ROSTER = ['Baker Mayfield', 'Jared Goff', 'Jahmyr Gibbs', 'James Cook', 'Tony Pollard', 'Zach Charbonnet', 'Bhayshul Tuten',
+  'Tee Higgins', 'Jaylen Waddle', 'Khalil Shakir', 'Jakobi Meyers', 'Josh Downs', 'Rashid Shaheed', 'Dalton Kincaid', 'Hunter Henry',
+  'Brandon Aubrey', 'PIT'];
+function idOf(name) {
+  const D = ev('D');
+  if (D.U.has(name)) return name;
+  const ids = D.nameIdx.get(ev('norm')(name)) || [];
+  return ids.sort((a, b) => (D.M[b]?.mean || 0) - (D.M[a]?.mean || 0))[0] || null;
+}
+/* Reset to the reviewer's setup: default slots, PPR, no TE premium, default waivers. Each test starts here. */
+function setup(extra) {
+  const st = ev('state'), DEF = ev('DEFAULT_STATE'), D = ev('D');
+  st.roster = ROSTER.map(idOf);
+  st.slots = Object.assign({}, DEF.slots);
+  st.scoring = 'ppr'; st.tePrem = 0; st.sleeper = null; st.overrides = {}; st.returnWeek = {};
+  st.espn = Object.assign({}, DEF.espn);
+  st.waivers = JSON.parse(JSON.stringify(DEF.waivers));
+  st.settings = Object.assign({}, DEF.settings, { w: Object.assign({}, DEF.settings.w) });
+  if (extra) extra(st, D);
+  D.wCache = null; D.hist = {};
+  ev('syncScoring')(); ev('computeAll')();
+}
+const M = id => ev('D').M[id];
+const name = id => ev('D').U.get(id)?.name || id;
+
+const TESTS = [];
+const test = (name, fn) => TESTS.push([name, fn]);
+
+/* ---------- Phase 0: the harness itself ---------- */
+test('fixture loaded (week 4, 2026)', () => { const D = ev('D'); return D.season === 2026 && D.week === 4 && D.U.size > 300 || `season ${D.season} week ${D.week}, ${D.U.size} players`; });
+test('reviewer roster resolves to 17 players', () => { setup(); const r = ev('state').roster; return r.every(Boolean) && r.length === 17 || 'missing: ' + ROSTER.filter((n, i) => !r[i]).join(', '); });
+test('lineup fills every slot', () => { setup(); const { starters } = ev('optimize')(); return starters.every(s => s.r) || 'empty: ' + starters.filter(s => !s.r).map(s => s.slot.k).join(', '); });
+
+window.addEventListener('load', () => {
+  const t0 = Date.now();
+  (function wait() {
+    W = frame.contentWindow;
+    if (!W || !W.__ready) { if (Date.now() - t0 > 60000) { document.getElementById('selftest-out').textContent = 'FAIL app never became ready'; return; } return setTimeout(wait, 100); }
+    for (const [n, fn] of TESTS) check(n, fn);
+    const nFail = out.filter(l => l.startsWith('FAIL')).length;
+    out.push(`DONE ${TESTS.length - nFail} passed, ${nFail} failed`);
+    document.getElementById('selftest-out').textContent = out.join('\n');
+  })();
+});
+</script>
+</body>
+</html>
