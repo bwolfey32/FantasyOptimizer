@@ -140,6 +140,10 @@ test('players you started keep their slots; others already playing stay benched'
   const lost = mine.filter(id => !on.has(id)), promoted = L.filter(id => !mine.includes(id) && on.has(id));
   return !lost.length && !promoted.length || `lost ${lost.map(name)}, promoted ${promoted.map(name)}`;
 });
+test('a lineup first saved after kickoff stays labeled as Benny\'s assumption', () => {
+  setup(); ev('viewLineup')(); const ks = ev('knownStarters')(), html = ev('viewLineup')();
+  return ks.src === 'guess' && /Benny doesn’t know who you started/.test(html) || `source ${ks.src}`;
+});
 test('"I started him" / "I didn\'t start him" move a player already playing in and out', () => {
   setup(); const L = lockedOnRoster(), inLineup = id => ev('optimize')().starters.some(s => s.r?.id === id);
   const benched = L.find(id => !inLineup(id)), started = L.find(inLineup);
@@ -220,6 +224,25 @@ test('the model note reports calibration once three weeks are checked', () => {
   D.calib = { weeks: [1, 2, 3], n: 900, coverage50: 0.47, mae: { model: 6.1, sleeper: 6.4 }, pairs: { bins: [{ lo: 0.65, hi: 0.8, obs: 0.7, n: 120 }] } };
   const after = ev('modelNote')(), note = ev('calibNote')(); D.calib = null;
   return /isn’t available yet/.test(before) && /Checked against what players scored in weeks 1–3/.test(after) && /won 70%/.test(note) || 'notes didn\'t switch';
+});
+
+/* ---------- Phase 6: team names in roster import ---------- */
+test('team names resolve to the D/ST', () => {
+  const t = s => ev('teamOf')(ev('norm')(s));
+  const want = { 'Pittsburgh Steelers': 'PIT', 'Steelers': 'PIT', 'PIT D/ST': 'PIT', 'Pittsburgh': 'PIT', 'Steelers Defense': 'PIT', 'New York Giants': 'NYG', 'New York': null, 'Los Angeles': null, 'Josh Downs': null };
+  const bad = Object.entries(want).filter(([s, T]) => t(s) !== T).map(([s, T]) => `${s} → ${t(s)} (want ${T})`);
+  return !bad.length || bad.join('; ');
+});
+test('pasting "Pittsburgh Steelers" adds the Steelers D/ST', () => {
+  setup(); const { ids, miss } = ev('matchPasted')('Pittsburgh Steelers\nJosh Downs');
+  return ids.includes('PIT') && ids.includes(idOf('Josh Downs')) && !miss.length || `ids ${ids}, missed ${miss}`;
+});
+test('searching "Pittsburgh" finds the Steelers D/ST', () => { setup(); return ev('acMatches')('Pittsburgh').some(u => u.id === 'PIT') || 'not in results'; });
+test('picking a missing name clears its "not found" note', () => {
+  setup(); const D = ev('D');
+  D.flow = { method: 'manual', manual: [], manualMiss: ['Pitsburgh Steelers', 'Someone Else'], msg: ['', 'Added 1. Not found: Pitsburgh Steelers, Someone Else'] };
+  try { ev('acPick')('PIT', 'manual'); return JSON.stringify(D.flow.manualMiss) === '["Someone Else"]' && !/Steelers/.test(D.flow.msg[1]) || `left ${D.flow.manualMiss}, message "${D.flow.msg[1]}"`; }
+  finally { D.flow = null; }
 });
 
 /* ---------- every phase: the views still render ---------- */

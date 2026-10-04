@@ -675,6 +675,15 @@ td .wks { flex-wrap: nowrap; }
 /* ---------- constants ---------- */
 const TEAMS = {ARI:[22,'Cardinals'],ATL:[1,'Falcons'],BAL:[33,'Ravens'],BUF:[2,'Bills'],CAR:[29,'Panthers'],CHI:[3,'Bears'],CIN:[4,'Bengals'],CLE:[5,'Browns'],DAL:[6,'Cowboys'],DEN:[7,'Broncos'],DET:[8,'Lions'],GB:[9,'Packers'],HOU:[34,'Texans'],IND:[11,'Colts'],JAX:[30,'Jaguars'],KC:[12,'Chiefs'],LV:[13,'Raiders'],LAC:[24,'Chargers'],LAR:[14,'Rams'],MIA:[15,'Dolphins'],MIN:[16,'Vikings'],NE:[17,'Patriots'],NO:[18,'Saints'],NYG:[19,'Giants'],NYJ:[20,'Jets'],PHI:[21,'Eagles'],PIT:[23,'Steelers'],SF:[25,'49ers'],SEA:[26,'Seahawks'],TB:[27,'Buccaneers'],TEN:[10,'Titans'],WAS:[28,'Commanders']};
 const ABBR = Object.keys(TEAMS);
+const TEAM_CITY = {ARI:'Arizona',ATL:'Atlanta',BAL:'Baltimore',BUF:'Buffalo',CAR:'Carolina',CHI:'Chicago',CIN:'Cincinnati',CLE:'Cleveland',DAL:'Dallas',DEN:'Denver',DET:'Detroit',GB:'Green Bay',HOU:'Houston',IND:'Indianapolis',JAX:'Jacksonville',KC:'Kansas City',LV:'Las Vegas',LAC:'Los Angeles',LAR:'Los Angeles',MIA:'Miami',MIN:'Minnesota',NE:'New England',NO:'New Orleans',NYG:'New York',NYJ:'New York',PHI:'Philadelphia',PIT:'Pittsburgh',SF:'San Francisco',SEA:'Seattle',TB:'Tampa Bay',TEN:'Tennessee',WAS:'Washington'};
+/* A team named any common way, for D/ST lines and searches: "Steelers", "Pittsburgh Steelers", "Pittsburgh", "PIT", each
+   optionally with "D/ST", "DST", "Defense" or "Def". A city two teams share (New York, Los Angeles) needs the nickname.
+   `k` is already normalized (norm). Returns the abbreviation or null. */
+function teamOf(k) {
+  const t = k.replace(/\s*\(?\b(d\/st|dst|defense|def)\b\)?\s*$/, '').replace(/\s*\b(d\/st|dst|defense|def)\b\s*/g, ' ').trim(); if (!t) return null;
+  return ABBR.find(T => { const nick = TEAMS[T][1].toLowerCase(), city = TEAM_CITY[T].toLowerCase();
+    return t === T.toLowerCase() || t === nick || t === city + ' ' + nick || (t === city && ABBR.filter(x => TEAM_CITY[x] === TEAM_CITY[T]).length === 1); }) || null;
+}
 const ESPN_TO_ABBR = Object.fromEntries(ABBR.map(a => [TEAMS[a][0], a]));
 const fixAbbr = a => a ? ({WSH:'WAS', JAC:'JAX', LA:'LAR', OAK:'LV', SD:'LAC', STL:'LAR'}[a] || a) : null;
 const POS = ['QB','RB','WR','TE','K','DEF'];
@@ -2044,7 +2053,7 @@ function knownStarters() {
   const h = histAll()[liveKey()];
   if (state.sleeper?.starters) { ids = new Set(state.sleeper.starters); src = 'Sleeper'; }
   else if (Object.keys(state.espn.slotOf || {}).length) { ids = new Set(Object.entries(state.espn.slotOf).filter(([, s]) => !(s === 20 || s === 21)).map(([id]) => id)); src = 'ESPN'; }
-  else if (h) { ids = new Set((h.starters || []).map(e => e[1]).filter(Boolean)); src = 'Benny'; }
+  else if (h) { ids = new Set((h.starters || []).map(e => e[1]).filter(Boolean)); src = h.guess ? 'guess' : 'Benny'; }
   else { ids = new Set(assignSlots(expandSlots(), state.roster.map(id => D.M[id]).filter(r => r && r.status === 'ok')).filter(a => a.r).map(a => a.r.id)); src = 'guess'; }
   const fix = state.liveFix?.[liveKey()] || {};
   for (const [id, on] of Object.entries(fix)) on ? ids.add(id) : ids.delete(id);
@@ -2069,6 +2078,8 @@ function recordLineup(starters) {
   for (const id of state.roster) { const r = D.M[id]; if (r?.locked && ok(r.actual)) act[id] = Math.round(r.actual * 10) / 10; }
   const snap = { team: curTeam()?.name || '', fmt: fmtName(), strategy: strategy(), starters: st,
     bench: state.roster.filter(id => !on.has(id) && D.M[id]).map(id => ent(D.M[id])), act };
+  // first saved after kickoff: it holds Benny's assumption about who started, not a lineup shown before the games
+  if (prev ? prev.guess : state.roster.some(id => D.M[id]?.locked)) snap.guess = true;
   if (prev && canon(Object.assign({}, prev, { savedAt: 0 })) === canon(Object.assign({}, snap, { savedAt: 0 }))) return;
   histPut(k, Object.assign(snap, { savedAt: Date.now() }));
 }
@@ -2765,6 +2776,11 @@ function persSection(weeks, H) {
   return `<div class="row-head"><h2>Defense &amp; special-teams changes</h2><span class="small muted">Signings, trades, injuries and returns the season stats don’t show yet. Already applied to the week chips (marked •), schedule ratings and Lineup projections.</span></div>
   <div class="card list">${top.map(row).join('')}${rest.length ? `<details class="item prs-more"><summary class="small">Show ${rest.length} more teams</summary><div class="list">${rest.map(row).join('')}</div></details>` : ''}</div>`;
 }
+// the Pro teaser for moves a free account doesn't see: marginal ones are counted as such, not as improvements
+function hiddenTxt(rest) {
+  const real = rest.filter(m => !m.marginal).length, marg = rest.length - real, s = k => k === 1 ? '' : 's';
+  return real ? `Benny found ${real} more move${s(real)} worth making${marg ? `, plus ${marg} marginal` : ''}` : `${marg} more marginal move${s(marg)}`;
+}
 function viewWaivers() { return waiversBody(); }
 function waiversBody() {
   const W = state.waivers;
@@ -2800,7 +2816,7 @@ function waiversBody() {
       <div class="mside">${m.d ? `<span class="pill o">Drop</span> <div>${pl(m.d)}</div>${schedStrip(m.d, weeks, H)}` : `<span class="pill m">No drop</span> <div class="small muted">You have an open roster spot</div>`}</div>
       <div class="mgain"><span class="num">+${f1(m.hz)}</span><span class="small muted">expected lineup pts, next ${H} wk${H > 1 ? 's' : ''}</span>${H < weeks.length ? `<span class="small ${m.later >= 0 ? 'trend-up' : 'trend-down'}">${m.later >= 0 ? '+' : ''}${f1(m.later)} after that</span>` : ''}</div>
       <div class="mwhy small">${m.marginal ? '<span class="pill m">Marginal: holding is fine</span> ' : m.longBet ? '<span class="pill q">Long-term bet</span> ' : ''}${esc(m.whyText)}. <button type="button" class="btn sm" data-taken="${esc(m.f)}">Taken in my league</button></div></div>`;
-  }).join('') + (moves.length > shownMoves.length ? `<div class="item lock-row">${lockLine(`Benny found ${moves.length - shownMoves.length} more move${moves.length - shownMoves.length === 1 ? '' : 's'} that improve your roster`)}</div>` : '')
+  }).join('') + (moves.length > shownMoves.length ? `<div class="item lock-row">${lockLine(hiddenTxt(moves.slice(shownMoves.length)))}</div>` : '')
     : `<div class="item" style="padding:14px"><span class="muted">No free agent improves your lineup over ${hLab}. Try a longer window or a higher ownership limit.</span></div>`;
   const posBest = POS.map(p => { const top = R.byH.filter(id => D.U.get(id).pos === p).slice(0, 4); return top.map(id => `<tr><td><strong>${esc(D.U.get(id).name)}</strong> <span class="small muted">${p} · ${D.U.get(id).team}</span></td><td>${ownTxt(id)}</td><td>${f1(rosBase(id))}</td><td>${f1(R.sumH(id))}</td><td class="l">${schedStrip(id, weeks, Math.min(H, 6))}</td><td><button type="button" class="btn sm" data-taken="${esc(id)}">Taken</button></td></tr>`).join(''); }).join('');
   const stashCard = R.stashes.length ? `<div class="row-head"><h2>Injured players you’re holding</h2><span class="small muted">Players set to Keep are never suggested as drops. Startable players who’ll be back start on Keep.</span></div>
@@ -3503,7 +3519,7 @@ function flowPanel() {
   if (F.step === 'review') return `<div class="card panel flow">${head}${reviewHTML()}</div>`;
   const methods = `<div class="seg methods" role="group" aria-label="How to bring in your team">${FLOW_METHODS.map(([k, l]) => `<button type="button" data-flowmethod="${k}" aria-pressed="${F.method === k}">${l}</button>`).join('')}</div>`;
   const body = { sleeper: flowSleeper, espn: flowEspn, manual: flowManual, restore: flowRestore }[F.method]();
-  return `<div class="card panel flow">${head}${methods}<div class="flow-body">${body}</div>${F.msg ? `<div class="banner ${F.msg[0]} small">${esc(F.msg[1])}</div>` : ''}</div>`;
+  return `<div class="card panel flow">${head}${methods}<div class="flow-body">${body}</div>${F.msg ? `<div class="banner ${F.msg[0]} small" id="flowMsg">${esc(F.msg[1])}</div>` : ''}</div>`;
 }
 function flowSleeper() {
   return `<p class="small muted">Enter your Sleeper username or a league ID. Benny copies your roster, lineup slots and scoring, keeps them in sync, and finds your league’s real free agents. No login needed.</p>${sleeperControls()}`;
@@ -3628,7 +3644,7 @@ function acMatches(q) {
   for (const u of D.U.values()) {
     if (!D.M[u.id] && !D.prevPPG?.[u.id]) continue;
     const n = norm(u.name), i = n.indexOf(q), last = n.split(' ').slice(-1)[0];
-    const teamHit = (u.team || '').toLowerCase() === q || (u.pos === 'DEF' && norm(TEAMS[u.team]?.[1] || '').startsWith(q));
+    const teamHit = (u.team || '').toLowerCase() === q || (u.pos === 'DEF' && TEAMS[u.team] && (norm(TEAMS[u.team][1]).startsWith(q) || norm(TEAM_CITY[u.team] + ' ' + TEAMS[u.team][1]).startsWith(q) || teamOf(q) === u.team));
     if (i < 0 && !teamHit) continue;
     out.push([(teamCode && u.team === teamCode ? 400 : i === 0 ? 300 : last.startsWith(q) ? 200 : i > 0 ? 100 : 50) + (D.M[u.id]?.mean || 0), u]);
   }
@@ -3651,6 +3667,16 @@ function renderAc(inputId) {
     + (items.length ? items.map((u, i) => { const r = D.M[u.id], on = have.has(u.id); return `<button type="button" role="option" class="ac-item" data-acadd="${esc(u.id)}" data-acmode="${mode}" aria-selected="${i === D.ac.idx}"><span class="ac-main"><span class="pname">${esc(u.name)}</span><span class="psub">${u.pos === 'DEF' ? 'D/ST' : u.pos} · ${u.team || 'FA'}${r && r.status !== 'bye' ? ` · ${f1(r.mean)} proj` : r?.status === 'bye' ? ' · bye' : ''}${u.inj ? ' · ' + esc(u.inj) : ''}</span></span>${tag(on)}</button>`; }).join('')
     : `<div class="ac-empty small muted">${q ? `No player matches “${esc(q)}”.` : 'Type a name to search.'}</div>`);
 }
+/* A pasted name that didn't match counts as found once you pick the player it names, so its "Not found" note doesn't
+   outlive the fix (on this screen, on review and in the saved message). */
+function resolveMiss(u) {
+  const F = D.flow; if (!F?.manualMiss?.length) return;
+  const n = norm(u.name), left = F.manualMiss.filter(m => { const k = norm(m); return !(k.includes(n) || n.includes(k) || (u.pos === 'DEF' && (teamOf(k) === u.team || k.includes(TEAMS[u.team][1].toLowerCase())))); });
+  if (left.length === F.manualMiss.length) return;
+  F.manualMiss = left;
+  F.msg = left.length ? ['', `Not found: ${left.slice(0, 6).join(', ')}${left.length > 6 ? '…' : ''}`] : ['info', 'Every pasted name is matched now.'];
+  const el = $('#flowMsg'); if (el) { el.className = `banner ${F.msg[0]} small`; el.textContent = F.msg[1]; }
+}
 function acPick(id, mode) {
   const u = D.U.get(id); if (!u) return;
   if (mode === 'cmp0' || mode === 'cmp1') {   // keep the other side as shown, even when it was Benny's default pick
@@ -3658,6 +3684,7 @@ function acPick(id, mode) {
   }
   if (mode === 'manual') {
     const set = D.flow.manual; if (!set.includes(id)) set.push(id); flowTry();
+    resolveMiss(u);
     const ml = $('#manualList'); if (ml) ml.innerHTML = manualListHTML();
     const rb = $('[data-act=flowmanual]'); if (rb) { rb.disabled = false; rb.textContent = `Review ${set.length} player${set.length === 1 ? '' : 's'}`; }
     const q = $('#mq'); if (q) { q.value = ''; renderAc('mq'); }
@@ -4202,6 +4229,7 @@ function matchPasted(text) {
   for (const l of lines) {
     const k = norm(l); if (k.length < 4 || /^\d/.test(k)) continue;
     let u = (D.nameIdx.get(k) || []).map(id => D.U.get(id)).sort((a, b) => (D.M[b.id]?.mean || 0) - (D.M[a.id]?.mean || 0))[0];
+    if (!u) { const T = teamOf(k); if (T) u = D.U.get(T); }   // a line naming a team ("Pittsburgh Steelers", "PIT D/ST") is its D/ST
     if (!u) u = names.find(([n]) => k.includes(n))?.[1];
     if (!u && /d\/?st|defense|\bdef\b/.test(k)) { const T = ABBR.find(a => k.includes(TEAMS[a][1].toLowerCase())); if (T) u = D.U.get(T); }
     if (u) { if (!ids.includes(u.id)) ids.push(u.id); } else if (/[a-z]{2,} [a-z]{2,}/.test(k) && k.length < 40) miss.push(l);
