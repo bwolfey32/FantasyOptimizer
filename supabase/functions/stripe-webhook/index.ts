@@ -67,7 +67,8 @@ Deno.serve(async (req) => {
         // moving up from monthly: stop the monthly plan at the end of what's already paid, so nobody pays twice
         const { data: cur } = await admin.from('entitlements').select('stripe_subscription_id').eq('user_id', userId).maybeSingle();
         if (cur?.stripe_subscription_id) {
-          const sub = await stripe.subscriptions.update(cur.stripe_subscription_id, { cancel_at_period_end: true }).catch(() => null);
+          // the metadata tells the cancel-request event below that this ending is an upgrade, not churn
+          const sub = await stripe.subscriptions.update(cur.stripe_subscription_id, { cancel_at_period_end: true, metadata: { ended_by: 'season_upgrade' } }).catch(() => null);
           if (sub) await save(userId, subFields(sub));
         }
         await track(userId, 'payment_confirmed', { plan: 'season', amount: (s.amount_total ?? 0) / 100, currency: s.currency, upgraded_from_monthly: !!cur?.stripe_subscription_id });
@@ -83,6 +84,18 @@ Deno.serve(async (req) => {
       if (userId) {
         await save(userId, subFields(sub));
         if (event.type === 'customer.subscription.deleted') await track(userId, 'subscription_ended', { plan: 'monthly' });
+        else {
+          // Churn on the day it's decided: Stripe sends updates for many reasons, so react only when cancelling was
+          // switched on or off (the portal sets cancel_at_period_end; newer Stripe versions may set cancel_at instead).
+          const prev = ((event.data as any).previous_attributes || {}) as Record<string, unknown>;
+          if ('cancel_at_period_end' in prev || 'cancel_at' in prev) {
+            const was = !!(('cancel_at_period_end' in prev ? prev.cancel_at_period_end : sub.cancel_at_period_end) || ('cancel_at' in prev ? prev.cancel_at : sub.cancel_at));
+            const now = !!(sub.cancel_at_period_end || sub.cancel_at), end = sub.cancel_at || periodEnd(sub);
+            const weeks = end ? Math.max(0, Math.round((end * 1000 - Date.now()) / (7 * 864e5))) : null;
+            if (now && !was) await track(userId, 'subscription_cancel_requested', { plan: 'monthly', weeks_remaining: weeks, reason: sub.metadata?.ended_by === 'season_upgrade' ? 'upgraded_to_season' : 'cancelled' });
+            else if (!now && was) await track(userId, 'subscription_cancel_reversed', { plan: 'monthly', weeks_remaining: weeks });
+          }
+        }
       }
     }
     return new Response('ok', { status: 200 });

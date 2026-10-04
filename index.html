@@ -806,7 +806,7 @@ const acct = { on: !!(CLOUD.url && CLOUD.key) && location.hash !== '#export', sb
 const PH = { key: 'phc_w2pVgo7e9LxeAKLXUemtyXDRWZfgVE29UtvBm3fKX3HQ', host: 'https://us.i.posthog.com', lib: 'https://cdn.jsdelivr.net/npm/posthog-js@1.435.8/dist/module.js' };
 const anFlag = new URLSearchParams(location.search).get('analytics');
 if (anFlag === 'off') store.set('fo1:noan', 1); else if (anFlag === 'on') store.del('fo1:noan');
-const an = { ph: null, q: [], user: null, once: new Set(), loading: false,
+const an = { ph: null, q: [], qp: [], user: null, once: new Set(), loading: false,
   on: !!PH.key && location.hash !== '#export' && /^https?:$/.test(location.protocol) && !/^(localhost|127\.|\[::1\])/.test(location.hostname)
     && !store.get('fo1:noan') && navigator.doNotTrack !== '1' && !navigator.globalPrivacyControl };
 const anCtx = () => ({ device: matchMedia('(pointer: coarse)').matches || innerWidth < 700 ? 'mobile' : 'desktop', tier: isPro() ? 'pro' : 'free', signed_in: !!acct.user, nfl_week: D.week || null });
@@ -817,6 +817,15 @@ function track(ev, props, now) {
 }
 const trackOnce = (key, ev, props) => { if (!an.once.has(key)) { an.once.add(key); track(ev, props); } };
 function anIdentify(id) { if (!an.on) return; an.user = id; if (an.ph) id ? an.ph.identify(id) : an.ph.reset(); }
+/* Person properties, so any chart can be split by them without being on every event: the current tier, team count and
+   whether a team is Sleeper-linked (refreshed each visit and when they change), and, kept from the first team saved,
+   how and when this person first set up. Signed out, they belong to the browser's anonymous visitor. */
+const anTeams = () => state.teams.filter(t => (t.roster || []).length);
+function anPerson(setOnce) {
+  if (!an.on) return;
+  const set = { tier: isPro() ? 'pro' : 'free', teams: anTeams().length, sleeper_team: anTeams().some(t => !!t.sleeper?.leagueId), signed_in: !!acct.user };
+  an.ph ? an.ph.setPersonProperties(set, setOnce) : an.qp.push([set, setOnce]);
+}
 function anStart() {
   if (!an.on || an.ph || an.loading) return; an.loading = true;
   import(PH.lib).then(m => {
@@ -824,8 +833,10 @@ function anStart() {
     ph.init(PH.key, { api_host: PH.host, autocapture: false, capture_pageview: true, capture_pageleave: false, disable_session_recording: true,
       persistence: 'localStorage', person_profiles: 'always', respect_dnt: true, disable_surveys: true, advanced_disable_feature_flags: true, disable_external_dependency_loading: true });
     an.ph = ph; if (an.user) ph.identify(an.user);
+    for (const [s, o] of an.qp.splice(0)) ph.setPersonProperties(s, o);
     for (const [e, p] of an.q.splice(0)) ph.capture(e, p);
-  }).catch(() => { an.on = false; an.q = []; });
+    anPerson();
+  }).catch(() => { an.on = false; an.q = []; an.qp = []; });
 }
 // team setup: a start is counted once per method each time the setup panel opens; failures are counted by kind
 const flowMethod = () => { const F = D.flow; return !F ? null : F.method === 'espn' ? (F.espnMode === 'paste' ? 'espn_paste' : 'espn_league') : F.method; };
@@ -1035,7 +1046,7 @@ function onAuth(ev, session) {
   const u = session?.user || null;
   if (u && u.id !== acct.user?.id) {
     acct.user = u; acct.step = 'email'; acct.code = ''; acct.msg = null; stripAuthParams();
-    anIdentify(u.id); if (acct.toastNext) track('signed_in', { method: acct.signVia || 'email' });   // a fresh sign-in, not a restored session
+    anIdentify(u.id); anPerson(); if (acct.toastNext) track('signed_in', { method: acct.signVia || 'email' });   // a fresh sign-in, not a restored session
     const c = store.get('fo1:pro'); acct.pro = c && c.uid === u.id ? c : null;
     startSync().then(() => {
       loadPro().then(() => { if (D.proActivating) pollPro(); });
@@ -1147,7 +1158,7 @@ async function loadPro() {
     const was = isPro();
     acct.pro = data ? { plan: data.plan, status: data.status, until: data.pro_until ? Date.parse(data.pro_until) : 0 } : null;
     store.set('fo1:pro', acct.pro ? Object.assign({ uid: acct.user.id }, acct.pro) : null);
-    if (was !== isPro()) render(); else renderAcct();
+    if (was !== isPro()) { anPerson(); render(); } else renderAcct();
   } catch {}
 }
 // a function's own error message, when it sent one
@@ -2504,7 +2515,7 @@ function waiversBody() {
   const W = state.waivers;
   if (!state.roster.length) return `<div class="card panel"><h2>Add your roster first</h2><p style="margin:0">Waiver suggestions compare free agents against your players. <button type="button" class="linkbtn" data-act="flow" data-method="sleeper" data-dest="replace">Import your team</button> or add players in <a href="#roster" data-tab="players">Roster</a>.</p></div>`;
   const R = computeWaivers(), { weeks, H, moves, needs } = R;
-  trackOnce('wv:' + D.week, 'waivers_viewed', { has_move: moves.length > 0, best_gain: moves[0] ? Math.round(moves[0].hz) : 0, window: W.horizon, source: W.source });
+  trackOnce('wv:' + D.week, 'waivers_viewed', { has_move: moves.length > 0, waiver_count: moves.length, best_gain: moves[0] ? Math.round(moves[0].hz) : 0, window: W.horizon, source: W.source });
   const hLab = H === 1 ? `week ${weeks[0]}` : `weeks ${weeks[0]}–${weeks[H - 1]}`;
   const ownTxt = id => D.own.has(id) ? `${D.own.get(id) < 1 ? '<1' : Math.round(D.own.get(id))}% owned` : 'unowned';
   const pl = id => { const u = D.U.get(id), r = D.M[id]; return `<span class="pname">${esc(u.name)}</span><span class="psub">${u.pos} · ${u.team || 'FA'} ${injPill(r)} · ${f1(rosBase(id))} pts/g</span>`; };
@@ -3262,6 +3273,7 @@ function commitDraft() {
   if (d.bundle) {
     let msg; try { msg = importBundle(d.bundle, !!$('#ioReplace')?.checked); } catch (err) { flowFail('bad_code'); F.msg = ['err', err.message]; return render(); }
     track('team_saved', { method, teams: d.bundle.teams.length, first_team: first, intent: D.intent || 'lineup' });
+    anPerson({ first_setup_method: method, first_week: D.week, first_season: D.season });
     D.drafts.code = ''; D.flow = null; D.flash = { html: `<strong>${esc(msg)}</strong> <a href="#roster" data-tab="players">Edit roster</a>` }; slAutoSync(true); return afterSave();
   }
   if (!d.roster.length) return;
@@ -3279,6 +3291,7 @@ function commitDraft() {
   applyTeam(curTeam()); syncScoring();
   if (d.src) D.drafts[d.src] = '';
   track('team_saved', { method, scoring: data.scoring, te_premium: data.tePrem > 0, players: data.roster.length, unmatched: d.unresolved.length, new_team: dest === 'new', first_team: first, intent: D.intent || 'lineup' });
+  anPerson({ first_setup_method: method, first_week: D.week, first_season: D.season });
   D.flow = null; D.open.clear(); D.wCache = null; D.sl = null; save();
   D.flash = { html: `<strong>Saved ${esc(curTeam().name)}:</strong> ${data.roster.length} players, ${esc(fmtName(true))} scoring${d.unresolved.length ? `; ${d.unresolved.length} name${d.unresolved.length === 1 ? '' : 's'} not found` : ''}. <a href="#roster" data-tab="players">Edit roster</a>` };
   afterSave();
