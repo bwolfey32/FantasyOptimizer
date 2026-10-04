@@ -199,6 +199,18 @@ test('personal indoor/outdoor splits are context only', () => {
   setup(); const bad = modelled().filter(r => r.factors.some(f => f.key === 'wx' && /^(Better|Worse) (indoors|outdoors)$/.test(f.short(f.pct))));
   return !bad.length || bad.slice(0, 5).map(r => r.u.name).join(', ');
 });
+test('weather icons match the forecast, by day and by night', () => {
+  const D = ev('D'), icons = ev('wxIcons'), saved = D.wx;
+  const g = (id, home, date) => ({ id, home, date }), day = '2026-10-04T17:00Z', sun = '2026-10-05T00:20Z';   // 1 pm ET; Sunday night
+  D.wx = { a: { code: 0, wind: 5 }, b: { code: 0, wind: 5 }, c: { code: 2, wind: 5, day: 0 }, d: { code: 3, wind: 4, rain: 0.2 },
+    e: { code: 71, wind: 6, snow: 0.4, rain: 0.1 }, f: { code: 1, wind: 18 }, h: { code: 3, wind: 10.6, gust: 25.5 }, x: { code: 95, wind: 20 } };
+  try {
+    const want = [[g('x', 'DET', day), 'indoor'], [g('a', 'KC', day), 'sunny'], [g('b', 'KC', sun), 'clear-night'], [g('c', 'KC', day), 'partly-cloudy-night'],
+      [g('d', 'KC', day), 'rain'], [g('e', 'KC', day), 'sleet'], [g('f', 'KC', day), 'partly-cloudy,wind'], [g('h', 'KC', day), 'cloudy,wind'], [g('z', 'KC', day), '']];
+    const bad = want.filter(([gm, w]) => icons(gm).join() !== w);
+    return !bad.length || bad.map(([gm, w]) => `${gm.id}: ${icons(gm).join() || 'none'}, want ${w || 'none'}`).join('; ');
+  } finally { D.wx = saved; }
+});
 
 /* ---------- Phase 5: probabilities and calibration ---------- */
 test('Start/Sit leads with a lean and the point gap; the % is small print', () => {
