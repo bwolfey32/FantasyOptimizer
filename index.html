@@ -2805,7 +2805,8 @@ async function shareMove() {
   const text = `Benny’s Picks: add ${nm(m.f)}${m.d ? `, drop ${nm(m.d)}` : ''}, +${f1(m.hz)} expected lineup points over the next ${H} week${H === 1 ? '' : 's'} (week ${D.week}).`;
   const url = 'https://bennyspicks.us/?utm_source=share&utm_medium=waiver_move#waivers';
   const done = how => track('result_shared', { kind: 'waiver_move', how, gain: Math.round(m.hz), pos: D.U.get(m.f)?.pos });
-  if (navigator.share) { try { await navigator.share({ text, url }); done('share_sheet'); } catch {} return; }   // cancelled: nothing shared
+  // desktop share sheets (Windows, macOS Chrome) mostly offer "Copy link", which drops the text: copy both there instead
+  if (navigator.share && matchMedia('(pointer: coarse)').matches) { try { await navigator.share({ text, url }); done('share_sheet'); } catch {} return; }   // cancelled: nothing shared
   try { await navigator.clipboard.writeText(`${text} ${url}`); done('copy'); toast('Copied. Paste it anywhere.'); }
   catch { window.prompt('Copy this:', `${text} ${url}`); }
 }
