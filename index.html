@@ -485,6 +485,17 @@ details.how p, details.how li { max-width: 72ch; }
 .schemes { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 12px; }
 .side { border: 1px solid var(--line); border-radius: 8px; padding: 10px 12px; display: flex; flex-direction: column; gap: 6px; min-width: 0; background: var(--surface); }
 .tend { margin: 0; padding-left: 18px; font-size: 13px; display: flex; flex-direction: column; gap: 2px; font-variant-numeric: tabular-nums; }
+/* Defenses: column picker and the coordinator profile row */
+.colchips { display: flex; flex-wrap: wrap; gap: 6px; }
+.colchip { display: inline-flex; align-items: center; border: 1px solid var(--line); border-radius: 999px; background: var(--surface); font-size: 13px; }
+.colchip.off { opacity: .55; }
+.colchip label { display: inline-flex; align-items: center; gap: 5px; padding: 4px 2px; cursor: pointer; white-space: nowrap; }
+.colmv { background: none; border: 0; color: var(--ink); font: inherit; font-size: 17px; line-height: 1; padding: 4px 9px; cursor: pointer; }
+.colmv:disabled { color: var(--line); cursor: default; }
+td.dcrow { text-align: left; white-space: normal; background: var(--surface-2); padding: 10px 12px; }
+.dcp { display: flex; flex-direction: column; gap: 8px; width: min(820px, calc(100vw - 58px)); position: sticky; left: 12px; }   /* stays in view while the wide table scrolls sideways */
+.dcp .tscroll { max-width: 520px; }
+.dclean { list-style: none; padding-left: 0; gap: 4px; }
 
 /* Waivers */
 .needs { display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 10px; }
@@ -3411,14 +3422,65 @@ function heat(v, avg, invert) {
   if (!ok(v) || !ok(avg) || !avg) return ''; let d = v / avg - 1; if (invert) d = -d;
   const a = Math.min(40, Math.abs(d) * 110); return `background:color-mix(in srgb, var(${d > 0 ? '--good' : '--bad'}) ${a.toFixed(0)}%, transparent)`;
 }
+/* Defenses table columns: [key, header, format, full name]. Which ones show and their left-to-right order are a
+   per-browser preference (fo1:defcols); K pts and total yards start hidden. */
+const DEF_COLS = [['fpaQB', 'QB pts', f1, 'Fantasy points allowed to QBs'], ['fpaRB', 'RB pts', f1, 'Fantasy points allowed to RBs'], ['fpaWR', 'WR pts', f1, 'Fantasy points allowed to WRs'], ['fpaTE', 'TE pts', f1, 'Fantasy points allowed to TEs'], ['fpaK', 'K pts', f1, 'Fantasy points allowed to kickers'],
+  ['passYdA', 'Pass yds', f0, 'Passing yards allowed'], ['ydsA', 'Total yds', f0, 'Total yards allowed'], ['ypcA', 'YPC', f1, 'Yards per carry allowed'], ['sacks', 'Sacks', f1, 'Sacks'], ['ptsA', 'Pts allowed', f1, 'Points allowed']];
+const DEF_COL = Object.fromEntries(DEF_COLS.map(c => [c[0], c]));
+const DEF_HIDE = ['fpaK', 'ydsA'];
+function defCols() {
+  const p = store.get('fo1:defcols') || {}, known = k => !!DEF_COL[k];
+  const order = (Array.isArray(p.order) ? p.order.filter(known) : []);
+  for (const [k] of DEF_COLS) if (!order.includes(k)) order.push(k);
+  return { order, hide: new Set(Array.isArray(p.hide) ? p.hide.filter(known) : DEF_HIDE) };
+}
+const saveDefCols = c => store.set('fo1:defcols', { order: c.order, hide: [...c.hide] });
+function defColsPanel(c) {
+  return `<div class="card panel colcfg"><div class="row-head"><h3>Columns</h3><span class="toolbar"><button type="button" class="btn sm" data-act="defcolsreset">Reset</button><button type="button" class="btn sm" data-act="defcols">Done</button></span></div>
+    <p class="small muted" style="margin:0">Tick the stats to show. Use the arrows to move a column left or right; the table follows this order.</p>
+    <div class="colchips">${c.order.map((k, i) => { const [, l, , full] = DEF_COL[k], on = !c.hide.has(k); return `<span class="colchip${on ? '' : ' off'}"><button type="button" class="colmv" data-colmv="${k}|-1" ${i ? '' : 'disabled'} aria-label="Move ${esc(full)} left">‹</button><label title="${esc(full)}"><input type="checkbox" data-colon="${k}" ${on ? 'checked' : ''}> ${esc(l)}</label><button type="button" class="colmv" data-colmv="${k}|1" ${i < c.order.length - 1 ? '' : 'disabled'} aria-label="Move ${esc(full)} right">›</button></span>`; }).join('')}</div></div>`;
+}
 function viewDefenses() {
-  const [sk, dir] = D.defSort, L = D.L;
-  const cols = [['fpaQB', 'QB pts'], ['fpaRB', 'RB pts'], ['fpaWR', 'WR pts'], ['fpaTE', 'TE pts'], ['passYdA', 'Pass yds'], ['ypcA', 'YPC'], ['sacks', 'Sacks'], ['ptsA', 'Pts allowed']];
+  const [sk, dir] = D.defSort, L = D.L, cfg = defCols();
+  const cols = cfg.order.filter(k => !cfg.hide.has(k)).map(k => DEF_COL[k]), span = cols.length + 4;
   const rows = [...ABBR].sort((a, b) => sk === 'team' ? a.localeCompare(b) * dir : ((D.B[a][sk] ?? -1e9) - (D.B[b][sk] ?? -1e9)) * dir);
-  return `<div class="section"><div class="row-head"><h2>Defenses, week ${D.week}</h2><span class="small muted">Per game. Green = good for opposing offenses. Blends ${D.season} games with ${D.season - 1} by staff continuity.</span></div>
-  <div class="tscroll"><table><thead><tr><th class="l" data-sort="team">Team</th><th class="l">Record</th><th class="l">Wk ${D.week} opp</th>${cols.map(([k, l]) => `<th data-sort="${k}">${l}${sk === k ? (dir < 0 ? ' ↓' : ' ↑') : ''}</th>`).join('')}<th class="l">DC</th></tr></thead><tbody>
-  ${rows.map(T => { const b = D.B[T], s = staffOf(T), tg = D.tg[T]; return `<tr><td><strong>${T}</strong> <span class="muted small">${TEAMS[T][1]}</span></td><td class="l">${esc(D.rec[T] || '—')}</td><td class="l">${tg ? (tg.home ? 'vs ' : '@ ') + tg.opp : 'Bye'}</td>${cols.map(([k]) => `<td style="${heat(b[k], L[k], k === 'sacks')}">${k === 'ypcA' ? f1(b[k]) : k === 'passYdA' ? f0(b[k]) : f1(b[k])}</td>`).join('')}<td class="l">${esc(s.dc)}${s.defNew ? ' <span class="pill n">New</span>' : ''}</td></tr>`; }).join('')}
-  <tr><td><strong>League avg</strong></td><td></td><td></td>${cols.map(([k]) => `<td><strong>${k === 'passYdA' ? f0(L[k]) : f1(L[k])}</strong></td>`).join('')}<td></td></tr></tbody></table></div></div>`;
+  return `<div class="section"><div class="row-head"><h2>Defenses, week ${D.week}</h2><span class="toolbar"><span class="small muted">Per game. Green = good for opposing offenses. Blends ${D.season} games with ${D.season - 1} by staff continuity. Tap a coordinator’s name for a profile.</span><button type="button" class="btn sm" data-act="defcols" aria-expanded="${!!D.colsOpen}">Columns</button></span></div>
+  ${D.colsOpen ? defColsPanel(cfg) : ''}
+  <div class="tscroll"><table><thead><tr><th class="l" data-sort="team">Team</th><th class="l">Record</th><th class="l">Wk ${D.week} opp</th>${cols.map(([k, l, , full]) => `<th data-sort="${k}" title="${esc(full)}">${l}${sk === k ? (dir < 0 ? ' ↓' : ' ↑') : ''}</th>`).join('')}<th class="l">DC</th></tr></thead><tbody>
+  ${rows.map(T => { const b = D.B[T], s = staffOf(T), tg = D.tg[T], open = D.dcOpen === T; return `<tr><td><strong>${T}</strong> <span class="muted small">${TEAMS[T][1]}</span></td><td class="l">${esc(D.rec[T] || '—')}</td><td class="l">${tg ? (tg.home ? 'vs ' : '@ ') + tg.opp : 'Bye'}</td>${cols.map(([k, , f]) => `<td style="${heat(b[k], L[k], k === 'sacks')}">${f(b[k])}</td>`).join('')}<td class="l"><button type="button" class="linkbtn" data-dc="${T}" aria-expanded="${open}">${esc(s.dc || s.defCaller || 'Unknown')}</button>${s.defNew ? ' <span class="pill n">New</span>' : ''}</td></tr>
+    ${open ? `<tr><td colspan="${span}" class="dcrow">${dcProfile(T)}</td></tr>` : ''}`; }).join('')}
+  <tr><td><strong>League avg</strong></td><td></td><td></td>${cols.map(([k, , f]) => `<td><strong>${f(L[k])}</strong></td>`).join('')}<td></td></tr></tbody></table></div></div>`;
+}
+/* A defensive play-caller's profile, opened from the DC column: scheme, background and style, what the scheme tends to
+   do to each position, the team's record, and his defense's numbers this season next to last season (his previous
+   team's defense when he is new and came from another NFL staff). Ranks are among the 32 defenses, 1st = best. */
+const DC_STATS = [['ptsA', 'Points allowed', f1, -1], ['ydsA', 'Yards allowed', f0, -1], ['passYdA', 'Passing yards allowed', f0, -1], ['ypcA', 'Yards per carry allowed', f1, -1], ['sacks', 'Sacks', f1, 1],
+  ['fpaQB', 'QB fantasy pts allowed', f1, -1], ['fpaRB', 'RB fantasy pts allowed', f1, -1], ['fpaWR', 'WR fantasy pts allowed', f1, -1], ['fpaTE', 'TE fantasy pts allowed', f1, -1]];
+function dcProfile(T) {
+  const s = staffOf(T), caller = s.defCaller || s.dc, c = COACH[caller], fam = c ? DEF_FAM[c[0]] : null, y = D.season;
+  const cur = D.cur[T]?.g ? D.cur[T] : null, prevT = s.defNew && s.defPrev ? s.defPrev : T, prev = D.prior[y - 1]?.[prevT];
+  const rankIn = (src, k, team, best) => { const v = src?.[team]?.[k]; if (!ok(v)) return null; return 1 + Object.values(src).filter(x => ok(x?.[k]) && (best > 0 ? x[k] > v : x[k] < v)).length; };
+  const curSrc = Object.fromEntries(ABBR.filter(t => D.cur[t]?.g).map(t => [t, D.cur[t]])), prevSrc = D.prior[y - 1] || {};
+  const avg = k => mean(Object.values(curSrc).map(x => x[k]).filter(ok));
+  const cell = (src, team, k, f, best) => { const v = src?.[team]?.[k], r = rankIn(src, k, team, best); return ok(v) ? `${f(v)}${r ? ` <span class="muted">${ord(r)}</span>` : ''}` : '—'; };
+  const role = caller === s.hc ? `Head coach who calls the defense${s.dc && s.dc !== caller ? `; ${esc(s.dc)} holds the coordinator title` : ''}` : caller === s.dc ? 'Defensive coordinator and play-caller' : `Calls the defense; ${esc(s.dc)} holds the coordinator title`;
+  const prevLab = s.defNew ? (s.defPrev ? `${y - 1}, ${s.defPrev} defense` :`${y - 1}, ${T} before him`) : `${y - 1}`;
+  const leans = fam ? ['QB', 'RB', 'WR', 'TE', 'K', 'DEF'].filter(p => fam[p]?.[1]).map(p => { const [v, t] = fam[p], own = p === 'DEF';
+    const [lab, dir] = own ? (v > 0 ? ['Helps', 'up'] : v < 0 ? ['Hurts', 'down'] : ['Neutral for', '']) : (v > 0 ? ['Good for', 'up'] : v < 0 ? ['Tough on', 'down'] : ['Neutral for', '']);
+    return `<li><span class="chip ${dir}">${lab} ${own ? `the ${T} D/ST` : `opposing ${p}s`}</span> ${esc(t[0].toUpperCase() + t.slice(1))}.</li>`; }).join('') : '';
+  const diff = cur && ok(cur.ptsFor) ? cur.ptsFor - cur.ptsA : null, la = avg('ptsA');
+  const recLine = cur
+    ? `${T} is <strong>${esc(D.rec[T] || '0-0')}</strong>${s.defNew ? ` in his first season running this defense` : ''}. The defense allows ${f1(cur.ptsA)} points a game, ${ok(la) ? `${f1(Math.abs(cur.ptsA - la))} ${cur.ptsA <= la ? 'fewer' : 'more'} than the league average of ${f1(la)}` : ''}${ok(diff) ? `; the team ${diff >= 0 ? 'outscores opponents' : 'is outscored'} by ${f1(Math.abs(diff))} a game` : ''}.`
+    : `${T} hasn’t played yet this season.`;
+  return `<div class="dcp"><div class="row-head"><div><strong style="font-size:16px">${esc(caller || 'Unknown play-caller')}</strong>${s.defNew ? ' <span class="pill n">New</span>' : ''} <span class="small muted">${TEAMS[T][1]} · ${role}</span></div><button type="button" class="btn sm" data-dc="${T}">Close</button></div>
+    ${fam ? `<div><span class="label">Scheme</span> <strong>${esc(fam.label)}</strong></div>` : ''}
+    ${c ? `<div class="small"><strong>Background:</strong> ${esc(c[1])}</div><div class="small"><strong>How he runs it:</strong> ${esc(c[2])}</div>` : `<div class="small muted">No profile for this play-caller yet. The numbers below still show how ${T}’s defense plays.</div>`}
+    ${leans ? `<div><span class="label">What the scheme means for fantasy</span><ul class="tend dclean">${leans}</ul></div>` : ''}
+    <div><span class="label">Record</span><div class="small">${recLine}</div></div>
+    <div class="tscroll"><table><thead><tr><th class="l">Per game</th><th>${y} so far</th><th>${esc(prevLab)}</th><th>${y} avg</th></tr></thead><tbody>
+      ${DC_STATS.map(([k, l, f, best]) => `<tr><td class="l">${l}</td><td>${cell(curSrc, T, k, f, best)}</td><td>${cell(prevSrc, prevT, k, f, best)}</td><td class="muted">${f(avg(k))}</td></tr>`).join('')}
+    </tbody></table></div>
+    <div class="small muted">Ranks are among the 32 defenses, 1st = best. ${s.defNew && !s.defPrev ? `He didn’t call an NFL defense last season, so the ${y - 1} column is ${T}’s defense under the previous staff.` : s.defNew ? `The ${y - 1} column is the ${s.defPrev} defense he came from.` : ''} Passing yards and yards per carry allowed are only tracked for the current season.</div></div>`;
 }
 function spark(vals, fmt) {
   const pts = vals.map((v, i) => [i, v]).filter(p => ok(p[1])); if (pts.length < 2) return '<span class="muted small">—</span>';
@@ -3480,7 +3542,9 @@ function viewSettings() {
 
 /* ---------- events ---------- */
 document.addEventListener('click', e => {
-  const t = e.target.closest('[data-tab],[data-expand],[data-add],[data-remove],[data-strategy],[data-act],[data-sort],[data-team],[data-fteam],[data-clearovr],[data-wh],[data-wsrc],[data-taken],[data-keepmode],[data-decide],[data-brief],[data-wrank],[data-acadd],[data-mrem],[data-flowmethod],[data-espnmode],[data-rview],[data-research],[data-hweek]'); if (!t) return;
+  const t = e.target.closest('[data-tab],[data-expand],[data-add],[data-remove],[data-strategy],[data-act],[data-sort],[data-team],[data-fteam],[data-clearovr],[data-wh],[data-wsrc],[data-taken],[data-keepmode],[data-decide],[data-brief],[data-wrank],[data-acadd],[data-mrem],[data-flowmethod],[data-espnmode],[data-rview],[data-research],[data-hweek],[data-dc],[data-colmv]'); if (!t) return;
+  if (t.dataset.dc) { D.dcOpen = D.dcOpen === t.dataset.dc ? null : t.dataset.dc; render(); return; }
+  if (t.dataset.colmv) { const [k, d] = t.dataset.colmv.split('|'), c = defCols(), i = c.order.indexOf(k), j = i + +d; if (i < 0 || j < 0 || j >= c.order.length) return; [c.order[i], c.order[j]] = [c.order[j], c.order[i]]; saveDefCols(c); render(); $(`[data-colmv="${k}|${d}"]:not([disabled])`)?.focus(); return; }
   if (t.dataset.acadd) { e.preventDefault(); acPick(t.dataset.acadd, t.dataset.acmode); return; }
   if (t.dataset.mrem) { D.flow.manual = D.flow.manual.filter(x => x !== t.dataset.mrem); const ml = $('#manualList'); if (ml) ml.innerHTML = manualListHTML(); const rb = $('[data-act=flowmanual]'); if (rb) { const n = D.flow.manual.length; rb.disabled = !n; rb.textContent = `Review ${n || ''} player${n === 1 ? '' : 's'}`; } return; }
   if (t.dataset.flowmethod) { D.flow.method = t.dataset.flowmethod; D.flow.msg = null; render(); deskFocus({ sleeper: '#slQuery', espn: '#leagueId', manual: '#mq', restore: '#ioIn' }[D.flow.method]); return; }
@@ -3511,6 +3575,8 @@ document.addEventListener('click', e => {
   if (t.dataset.team) { D.teamOpen = D.teamOpen === t.dataset.team ? null : t.dataset.team; render(); return; }
   const a = t.dataset.act;
   if (a === 'reload') { for (let s = 0; s < 4; s++) store.del('fo1:coach:' + ((D.season || 0) - s)); load({ manual: true }); }
+  else if (a === 'defcols') { D.colsOpen = !D.colsOpen; render(); }
+  else if (a === 'defcolsreset') { store.del('fo1:defcols'); render(); }
   else if (a === 'loadleague') loadLeague();
   else if (a === 'useteam') useEspnTeam();
   else if (a === 'slfind') slFind();
@@ -3626,6 +3692,7 @@ document.addEventListener('input', e => {
 });
 document.addEventListener('change', e => {
   const t = e.target;
+  if (t.dataset.colon) { const c = defCols(), k = t.dataset.colon; t.checked ? c.hide.delete(k) : c.hide.add(k); saveDefCols(c); render(); $(`[data-colon="${k}"]`)?.focus(); return; }
   if (t.id === 'weekSel') { state.settings.week = +t.value; if (state.settings.week === D.detWeek && D.season === D.detSeason) state.settings.week = null; save(); D.open.clear(); load({ fresh: true }); return; }
   if (t.dataset.iosel) { const s = D.ioSkip || (D.ioSkip = new Set()); t.checked ? s.delete(t.dataset.iosel) : s.add(t.dataset.iosel); D.ioOutMsg = ''; render(); return; }
   if (t.id === 'ioReplace') { D.ioReplace = t.checked; return; }
