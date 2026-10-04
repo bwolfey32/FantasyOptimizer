@@ -2595,22 +2595,28 @@ function weekVals(id, weeks) {
     return Math.max(0, base * matchupMult(u.pos, s.opp, w, u.team) * (fill && i >= 2 ? 0.5 : 1));
   });
 }
-function bestLineup(ids, wi, V, slots) {
+/* R (optional): replacement level by position for this week, what you'd stream from free agents. A slot your roster
+   can't fill with someone better (a bye, an injury, a weak backup) scores that instead, and a backup only counts as
+   cover for what he adds over it, so a second QB in a 1-QB league is worth little: you'd pick one up the week you
+   need him. */
+const replSlot = (slot, R) => R ? Math.max(0, ...slot.elig.map(p => R[p] || 0)) : 0;
+function bestLineup(ids, wi, V, slots, R) {
   const c = ids.filter(id => V[id] && V[id][wi] > 0), n = slots.length; if (!n) return { total: 0, starters: [] };
-  const cost = slots.map(s => { const row = c.map(id => s.elig.includes(D.U.get(id).pos) ? -V[id][wi] : 1e6); for (let i = 0; i < n; i++) row.push(1e5); return row; });
+  const cost = slots.map(s => { const row = c.map(id => s.elig.includes(D.U.get(id).pos) ? -V[id][wi] : 1e6); const r = -replSlot(s, R); for (let i = 0; i < n; i++) row.push(r); return row; });
   const asg = hungarian(cost); let total = 0; const starters = [];
-  asg.forEach((j, i) => { if (j >= 0 && j < c.length && cost[i][j] < 1e5) { total += V[c[j]][wi]; starters.push([slots[i], c[j]]); } });
-  return { total, starters, depth: depthValue(c, starters, wi, V) };
+  asg.forEach((j, i) => { if (j >= 0 && j < c.length && cost[i][j] < 1e5) { total += V[c[j]][wi]; starters.push([slots[i], c[j]]); } else total += replSlot(slots[i], R); });
+  return { total, starters, depth: depthValue(c, starters, wi, V, R) };
 }
 /* Bench insurance: each week a starter has some chance of a late scratch or in-game injury. When that happens the
-   best healthy bench player who fits his slot plays instead, so a backup is worth (miss chance × his points)
-   for each starter he could replace. Without this, a bench player who never starts looks worthless. */
+   best healthy bench player who fits his slot plays instead (or a free agent, when none beats one), so a backup is
+   worth (miss chance × his points over that) for each starter he could replace. Without this, a bench player who
+   never starts looks worthless. */
 const PMISS = { QB: .05, RB: .09, WR: .07, TE: .07, K: .02, DEF: .01 };
-function depthValue(ids, starters, wi, V) {
+function depthValue(ids, starters, wi, V, R) {
   const used = new Set(starters.map(s => s[1])), bench = ids.filter(id => !used.has(id));
   let dep = 0;
   for (const [slot, id] of starters) {
-    let rep = 0; for (const b of bench) if (slot.elig.includes(D.U.get(b).pos) && V[b][wi] > rep) rep = V[b][wi];
+    let rep = replSlot(slot, R); for (const b of bench) if (slot.elig.includes(D.U.get(b).pos) && V[b][wi] > rep) rep = V[b][wi];
     dep += PMISS[D.U.get(id).pos] * rep;
   }
   return dep;
@@ -2637,14 +2643,20 @@ function computeWaivers() {
   // This week, a starter whose game has kicked off has banked his points and can't be swapped out, so his slot is left
   // out of this week's comparison (otherwise a free agent who hasn't played yet looks like he fills an empty spot).
   const now = optimize().starters, slots0 = slots.filter((s, i) => !now[i]?.r?.locked), slotsAt = wi => wi ? slots : slots0;
-  const base = weeks.map((_, wi) => bestLineup(roster, wi, V, slotsAt(wi)));
+  /* Replacement level: from next week on, a slot left empty by a bye or an injury, or held by someone worse, goes to a
+     free agent, the third-best available at the position that week (other teams stream too). Moves are measured over
+     that, not over an empty slot, so a backup QB for one bye or for injury cover gains only what he beats a streamer
+     by. This week stays unfilled: the pickup you make now is the move itself. */
+  const replAt = (VX, wi) => Object.fromEntries(POS.map(P => { const v = pool.filter(id => D.U.get(id).pos === P).map(id => VX[id][wi]).sort((a, b) => b - a); return [P, v[Math.min(2, v.length - 1)] || 0]; }));
+  const RW = weeks.map((_, wi) => wi ? replAt(V, wi) : null);
+  const base = weeks.map((_, wi) => bestLineup(roster, wi, V, slotsAt(wi), RW[wi]));
   /* A player's usual week: his average over the weeks left after this one, skipping his bye (weeks he's injured count
      as 0). The best lineup on these values is your team's everyday strength, so a move that fixes a weak position
      raises it, a pickup who only covers a bye or an injury doesn't, and dropping a good player on bye lowers it. */
   const later1 = weeks.length > 1 ? 1 : 0;
   const usual = id => { const T = D.U.get(id).team, vals = V[id].filter((x, wi) => wi >= later1 && T && !schedOpp(T, weeks[wi]).bye); return vals.length ? mean(vals) : 0; };
   const VS = {}; for (const id of [...roster, ...pool]) VS[id] = [usual(id)];
-  const baseS = bestLineup(roster, 0, VS, slots);
+  const RS = replAt(VS, 0), baseS = bestLineup(roster, 0, VS, slots, RS);
   // candidates: best 24 overall over the horizon plus the best 5 at each position, and the same by usual week
   const byH = [...pool].sort((a, b) => sumH(b) - sumH(a)), byS = [...pool].sort((a, b) => VS[b][0] - VS[a][0]), cand = new Set(byH.slice(0, 24));
   for (const p of POS) byH.filter(id => D.U.get(id).pos === p).slice(0, 5).forEach(id => cand.add(id));
@@ -2674,19 +2686,19 @@ function computeWaivers() {
     for (const d of drops) {
       if (d && sumAll(d) > 1.6 * sumAll(f) + 5) continue;
       const nr = roster.filter(x => x !== d).concat(f);
-      let hz = 0, later = 0, depLost = 0; const starts = [], lost = [];
+      let hz = 0, near = 0, later = 0, depLost = 0; const starts = [], lost = [];
       for (let wi = 0; wi < weeks.length; wi++) {
-        const L2 = bestLineup(nr, wi, V, slotsAt(wi)), diff = (L2.total + L2.depth) - (base[wi].total + base[wi].depth);
-        if (wi < h) { hz += diff; depLost += base[wi].depth - L2.depth; const st = L2.starters.find(s => s[1] === f); if (st) starts.push([weeks[wi], st[0].label || st[0].k]); if (d && base[wi].starters.some(s => s[1] === d)) lost.push(weeks[wi]); }
+        const L2 = bestLineup(nr, wi, V, slotsAt(wi), RW[wi]), diff = (L2.total + L2.depth) - (base[wi].total + base[wi].depth);
+        if (wi < h) { hz += diff; if (wi < 2) near += diff; depLost += base[wi].depth - L2.depth; const st = L2.starters.find(s => s[1] === f); if (st) starts.push([weeks[wi], st[0].label || st[0].k]); if (d && base[wi].starters.some(s => s[1] === d)) lost.push(weeks[wi]); }
         else later += diff;
       }
       // how much the move raises your usual lineup, per week
-      const LS = bestLineup(nr, 0, VS, slots), strength = (LS.total + LS.depth) - (baseS.total + baseS.depth);
+      const LS = bestLineup(nr, 0, VS, slots, RS), strength = (LS.total + LS.depth) - (baseS.total + baseS.depth);
       // Ranked by the window's lineup points (byes and injuries included) plus the usual-lineup gain over the same weeks,
       // so an upgrade at a weak spot beats a one-week patch. "window": later weeks just break ties; "blend" adds a third
       // of the value after the window, but only for a move that doesn't cost points in the window (never for a kicker
       // or D/ST: you'll stream another by then).
-      const score = hz + strength * h + (longTerm && !single && hz >= 0 ? 0.35 : 0.001) * later, mv = { f, d, hz, later, strength, score, starts, lost, depLost, H: h };
+      const score = hz + strength * h + (longTerm && !single && hz >= 0 ? 0.35 : 0.001) * later, mv = { f, d, hz, near, later, strength, score, starts, lost, depLost, H: h };
       if (!best || score > best.score) best = mv;
       if (single && d && posOf(d) === fp && (!bestSame || score > bestSame.score)) bestSame = mv;
     }
@@ -2699,11 +2711,14 @@ function computeWaivers() {
        up a player: a move must add HOLD_BAR window points (or raise the usual lineup by as much), and a kicker or D/ST
        swap must average 1 pt a week. With long-term value on, a move that clears the bar only on later weeks is a
        "long-term bet". Anything else is marginal: listed, never the best move, and holding is fine.
+       A pickup that doesn't raise the usual lineup is only cover for byes and injuries, and cover for a week further
+       out can wait: you'd stream one that week. So it has to clear the bar on this week and next, and is never a
+       long-term bet.
        Never drop a top-half kicker or D/ST (rest of season, league size) for one that ranks below it: that one is a
        streamer for a good week, not a replacement (hold). */
     const swap = single && best.d && posOf(best.d) === fp, bar = Math.max(1.5, 0.75 * h);
-    const clears = swap ? best.hz / h >= 1 : Math.max(best.hz, best.strength * h) >= bar;
-    best.longBet = !single && !clears && longTerm && best.hz >= 0 && 0.35 * best.later >= bar;
+    const cover = best.strength < 0.25, clears = swap ? best.hz / h >= 1 : Math.max(cover ? best.near : best.hz, best.strength * h) >= bar;
+    best.longBet = !single && !cover && !clears && longTerm && best.hz >= 0 && 0.35 * best.later >= bar;
     best.hold = swap && posRank[best.d] <= Math.ceil(W.teams / 2) && posRank[f] > posRank[best.d] ? { rf: posRank[f], rd: posRank[best.d] } : null;
     best.marginal = (!clears && !best.longBet) || !!best.hold;
     moves.push(best);
@@ -2932,7 +2947,7 @@ function waiversBody() {
   <div class="needs">${needCards}</div>
   ${needs.holes.length ? `<div class="banner small"><strong>Lineup holes:</strong> ${esc(needs.holes.join(' · '))}. A pickup at that position is worth more than usual.</div>` : ''}
   ${stashCard}
-  <div class="row-head"><h2>All moves, ranked</h2><span class="small muted">Ranked by expected lineup points over ${hLab} plus how much each move raises your usual lineup, so an upgrade at a weak spot outranks a one-week bye patch${longTerm ? ', plus a third of the gain after that' : ''}. The big number is the ${hLab} gain only. A move needs +${f1(Math.max(1.5, 0.75 * H))} (a kicker or D/ST swap, +1 a week) to be worth the churn; smaller ones are marked Marginal. Kickers and D/STs are swapped for yours, never added by dropping another position, and judged on the next ${Math.min(H, STREAM_H)} weeks only, since they're streamed; a top-half one is never dropped for one ranked below it. Bench players count as injury cover. Week chips: green is a soft matchup, red is tough, • means the defense changed.</span></div>
+  <div class="row-head"><h2>All moves, ranked</h2><span class="small muted">Ranked by expected lineup points over ${hLab} plus how much each move raises your usual lineup, so an upgrade at a weak spot outranks a one-week bye patch${longTerm ? ', plus a third of the gain after that' : ''}. The big number is the ${hLab} gain only. A move needs +${f1(Math.max(1.5, 0.75 * H))} (a kicker or D/ST swap, +1 a week) to be worth the churn; smaller ones are marked Marginal. Kickers and D/STs are swapped for yours, never added by dropping another position, and judged on the next ${Math.min(H, STREAM_H)} weeks only, since they're streamed; a top-half one is never dropped for one ranked below it. Byes, injuries and bench cover are measured against a free agent you could stream that week, so a backup counts only for what he beats one by, and cover needed further out than next week can wait. Week chips: green is a soft matchup, red is tough, • means the defense changed.</span></div>
   <div class="card list">${moveRows}</div>
   ${persSection(weeks, H)}
   <div class="row-head"><h2>Top free agents by position</h2><span class="small muted">Projected points over ${hLab}</span></div>

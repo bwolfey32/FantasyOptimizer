@@ -285,6 +285,22 @@ test('a top-half D/ST is never dropped for a lower-ranked one; the reason says t
   return /streaming option for week 5 \(\+4\.2\), but don’t drop Seahawks D\/ST/.test(why) && /#3 rest of season, Raiders D\/ST #12/.test(why) || why;
 });
 
+/* ---------- replacement level (reviewer: "add Deshaun Watson, drop Tre' Harris, +16.9 over 15 weeks", 1-QB league) ---------- */
+// one QB (Goff), Tre' Harris on the bench: Watson only covers Goff's bye and injuries, which a streamer would do too
+const oneQB = hz => setup(st => { st.roster[st.roster.indexOf(idOf('Rashid Shaheed'))] = idOf("Tre' Harris"); st.roster = st.roster.filter(x => x !== idOf('Baker Mayfield')); st.waivers.horizon = hz; });
+test('a backup QB in a 1-QB league is never a recommended move (Watson for Harris), any window', () => {
+  const QB = id => ev('D').U.get(id).pos === 'QB';
+  for (const hz of [2, 4, 'ros']) for (const rank of ['window', 'blend']) {
+    oneQB(hz); ev('state').waivers.rank = rank; ev('D').wCache = null; const W = ev('computeWaivers')();
+    const bad = W.moves.filter(m => QB(m.f) && !m.marginal); if (bad.length) return `window ${hz} ${rank}: ` + bad.map(m => `${name(m.f)} for ${name(m.d)} +${m.hz.toFixed(1)}`).join(', ');
+  }
+});
+test('an empty slot on a bye counts a streamer, not 0', () => {
+  oneQB('ros'); const W = ev('computeWaivers')(), D = ev('D'), goff = idOf('Jared Goff'), wi = W.weeks.findIndex(w => ev('schedOpp')(D.U.get(goff).team, w).bye);
+  const m = W.moves.find(m => m.f === idOf('Deshaun Watson')), gain = m ? m.hz : 0;
+  return wi > 0 && gain < 0.5 * W.V[idOf('Deshaun Watson')][wi] || `Goff's bye at index ${wi}, Watson move +${gain.toFixed(1)}`;
+});
+
 /* ---------- weakest spot: pickups at the position Benny Grade rates lowest ---------- */
 test('weakest spot follows Benny Grade, lists free agents there, and skips one marked Taken', () => {
   setup(); const g = ev('teamGrade')(), ws = ev('weakSpot')(), D = ev('D');
