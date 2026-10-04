@@ -425,6 +425,8 @@ body.welcome.wsign #acctBtn .acct-txt { position: static; width: auto; height: a
 .list .item + .item { border-top: 1px solid var(--line); }
 .prow { display: grid; grid-template-columns: 54px minmax(0, 1.5fr) minmax(0, 1.25fr) 62px 64px 92px 64px; align-items: center; gap: 12px; padding: 10px 14px; width: 100%; background: none; border: 0; text-align: left; }
 .prow:hover { background: color-mix(in srgb, var(--accent) 5%, transparent); }
+.lfix { padding: 0 14px 8px 80px; }
+@media (max-width: 700px) { .lfix { padding-left: 14px; } }
 .lhead { padding-block: 8px; }
 .lhead:hover { background: none; }
 .slot { font-family: var(--font-display); font-weight: 700; font-size: 15px; letter-spacing: .04em; color: var(--accent); }
@@ -815,7 +817,7 @@ const DEFAULT_STATE = {
   slots: { QB:1, RB:2, WR:2, TE:1, FLEX:1, 'RB/WR':0, 'WR/TE':0, OP:0, 'D/ST':1, K:1 },
   espn: { leagueId: '', teamId: null, slotOf: {} },
   waivers: { horizon: 4, teams: 12, ownMax: 50, source: 'own', faList: [], faListAt: null, taken: {}, allowDrop: {}, forceKeep: {}, rank: 'window' },
-  teams: [], activeTeam: null, returnWeek: {}, scoring: 'ppr', tePrem: 0, sleeper: null,
+  teams: [], activeTeam: null, returnWeek: {}, liveFix: {}, scoring: 'ppr', tePrem: 0, sleeper: null,
 };
 /* Fantasy teams. The active team's fields live on `state` itself (state.roster, state.slots, ...) so the rest of the
    app reads one team at a time; save() copies them back into state.teams, and switching loads another team's copy.
@@ -1956,7 +1958,8 @@ function computeAll() {
 }
 // Safe (floor) and Boom (ceiling) lineups are Pro; free lineups optimize the projection
 const strategy = () => isPro() ? state.settings.strategy : 'mean';
-const metricOf = r => { if (r.locked && ok(r.actual)) return r.actual; const s = strategy(); return s === 'floor' ? r.floor : s === 'ceil' ? r.ceil : r.mean; };
+// always the pregame value: points already scored aren't a forecast, and a player whose game started can't be moved anyway
+const metricOf = r => { const s = strategy(); return s === 'floor' ? r.floor : s === 'ceil' ? r.ceil : r.mean; };
 
 /* ---------- lineup optimizer (Hungarian assignment, exact for any slot mix) ---------- */
 function hungarian(cost) {
@@ -1975,17 +1978,29 @@ function hungarian(cost) {
   const ans = new Array(n).fill(-1); for (let j = 1; j <= m; j++) if (p[j]) ans[p[j] - 1] = j - 1; return ans;
 }
 function expandSlots() { const out = []; for (const t of SLOT_TYPES) for (let i = 0; i < (state.slots[t.k] || 0); i++) out.push(t); return out; }
-function assignSlots(slots, cands) {
+function assignSlots(slots, cands, val = metricOf) {
   if (!slots.length) return [];
   const n = slots.length;
-  const cost = slots.map(s => { const row = cands.map(r => s.elig.includes(r.pos) ? -metricOf(r) : 1e6); for (let i = 0; i < n; i++) row.push(1e5); return row; });
+  const cost = slots.map(s => { const row = cands.map(r => s.elig.includes(r.pos) ? -val(r, s) : 1e6); for (let i = 0; i < n; i++) row.push(1e5); return row; });
   const asg = hungarian(cost);
   return slots.map((s, i) => { const j = asg[i]; return { slot: s, r: j >= 0 && j < cands.length && cost[i][j] < 1e5 ? cands[j] : null }; });
 }
+/* Before kickoff, simply the best lineup. Once games start, a player already playing can't be moved: the ones you started
+   (knownStarters) keep their slots, and only the open slots are picked, from players yet to play. */
 function optimize() {
   const slots = expandSlots(), roster = state.roster.map(id => D.M[id]).filter(Boolean);
   if (!slots.length) return { starters: [], bench: roster };
-  const starters = assignSlots(slots, roster.filter(r => r.status === 'ok')), used = new Set(starters.filter(s => s.r).map(s => s.r.id));
+  let starters;
+  if (!roster.some(r => r.locked)) starters = assignSlots(slots, roster.filter(r => r.status === 'ok'));
+  else {
+    // started players go in first, each in the narrowest slot he fits, so the flex spots stay open for the rest
+    const ks = knownStarters().ids, frozen = roster.filter(r => r.locked && ks.has(r.id));
+    starters = assignSlots(slots, frozen, (r, s) => 100 - s.elig.length);
+    const open = starters.map((a, i) => a.r ? -1 : i).filter(i => i >= 0);
+    const rest = assignSlots(open.map(i => slots[i]), roster.filter(r => r.status === 'ok' && !r.locked));
+    open.forEach((i, j) => { starters[i] = rest[j]; });
+  }
+  const used = new Set(starters.filter(s => s.r).map(s => s.r.id));
   const bench = roster.filter(r => !used.has(r.id)).sort((a, b) => (b.status === 'ok') - (a.status === 'ok') || metricOf(b) - metricOf(a));
   return { starters, bench };
 }
@@ -2004,19 +2019,34 @@ function histPut(k, snap) {
 }
 function moveHist(from, to) { const H = histAll(); for (const k of Object.keys(H)) if (k.startsWith(from + '|')) { const nk = to + k.slice(from.length); if (!H[nk]) H[nk] = H[k]; delete H[k]; } store.set(HIST_KEY, H); }
 const slotOrder = k => SLOT_TYPES.findIndex(t => t.k === k);
+/* Who you started this week, for the lineup once games kick off: your Sleeper lineup when synced, else the ESPN lineup
+   from your import, else the lineup Benny showed before kickoff (the saved history). Your corrections on the Lineup tab
+   ("I started him" / "I didn't start him", state.liveFix) apply on top. `src` is '' when Benny has no source. */
+const liveKey = () => histKey(state.activeTeam, D.season, D.week);
+function knownStarters() {
+  let ids = null, src = '';
+  if (state.sleeper?.starters) { ids = new Set(state.sleeper.starters); src = 'Sleeper'; }
+  else if (Object.keys(state.espn.slotOf || {}).length) { ids = new Set(Object.entries(state.espn.slotOf).filter(([, s]) => !(s === 20 || s === 21)).map(([id]) => id)); src = 'ESPN'; }
+  else { const h = histAll()[liveKey()]; if (h) { ids = new Set((h.starters || []).map(e => e[1]).filter(Boolean)); src = 'Benny'; } }
+  ids = ids || new Set();
+  const fix = state.liveFix?.[liveKey()] || {};
+  for (const [id, on] of Object.entries(fix)) on ? ids.add(id) : ids.delete(id);
+  return { ids, src, fixed: Object.keys(fix).length > 0 };
+}
+function toggleStarted(id) {
+  const k = liveKey(), F = state.liveFix || (state.liveFix = {});
+  for (const key in F) if (key !== k) delete F[key];   // only this week's corrections matter
+  const f = F[k] || (F[k] = {}); f[id] = !knownStarters().ids.has(id);
+  save(); render();
+}
 function recordLineup(starters) {
   if (!state.roster.length || D.snapshot || D.season !== D.detSeason || D.week !== D.detWeek) return;
   const k = histKey(state.activeTeam, D.season, D.week), prev = histAll()[k];
   const ent = r => [r.id, r.u.name, r.pos, r.status === 'bye' ? 0 : Math.round(r.mean * 10) / 10];
   const row = s => s.r ? [s.slot.k, ...ent(s.r)] : [s.slot.k, null, '', '', 0];
-  let st = starters.map(row);
-  if (prev && state.roster.some(id => D.M[id]?.locked)) {
-    // games have started: starters already playing stay put, and only the open slots are refilled from players yet to play
-    const frozen = (prev.starters || []).filter(e => e[1] && D.M[e[1]]?.locked), taken = new Set(frozen.map(e => e[1])), left = expandSlots();
-    for (const e of frozen) { const i = left.findIndex(s => s.k === e[0]); if (i >= 0) left.splice(i, 1); }
-    const cands = state.roster.map(id => D.M[id]).filter(r => r && r.status === 'ok' && !r.locked && !taken.has(r.id));
-    st = [...frozen, ...assignSlots(left, cands).map(row)].sort((a, b) => slotOrder(a[0]) - slotOrder(b[0]));
-  }
+  // optimize() already keeps started players in place; each keeps the entry saved before his kickoff (pregame projection)
+  const was = new Map((prev?.starters || []).filter(e => e[1]).map(e => [e[1], e]));
+  const st = starters.map(s => s.r?.locked && was.has(s.r.id) ? [s.slot.k, ...was.get(s.r.id).slice(1)] : row(s));
   const on = new Set(st.map(e => e[1]).filter(Boolean));
   const act = Object.assign({}, prev?.act);
   for (const id of state.roster) { const r = D.M[id]; if (r?.locked && ok(r.actual)) act[id] = Math.round(r.actual * 10) / 10; }
@@ -3040,7 +3070,7 @@ function playerRow(r, slotLabel, starting) {
     <span class="proj num">${r.status === 'bye' ? '—' : f1(r.mean)}</span>
     <span class="range">${r.status === 'bye' ? '' : f1(r.floor) + '–' + f1(r.ceil)}</span>
     <span class="pav">${r.pAvg != null ? pct(r.pAvg) : '—'}</span>
-  </button>${open ? detailBlock(r) : ''}</div>`;
+  </button>${r.locked && !state.sleeper?.starters ? `<div class="lfix small"><span class="muted">🔒 Game started${starting ? '' : ', on your bench here'}.</span> <button type="button" class="linkbtn" data-started="${esc(r.id)}">${starting ? 'I didn’t start him' : 'I started him'}</button></div>` : ''}${open ? detailBlock(r) : ''}</div>`;
 }
 function factorList(r) {
   if (!r.factors.length) return '<div class="small muted">No matchup factors (bye week or no game data).</div>';
@@ -3679,7 +3709,10 @@ function lineupBody() {
   // activation: Benny's lineup shown for a real team, counted once per NFL week in this browser (weekly retention uses it)
   const luKey = `${D.season}-${D.week}`;
   if (an.on && store.get('fo1:anlu') !== luKey) { store.set('fo1:anlu', luKey); track('lineup_shown', { players: state.roster.length, starters: starters.filter(s => s.r).length, teams: state.teams.length, scoring: state.scoring }); }
-  const st = starters.filter(s => s.r), tot = st.reduce((s, x) => s + metricOf(x.r), 0), mu = st.reduce((s, x) => s + x.r.mean, 0), sdT = Math.sqrt(st.reduce((s, x) => s + x.r.sd ** 2, 0));
+  const st = starters.filter(s => s.r), mu = st.reduce((s, x) => s + x.r.mean, 0), sdT = Math.sqrt(st.reduce((s, x) => s + x.r.sd ** 2, 0));
+  // once games start: points banked by started players, shown apart from the pregame projection rather than mixed into it
+  const live = state.roster.some(id => D.M[id]?.locked), played = st.filter(x => x.r.locked), sofar = played.reduce((s, x) => s + (ok(x.r.actual) ? x.r.actual : 0), 0);
+  const ks = live ? knownStarters() : null;
   // injury alerts: starters and bench counted separately (out/IR players are already benched, so they show as bench alerts)
   const tagged = r => r && r.inj && r.status !== 'bye', empty = starters.length - st.length;
   const startTags = st.filter(x => tagged(x.r)).map(x => x.r), benchTags = bench.filter(tagged);
@@ -3689,12 +3722,15 @@ function lineupBody() {
   return `<div class="section">
   <div class="gm-row">${gradeCard()}${movesCard()}</div>
   <div class="summary">
-    <div><span class="label">Starters project</span><span class="big num">${f1(mu)}</span><span class="small muted">${fmtName()} points, week ${D.week}</span></div>
+    <div><span class="label">Starters project</span><span class="big num">${f1(mu)}</span><span class="small muted">${fmtName()} points, week ${D.week}${live ? ', before kickoff' : ''}</span></div>
     <div><span class="label">Likely range</span><span class="big num">${f0(mu - 0.674 * sdT)}–${f0(mu + 0.674 * sdT)}</span><span class="small muted">middle 50% of outcomes</span></div>
-    <div><span class="label">Optimizing for</span><span class="big num" style="font-size:24px">${sLab[strat]}</span><span class="small muted">${strat === 'mean' ? 'best average outcome' : strat === 'floor' ? 'use when you’re favored' : 'use when you’re the underdog'} · ${f1(tot)}</span></div>
+    ${live ? `<div><span class="label">Scored so far</span><span class="big num">${f1(sofar)}</span><span class="small muted">${played.length} of ${st.length} starters playing or done</span></div>`
+      : `<div><span class="label">Optimizing for</span><span class="big num" style="font-size:24px">${sLab[strat]}</span><span class="small muted">${strat === 'mean' ? 'best average outcome' : strat === 'floor' ? 'use when you’re favored' : 'use when you’re the underdog'}</span></div>`}
     <div><span class="label">Injury alerts</span><span class="big num">${startTags.length}<span class="small muted" style="font-family:var(--font-body);font-size:14px;font-weight:400"> starter${startTags.length === 1 ? '' : 's'} · ${benchTags.length} bench</span></span><span class="small muted">${startTags.length ? 'Starting: ' + esc(tagTxt(startTags)) : 'No starters tagged'}${benchTags.length ? ' · Bench: ' + esc(tagTxt(benchTags)) : ''}${empty ? ` · ${empty} empty slot${empty === 1 ? '' : 's'}` : ''}</span></div>
   </div>
   ${D.histOpen ? histPanel() : ''}
+  ${live ? `<div class="banner small">${ks.src || ks.fixed ? `Games have started. Players already playing stay where ${ks.src === 'Sleeper' ? 'your Sleeper lineup has them' : ks.src === 'ESPN' ? 'your imported ESPN lineup has them' : ks.src === 'Benny' ? 'Benny’s lineup had them before kickoff' : 'you marked them'}; only the open slots are picked, from players yet to play.${ks.src !== 'Sleeper' ? ' Started someone else? Use “I started him” on that player.' : ''}`
+    : 'Games have started and Benny doesn’t know who you started, so players already playing sit on the bench here and only the open slots are picked. Use “I started him” on anyone you started.'}</div>` : ''}
   <div class="row-head"><h2>Start</h2><span class="toolbar"><button type="button" class="btn sm" data-act="hist" aria-expanded="${!!D.histOpen}">Past weeks</button><span class="seg" role="group" aria-label="Strategy">${['mean', 'floor', 'ceil'].map(k => k === 'mean' || isPro() ? `<button type="button" data-strategy="${k}" aria-pressed="${strat === k}">${{ mean: 'Projected', floor: 'Safe', ceil: 'Boom' }[k]}</button>` : `<button type="button" data-tab="pro" title="Safe and Boom lineups are part of Pro">${{ floor: 'Safe', ceil: 'Boom' }[k]} <span aria-hidden="true">🔒</span></button>`).join('')}</span></span></div>
   <div class="card list">${head}${starters.map(s => s.r ? playerRow(s.r, s.slot.label || s.slot.k, true) : `<div class="item"><div class="prow"><span class="slot">${esc(s.slot.label || s.slot.k)}</span><span class="pwho muted">No eligible player. <a href="#roster" data-tab="players">Add one in Roster</a>.</span></div></div>`).join('')}</div>
   <div class="row-head"><h2>Bench</h2><span class="small muted">Tap any player for the full matchup breakdown</span></div>
@@ -3712,7 +3748,10 @@ function viewCompare() {
   const pick = (k, r) => { const lbl = r ? esc(r.u.name + ' · ' + r.pos + ' ' + (r.T || 'FA')) : '';
     return `<div class="ac ac-pick"><input class="inp" id="cmp${k}" type="text" autocomplete="off" role="combobox" aria-expanded="false" aria-controls="cmpList${k}" aria-autocomplete="list" data-label="${lbl}" value="${lbl}" placeholder="Search a player"><span class="ac-caret" aria-hidden="true"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="m6 9 6 6 6-6"/></svg></span><div class="ac-list" id="cmpList${k}" role="listbox" hidden></div></div>`; };
   let verdict = '';
-  if (A && Bp) {
+  // a player whose game started can't move in or out of a lineup, so there's no call to make
+  if (A && Bp && (A.locked || Bp.locked)) verdict = `<div class="card pick"><div class="pick-head"><span class="label">Benny’s Pick</span><span class="pill m">Game started</span></div>
+      <div class="small">${esc([A, Bp].filter(r => r.locked).map(r => r.u.name).join(' and '))}${A.locked && Bp.locked ? ' have' : ' has'} already kicked off, so there’s no start/sit call to make. The side-by-side below is the pregame view.</div></div>`;
+  else if (A && Bp) {
     // counted once per pair; "picked" is a pair the user chose, as opposed to the one Start / Sit opens on
     trackOnce('ss:' + [a, b].sort().join('|'), 'start_sit_used', { picked: state.compare[0] === a && state.compare[1] === b, pos: A.pos });
     const pA = pBeats(A, Bp), w = pA >= 0.5 ? A : Bp, l = w === A ? Bp : A, pw = Math.max(pA, 1 - pA), edge = w.mean - l.mean;
@@ -3902,7 +3941,7 @@ function viewSettings() {
 
 /* ---------- events ---------- */
 document.addEventListener('click', e => {
-  const t = e.target.closest('[data-tab],[data-expand],[data-add],[data-remove],[data-strategy],[data-act],[data-sort],[data-team],[data-fteam],[data-clearovr],[data-wh],[data-wsrc],[data-taken],[data-keepmode],[data-decide],[data-brief],[data-wrank],[data-acadd],[data-mrem],[data-flowmethod],[data-espnmode],[data-rview],[data-research],[data-hweek],[data-dc],[data-colmv]'); if (!t) return;
+  const t = e.target.closest('[data-tab],[data-expand],[data-add],[data-remove],[data-strategy],[data-act],[data-sort],[data-team],[data-fteam],[data-clearovr],[data-wh],[data-wsrc],[data-taken],[data-keepmode],[data-decide],[data-brief],[data-wrank],[data-acadd],[data-mrem],[data-flowmethod],[data-espnmode],[data-rview],[data-research],[data-hweek],[data-dc],[data-colmv],[data-started]'); if (!t) return;
   if (t.dataset.dc) { D.dcOpen = D.dcOpen === t.dataset.dc ? null : t.dataset.dc; render(); return; }
   if (t.dataset.colmv) { const [k, d] = t.dataset.colmv.split('|'), c = defCols(), i = c.order.indexOf(k), j = i + +d; if (i < 0 || j < 0 || j >= c.order.length) return; [c.order[i], c.order[j]] = [c.order[j], c.order[i]]; saveDefCols(c); render(); $(`[data-colmv="${k}|${d}"]:not([disabled])`)?.focus(); return; }
   if (t.dataset.acadd) { e.preventDefault(); acPick(t.dataset.acadd, t.dataset.acmode); return; }
@@ -3930,6 +3969,7 @@ document.addEventListener('click', e => {
   if (t.dataset.add) { addToRoster(t.dataset.add); return; }
   if (t.dataset.remove) { removeFromRoster(t.dataset.remove); return; }
   if (t.dataset.clearovr) { delete state.overrides[t.dataset.clearovr]; save(); computeAll(); render(); return; }
+  if (t.dataset.started) { toggleStarted(t.dataset.started); return; }
   if (t.dataset.strategy) { state.settings.strategy = t.dataset.strategy; track('strategy_changed', { strategy: t.dataset.strategy }); save(); render(); return; }
   if (t.dataset.sort) { const k = t.dataset.sort; D.defSort = D.defSort[0] === k ? [k, -D.defSort[1]] : [k, -1]; render(); return; }
   if (t.dataset.team) { D.teamOpen = D.teamOpen === t.dataset.team ? null : t.dataset.team; render(); return; }

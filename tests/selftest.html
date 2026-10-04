@@ -44,7 +44,7 @@ function setup(extra) {
   const st = ev('state'), DEF = ev('DEFAULT_STATE'), D = ev('D');
   st.roster = ROSTER.map(idOf);
   st.slots = Object.assign({}, DEF.slots);
-  st.scoring = 'ppr'; st.tePrem = 0; st.sleeper = null; st.overrides = {}; st.returnWeek = {};
+  st.scoring = 'ppr'; st.tePrem = 0; st.sleeper = null; st.overrides = {}; st.returnWeek = {}; st.liveFix = {};
   st.espn = Object.assign({}, DEF.espn);
   st.waivers = JSON.parse(JSON.stringify(DEF.waivers));
   st.settings = Object.assign({}, DEF.settings, { w: Object.assign({}, DEF.settings.w) });
@@ -61,7 +61,14 @@ const test = (name, fn) => TESTS.push([name, fn]);
 /* ---------- Phase 0: the harness itself ---------- */
 test('fixture loaded (week 4, 2026)', () => { const D = ev('D'); return D.season === 2026 && D.week === 4 && D.U.size > 300 || `season ${D.season} week ${D.week}, ${D.U.size} players`; });
 test('reviewer roster resolves to 17 players', () => { setup(); const r = ev('state').roster; return r.every(Boolean) && r.length === 17 || 'missing: ' + ROSTER.filter((n, i) => !r[i]).join(', '); });
-test('lineup fills every slot', () => { setup(); const { starters } = ev('optimize')(); return starters.every(s => s.r) || 'empty: ' + starters.filter(s => !s.r).map(s => s.slot.k).join(', '); });
+test('lineup fills every slot, keeping the pregame lineup once games start', () => {
+  setup(); const D = ev('D'), L = Object.values(D.M).filter(r => r.locked);
+  // Benny's lineup as shown before kickoff, saved in the history as a visit before the games would have
+  L.forEach(r => { r.locked = false; }); const pre = ev('optimize')().starters; L.forEach(r => { r.locked = true; });
+  D.hist[ev('liveKey')()] = { starters: pre.map(s => [s.slot.k, s.r?.id || null, '', '', 0]) };
+  const now = ev('optimize')().starters, moved = pre.filter((s, i) => s.r?.locked && !now.some(x => x.r?.id === s.r.id));
+  return now.every(s => s.r) && !moved.length || `empty: ${now.filter(s => !s.r).map(s => s.slot.k)}, started players moved out: ${moved.map(s => name(s.r.id))}`;
+});
 
 /* ---------- Phase 1: player roles and injury timelines ---------- */
 test('backup QB (Drew Lock) is a backup worth 0 this week', () => {
@@ -107,6 +114,50 @@ test('a later week counts an injured player in once he is back', () => {
   setup(); const D = ev('D'), id = idOf('Baker Mayfield'), back = ev('returnWeek')(id), keep = D.week;
   try { D.week = back; const r = ev('evalPlayer')(id); D.week = back - 1; const r2 = ev('evalPlayer')(id); return r.status !== 'out' && r2.status === 'out' || `wk ${back}: ${r.status}, wk ${back - 1}: ${r2.status}`; }
   finally { D.week = keep; ev('computeAll')(); }
+});
+
+/* ---------- Phase 2: actionable live lineup (the fixture was saved with some week-4 games under way) ---------- */
+const lockedOnRoster = () => ev('state').roster.filter(id => M(id)?.locked);
+test('fixture has players whose games started', () => { setup(); return lockedOnRoster().length >= 3 || 'only ' + lockedOnRoster().length; });
+test('the lineup score ignores points already scored', () => {
+  setup(); const r = M(lockedOnRoster().find(id => ev('ok')(M(id).actual)));
+  return r && ev('metricOf')(r) === r.mean || `metric ${r && ev('metricOf')(r)}, mean ${r?.mean}, actual ${r?.actual}`;
+});
+test('with no known lineup, players already playing are not started', () => {
+  setup(); const bad = ev('optimize')().starters.filter(s => s.r?.locked);
+  return !bad.length || 'started: ' + bad.map(s => name(s.r.id)).join(', ');
+});
+test('players you started keep their slots; others already playing stay benched', () => {
+  setup(); const L = lockedOnRoster(), mine = L.slice(0, 2), D = ev('D');
+  D.hist[ev('liveKey')()] = { starters: mine.map(id => ['X', id, '', '', 0]) };
+  const { starters, bench } = ev('optimize')(), on = new Set(starters.filter(s => s.r).map(s => s.r.id));
+  const lost = mine.filter(id => !on.has(id)), promoted = L.filter(id => !mine.includes(id) && on.has(id));
+  return !lost.length && !promoted.length || `lost ${lost.map(name)}, promoted ${promoted.map(name)}`;
+});
+test('"I started him" puts a player already playing into the lineup', () => {
+  setup(); const L = lockedOnRoster(), id = L[L.length - 1];
+  ev('toggleStarted')(id); const on = ev('optimize')().starters.some(s => s.r?.id === id);
+  ev('toggleStarted')(id); const off = ev('optimize')().starters.some(s => s.r?.id === id);
+  return on && !off || `after marking: ${on}, after unmarking: ${off}`;
+});
+test('Lineup and Start/Sit agree: no benched player projects more than the starter in a slot he fits', () => {
+  setup(); const { starters, bench } = ev('optimize')(), bad = [];
+  for (const s of starters) { if (!s.r || s.r.locked) continue;
+    for (const b of bench) if (b.status === 'ok' && !b.locked && s.slot.elig.includes(b.pos) && b.mean > s.r.mean + 1e-9) bad.push(`${name(b.id)} ${b.mean.toFixed(1)} over ${name(s.r.id)} ${s.r.mean.toFixed(1)}`); }
+  return !bad.length || bad.join('; ');
+});
+
+/* ---------- every phase: the views still render ---------- */
+test('Lineup, Start/Sit and Waivers render', () => {
+  setup(); const lu = ev('viewLineup')(), cmp = ev('viewCompare')(), wv = ev('viewWaivers')();
+  if (!/Scored so far/.test(lu)) return 'Lineup has no "Scored so far" tile during live games';
+  if (/Optimizing for/.test(lu)) return 'Lineup still shows "Optimizing for" during live games';
+  return cmp.length > 500 && wv.length > 500 || 'a view came back nearly empty';
+});
+test('Start/Sit makes no call for a player whose game started', () => {
+  setup(); const L = lockedOnRoster(), free = ev('state').roster.find(id => M(id) && !M(id).locked && M(id).status === 'ok');
+  ev('state').compare = [L[0], free]; const html = ev('viewCompare')(); ev('state').compare = [null, null];
+  return /Game started/.test(html) && !/chance to outscore/.test(html) || 'verdict shown for a started player';
 });
 
 window.addEventListener('load', () => {
