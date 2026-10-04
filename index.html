@@ -293,6 +293,11 @@ body.welcome.wpro #panels { display: block !important; }   /* the sign-in panel 
 .ac-tag { flex: 0 0 auto; font-size: 12.5px; font-weight: 600; color: var(--accent); border: 1px solid currentColor; border-radius: 999px; padding: 1px 8px; }
 .ac-tag.on { color: var(--muted); }
 .ac-empty { padding: 10px 12px; }
+.ac-head { padding: 7px 12px; border-bottom: 1px solid var(--line); background: var(--surface-2); position: sticky; top: 0; }
+.ac-pick .inp { padding-right: 34px; cursor: pointer; }
+.ac-pick .inp:focus { cursor: text; }
+.ac-caret { position: absolute; right: 10px; top: 50%; transform: translateY(-50%); display: grid; color: var(--muted); pointer-events: none; transition: transform .15s; }
+.ac-pick .inp[aria-expanded="true"] + .ac-caret { transform: translateY(-50%) rotate(180deg); }
 .addbox { padding: 12px 14px; display: flex; flex-direction: column; gap: 6px; }
 .rrow { display: grid; grid-template-columns: minmax(0, 1fr) 56px 34px auto auto; gap: 10px; align-items: center; padding: 8px 14px; }
 .rrow .rr-proj { font-size: 20px; text-align: right; }
@@ -3358,16 +3363,28 @@ function acMatches(q) {
   }
   return out.sort((a, b) => b[0] - a[0]).slice(0, 8).map(x => x[1]);
 }
+// each player search box: its suggestion list, and what picking a suggestion does
+const AC_BOX = { addq: ['acList', 'roster'], mq: ['mqList', 'manual'], cmp0: ['cmpList0', 'cmp0'], cmp1: ['cmpList1', 'cmp1'] };
+const isCmpBox = id => id === 'cmp0' || id === 'cmp1';
+// Start / Sit: an empty box lists your roster (best projection first, minus the other side's player)
+function cmpRoster(k) { const other = D.cmpShown?.[1 - k]; return state.roster.map(id => D.U.get(id)).filter(u => u && D.M[u.id] && u.id !== other).sort((a, b) => D.M[b.id].mean - D.M[a.id].mean); }
 function renderAc(inputId) {
-  const inp = $('#' + inputId), list = $('#' + (inputId === 'addq' ? 'acList' : 'mqList')); if (!inp || !list) return;
-  const mode = inputId === 'addq' ? 'roster' : 'manual', items = acMatches(inp.value), have = new Set(mode === 'manual' ? D.flow?.manual || [] : state.roster);
+  const [listId, mode] = AC_BOX[inputId] || [], inp = $('#' + inputId), list = listId && $('#' + listId); if (!inp || !list) return;
+  // Start / Sit boxes work like a dropdown: open on focus with your roster, and typing searches every player
+  const cmp = isCmpBox(inputId), q = inp.value.trim(), browse = cmp && q.length < 2;
+  const items = browse ? cmpRoster(+inputId[3]) : cmp ? acMatches(q).filter(u => D.M[u.id]) : acMatches(q), have = new Set(mode === 'manual' ? D.flow?.manual || [] : state.roster);
   D.ac = { input: inputId, items, idx: Math.max(0, Math.min(D.ac?.input === inputId ? D.ac.idx : 0, items.length - 1)) };
-  const open = inp.value.trim().length >= 2; list.hidden = !open; inp.setAttribute('aria-expanded', String(open));
-  list.innerHTML = items.length ? items.map((u, i) => { const r = D.M[u.id], on = have.has(u.id); return `<button type="button" role="option" class="ac-item" data-acadd="${esc(u.id)}" data-acmode="${mode}" aria-selected="${i === D.ac.idx}"><span class="ac-main"><span class="pname">${esc(u.name)}</span><span class="psub">${u.pos === 'DEF' ? 'D/ST' : u.pos} · ${u.team || 'FA'}${r && r.status !== 'bye' ? ` · ${f1(r.mean)} proj` : r?.status === 'bye' ? ' · bye' : ''}${u.inj ? ' · ' + esc(u.inj) : ''}</span></span><span class="ac-tag ${on ? 'on' : ''}">${on ? 'On roster' : 'Add'}</span></button>`; }).join('')
-    : `<div class="ac-empty small muted">No player matches “${esc(inp.value.trim())}”.</div>`;
+  const open = cmp || q.length >= 2; list.hidden = !open; inp.setAttribute('aria-expanded', String(open));
+  const tag = on => cmp ? (on ? '<span class="ac-tag on">On roster</span>' : '') : `<span class="ac-tag ${on ? 'on' : ''}">${on ? 'On roster' : 'Add'}</span>`;
+  list.innerHTML = (browse ? '<div class="ac-head small muted" role="presentation">Your players · type to search everyone</div>' : '')
+    + (items.length ? items.map((u, i) => { const r = D.M[u.id], on = have.has(u.id); return `<button type="button" role="option" class="ac-item" data-acadd="${esc(u.id)}" data-acmode="${mode}" aria-selected="${i === D.ac.idx}"><span class="ac-main"><span class="pname">${esc(u.name)}</span><span class="psub">${u.pos === 'DEF' ? 'D/ST' : u.pos} · ${u.team || 'FA'}${r && r.status !== 'bye' ? ` · ${f1(r.mean)} proj` : r?.status === 'bye' ? ' · bye' : ''}${u.inj ? ' · ' + esc(u.inj) : ''}</span></span>${tag(on)}</button>`; }).join('')
+    : `<div class="ac-empty small muted">${q ? `No player matches “${esc(q)}”.` : 'Type a name to search.'}</div>`);
 }
 function acPick(id, mode) {
   const u = D.U.get(id); if (!u) return;
+  if (mode === 'cmp0' || mode === 'cmp1') {   // keep the other side as shown, even when it was Benny's default pick
+    const c = (D.cmpShown || state.compare).slice(); c[+mode[3]] = id; state.compare = c; save(); render(); return;
+  }
   if (mode === 'manual') {
     const set = D.flow.manual; if (!set.includes(id)) set.push(id); flowTry();
     const ml = $('#manualList'); if (ml) ml.innerHTML = manualListHTML();
@@ -3509,19 +3526,16 @@ function lineupBody() {
   <div class="card list">${bench.length ? bench.map(r => playerRow(r, 'BN', false)).join('') : '<div class="item"><div class="prow"><span></span><span class="muted">Nobody on the bench.</span></div></div>'}</div>
   </div>`;
 }
-function playerOptions() {
-  const ros = new Set(state.roster);
-  const all = [...D.U.values()].filter(u => D.M[u.id] && (ros.has(u.id) || D.M[u.id].mean > 2)).sort((a, b) => (ros.has(b.id) - ros.has(a.id)) || D.M[b.id].mean - D.M[a.id].mean);
-  return all.map(u => `<option value="${esc(u.name + ' · ' + u.pos + ' ' + (u.team || 'FA'))}"></option>`).join('');
-}
-function resolvePick(v) { const m = /^(.*) · (\w+) (\w+)$/.exec(v || ''); const nm = norm(m ? m[1] : v); const c = D.nameIdx.get(nm) || []; return c.find(id => !m || (D.U.get(id).pos === m[2])) || null; }
 function viewCompare() {
   let [a, b] = state.compare;
   // open on the closest start/sit call when nothing is picked yet
   if (!a || !D.M[a] || !b || !D.M[b]) { const d = reviewDecisions()[0]; if (d) { a = d.start; b = d.alt; } }
   if (!a || !D.M[a] || !b || !D.M[b]) { const ros = state.roster.map(id => D.M[id]).filter(r => r && r.status === 'ok'); const { bench } = optimize(); const nb = bench.find(r => r.status === 'ok'); if (nb) { const { starters } = optimize(); const st = starters.find(s => s.r && s.slot.elig.includes(nb.pos)); a = a && D.M[a] ? a : st?.r.id; b = b && D.M[b] ? b : nb.id; } else if (ros.length > 1) { a = a || ros[0].id; b = b || ros[1].id; } }
   const A = D.M[a], Bp = D.M[b];
-  const pick = (k, r) => `<input class="inp" list="plist" id="cmp${k}" data-cmp="${k}" value="${r ? esc(r.u.name + ' · ' + r.pos + ' ' + (r.T || 'FA')) : ''}" placeholder="Search a player" style="width:100%">`;
+  D.cmpShown = [a || null, b || null];
+  // a player search that opens like a dropdown (renderAc); the box empties while open and shows the pick again on leaving
+  const pick = (k, r) => { const lbl = r ? esc(r.u.name + ' · ' + r.pos + ' ' + (r.T || 'FA')) : '';
+    return `<div class="ac ac-pick"><input class="inp" id="cmp${k}" type="text" autocomplete="off" role="combobox" aria-expanded="false" aria-controls="cmpList${k}" aria-autocomplete="list" data-label="${lbl}" value="${lbl}" placeholder="Search a player"><span class="ac-caret" aria-hidden="true"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="m6 9 6 6 6-6"/></svg></span><div class="ac-list" id="cmpList${k}" role="listbox" hidden></div></div>`; };
   let verdict = '';
   if (A && Bp) {
     // counted once per pair; "picked" is a pair the user chose, as opposed to the one Start / Sit opens on
@@ -3547,7 +3561,7 @@ function viewCompare() {
     ${why.length ? `<ul class="reasons">${why.map(x => `<li class="${x.up ? 'up' : 'down'}"><span class="rv">${spct(x.pct)}</span> ${esc(x.text)}</li>`).join('')}</ul>` : ''}
     ${isPro() ? `<details class="more"><summary>All factors</summary>${factorList(r)}${r.scheme ? `<div class="scheme"><strong>Scheme:</strong> ${esc(r.scheme)}</div>` : ''}</details>
     <details class="more"><summary>Coaching and scheme matchup</summary>${schemeBlock(r)}</details>` : lockLine('Every matchup factor and the coaching matchup')}</div>`; };
-  return `<div class="section"><datalist id="plist">${playerOptions()}</datalist>${decBar}<div class="cmp"><div class="field"><label class="label" for="cmp0">Player A</label>${pick(0, A)}</div><div class="field"><label class="label" for="cmp1">Player B</label>${pick(1, Bp)}</div></div>${verdict}<h2>Side by side</h2><div class="cmp">${col(A)}${col(Bp)}</div></div>`;
+  return `<div class="section">${decBar}<div class="cmp"><div class="field"><label class="label" for="cmp0">Player A</label>${pick(0, A)}</div><div class="field"><label class="label" for="cmp1">Player B</label>${pick(1, Bp)}</div></div>${verdict}<h2>Side by side</h2><div class="cmp">${col(A)}${col(Bp)}</div></div>`;
 }
 /* Two or three plain reasons for a pick: the projection gap, then the biggest matchup factors in the winner's favor
    or against the other player, an injury tag, or a safer floor. */
@@ -3836,24 +3850,32 @@ document.addEventListener('keydown', e => {
   if (e.key === 'Enter' && t.id === 'slQuery') { e.preventDefault(); slFind(); }
   if (e.key === 'Enter' && t.id === 'acctEmail') { e.preventDefault(); sendCode(); }
   if (e.key === 'Enter' && t.id === 'acctCode') { e.preventDefault(); verifyCode(); }
-  // player search: arrows move through suggestions, Enter adds the highlighted one, Escape closes the list
-  if ((t.id === 'addq' || t.id === 'mq') && D.ac?.input === t.id) {
-    const n = D.ac.items.length;
-    if (e.key === 'ArrowDown' || e.key === 'ArrowUp') { e.preventDefault(); if (!n) return; D.ac.idx = (D.ac.idx + (e.key === 'ArrowDown' ? 1 : n - 1)) % n; renderAc(t.id); }
-    else if (e.key === 'Enter') { e.preventDefault(); const u = D.ac.items[D.ac.idx]; if (u) acPick(u.id, t.id === 'addq' ? 'roster' : 'manual'); }
-    else if (e.key === 'Escape') { const l = $(t.id === 'addq' ? '#acList' : '#mqList'); if (l) l.hidden = true; t.setAttribute('aria-expanded', 'false'); }
+  // player search: arrows move through suggestions, Enter picks the highlighted one, Escape closes the list
+  if (AC_BOX[t.id] && D.ac?.input === t.id) {
+    const n = D.ac.items.length, [listId, mode] = AC_BOX[t.id];
+    if (e.key === 'ArrowDown' || e.key === 'ArrowUp') { e.preventDefault(); if (!n) return; D.ac.idx = (D.ac.idx + (e.key === 'ArrowDown' ? 1 : n - 1)) % n; renderAc(t.id); $(`#${listId} [aria-selected="true"]`)?.scrollIntoView({ block: 'nearest' }); }
+    else if (e.key === 'Enter') { e.preventDefault(); const u = D.ac.items[D.ac.idx]; if (u) acPick(u.id, mode); }
+    else if (e.key === 'Escape') { if (isCmpBox(t.id)) { t.blur(); return; } const l = $('#' + listId); if (l) l.hidden = true; t.setAttribute('aria-expanded', 'false'); }
   }
 });
+// Start / Sit boxes open like a dropdown: empty the box (the current pick stays as the placeholder) and list the roster
+function openCmpBox(t) { if (!t.value && t.getAttribute('aria-expanded') === 'true') return; t.placeholder = t.dataset.label || 'Search a player'; t.value = ''; D.ac = null; renderAc(t.id); }
+document.addEventListener('focusin', e => { if (isCmpBox(e.target.id)) openCmpBox(e.target); });
+document.addEventListener('click', e => { if (isCmpBox(e.target.id) && e.target.getAttribute('aria-expanded') !== 'true') openCmpBox(e.target); });
 // close the suggestion list when focus leaves the search box (after a beat, so a tap on a suggestion still lands)
 document.addEventListener('focusout', e => {
-  const id = e.target.id; if (id !== 'addq' && id !== 'mq') return;
-  setTimeout(() => { const l = $(id === 'addq' ? '#acList' : '#mqList'); if (l && !l.contains(document.activeElement) && document.activeElement?.id !== id) { l.hidden = true; e.target.setAttribute('aria-expanded', 'false'); } }, 200);
+  const id = e.target.id; if (!AC_BOX[id]) return;
+  setTimeout(() => {
+    const l = $('#' + AC_BOX[id][0]); if (!l || l.contains(document.activeElement) || document.activeElement?.id === id) return;
+    l.hidden = true; e.target.setAttribute('aria-expanded', 'false');
+    if (isCmpBox(id)) { e.target.value = e.target.dataset.label || ''; e.target.placeholder = 'Search a player'; }   // nothing picked: show the current player again
+  }, 200);
 });
 document.addEventListener('input', e => {
   const t = e.target;
   if (t.id === 'wOwn') { const o = $('#wOwn-v'); if (o) o.textContent = t.value + '%'; return; }
   if (t.id === 'addq') { D.addq = t.value; renderAc('addq'); return; }
-  if (t.id === 'mq') { renderAc('mq'); return; }
+  if (t.id === 'mq' || isCmpBox(t.id)) { if (D.ac) D.ac.idx = 0; renderAc(t.id); return; }
   if (t.dataset.draft) { D.drafts[t.dataset.draft] = t.value; return; }
   if (t.id === 'slQuery') { D.sl = D.sl || {}; D.sl.q = t.value; return; }
   if (t.id === 'acctEmail') { acct.email = t.value; return; }
@@ -3884,7 +3906,6 @@ document.addEventListener('change', e => {
   if (t.id === 'ppos') { D.ppos = t.value; const b = $('#plistBox'); if (b) b.innerHTML = playerListHTML(); return; }
   if (t.dataset.set) { const k = t.dataset.set, v = +t.value; if (k.startsWith('w.')) state.settings.w[k.slice(2)] = v; else state.settings[k] = v; save(); computeAll(); return; }
   if (t.dataset.ovr != null && t.dataset.ovr !== undefined && t.hasAttribute('data-ovr')) { const id = t.dataset.ovr; if (t.value === '') delete state.overrides[id]; else state.overrides[id] = +t.value; save(); computeAll(); state.tab === 'players' ? refreshPlayers() : render(); return; }
-  if (t.dataset.cmp) { const id = resolvePick(t.value); if (id) { state.compare[+t.dataset.cmp] = id; save(); render(); } return; }
   if (t.dataset.slot) { state.slots[t.dataset.slot] = clamp(Math.round(+t.value || 0), 0, 5); save(); return; }
   if (t.hasAttribute('data-season')) { const s = Math.round(+t.value); if (s >= 2019 && s <= D.detSeason) { state.settings.season = s === D.detSeason ? null : s; state.settings.week = null; save(); load({ fresh: true }); } return; }
   if (t.dataset.espn) { state.espn[t.dataset.espn] = t.value; save(); return; }
