@@ -41,17 +41,20 @@
   --font-display: "Saira Condensed", "Arial Narrow", "Roboto Condensed", sans-serif;
   --font-body: "IBM Plex Sans", system-ui, -apple-system, "Segoe UI", sans-serif;
   --radius: 10px;
+  --sleeper-tint: #e3eaf5; --sleeper-ink: #022047; --espn-tint: #fbe7e8; --espn-ink: #8f0009;   /* the setup tabs, in each platform's colors */
 }
 @media (prefers-color-scheme: dark) {
   :root:not([data-theme="light"]) {
     --bg: #0e1512; --surface: #151e1a; --surface-2: #1c2722; --ink: #e4ebe6; --muted: #a9b7af;
     --line: #29352f; --accent: #4fc38e; --accent-ink: #07130d; --good: #4fc38e; --bad: #f07a6e; --warn: #e3b052; --gold: #e2bb52;
+    --sleeper-tint: #1b2a45; --sleeper-ink: #c4d4ea; --espn-tint: #3d1517; --espn-ink: #ffb4b8;
     color-scheme: dark;
   }
 }
 :root[data-theme="dark"] {
   --bg: #0e1512; --surface: #151e1a; --surface-2: #1c2722; --ink: #e4ebe6; --muted: #a9b7af;
   --line: #29352f; --accent: #4fc38e; --accent-ink: #07130d; --good: #4fc38e; --bad: #f07a6e; --warn: #e3b052; --gold: #e2bb52;
+  --sleeper-tint: #1b2a45; --sleeper-ink: #c4d4ea; --espn-tint: #3d1517; --espn-ink: #ffb4b8;
   color-scheme: dark;
 }
 * { box-sizing: border-box; }
@@ -101,7 +104,7 @@ a { color: var(--accent); }
 .blink .n.up { color: var(--good); }
 .controls { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
 .sel, .inp { background: var(--surface); border: 1px solid var(--line); border-radius: 8px; padding: 7px 10px; min-width: 0; }
-.inp:focus, .sel:focus { border-color: var(--accent); outline: none; }
+.inp:focus, .sel:focus { border-color: var(--accent); outline: none; box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 22%, transparent); }
 .btn { background: var(--surface); border: 1px solid var(--line); border-radius: 8px; padding: 7px 12px; font-weight: 500; }
 .btn:hover { border-color: var(--accent); }
 .btn.primary { background: var(--accent); color: var(--accent-ink); border-color: var(--accent); }
@@ -321,6 +324,21 @@ body.welcome.wpro #panels { display: block !important; }   /* the sign-in panel 
 .seg { display: inline-flex; border: 1px solid var(--line); border-radius: 8px; overflow: hidden; background: var(--surface); }
 .seg button { border: 0; background: none; padding: 6px 12px; font-weight: 500; font-size: 14px; }
 .seg button[aria-pressed="true"] { background: var(--accent); color: var(--accent-ink); }
+/* the setup tabs show where the team comes from in that platform's colors; green stays for the main action */
+.seg.methods [data-flowmethod="sleeper"][aria-pressed="true"] { background: var(--sleeper-tint); color: var(--sleeper-ink); box-shadow: inset 0 -2px 0 var(--sleeper-ink); }
+.seg.methods [data-flowmethod="espn"][aria-pressed="true"] { background: var(--espn-tint); color: var(--espn-ink); box-shadow: inset 0 -2px 0 var(--espn-ink); }
+/* a quieter, smaller switch for a choice inside a method (ESPN: public league or paste) */
+.seg.quiet { border-radius: 7px; background: var(--surface-2); padding: 2px; border-color: transparent; gap: 2px; }
+.seg.quiet button { padding: 3px 10px; font-size: 13px; border-radius: 5px; color: var(--muted); }
+.seg.quiet button[aria-pressed="true"] { background: var(--surface); color: var(--ink); box-shadow: 0 1px 2px rgba(0, 0, 0, .12); }
+.flow-back { align-self: center; }
+.flow-sub { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 12px; }
+.flow-title { display: flex; align-items: center; gap: 10px; }
+.flow-title .wl-ico { width: 34px; height: 34px; border-radius: 8px; background: var(--wl-tint); color: var(--wl-ink); }
+.flow-title .wl-ico svg { width: 20px; height: 20px; }
+.flow-title.m-sleeper { --wl-tint: var(--sleeper-tint); --wl-ink: var(--sleeper-ink); }
+.flow-title.m-espn { --wl-tint: var(--espn-tint); --wl-ink: var(--espn-ink); }
+.flow-title.m-manual { --wl-tint: color-mix(in srgb, var(--accent) 14%, var(--surface)); --wl-ink: var(--accent); }
 
 /* Fantasy team headers */
 .teambar { display: flex; flex-direction: column; gap: 8px; min-width: 0; }
@@ -3098,7 +3116,8 @@ const WL_ICONS = {
   espn: WL_IMPORT,
   manual: wlSvg('<circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/>'),
 };
-const WL_GO = wlSvg('<path d="M5 12h14"/><path d="m13 6 6 6-6 6"/>');
+const FLOW_TITLES = { sleeper: 'Import from Sleeper', espn: 'Import from ESPN', manual: 'Find your players', restore: 'Restore a saved team' };
+const WL_GO =wlSvg('<path d="M5 12h14"/><path d="m13 6 6 6-6 6"/>');
 // platform logos, shown in place of the icon once the files are in assets/: { sleeper: 'assets/logo-sleeper.svg', espn: 'assets/logo-espn.svg' }
 const WL_LOGOS = {};
 function viewWelcome() {
@@ -3199,8 +3218,12 @@ function openFlow(method, dest, espnMode) {
 }
 function flowPanel() {
   const F = D.flow;
-  const title = F.step === 'review' ? 'Review and save' : D.welcome ? 'Set up your team' : F.dest === 'new' ? 'Add a team' : `Import into ${esc(curTeam().name)}`;
-  const head = `<div class="row-head"><h2>${title}</h2><button type="button" class="btn sm" data-act="flowclose">Cancel</button></div>`;
+  // on the welcome, the panel is named for the card that opened it, and Back returns to the cards
+  const pick = D.welcome && F.step !== 'review';
+  const title = F.step === 'review' ? 'Review and save' : pick ? FLOW_TITLES[F.method] : F.dest === 'new' ? 'Add a team' : `Import into ${esc(curTeam().name)}`;
+  const head = pick
+    ? `<div class="row-head"><h2 class="flow-title m-${F.method}">${WL_ICONS[F.method] ? `<span class="wl-ico">${WL_ICONS[F.method]}</span>` : ''}${title}</h2><button type="button" class="linkbtn small flow-back" data-act="flowclose">← Back</button></div>`
+    : `<div class="row-head"><h2>${title}</h2><button type="button" class="btn sm" data-act="flowclose">Cancel</button></div>`;
   if (F.step === 'review') return `<div class="card panel flow">${head}${reviewHTML()}</div>`;
   const methods = `<div class="seg methods" role="group" aria-label="How to bring in your team">${FLOW_METHODS.map(([k, l]) => `<button type="button" data-flowmethod="${k}" aria-pressed="${F.method === k}">${l}</button>`).join('')}</div>`;
   const body = { sleeper: flowSleeper, espn: flowEspn, manual: flowManual, restore: flowRestore }[F.method]();
@@ -3211,12 +3234,14 @@ function flowSleeper() {
 }
 function flowEspn() {
   const F = D.flow, tms = D.espnTeams, paste = F.espnMode === 'paste';
-  return `<div class="seg" role="group" aria-label="ESPN import type"><button type="button" data-espnmode="league" aria-pressed="${!paste}">Public league</button><button type="button" data-espnmode="paste" aria-pressed="${paste}">Paste roster</button></div>
+  return `<div class="flow-sub"><div class="seg quiet" role="group" aria-label="ESPN import type"><button type="button" data-espnmode="league" aria-pressed="${!paste}">Public league</button><button type="button" data-espnmode="paste" aria-pressed="${paste}">Paste roster</button></div>
+    ${paste ? '' : `<span class="small muted">Private league? <button type="button" class="linkbtn" data-espnmode="paste">Use Paste roster</button>.</span>`}</div>
   ${paste ? `<p class="small muted">Works for any league, private ones included. On ESPN, open <strong>My Team</strong>, select the roster table, copy it, and paste it here. A list of names, one per line, works too.</p>
     <textarea class="inp" id="rosterPaste" data-draft="paste" placeholder="Joe Burrow&#10;Bijan Robinson&#10;Ja'Marr Chase&#10;Packers D/ST">${esc(D.drafts.paste || '')}</textarea>
     <div class="toolbar"><button type="button" class="btn primary" data-act="flowpaste" data-src="paste">Match players</button></div>`
-  : `<p class="small muted">If your league is viewable by the public, enter the number after <code>leagueId=</code> in its web address. This also brings in your lineup slots. For a private league, use Paste roster.</p>
-    <div class="toolbar"><input class="inp" id="leagueId" data-espn="leagueId" inputmode="numeric" placeholder="League ID" aria-label="ESPN league ID" value="${esc(state.espn.leagueId)}" style="flex:1 1 140px"><button type="button" class="btn" data-act="loadleague">Load league</button></div>
+  : `<div class="field"><label class="label" for="leagueId">ESPN league ID</label>
+    <div class="toolbar"><input class="inp" id="leagueId" data-espn="leagueId" inputmode="numeric" placeholder="e.g. 12345678" aria-describedby="leagueIdHelp" value="${esc(state.espn.leagueId)}" style="flex:1 1 140px"><button type="button" class="btn ${tms ? '' : 'primary'}" data-act="loadleague">Load league</button></div>
+    <div class="small muted" id="leagueIdHelp">Find this number after <code>leagueId=</code> in your ESPN league URL.</div></div>
     ${tms ? `<div class="toolbar"><select class="sel" id="espnTeam" data-espn="teamId" aria-label="Your ESPN team" style="flex:1 1 180px">${tms.map(t => `<option value="${t.id}" ${String(state.espn.teamId) === String(t.id) ? 'selected' : ''}>${esc(t.name)}</option>`).join('')}</select><button type="button" class="btn primary" data-act="useteam">Review this team</button></div>` : ''}
     ${D.espnMsg ? `<div class="banner ${D.espnMsg[0]} small">${esc(D.espnMsg[1])}</div>` : ''}`}`;
 }
