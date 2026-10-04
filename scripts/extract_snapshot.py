@@ -30,6 +30,10 @@ if failed:
 
 if len(snap.get("own", [])) < 100:
     print("Warning: ESPN ownership didn't load; waiver suggestions on the saved copy will treat everyone as available.")
+if not snap.get("wx"):
+    print("Warning: no weather forecasts in the snapshot (none due yet, or Open-Meteo didn't answer).")
+if not snap.get("split"):
+    print("Warning: last season's indoor/outdoor splits didn't build; the weather factor will skip personal splits.")
 
 with open(out_path, "w", encoding="utf-8") as f:
     json.dump(snap, f, ensure_ascii=False, separators=(",", ":"))

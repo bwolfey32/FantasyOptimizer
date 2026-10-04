@@ -127,6 +127,19 @@ a { color: var(--accent); }
 .hist .hdet > td { padding: 4px 10px 12px; background: var(--surface-2); }
 .hist .hdet table { background: var(--surface); border: 1px solid var(--line); border-radius: 8px; margin-bottom: 6px; }
 .hist .hbench td { color: var(--muted); }
+.wxt td { white-space: normal; vertical-align: top; }
+.wxt td:first-child, .wxt td:nth-child(2) { white-space: nowrap; }
+.wxt .wxc { min-width: 230px; }
+.wxt .chip { margin: 0 2px 2px 0; }
+@media (max-width: 600px) {
+  .wxt, .wxt tbody, .wxt tr, .wxt td { display: block; }
+  .wxt thead { display: none; }
+  .wxt tr { padding: 10px 12px; border-bottom: 1px solid var(--line); }
+  .wxt tr:last-child { border-bottom: 0; }
+  .wxt td { border: 0; padding: 1px 0; min-width: 0 !important; white-space: normal !important; }
+  .wxt td:first-child { font-size: 12.5px; color: var(--muted); }
+  .wxt td:empty { display: none; }
+}
 @media (max-width: 600px) { .hist th, .hist td { padding: 6px 6px; } .hist .hdet > td { padding: 4px 4px 10px; } }
 @media (max-width: 600px) { .tabs { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 0; } .tabs .navlink { padding: 8px 2px; font-size: 14.5px; letter-spacing: .01em; white-space: normal; line-height: 1.1; } }
 
@@ -495,6 +508,8 @@ const API = {
   ownFilter: JSON.stringify({ players: { filterActive: { value: true }, filterSlotIds: { value: [0, 2, 4, 6, 16, 17] }, limit: 450, sortPercOwned: { sortPriority: 1, sortAsc: false } } }),
   league: (s, id) => `https://lm-api-reads.fantasy.espn.com/apis/v3/games/ffl/seasons/${s}/segments/0/leagues/${encodeURIComponent(id)}?view=mRoster&view=mTeam&view=mSettings`,
   coaches: (s, id) => `https://sports.core.api.espn.com/v2/sports/football/leagues/nfl/seasons/${s}/teams/${id}/coaches`,
+  wx: (lat, lon, d0, d1) => `https://api.open-meteo.com/v1/forecast?latitude=${lat.join(',')}&longitude=${lon.join(',')}&hourly=temperature_2m,precipitation,precipitation_probability,snowfall,wind_speed_10m,wind_gusts_10m,weather_code&temperature_unit=fahrenheit&wind_speed_unit=mph&precipitation_unit=inch&timezone=UTC&start_date=${d0}&end_date=${d1}`,
+  geo: q => `https://geocoding-api.open-meteo.com/v1/search?count=1&name=${encodeURIComponent(q)}`,
 };
 /* 2026 staffs, researched Oct 2, 2026 from offseason hiring trackers. Mid-season changes are not included; edit in Settings.
    [HC, OC, DC, offensive play-caller, defensive play-caller, HC new, offense new, defense new, offense prev team, defense prev team, note] */
@@ -541,7 +556,28 @@ const SLOT_TYPES = [
 const ESPN_SLOT = {0:'QB', 2:'RB', 3:'RB/WR', 4:'WR', 5:'WR/TE', 6:'TE', 7:'OP', 16:'D/ST', 17:'K', 23:'FLEX'};
 const ESPN_POS = {1:'QB', 2:'RB', 3:'WR', 4:'TE', 5:'K', 16:'DEF'};
 const CV = {QB:.38, RB:.5, WR:.55, TE:.6, K:.45, DEF:.7};
-const FACTOR_KEYS = [['dvp','Defense vs. position'],['cover','Secondary / run defense'],['protect','Pass protection vs. pass rush'],['script','Game script & opponent'],['style','Offensive style & pace'],['pers','Defensive personnel changes']];
+const FACTOR_KEYS = [['dvp','Defense vs. position'],['cover','Secondary / run defense'],['protect','Pass protection vs. pass rush'],['script','Game script & opponent'],['style','Offensive style & pace'],['pers','Defensive personnel changes'],['wx','Weather & stadium']];
+/* Home stadiums: name, latitude, longitude, roof. 'dome' is always covered; 'retract' is a retractable roof, closed in bad
+   weather, so it counts as covered too; 'open' plays in the weather. Neutral sites (London, Munich, ...) come from ESPN.
+   Checked October 2026. */
+const STADIUMS = {
+  ARI: ['State Farm Stadium', 33.5276, -112.2626, 'retract'], ATL: ['Mercedes-Benz Stadium', 33.7554, -84.4008, 'retract'],
+  BAL: ['M&T Bank Stadium', 39.2780, -76.6227, 'open'], BUF: ['Highmark Stadium', 42.7738, -78.7870, 'open'],
+  CAR: ['Bank of America Stadium', 35.2258, -80.8528, 'open'], CHI: ['Soldier Field', 41.8623, -87.6167, 'open'],
+  CIN: ['Paycor Stadium', 39.0955, -84.5161, 'open'], CLE: ['Huntington Bank Field', 41.5061, -81.6995, 'open'],
+  DAL: ['AT&T Stadium', 32.7473, -97.0945, 'retract'], DEN: ['Empower Field at Mile High', 39.7439, -105.0201, 'open'],
+  DET: ['Ford Field', 42.3400, -83.0456, 'dome'], GB: ['Lambeau Field', 44.5013, -88.0622, 'open'],
+  HOU: ['NRG Stadium', 29.6847, -95.4107, 'retract'], IND: ['Lucas Oil Stadium', 39.7601, -86.1639, 'retract'],
+  JAX: ['EverBank Stadium', 30.3239, -81.6373, 'open'], KC: ['GEHA Field at Arrowhead Stadium', 39.0489, -94.4839, 'open'],
+  LV: ['Allegiant Stadium', 36.0908, -115.1833, 'dome'], LAC: ['SoFi Stadium', 33.9535, -118.3392, 'dome'],
+  LAR: ['SoFi Stadium', 33.9535, -118.3392, 'dome'], MIA: ['Hard Rock Stadium', 25.9580, -80.2389, 'open'],
+  MIN: ['U.S. Bank Stadium', 44.9736, -93.2575, 'dome'], NE: ['Gillette Stadium', 42.0909, -71.2643, 'open'],
+  NO: ['Caesars Superdome', 29.9511, -90.0812, 'dome'], NYG: ['MetLife Stadium', 40.8135, -74.0745, 'open'],
+  NYJ: ['MetLife Stadium', 40.8135, -74.0745, 'open'], PHI: ['Lincoln Financial Field', 39.9008, -75.1675, 'open'],
+  PIT: ['Acrisure Stadium', 40.4468, -80.0158, 'open'], SF: ['Levi’s Stadium', 37.4030, -121.9700, 'open'],
+  SEA: ['Lumen Field', 47.5952, -122.3316, 'open'], TB: ['Raymond James Stadium', 27.9759, -82.5033, 'open'],
+  TEN: ['Nissan Stadium', 36.1665, -86.7713, 'open'], WAS: ['Northwest Stadium', 38.9077, -76.8645, 'open'],
+};
 
 /* ---------- helpers ---------- */
 const $ = (s, r = document) => r.querySelector(s);
@@ -589,7 +625,7 @@ async function pool(items, n, fn) { const out = new Array(items.length); let i =
 /* ---------- state ---------- */
 const DEFAULT_STATE = {
   v: 1, tab: 'lineup', roster: [], example: false, overrides: {}, staffEdits: {}, compare: [null, null],
-  settings: { season: null, week: null, blend: 0.6, intensity: 0.6, priorWeeks: 4, strategy: 'mean', w: { dvp: 1, cover: 1, protect: 1, script: 1, style: 1, pers: 1 } },
+  settings: { season: null, week: null, blend: 0.6, intensity: 0.6, priorWeeks: 4, strategy: 'mean', w: { dvp: 1, cover: 1, protect: 1, script: 1, style: 1, pers: 1, wx: 1 } },
   slots: { QB:1, RB:2, WR:2, TE:1, FLEX:1, 'RB/WR':0, 'WR/TE':0, OP:0, 'D/ST':1, K:1 },
   espn: { leagueId: '', teamId: null, slotOf: {} },
   waivers: { horizon: 4, teams: 12, ownMax: 50, source: 'own', faList: [], faListAt: null, taken: {}, allowDrop: {}, forceKeep: {}, rank: 'window' },
@@ -1054,13 +1090,98 @@ function parseSB(j) {
     for (const t of teams) if (t.rec) rec[t.abbr] = t.rec;
     const od = c.odds?.[0]; let fav = null, line = 0, ou = null;
     if (od) { ou = ok(+od.overUnder) && +od.overUnder > 0 ? +od.overUnder : null; const m = /^([A-Z]{2,4})\s*-(\d+(?:\.\d+)?)/.exec(od.details || ''); if (m) { fav = fixAbbr(m[1]); line = +m[2]; } }
-    const st = c.status?.type || e.status?.type || {};
-    games.push({ id: e.id, date: e.date, home: h.abbr, away: a.abbr, state: st.state || 'pre', short: st.shortDetail || '', fav, line, ou });
+    const st = c.status?.type || e.status?.type || {}, v = c.venue, ad = v?.address || {};
+    // where it's played: the home team's stadium, unless ESPN marks a neutral site (London, Munich, ...)
+    const venue = c.neutralSite && v ? { name: v.fullName || '', city: [ad.city, ad.state || ad.country].filter(Boolean).join(', '), q: ad.city || '', roof: v.indoor ? 'dome' : 'open', neutral: true } : null;
+    const ew = e.weather || c.weather;
+    games.push({ id: e.id, date: e.date, home: h.abbr, away: a.abbr, state: st.state || 'pre', short: st.shortDetail || '', fav, line, ou, venue,
+      espnWx: ew && ok(+ew.temperature) ? { t: +ew.temperature, text: ew.displayValue || '' } : null });
   }
   return { games, rec };
 }
 const winPct = r => { if (!r) return null; const [w, l, t = 0] = r.split('-').map(Number); const g = w + l + t; return g ? (w + t / 2) / g : null; };
 function implied(g, T) { if (!g || g.ou == null) return null; if (!g.fav) return g.ou / 2; return g.fav === T ? (g.ou + g.line) / 2 : (g.ou - g.line) / 2; }
+
+/* ---------- stadiums and weather ----------
+   Each game's site is the home team's stadium, or ESPN's venue for a neutral site. Covered stadiums (domes, and
+   retractable roofs, which close in bad weather) get no forecast. For open ones, a single Open-Meteo request covers every
+   game of the week; each game gets the hourly forecast at its stadium for the three hours from kickoff. */
+function siteOf(g) {
+  if (g?.venue) return g.venue;
+  const s = g && STADIUMS[g.home]; return s ? { name: s[0], lat: s[1], lon: s[2], roof: s[3] } : null;
+}
+const covered = s => !!s && s.roof !== 'open';
+async function fetchWeather(games) {
+  const now = Date.now(), out = {};
+  const want = games.filter(g => g.id && g.date && Date.parse(g.date) < now + 15.5 * 864e5 && Date.parse(g.date) > now - 80 * 864e5);
+  const spots = [];
+  for (const g of want) {
+    const s = siteOf(g); if (!s || covered(s)) continue;
+    let lat = s.lat, lon = s.lon;
+    if (s.neutral) {   // a neutral site: look its city up once, then remember it
+      const key = 'fo1:geo:' + s.q; let hit = store.get(key);
+      if (!hit && s.q) { const r = (await fetchJSON(API.geo(s.q), 10000).catch(() => null))?.results?.[0]; if (r) { hit = [+r.latitude.toFixed(3), +r.longitude.toFixed(3)]; store.set(key, hit); } }
+      if (!hit) continue; [lat, lon] = hit;
+    }
+    spots.push([g, lat, lon]);
+  }
+  if (!spots.length) return out;
+  const days = spots.map(([g]) => Date.parse(g.date)), day = t => new Date(t).toISOString().slice(0, 10);
+  const j = await fetchJSON(API.wx(spots.map(x => x[1]), spots.map(x => x[2]), day(Math.min(...days)), day(Math.max(...days) + 864e5)), 20000);
+  const all = Array.isArray(j) ? j : [j];
+  spots.forEach(([g], i) => {
+    const h = all[i]?.hourly; if (!h?.time) return;
+    const t0 = Math.floor(Date.parse(g.date) / 36e5) * 36e5, i0 = h.time.findIndex(t => Date.parse(t + ':00Z') === t0); if (i0 < 0) return;
+    const span = [i0, i0 + 1, i0 + 2].filter(i => i < h.time.length), vals = k => span.map(i => h[k]?.[i]).filter(ok);
+    const sum = k => vals(k).reduce((s, x) => s + x, 0), hi = k => vals(k).length ? Math.max(...vals(k)) : null, r1 = x => ok(x) ? Math.round(x * 10) / 10 : null;
+    const snow = sum('snowfall');
+    out[g.id] = { t: Math.round(mean(vals('temperature_2m')) ?? NaN), wind: r1(mean(vals('wind_speed_10m'))), gust: r1(hi('wind_gusts_10m')), snow: r1(snow),
+      rain: Math.round(Math.max(0, sum('precipitation') - snow / 10) * 100) / 100, prob: hi('precipitation_probability'), code: h.weather_code?.[i0] ?? null };
+  });
+  return out;
+}
+/* Last season's scores in covered vs. open stadiums, per player: [PPR points, catches, games] indoors, then outdoors.
+   Built once from that season's 18 weekly stat files and schedule (about 12 MB to download), then kept on this device
+   and in snapshot.json as a few KB, so it loads in the background after the page is up. */
+async function loadSplits(season) {
+  const key = `fo1:split:${season}`, hit = store.get(key); if (hit) return hit;
+  const host = {};
+  for (const g of await fetchJSON(API.sched(season)) || []) { if (!g.week || !g.home || !g.away) continue; const h = fixAbbr(g.home), m = host[g.week] || (host[g.week] = {}); m[h] = h; m[fixAbbr(g.away)] = h; }
+  const out = {};
+  const got = await pool(Array.from({ length: 18 }, (_, i) => i + 1), 4, async w => {
+    for (const r of await fetchJSON(API.wk(season, w)) || []) {
+      const pos = r.player?.position, s = r.stats || {}; if (!POS.includes(pos) || !(s.gp >= 1 || pos === 'DEF') || s.pts_ppr == null) continue;
+      const T = fixAbbr(r.team || (pos === 'DEF' ? r.player_id : null)), st = STADIUMS[host[w]?.[T]]; if (!st) continue;
+      const id = pos === 'DEF' ? T : r.player_id, o = out[id] || (out[id] = [0, 0, 0, 0, 0, 0]), k = st[3] === 'open' ? 3 : 0;
+      o[k] += s.pts_ppr; o[k + 1] += s.rec || 0; o[k + 2]++;
+    }
+    return true;
+  });
+  if (got.filter(Boolean).length < 15) throw new Error('season stats incomplete');
+  for (const id in out) { const o = out[id]; if (o[2] + o[5] < 4) delete out[id]; else out[id] = o.map(x => Math.round(x * 10) / 10); }
+  store.set(key, out); return out;
+}
+const wxSky = c => c == null ? '' : c >= 95 ? 'thunderstorms' : c >= 85 ? 'snow showers' : c >= 80 ? 'rain showers' : c >= 71 ? 'snow' : c >= 61 ? 'rain' : c >= 51 ? 'drizzle' : c >= 45 ? 'fog' : c >= 3 ? 'overcast' : c >= 1 ? 'partly cloudy' : 'clear';
+function wxText(w) {
+  const wet = w.snow >= 0.1 ? `${f1(w.snow)}″ of snow` : w.rain >= 0.02 ? `${w.rain.toFixed(2)}″ of rain` : ok(w.prob) && w.prob >= 30 ? `${w.prob}% chance of rain` : 'dry';
+  return `${ok(w.t) ? w.t + '°F' : '—'}, ${wxSky(w.code) || 'sky unknown'} · wind ${Math.round(w.wind ?? 0)} mph${ok(w.gust) && w.gust >= (w.wind ?? 0) + 8 ? ` (gusts ${Math.round(w.gust)})` : ''} · ${wet}`;
+}
+/* How hard the conditions are, each 0 (no effect) to about 1 (strong): wind from 10 mph (1 at 20 mph, 1.5 at 25+);
+   rain from 0.25″ over the three hours (counted fully only when likely); snow from half an inch; cold from freezing (1 at 12°F). */
+function wxLoad(w) {
+  if (!w) return null;
+  const ew = (w.wind ?? 0) + 0.25 * Math.max(0, (w.gust ?? 0) - (w.wind ?? 0)), likely = ok(w.prob) ? 0.5 + 0.5 * Math.min(1, w.prob / 60) : 1;
+  return { wind: clamp((ew - 10) / 10, 0, 1.5), rain: clamp((w.rain || 0) / 0.25, 0, 1.2) * likely, snow: clamp((w.snow || 0) / 0.5, 0, 1.2), cold: ok(w.t) ? clamp((32 - w.t) / 20, 0, 1) : 0 };
+}
+const wxRough = w => { const L = wxLoad(w); return !!L && L.wind + L.rain + L.snow + L.cold >= 0.3; };
+// a few words for the matchup line under each player
+function wxTag(g) {
+  const s = siteOf(g); if (!s) return '';
+  if (covered(s)) return s.roof === 'dome' ? 'Indoors' : 'Roof';
+  const w = D.wx?.[g.id]; if (!w) return '';
+  const bits = [ok(w.t) ? w.t + '°' : null, (w.wind ?? 0) >= 12 ? Math.round(w.wind) + ' mph wind' : null, w.snow >= 0.1 ? 'snow' : (w.rain >= 0.05 || (w.prob ?? 0) >= 50) ? 'rain' : null].filter(Boolean);
+  return bits.join(' · ');
+}
 
 /* ---------- loading ---------- */
 /* Live sources first. A published claude.ai copy cannot reach outside sites, so it falls back to snapshot.json,
@@ -1114,9 +1235,11 @@ async function gatherLive(err) {
   const schedKey = `fo1:sched:${season}`, schedCached = store.get(schedKey);
   const pSched = schedCached ? Promise.resolve(schedCached) : T(fetchJSON(API.sched(season)).then(rows => { const c = (rows || []).filter(g => g.week && g.home && g.away).map(g => [g.week, fixAbbr(g.home), fixAbbr(g.away)]); if (c.length > 200) store.set(schedKey, c); return c; }).catch(e => { err('Season schedule', e); return []; }));
   const pOwn = T(fetchJSON(API.own(season), 30000, { 'x-fantasy-filter': API.ownFilter }).then(j => (j.players || []).map(e => e.player).filter(p => p && ESPN_POS[p.defaultPositionId]).map(p => [p.fullName, p.defaultPositionId, p.proTeamId, p.ownership?.percentOwned ?? 0])).catch(e => { err('ESPN ownership', e); return []; }));
+  // forecasts for this week's outdoor games, once the schedule says where and when they're played
+  const pWx = T(pSB.then(j => j ? fetchWeather(parseSB(j).games) : {}).catch(e => { err('Weather forecast', e); return {}; }));
   if (!tasks.length) tasks.push(Promise.resolve());
 
-  const [sbj, projRows, weeks, actual, priors, sched, own, , , idpRows] = await Promise.all([pSB, pProj, Promise.all(weekPs), pActual, Promise.all(priorPs), pSched, pOwn, pPPG, pIdpPrev, pIdpNow]);
+  const [sbj, projRows, weeks, actual, priors, sched, own, , , idpRows, wx] = await Promise.all([pSB, pProj, Promise.all(weekPs), pActual, Promise.all(priorPs), pSched, pOwn, pPPG, pIdpPrev, pIdpNow, pWx]);
   const sb = parseSB(sbj), now = parseSB(sb0), proj = [];
   // when each input last changed at its source, for the freshness panel (not just when this page fetched it)
   let projAt = 0, newsAt = 0; const nowMs = Date.now();
@@ -1126,8 +1249,8 @@ async function gatherLive(err) {
     const u = +(r.updated_at || r.last_modified || 0); if (u > projAt && u <= nowMs + 6e4) projAt = u;
     const n = +(p.news_updated || 0); if (n > newsAt && n <= nowMs + 6e4) newsAt = n;
   }
-  const fresh = { fetched: nowMs, proj: projAt || null, news: newsAt || null, lines: sb.games.some(g => g.ou != null) ? nowMs : null, own: own.length ? nowMs : null, stats: weeks.length ? nowMs : null };
-  return { v: 1, createdAt: new Date().toISOString(), fresh, season, week, detSeason, detWeek, games: sb.games, rec: Object.assign({}, sb.rec, now.rec), proj, weeks, actual, priors, sched, own, prevPPG: prevPPG || {},
+  const fresh = { fetched: nowMs, proj: projAt || null, news: newsAt || null, lines: sb.games.some(g => g.ou != null) ? nowMs : null, own: own.length ? nowMs : null, stats: weeks.length ? nowMs : null, wx: Object.keys(wx || {}).length ? nowMs : null };
+  return { v: 1, createdAt: new Date().toISOString(), fresh, season, week, detSeason, detWeek, games: sb.games, rec: Object.assign({}, sb.rec, now.rec), proj, weeks, actual, priors, sched, own, prevPPG: prevPPG || {}, wx: wx || {},
     idp: { prev: idpPrev || [], now: idpCompactNow(idpRows, idpPrev), ret: prevRet || [] } };
 }
 function ingest(inp) {
@@ -1168,6 +1291,21 @@ function ingest(inp) {
   D.sched = {};
   for (const [w, h, a] of inp.sched || []) { const m = D.sched[w] || (D.sched[w] = {}); m[h] = { opp: a, home: true }; m[a] = { opp: h, home: false }; }
   if (!D.sched[D.week] && D.games.length) { const m = D.sched[D.week] = {}; for (const T in D.tg) m[T] = { opp: D.tg[T].opp, home: D.tg[T].home }; }
+  /* For the weather factor: each player's role (passing vs. rushing yards, receiving yards per target) and his scores this
+     season in covered vs. open stadiums. Past games count at the home team's stadium. */
+  D.wx = inp.wx || {}; D.prof = {}; D.split = inp.split || store.get(`fo1:split:${inp.season - 1}`) || null;
+  const hostOf = (w, T) => { const m = D.sched[w]?.[T]; return m ? (m.home ? T : m.opp) : null; };
+  const where = (w, T) => { const s = STADIUMS[hostOf(w, T)]; return s ? (s[3] === 'open' ? 'outP' : 'inP') : null; };
+  const prof = id => D.prof[id] || (D.prof[id] = { py: 0, ry: 0, rcy: 0, tg: 0, inP: [], outP: [] });
+  inp.weeks.forEach((wk, wi) => {
+    for (const [id, pos, T, , ppr, , py, , , ry, tg, rcy, , rec] of wk.P) {
+      const p = prof(id); p.py += py; p.ry += ry; p.rcy += rcy; p.tg += tg;
+      const k = where(wi + 1, T); if (k) p[k].push(fmtPts(ppr, rec, pos));
+    }
+    for (const d of wk.D) { const k = where(wi + 1, d[0]); if (k) prof(d[0])[k].push(d[11]); }
+  });
+  D.ypt = {};
+  for (const P of ['WR', 'TE']) { let y = 0, t = 0; for (const id in D.prof) if (D.U.get(id)?.pos === P && D.prof[id].tg >= 8) { y += D.prof[id].rcy; t += D.prof[id].tg; } D.ypt[P] = t ? y / t : (P === 'WR' ? 8 : 7); }
   D.own = new Map();
   for (const [name, posId, team, pct] of inp.own || []) {
     const pos = ESPN_POS[posId], T = ESPN_TO_ABBR[team]; let id = null;
@@ -1201,10 +1339,13 @@ async function load(opts = {}) {
   if (!D.inp) { D.loading = false; D.failed = true; render(); return; }
   D.loading = false; render();
   if (location.hash !== '#export' && !opts.manual) slAutoSync();   // on page load, re-sync linked Sleeper teams; Refresh projections leaves rosters alone
+  // last season's indoor/outdoor scores for the weather factor: built once in the background, then cached
+  const pSplit = D.split ? Promise.resolve(D.split) : loadSplits(D.season - 1).then(s => { D.split = s; computeAll(); render(); return s; }).catch(() => null);
   if (D.snapshot) return;
   if (location.hash === '#export') {
     await checkCoaches(D.season);
-    const snap = Object.assign({}, inp, { coaches: D.coaches, proj: inp.proj.filter(p => (p[5] || 0) > 0 || D.H[p[0]] || D.prevPPG[p[0]]) });
+    const split = await pSplit;
+    const snap = Object.assign({}, inp, { coaches: D.coaches, split, proj: inp.proj.filter(p => (p[5] || 0) > 0 || D.H[p[0]] || D.prevPPG[p[0]]) });
     const pre = document.createElement('pre'); pre.id = 'snapshot-out'; pre.hidden = true; pre.textContent = JSON.stringify(snap); document.body.appendChild(pre);
   } else checkCoaches(D.season);
 }
@@ -1290,6 +1431,7 @@ function evalPlayer(id) {
         note: persNote(O, pos) || `No notable roster changes to the ${O} defense` });
     }
   }
+  { const f = wxFactor(r, g); if (f) r.factors.push(f); }
   // scheme & coaching continuity
   const offSide = pos === 'DEF' ? so : st, offTeam = pos === 'DEF' ? O : T, defSide = pos === 'DEF' ? st : so, defTeam = pos === 'DEF' ? T : O;
   const bits = [];
@@ -1305,6 +1447,51 @@ function evalPlayer(id) {
   r.sd = Math.sqrt(((n > 1 ? n * h.sd ** 2 : 0) + 3 * dsd ** 2) / ((n > 1 ? n : 0) + 3)) * (r.newStaff ? 1.1 : 1);
   const adj = r.mult - 1; r.grade = adj >= 0.12 ? 'A' : adj >= 0.04 ? 'B' : adj > -0.04 ? 'C' : adj > -0.12 ? 'D' : 'F';
   return finish(r);
+}
+/* Weather & stadium. The betting total already lowers every player's outlook when bad weather is forecast (the game-script
+   factor uses it), so this factor moves points between passing, running and kicking rather than cutting them all again:
+   wind hurts deep passing and kicking most; rain and snow add carries and cost passers and pass-catchers; cold costs
+   kickers and passers a little. How much depends on the player: a deep threat feels wind more than a slot receiver,
+   a running quarterback less than a pocket passer, a two-down back gains while a receiving back doesn't. Covered stadiums
+   give passers and kickers a small lift. Last, his own scores indoors vs. outdoors this season, pulled hard toward no
+   difference since the samples are small. The factor uses only its own weight, not the matchup-strength scaling. */
+function wxFactor(r, g) {
+  const s = siteOf(g); if (!s) return null;
+  const pos = r.pos, p = D.prof?.[r.id], cov = covered(s), w = cov ? null : D.wx?.[g.id], L = wxLoad(w);
+  const at = `${s.roof === 'dome' ? 'Indoors' : s.roof === 'retract' ? 'Retractable roof' : 'Outdoors'} at ${s.name}${s.neutral && s.city ? ` (${s.city})` : ''}`;
+  let cond = 0, condTxt, short = '', reason = null;
+  if (cov) {
+    cond = { QB: 0.015, WR: 0.015, TE: 0.015, K: 0.03, DEF: -0.015 }[pos] || 0;
+    condTxt = s.roof === 'dome' ? 'no weather to deal with' : 'closed when the weather is bad';
+    if (cond) { short = 'Indoor game'; reason = `${s.name} is ${s.roof === 'dome' ? 'a dome' : 'covered'}, ${cond > 0 ? 'a small lift for passing and kicking' : 'where offenses score a little more'}`; }
+  } else if (L) {
+    if (pos === 'QB') { const run = p && p.ry + p.py > 200 ? p.ry / (p.ry + 0.4 * p.py) : 0.1; cond = -(0.10 * L.wind + 0.06 * L.rain + 0.07 * L.snow + 0.03 * L.cold) * (1 - 0.5 * clamp(run, 0, 0.6)); }
+    else if (pos === 'WR' || pos === 'TE') { const ypt = p?.tg >= 8 ? p.rcy / p.tg : D.ypt?.[pos] || 8; cond = -(0.10 * L.wind + 0.05 * L.rain + 0.06 * L.snow + 0.02 * L.cold) * clamp(ypt / (D.ypt?.[pos] || 8), 0.75, 1.35); }
+    else if (pos === 'RB') { const rs = p && p.ry + p.rcy > 30 ? p.ry / (p.ry + p.rcy) : 0.7; cond = (0.035 * L.wind + 0.03 * L.rain + 0.045 * L.snow) * clamp(2 * rs - 0.6, -0.4, 1.2); }
+    else if (pos === 'K') cond = -(0.15 * L.wind + 0.05 * L.rain + 0.08 * L.snow + 0.04 * L.cold);
+    else if (pos === 'DEF') cond = 0.04 * L.wind + 0.05 * L.rain + 0.06 * L.snow;
+    condTxt = wxText(w);
+    const main = L.snow >= 0.3 ? 'Snow expected' : L.wind >= 0.3 ? `Wind ${Math.round(w.wind)} mph` : L.rain >= 0.3 ? 'Rain expected' : L.cold >= 0.4 ? `Cold (${w.t}°)` : '';
+    short = main || 'Good weather';
+    if (main) reason = `Forecast at ${s.name}: ${condTxt}`;
+  } else condTxt = 'forecast not available yet (forecasts reach about two weeks ahead)';
+  // his own record in this kind of stadium, this season and last; it needs 3+ games of each kind and is pulled hard toward no difference
+  let split = 0, splitTxt = '';
+  const here = cov ? 'indoors' : 'outdoors', there = cov ? 'outdoors' : 'indoors', last = D.split?.[r.id];
+  const side = (list, k) => { const n = (list?.length || 0) + (last ? last[k + 2] : 0); return n ? { n, avg: ((list || []).reduce((s, x) => s + x, 0) + (last ? fmtPts(last[k], last[k + 1], pos) : 0)) / n } : null; };
+  const mine = side(cov ? p?.inP : p?.outP, cov ? 0 : 3), other = side(cov ? p?.outP : p?.inP, cov ? 3 : 0);
+  if (mine?.n >= 3 && other?.n >= 3) {
+    const all = (mine.avg * mine.n + other.avg * other.n) / (mine.n + other.n);
+    if (all >= 4) {
+      // dome teams play most indoor games at home, so part of a split is home-field edge: shrink it hard and cap it at ±5%
+      split = clamp((mine.avg / all - 1) * mine.n / (mine.n + 10), -0.05, 0.05);
+      const since = last ? 'since last season' : 'this season', verb = pos === 'DEF' ? 'scores' : 'averages';
+      splitTxt = ` · ${verb} ${f1(mine.avg)} ${here} vs ${f1(other.avg)} ${there} ${since} (${mine.n} and ${other.n} games)`;
+      if (Math.abs(split) > Math.abs(cond)) { short = split > 0 ? `Better ${here}` : `Worse ${here}`; reason = `${verb[0].toUpperCase() + verb.slice(1)} ${f1(mine.avg)} ${here} vs ${f1(other.avg)} ${there} ${since}`; }
+    }
+  }
+  const pct = clamp((cond + split) * (state.settings.w.wx ?? 1), -0.25, 0.25);
+  return { key: 'wx', label: 'Weather & stadium', pct, note: `${at}: ${condTxt}${splitTxt}`, short: () => short || (pct >= 0 ? 'Good conditions' : 'Tough conditions'), reason };
 }
 function trendTxt(T, k, def) {
   const p = D.prior[D.season - 1]?.[T]?.[k], c = D.B[T]?.[k]; if (!ok(p) || !ok(c)) return '';
@@ -2174,6 +2361,7 @@ function renderFresh() {
     ['Injury news', 'Latest player news or injury update', F.news],
     ['Vegas lines & scores', 'Checked with ESPN', F.lines],
     ['Waiver ownership', 'Checked with ESPN', F.own],
+    ['Weather forecast', 'Checked with Open-Meteo', F.wx],
     ['Stats & defenses', 'Weekly stats and defensive rosters', F.stats],
   ];
   const page = D.snapshot ? `Showing the saved copy from ${ago(D.loadedAt.getTime())}${D.refreshing ? '; getting live data now' : '; live data couldn’t be reached'}.` : `Live data loaded ${ago(D.loadedAt?.getTime() || Date.now())}.`;
@@ -2187,9 +2375,9 @@ setInterval(renderStatus, 60000);
    Five destinations, each with its own address (#lineup, #start-sit, #waivers, #roster, #research), so Back, refresh
    and shared links land on the same screen. Research has two subpages; Settings is a utility page off the header. */
 const NAV = [['lineup', 'Lineup'], ['compare', 'Start / Sit'], ['waivers', 'Waivers'], ['players', 'Roster'], ['defenses', 'Research']];
-const HASH = { lineup: 'lineup', compare: 'start-sit', waivers: 'waivers', players: 'roster', defenses: 'research', teams: 'research-teams', settings: 'settings' };
+const HASH = { lineup: 'lineup', compare: 'start-sit', waivers: 'waivers', players: 'roster', defenses: 'research', teams: 'research-teams', weather: 'research-weather', settings: 'settings' };
 const TAB_OF = Object.fromEntries(Object.entries(HASH).map(([k, v]) => [v, k]));
-const navOf = tab => tab === 'teams' ? 'defenses' : tab;
+const navOf = tab => tab === 'teams' || tab === 'weather' ? 'defenses' : tab;
 function go(tab, opts = {}) {
   if (!HASH[tab]) return;
   D.flash = opts.keepFlash ? D.flash : null;
@@ -2224,7 +2412,7 @@ function render() {
   if (D.failed) { renderBrief(); main.innerHTML = `<div class="card panel"><h2>Couldn’t load this week’s data</h2><p style="margin:0">Sleeper and ESPN didn’t respond. Check your connection and press Refresh projections.</p></div>`; return; }
   if (D.loading) { renderBrief(); main.innerHTML = `<div class="card loading"><h3>Loading week ${D.week || ''}</h3><div class="small">Projections, stats and schedules. Past seasons are saved after your first visit.</div><div class="bar"><span id="lbar" style="width:${Math.round(D.progress * 100)}%"></span></div></div>`; return; }
   renderBrief();
-  main.innerHTML = ({ lineup: viewLineup, compare: viewCompare, waivers: viewWaivers, defenses: viewResearch, teams: viewResearch, players: viewPlayers, settings: viewSettings })[state.tab]();
+  main.innerHTML = ({ lineup: viewLineup, compare: viewCompare, waivers: viewWaivers, defenses: viewResearch, teams: viewResearch, players: viewPlayers, settings: viewSettings, weather: viewResearch })[state.tab]();
 }
 function injPill(r) {
   const i = r.inj || ''; if (!i) return '';
@@ -2235,7 +2423,8 @@ function matchCell(r) {
   const g = r.game, at = D.tg[r.T].home ? 'vs' : '@';
   const ln = g.fav ? (g.fav === r.T ? `−${g.line}` : `+${g.line}`) : (g.ou ? 'PK' : '');
   const when = r.locked ? (ok(r.actual) ? `<span class="pill m">${g.state === 'post' ? 'Final' : 'Live'} ${f1(r.actual)}</span>` : `<span class="pill m">${esc(g.short)}</span>`) : '';
-  return `<span class="match"><span class="opp">${at} ${r.O}</span> <span class="muted">${D.rec[r.O] ? '(' + esc(D.rec[r.O]) + ') ' : ''}${ln}${g.ou ? ' · O/U ' + g.ou : ''}</span> ${when}${r.chip ? `<span style="display:block"><span class="chip ${r.chip.dir}">${esc(r.chip.text)}</span></span>` : ''}</span>`;
+  const wt = r.locked ? '' : wxTag(g);
+  return `<span class="match"><span class="opp">${at} ${r.O}</span> <span class="muted">${D.rec[r.O] ? '(' + esc(D.rec[r.O]) + ') ' : ''}${ln}${g.ou ? ' · O/U ' + g.ou : ''}${wt ? ' · ' + esc(wt) : ''}</span> ${when}${r.chip ? `<span style="display:block"><span class="chip ${r.chip.dir}">${esc(r.chip.text)}</span></span>` : ''}</span>`;
 }
 /* Where Benny's lineup differs from the one set in the league app (Sleeper starters, or ESPN slots from an import). */
 function espnNote(r, starting) {
@@ -2711,9 +2900,29 @@ function viewLineup() {
   return lineupBody();
 }
 function viewResearch() {
-  const sub = state.tab === 'teams' ? 'teams' : 'defenses';
-  return `<div class="section"><div class="seg sub" role="group" aria-label="Research"><a href="#research" data-tab="defenses" ${sub === 'defenses' ? 'aria-current="page"' : ''}>Defenses</a><a href="#research-teams" data-tab="teams" ${sub === 'teams' ? 'aria-current="page"' : ''}>Teams &amp; schemes</a></div>
-    ${sub === 'teams' ? viewTeams() : viewDefenses()}</div>`;
+  const sub = state.tab === 'teams' || state.tab === 'weather' ? state.tab : 'defenses';
+  return `<div class="section"><div class="seg sub" role="group" aria-label="Research"><a href="#research" data-tab="defenses" ${sub === 'defenses' ? 'aria-current="page"' : ''}>Defenses</a><a href="#research-teams" data-tab="teams" ${sub === 'teams' ? 'aria-current="page"' : ''}>Teams &amp; schemes</a><a href="#research-weather" data-tab="weather" ${sub === 'weather' ? 'aria-current="page"' : ''}>Weather</a></div>
+    ${sub === 'teams' ? viewTeams() : sub === 'weather' ? viewWeather() : viewDefenses()}</div>`;
+}
+/* Every game this week: where it's played, roof or open air, the forecast for kickoff, and how it moves the players on
+   the selected team. */
+function viewWeather() {
+  const ros = state.roster.map(id => D.M[id]).filter(Boolean);
+  const games = [...D.games].sort((a, b) => (a.date || '').localeCompare(b.date || '') || a.home.localeCompare(b.home));
+  if (!games.length) return `<div class="card panel"><p style="margin:0">No games found for week ${D.week}.</p></div>`;
+  const anyWx = games.some(g => D.wx?.[g.id]);
+  const rows = games.map(g => {
+    const s = siteOf(g), w = D.wx?.[g.id], cov = covered(s);
+    const when = g.date ? new Date(g.date).toLocaleString([], { weekday: 'short', hour: 'numeric', minute: '2-digit' }) : '';
+    const cond = !s ? '<span class="muted">Unknown stadium</span>' : cov ? `<span class="muted">${s.roof === 'dome' ? 'Indoors, no weather' : 'Retractable roof, closed in bad weather'}</span>`
+      : w ? `${esc(wxText(w))}${wxRough(w) ? ' <span class="pill q">Weather game</span>' : ''}` : '<span class="muted">Forecast not out yet</span>';
+    const mine = ros.filter(r => r.T === g.home || r.T === g.away).map(r => { const f = r.factors.find(x => x.key === 'wx'); const v = f && Math.abs(f.pct) >= 0.005 ? f.pct : 0; return `<span class="chip ${v >= 0.01 ? 'up' : v <= -0.01 ? 'down' : ''}">${esc(shortName(r.id))}${v ? ' ' + spct(v) : ''}</span>`; }).join(' ');
+    return `<tr><td class="l">${esc(when)}${g.state === 'post' ? ' <span class="pill m">Final</span>' : g.state === 'in' ? ' <span class="pill m">Live</span>' : ''}</td><td class="l"><strong>${g.away} @ ${g.home}</strong></td>
+      <td class="l">${s ? esc(s.name) + (s.neutral && s.city ? ` <span class="muted">(${esc(s.city)})</span>` : '') : ''}</td><td class="l wxc">${cond}</td><td class="l">${mine}</td></tr>`;
+  }).join('');
+  return `<div class="row-head"><h2>Stadiums &amp; weather <span class="hsub">week ${D.week}</span></h2></div>
+    <p class="small muted" style="margin:0">Forecast for the three hours from kickoff at each open-air stadium${anyWx ? '' : ' (forecasts appear about two weeks before a game)'}, from Open-Meteo. Domes and retractable roofs play without weather. The numbers next to your players are how much the weather and stadium move their projection; open a player on Lineup for the details.</p>
+    <div class="tscroll"><table class="wxt"><thead><tr><th class="l">Kickoff</th><th class="l">Game</th><th class="l">Stadium</th><th class="l">Conditions</th><th class="l">Your players</th></tr></thead><tbody>${rows}</tbody></table></div>`;
 }
 function lineupBody() {
   const { starters, bench } = optimize();
@@ -2791,6 +3000,7 @@ function factorReason(r, f) {
     case 'protect': return pos === 'DEF' ? `${O} gives up ${f1(B[O]?.sacksTaken)} sacks a game` : f.pct > 0 ? `${T}’s line should keep the pocket clean against ${O}` : `${O} brings a heavy pass rush (${f1(B[O]?.sacks)} sacks a game)`;
     case 'script': { const it = r.game ? implied(r.game, pos === 'DEF' ? O : T) : null; if (it == null) break; return pos === 'DEF' ? `${O} is projected for only ${f1(it)} points` : f.pct > 0 ? `${T} is projected to score ${f1(it)} points` : `${T} is projected for only ${f1(it)} points`; }
     case 'style': return pos === 'RB' ? `${T} runs on ${pct(1 - (B[T]?.passRate ?? 0))} of plays` : pos === 'K' || pos === 'DEF' ? null : `${T} throws on ${pct(B[T]?.passRate)} of plays`;
+    case 'wx': return f.reason;
     case 'pers': { const m = /:\s(.+)$/.exec(f.note); return m ? `${pos === 'DEF' ? T : O} defense ${f.pct > 0 ? (pos === 'DEF' ? 'improved' : 'weakened') : (pos === 'DEF' ? 'weakened' : 'improved')}: ${m[1]}` : null; }
   }
   return null;
@@ -2879,6 +3089,7 @@ function viewSettings() {
   <div class="card panel"><details class="how"><summary>How the projection works</summary>
     <ol><li><strong>Base:</strong> Sleeper’s weekly projection, converted to each team’s scoring (PPR, half-PPR or standard), blended with the player’s season average (slider above).</li>
     <li><strong>Matchup factors</strong>, each capped at ±25%: fantasy points the opponent allows to the position; secondary (pass yards allowed) or run defense (yards per carry allowed, plus the player’s own line); sacks allowed by the offense vs. sacks by the opposing defense; the team’s Vegas implied total and spread, with the opponent’s record; the offense’s pass rate and pace; and the opponent’s defensive roster changes (signings, trades, injuries) that its stats don’t show yet.</li>
+    <li><strong>Weather &amp; stadium:</strong> domes and closed retractable roofs give passers and kickers a small lift. Outdoors, the forecast for the three hours from kickoff (Open-Meteo) moves points between passing, running and kicking: wind over 10 mph hurts deep passing and kickers most, rain and snow add carries, and freezing cold costs kickers and passers a little. The betting total already lowers everyone in bad weather, so this factor doesn’t cut them all again. Each player’s role sets how much he feels it (a deep threat more than a slot receiver, a running quarterback less than a pocket passer), and his own scores indoors vs. outdoors this season count a little.</li>
     <li><strong>Scheme history:</strong> each team’s numbers blend ${D.season} games with last season. When the play-caller is unchanged, last season counts as ${S.priorWeeks} games. When the play-caller is new, it counts as at most 1.5 games, mixed with the new coach’s old team, and the player’s range widens by 10%.</li>
     <li><strong>Probabilities:</strong> scores are treated as a bell curve around the projection, with spread from the player’s weekly scores (shrunk toward a typical spread for the position).</li>
     <li><strong>Lineup:</strong> an exact assignment fills every slot to maximize the chosen strategy. Bye weeks and players ruled Out or on IR sit automatically.</li></ol></details>

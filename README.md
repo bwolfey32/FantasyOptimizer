@@ -14,7 +14,15 @@ The site has five sections, plus Settings in the header:
 - **Start / Sit:** which of these two players should I choose? **Benny's Pick** names the start, the chance he outscores the other player, the projected edge, and the reasons why. It opens on your closest calls.
 - **Waivers:** which available players improve my team? Add/drop moves ranked by the expected lineup points they add over the window you choose, using each player's schedule. Injured players worth keeping are never suggested as drops, and bench depth counts as injury cover.
 - **Roster:** who's on my team, and how do I change it? Search every player as you type, add or remove (with Undo), filter by position, and set projection overrides under Advanced.
-- **Research:** every defense, plus each team's schemes and play-callers, including signings, trades and injuries that make a defense stronger or weaker than its stats.
+- **Research:** every defense, plus each team's schemes and play-callers, including signings, trades and injuries that make a defense stronger or weaker than its stats. **Weather** lists every game's stadium, whether it has a dome or roof, the kickoff forecast at open-air stadiums, and how the conditions move your players.
+
+**Weather and stadiums.** Every projection includes a weather & stadium factor:
+- Domes and closed retractable roofs give passers and kickers a small lift.
+- Outdoors, the forecast for the three hours from kickoff matters. Wind over 10 mph hurts deep passing and kickers most, rain and snow shift work to running backs, and freezing cold costs kickers and passers a little.
+- How much a player feels it depends on his role: a deep threat more than a slot receiver, a running quarterback less than a pocket passer.
+- His own scores indoors vs. outdoors, this season and last, count a little.
+
+The betting total already reflects bad weather, so this factor moves points between positions rather than cutting everyone again. Its weight is adjustable in **Settings**.
 
 A team bar on every page shows the selected team, week, scoring and where the roster comes from, with **+ Add team**, **Team settings**, **Import / replace** and **Share / back up**. Each team keeps its own roster, scoring (PPR, half-PPR or standard, with optional TE premium), lineup slots and league size.
 
@@ -46,7 +54,7 @@ Only you can read them. **Sign out** removes them from that browser but keeps th
 
 ## Data sources
 
-Projections, stats, injuries, schedules and synced Sleeper leagues come from [Sleeper](https://sleeper.com). Scores, records, Vegas lines, ownership and head coaches come from ESPN. Both are free, unofficial feeds, so if either one changes, part of the tool may stop working until the code is updated. Coordinator names and coaching profiles were compiled by hand as of October 2, 2026, and can be edited in **Settings → Coaching staffs**.
+Projections, stats, injuries, schedules and synced Sleeper leagues come from [Sleeper](https://sleeper.com). Scores, records, Vegas lines, ownership, head coaches and neutral-site venues come from ESPN. Weather forecasts come from [Open-Meteo](https://open-meteo.com), and stadium locations and roof types were compiled by hand as of October 2026. All three are free. Sleeper's and ESPN's are unofficial, so if either one changes, part of the tool may stop working until the code is updated. Coordinator names and coaching profiles were compiled by hand as of October 2, 2026, and can be edited in **Settings → Coaching staffs**.
 
 Projections are estimates, not guarantees. The weights the model uses are adjustable in **Settings**.
 
