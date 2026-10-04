@@ -189,25 +189,36 @@ body.welcome.wpro #panels { display: block !important; }   /* the sign-in panel 
 .wl-back { font-size: 14.5px; }
 .wl { width: 100%; max-width: 760px; margin: 0 auto; display: flex; flex-direction: column; gap: 16px; }
 .wl-top { display: flex; justify-content: flex-end; min-height: 22px; font-size: 14.5px; }
-.wl-hero { padding: 8px 0 4px; }
 .wl-hero h2 { font-size: 38px; line-height: 1.05; }
 .wl-hero p { margin: 10px 0 0; font-size: 16.5px; max-width: 62ch; }
-.wl-h { display: flex; align-items: center; gap: 12px; margin-top: 6px; }
-.wl-h h2 { font-size: 22px; }
-.wl-num { flex: none; width: 30px; height: 30px; border-radius: 50%; display: grid; place-items: center; background: var(--accent); color: var(--accent-ink); font-family: var(--font-display); font-weight: 700; font-size: 17px; }
-.wl-h.later { opacity: .6; }
-.wl-h.later .wl-num { background: var(--surface-2); color: var(--muted); }
-.wl-methods { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
-.wl-method { display: flex; flex-direction: column; gap: 4px; padding: 14px 16px; text-align: left; background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius); }
-.wl-method:hover { border-color: var(--accent); }
-.wl-mt { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; font-size: 16.5px; }
+.wl-q { font-size: 22px; margin-top: 8px; }
+.wl-methods { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; }
+/* each card in its platform's colors (Sleeper navy, ESPN red); Find your players in Benny's green */
+.wl-method { --wl-bg: #075b37; --wl-fg: #ffffff; --wl-ico: #ffffff; position: relative; overflow: hidden; isolation: isolate; display: flex; flex-direction: column; align-items: flex-start; gap: 10px; padding: 16px 44px 18px 16px; text-align: left; color: var(--wl-fg); border: 1px solid color-mix(in srgb, var(--wl-bg) 70%, #000); border-radius: var(--radius);
+  background: radial-gradient(120% 90% at 0% 0%, color-mix(in srgb, var(--wl-bg) 80%, #fff) 0%, transparent 60%), linear-gradient(150deg, var(--wl-bg) 35%, color-mix(in srgb, var(--wl-bg) 72%, #000) 100%);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, .2), 0 1px 2px rgba(0, 0, 0, .12), 0 4px 12px color-mix(in srgb, var(--wl-bg) 25%, transparent); transition: box-shadow .2s, transform .2s; }
+.wl-method.wl-sleeper { --wl-bg: #022047; --wl-fg: #ffffff; --wl-ico: #98b3d6; }
+.wl-method.wl-espn { --wl-bg: #b0000b; --wl-fg: #ffffff; --wl-ico: #ffffff; }
+.wl-method:hover { box-shadow: inset 0 1px 0 rgba(255, 255, 255, .2), 0 2px 4px rgba(0, 0, 0, .12), 0 10px 24px color-mix(in srgb, var(--wl-bg) 40%, transparent); transform: translateY(-2px); }
+.wl-method:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.wl-method .muted { color: inherit; opacity: .85; }
+/* the card's icon again, large and faint in the corner, and an arrow that nudges forward on hover */
+.wl-mark { position: absolute; right: -14px; bottom: -22px; z-index: -1; color: var(--wl-fg); opacity: .05; transition: transform .3s; }
+.wl-mark svg { width: 120px; height: 120px; stroke-width: 1.5; }
+.wl-method:hover .wl-mark { transform: rotate(-6deg) scale(1.05); }
+.wl-go { position: absolute; top: 16px; right: 14px; display: grid; opacity: .75; transition: transform .2s, opacity .2s; }
+.wl-go svg { width: 20px; height: 20px; }
+.wl-method:hover .wl-go { transform: translateX(3px); opacity: 1; }
+@media (prefers-reduced-motion: reduce) { .wl-method, .wl-mark, .wl-go { transition: none; } .wl-method:hover, .wl-method:hover .wl-mark, .wl-method:hover .wl-go { transform: none; } }
+.wl-ico { flex: none; width: 44px; height: 44px; border-radius: 10px; display: grid; place-items: center; background: color-mix(in srgb, var(--wl-fg) 14%, transparent); color: var(--wl-ico); }
+.wl-ico img { width: 32px; height: 32px; object-fit: contain; }
+.wl-mt { display: flex; flex-direction: column; gap: 2px; font-size: 16.5px; }
 .wl-card { border: 1px solid color-mix(in srgb, var(--accent) 40%, var(--line)); }
 .wl-loading { align-items: flex-start; }
 .wl-loading .bar { width: 100%; max-width: 320px; height: 4px; background: var(--surface-2); border-radius: 2px; overflow: hidden; }
 .wl-loading .bar span { display: block; height: 100%; background: var(--accent); transition: width .2s; }
-.wl-saved { display: flex; align-items: center; gap: 12px; font-size: 16px; }
-.wl-num.ok { background: var(--good); }
-@media (max-width: 600px) { .wl-methods { grid-template-columns: minmax(0, 1fr); } .wl-hero h2 { font-size: 30px; } .wl-top { justify-content: flex-start; } }
+@media (max-width: 680px) { .wl-methods { grid-template-columns: minmax(0, 1fr); } .wl-method { flex-direction: row; align-items: center; gap: 12px; padding: 12px 44px 12px 14px; } .wl-go { top: 50%; margin-top: -10px; } .wl-mark { right: 24px; bottom: -34px; } .wl-mark svg { width: 96px; height: 96px; } }
+@media (max-width: 600px) { .wl-hero h2 { font-size: 30px; } .wl-top { justify-content: flex-start; } }
 .wxt td { white-space: normal; vertical-align: top; }
 .wxt td:first-child, .wxt td:nth-child(2) { white-space: nowrap; }
 .wxt .wxc { min-width: 230px; }
@@ -1019,10 +1030,10 @@ async function resolveChoice(how) {
   signedInDone();
   await pullHist();
 }
-// signed in and synced: close the sign-in UI (finishing the walkthrough if it was step 2) and say so
+// signed in and synced: close the sign-in UI and say so
 function signedInDone() {
   acct.toastNext = false; D.acctOpen = false; D.wSignin = false;
-  if (D.onboard === 'account') { D.onboard = null; goIntended({ keepFlash: true }); } else render();
+  render();
   toast('Signed in. Your teams now sync to this account.');
   // they picked a Pro plan before signing in: carry on to checkout
   let buy = null; try { buy = sessionStorage.getItem('fo1:buy'); sessionStorage.removeItem('fo1:buy'); } catch {}
@@ -1105,7 +1116,7 @@ async function signOut(deleted) {
 function wipeLocal() {
   ['fo1:state', HIST_KEY, 'fo1:sync', 'fo1:pro'].forEach(k => store.del(k)); acct.pro = acct.bootPro = null;
   const tab = state.tab; state = ensureTeams(JSON.parse(JSON.stringify(DEFAULT_STATE))); state.tab = tab;
-  D.hist = null; D.acctOpen = false; D.histOpen = false; D.flow = null; D.tsOpen = false; D.ioOpen = false; D.onboard = null; D.open.clear(); D.wCache = null;
+  D.hist = null; D.acctOpen = false; D.histOpen = false; D.flow = null; D.tsOpen = false; D.ioOpen = false; D.open.clear(); D.wCache = null;
   primeSigs();
   if (D.inp) { if (D.fmtLoaded !== fmtKey()) ingest(D.inp); computeAll(); }
   save(); render();   // no team now, so the welcome walkthrough shows
@@ -2770,10 +2781,10 @@ function weekOptions() {
   return D.snapshot ? `<option selected>${D.week}</option>` : Array.from({ length: 18 }, (_, i) => `<option value="${i + 1}" ${D.week === i + 1 ? 'selected' : ''}>${i + 1}${D.detWeek === i + 1 && D.season === D.detSeason ? ' (now)' : ''}</option>`).join('');
 }
 function render() {
-  // no team yet (or finishing the walkthrough): the welcome takes the whole page, with no navigation
-  const welcome = D.welcome = needsTeam() || D.onboard === 'account';
+  // no team yet: the welcome takes the whole page, with no navigation
+  const welcome = D.welcome = needsTeam();
   // the Pro page (from the footer link) also opens before there's a team, with a way back to the setup
-  const wpro = welcome && state.tab === 'pro' && D.onboard !== 'account';
+  const wpro = welcome && state.tab === 'pro';
   if (!welcome && !D.flow) D.intent = null;   // set up some other way (a synced account, say): the link's destination no longer applies
   document.body.classList.toggle('welcome', welcome); document.body.classList.toggle('wpro', wpro);
   if (welcome) {
@@ -2791,7 +2802,7 @@ function render() {
   const msgs = [];
   if (D.flash && !D.loading) msgs.push(`<div class="banner info flash"><span>${D.flash.html}</span><button type="button" class="btn sm" data-act="flashclose" aria-label="Dismiss">Dismiss</button></div>`);
   // skipped the account step on the walkthrough: one reminder on Lineup until they sign in or dismiss it
-  if (!D.loading && state.tab === 'lineup' && acct.on && !acct.user && store.get('fo1:nudge') === 'show') msgs.push(`<div class="banner info exban"><span><strong>Keep ${esc(curTeam()?.name || 'your team')} on your phone too.</strong> Sign in and your teams and weekly lineups follow you to any device.</span><span class="toolbar"><button type="button" class="btn sm primary" data-act="account">Sign in</button><button type="button" class="btn sm" data-act="nudgeoff">Not now</button></span></div>`);
+  if (!D.loading && state.tab === 'lineup' && acct.on && !acct.user && store.get('fo1:nudge') === 'show') msgs.push(`<div class="banner info exban"><span><strong>Save your team across devices.</strong> ${esc(curTeam()?.name || 'Your team')} is saved in this browser now. Sign in to see it and Benny’s weekly lineups on your phone and computer too.</span><span class="toolbar"><button type="button" class="btn sm primary" data-act="account">Sign in</button><button type="button" class="btn sm" data-act="nudgeoff">Not now</button></span></div>`);
   // Only interrupt for problems that change the picks: missing projections or schedule, or data that's gone stale.
   const age = D.loadedAt ? Date.now() - D.loadedAt.getTime() : 0;
   if (!D.loading && !D.failed && D.snapshot && !D.refreshing && age > 36e5 * 36) msgs.push(`<div class="banner">These numbers are from ${esc(D.loadedAt.toLocaleDateString([], { weekday: 'long', month: 'short', day: 'numeric' }))}, so injury news since then isn’t included. Press Refresh to try for newer data.</div>`);
@@ -3063,54 +3074,50 @@ const acctMsgHTML = () => acct.msg ? `<div class="banner ph-mask ${acct.msg[0] =
 
 /* ---------- welcome walkthrough ----------
    Shown full screen, with no navigation, whenever no team has players yet: a first visit, after signing out, or after
-   Reset. Step 1 brings the team in through the same setup flow as + Add team; step 2 offers an account so it follows
-   them to their phone. People who already have an account sign in at the top and get their teams straight back. */
+   Reset. Three cards (Sleeper, ESPN, Find your players) open the same setup flow as + Add team; restoring a saved team is a link
+   below them. Once the team is saved they go straight to their lineup, where a banner offers an account (fo1:nudge).
+   People who already have an account sign in at the top and get their teams straight back. */
 /* The welcome matches what the link promised: a link to Waivers or Start / Sit (D.intent) gets its own headline, and
    after setup lands on that page instead of Lineup (goIntended). */
 const WELCOME_HERO = {
-  lineup: ['Your best lineup, every week', 'Bring in your fantasy team and Benny sets your starters, makes the close start/sit calls and finds the waiver pickups that add the most points, using live projections, matchups and weather.'],
+  lineup: ['Your best lineup, every week', 'Add your team to see recommended starters and waiver pickups.'],
   waivers: ['Your best waiver pickup, for your roster', 'Bring in your team and Benny ranks free agents by how many points they’d add to your lineup, for your scoring and your roster’s needs. With a Sleeper league, it uses your league’s real free agents.'],
   compare: ['Start or sit? Benny’s Pick for your players', 'Bring in your team and Benny makes your close start/sit calls: the chance each player outscores the other, and why.'],
 };
 const INTENT_TABS = new Set(['waivers', 'compare', 'players', 'defenses', 'teams', 'weather', 'settings']);
 function goIntended(opts) { const t = D.intent && HASH[D.intent] ? D.intent : 'lineup'; D.intent = null; go(t, opts); }
 const WELCOME_METHODS = [
-  ['sleeper', 'Connect Sleeper', 'Enter your username or league ID. Benny stays in sync with your league and finds its real free agents.', 'Recommended'],
-  ['espn', 'Import from ESPN', 'Load a public league by its ID, or copy your roster from any ESPN league and paste it.'],
-  ['manual', 'Build it yourself', 'Search for each player, or paste a list of names.'],
-  ['restore', 'Restore a saved team', 'Paste a team code or open a backup file from Benny’s Picks.'],
+  ['sleeper', 'Sleeper', 'Import and sync your league. No login needed.'],
+  ['espn', 'ESPN Fantasy', 'Import a public league, or paste your ESPN roster.'],
+  ['manual', 'Find your players', 'Search and select your players, or paste a roster.'],
 ];
+const wlSvg = d => `<svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${d}</svg>`;
+const WL_IMPORT = wlSvg('<path d="M12 3v12"/><path d="m7 10 5 5 5-5"/><path d="M4 15v4a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-4"/>');
+const WL_ICONS = {
+  sleeper: WL_IMPORT,
+  espn: WL_IMPORT,
+  manual: wlSvg('<circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/>'),
+};
+const WL_GO = wlSvg('<path d="M5 12h14"/><path d="m13 6 6 6-6 6"/>');
+// platform logos, shown in place of the icon once the files are in assets/: { sleeper: 'assets/logo-sleeper.svg', espn: 'assets/logo-espn.svg' }
+const WL_LOGOS = {};
 function viewWelcome() {
-  const done = D.onboard === 'account';
-  const step = (n, title, sub, on) => `<div class="wl-h ${on ? '' : 'later'}"><span class="wl-num">${n}</span><div><h2>${title}</h2>${sub ? `<div class="small muted">${sub}</div>` : ''}</div></div>`;
-  if (done) {
-    const ct = curTeam(), n = (ct?.roster || state.roster).length;
-    const body = acct.user && acct.choice ? accountPanel()
-      : `<div class="card panel wl-card"><p style="margin:0">Sign in to see <strong>${esc(ct?.name || 'your team')}</strong> and Benny’s weekly lineups on your phone and computer. There’s no password: we email you a code, or use Google.</p>
-          ${acctMsgHTML()}${signInForm()}</div>`;
-    return `<div class="wl">
-      <div class="wl-saved"><span class="wl-num ok" aria-hidden="true">✓</span><span><strong>Saved ${esc(ct?.name || 'your team')}</strong> · ${n} player${n === 1 ? '' : 's'}</span></div>
-      ${step(2, 'Keep it on all your devices', 'Optional. Your team is already saved in this browser.', true)}
-      ${body}
-      ${acct.user && acct.choice ? '' : `<div class="toolbar"><button type="button" class="btn" data-act="wskip">Skip for now</button><span class="small muted">You can sign in any time from the top of the page.</span></div>`}
-    </div>`;
-  }
   const top = !acct.on ? '' : acct.user ? `<span class="small muted ph-mask">Signed in as ${esc(acct.user.email || '')}. Your team will save to your account.</span>`
-    : `<button type="button" class="linkbtn" data-act="wsignin" aria-expanded="${!!D.wSignin}">Already have an account? Sign in</button>`;
+    : `<button type="button" class="linkbtn" data-act="wsignin" aria-expanded="${!!D.wSignin}">Sign in</button>`;
   const signIn = D.wSignin && acct.on && !acct.user ? `<div class="card panel wl-card"><div class="row-head"><h3>Sign in to get your teams back</h3><button type="button" class="btn sm" data-act="wsignin">Close</button></div>${acctMsgHTML()}${signInForm()}</div>` : '';
   let body;
   if (D.failed) body = `<div class="card panel"><p style="margin:0">This week’s player data didn’t load, and Benny needs it to find your players. Check your connection and try again.</p><div class="toolbar"><button type="button" class="btn primary" data-act="reload">Try again</button></div></div>`;
   else if (D.loading) body = `<div class="card panel wl-loading"><span class="small muted">Loading this week’s players…</span><div class="bar"><span id="lbar" style="width:${Math.round(D.progress * 100)}%"></span></div></div>`;
   else if (D.flow) body = flowPanel();
-  else body = `<div class="wl-methods">${WELCOME_METHODS.map(([k, t, d, tag]) => `<button type="button" class="wl-method" data-act="flow" data-method="${k}" data-dest="replace"><span class="wl-mt"><strong>${t}</strong>${tag ? ` <span class="pill n">${tag}</span>` : ''}</span><span class="small muted">${d}</span></button>`).join('')}</div>`;
+  else body = `<h2 class="wl-q">How would you like to add your team?</h2>
+    <div class="wl-methods">${WELCOME_METHODS.map(([k, t, d]) => `<button type="button" class="wl-method wl-${k}" data-act="flow" data-method="${k}" data-dest="replace"><span class="wl-ico">${WL_LOGOS[k] ? `<img src="${WL_LOGOS[k]}" alt="" width="32" height="32">` : WL_ICONS[k]}</span><span class="wl-mt"><strong>${t}</strong><span class="small muted">${d}</span></span><span class="wl-mark">${WL_ICONS[k]}</span><span class="wl-go">${WL_GO}</span></button>`).join('')}</div>
+    <div><button type="button" class="linkbtn small" data-act="flow" data-method="restore" data-dest="replace">Restore a saved team</button></div>`;
   return `<div class="wl">
     <div class="wl-top">${top}</div>${signIn}
     <div class="wl-hero"><h2>${(WELCOME_HERO[D.intent] || WELCOME_HERO.lineup)[0]}</h2>
       <p>${(WELCOME_HERO[D.intent] || WELCOME_HERO.lineup)[1]}</p></div>
-    ${step(1, 'Bring in your team', 'Pick how your league is set up. You’ll review everything before it’s saved.', true)}
     ${body}
-    ${acct.on && !acct.user ? step(2, 'Keep it on all your devices', 'Optional: sign in after your team is saved.', false) : ''}
-    <div class="small muted">By using Benny’s Picks you agree to the <a href="terms.html">Terms</a>. <a href="privacy.html">Privacy</a>.</div>
+    <div class="small muted">By using Benny’s Picks you agree to the <a href="terms.html">Terms</a>. <a href="privacy.html">Privacy</a>.${Object.keys(WL_LOGOS).length ? ' Not affiliated with Sleeper or ESPN.' : ''}</div>
   </div>`;
 }
 
@@ -3181,7 +3188,7 @@ function renderAd() {
 /* ---------- one setup flow ----------
    Every way to bring a team in (the welcome walkthrough, + Add team, Import / replace, Roster's Paste / import roster) opens
    this flow with a method preselected. Pick a method, review exactly what was found and where it goes, then save. */
-const FLOW_METHODS = [['sleeper', 'Connect Sleeper'], ['espn', 'Import ESPN'], ['manual', 'Build manually'], ['restore', 'Restore saved team']];
+const FLOW_METHODS = [['sleeper', 'Connect Sleeper'], ['espn', 'Import ESPN'], ['manual', 'Find players'], ['restore', 'Restore saved team']];
 D.drafts = D.drafts || {};   // unfinished text in the flow survives closing it and moving between pages
 function openFlow(method, dest, espnMode) {
   D.tsOpen = false; D.ioOpen = false; D.acctOpen = false; D.flash = null;
@@ -3266,10 +3273,10 @@ function reviewHTML() {
     </div></div>
     <div class="toolbar"><button type="button" class="btn primary" data-act="flowsave" ${d.roster.length ? '' : 'disabled'}>Save team</button><button type="button" class="btn" data-act="flowback">Back</button></div>`;
 }
-// after the first team on the welcome walkthrough, offer an account before the app opens; otherwise straight to Lineup
+// straight to the lineup; after the first team on the welcome walkthrough, the lineup offers an account (fo1:nudge)
 function afterSave() {
-  if (D.welcome && acct.on && !acct.user) { D.onboard = 'account'; acct.msg = null; acct.step = 'email'; render(); scrollTo(0, 0); return; }
-  D.onboard = null; goIntended({ keepFlash: true });
+  if (D.welcome && acct.on && !acct.user) store.set('fo1:nudge', 'show');
+  goIntended({ keepFlash: true });
 }
 function commitDraft() {
   const F = D.flow, d = F?.draft; if (!d) return;
@@ -3311,7 +3318,7 @@ function flowPaste(src) {
   render();
 }
 
-/* ---------- player search (Roster and Build manually) ----------
+/* ---------- player search (Roster and Find your players) ----------
    Suggests as you type from every player, whatever list is showing, with position, team and roster status. */
 function acMatches(q) {
   q = norm(q); if (q.length < 2) return [];
@@ -3745,7 +3752,6 @@ document.addEventListener('click', e => {
   else if (a === 'wsignin') { D.wSignin = !D.wSignin; acct.msg = null; if (D.wSignin) cloudReady().catch(() => {}); render(); if (D.wSignin) deskFocus(acct.step === 'code' ? '#acctCode' : '#acctEmail'); }
   else if (a === 'buy') goPro(t.dataset.plan);
   else if (a === 'billing') openBilling();
-  else if (a === 'wskip') { store.set('fo1:nudge', 'show'); D.onboard = null; goIntended({ keepFlash: true }); }
   else if (a === 'nudgeoff') { store.set('fo1:nudge', 'done'); render(); }
   else if (a === 'acctsend') sendCode();
   else if (a === 'acctverify') verifyCode();
