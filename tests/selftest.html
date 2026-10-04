@@ -177,6 +177,25 @@ test('Shrader for Shakir is never suggested; Aubrey to Shrader is at most margin
   return !swap || (swap.marginal && W.best !== swap) || `Aubrey to Shrader: +${swap.hz.toFixed(1)} over ${W.H} weeks, marginal ${swap.marginal}`;
 });
 
+/* ---------- Phase 4: projection discipline ---------- */
+const modelled = () => Object.values(ev('D').M).filter(r => r.status !== 'bye' && r.override == null && r.base > 0);
+test('matchup strength stays within ±20%', () => {
+  setup(); const bad = modelled().filter(r => r.mult < 0.8 - 1e-9 || r.mult > 1.2 + 1e-9);
+  return !bad.length || bad.slice(0, 5).map(r => `${r.u.name} ${r.mult.toFixed(2)}`).join(', ');
+});
+test('matchup factors move only the scoring-average part, never Sleeper\'s projection', () => {
+  setup(); const bad = modelled().filter(r => { const avgPart = r.base - r.projPart, want = r.projPart + (avgPart > 0 ? avgPart * r.mult : avgPart); return Math.abs(r.mean - want) > 1e-9 || Math.abs(r.mean - r.base) > Math.abs(avgPart) * 0.2 + 1e-9; });
+  return !bad.length || bad.slice(0, 5).map(r => `${r.u.name}: base ${r.base.toFixed(1)}, mean ${r.mean.toFixed(1)}`).join(', ');
+});
+test('a typical starter moves under 10% for the matchup', () => {
+  setup(); const big = modelled().filter(r => r.projPts > 8 && !r.role && Math.abs(r.eff) > 0.1);
+  return !big.length || big.slice(0, 5).map(r => `${r.u.name} ${(r.eff * 100).toFixed(0)}%`).join(', ');
+});
+test('personal indoor/outdoor splits are context only', () => {
+  setup(); const bad = modelled().filter(r => r.factors.some(f => f.key === 'wx' && /^(Better|Worse) (indoors|outdoors)$/.test(f.short(f.pct))));
+  return !bad.length || bad.slice(0, 5).map(r => r.u.name).join(', ');
+});
+
 /* ---------- every phase: the views still render ---------- */
 test('Lineup, Start/Sit and Waivers render', () => {
   setup(); const lu = ev('viewLineup')(), cmp = ev('viewCompare')(), wv = ev('viewWaivers')();

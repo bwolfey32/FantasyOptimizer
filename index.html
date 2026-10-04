@@ -1605,7 +1605,7 @@ function ingest(inp) {
     const c = Object.assign({}, b); for (const p of ['QB', 'RB', 'WR', 'TE']) if (ok(c['fpa' + p])) c['fpa' + p] *= D.fpaRatio[p]; return [T, c];
   }))]));
   D.actual = {}; for (const p of inp.actual.P) D.actual[p[0]] = fmtPts(p[4], p[13], p[1]); for (const d of inp.actual.D) D.actual[d[0]] = d[11];
-  D.U = new Map(); D.proj = {}; D.H = {};
+  D.U = new Map(); D.proj = {}; D.H = {}; D.teamUse = {};   // teamUse: each team's targets and carries a game, for oppText
   for (const [id, name, pos, team, inj, pts, opp, rec] of inp.proj) {
     if (!D.U.has(id)) D.U.set(id, { id, name, pos, team, inj });
     if (pts != null && !(id in D.proj)) D.proj[id] = { pts: fmtPts(pts, rec, pos), opp };
@@ -1614,6 +1614,7 @@ function ingest(inp) {
     for (const [id, pos, T, , ppr, , , , ra, , tg, , name, rec] of wk.P) {
       const pts = fmtPts(ppr, rec, pos);
       const h = D.H[id] || (D.H[id] = { pts: [], tgt: 0, ra: 0, wks: [] }); h.pts.push(pts); h.tgt += tg; h.ra += ra; h.wks.push(wi + 1);
+      if (T) { const t = D.teamUse[T] || (D.teamUse[T] = { tgt: 0, ra: 0, wks: new Set() }); t.tgt += tg; t.ra += ra; t.wks.add(wi); }
       if (!D.U.has(id)) D.U.set(id, { id, name, pos, team: T, inj: null });
     }
     for (const d of wk.D) { const id = d[0]; const h = D.H[id] || (D.H[id] = { pts: [], tgt: 0, ra: 0, wks: [] }); h.pts.push(d[11]); h.wks.push(wi + 1); if (!D.U.has(id)) D.U.set(id, { id, name: TEAMS[id][1] + ' D/ST', pos: 'DEF', team: id, inj: null }); }
@@ -1747,15 +1748,16 @@ function evalPlayer(id) {
   // the injury report is about now: for a later week he's out only until his expected return, as on Waivers (returnWeek)
   const later = D.season === D.detSeason && D.week > D.detWeek;
   if (/^(out|ir|pup|sus|na|cov)/i.test(u.inj || '') && !(later && injKind(u.inj) && D.week >= returnWeek(id))) r.status = 'out';
-  if (!tg) { r.status = 'bye'; r.mean = 0; r.sd = 0; r.grade = '–'; r.mult = 1; r.base = 0; return finish(r); }
+  if (!tg) { r.status = 'bye'; r.mean = 0; r.sd = 0; r.grade = '–'; r.mult = 1; r.base = 0; r.projPart = 0; r.share = 0; r.eff = 0; return finish(r); }
   const O = r.O = tg.opp, g = r.game = tg.g, tb = D.B[T] || {}, ob = D.B[O] || {}, L = D.L;
   if (g.state !== 'pre') { r.locked = true; r.actual = D.actual[id]; }
   // his scoring average, with last season counted as 2 games so a few early games don't carry it alone
   const prev = D.prevPPG?.[id]?.[0], avg = h?.n ? (ok(prev) ? (h.avg * h.n + prev * 2) / (h.n + 2) : h.avg) : (ok(prev) ? prev : null);
-  // a backup is worth nothing this week however he scored filling in; after a role change the projection leads
-  const role = r.role = roleOf(id, avg);
-  r.base = role?.kind === 'backup' ? 0 : role ? ROLE_LEAD * r.projPts + (1 - ROLE_LEAD) * avg
-    : r.projPts != null ? (avg != null ? S.blend * r.projPts + (1 - S.blend) * avg : r.projPts) : (avg ?? 0);
+  // a backup is worth nothing this week however he scored filling in; after a role change the projection leads.
+  // The base is two parts: Sleeper's projection (projPart), which already reflects this matchup, and his scoring average.
+  const role = r.role = roleOf(id, avg), pj = r.projPts;
+  r.projPart = role?.kind === 'backup' ? 0 : role ? ROLE_LEAD * pj : pj != null ? (avg != null ? S.blend * pj : pj) : 0;
+  r.base = role?.kind === 'backup' ? 0 : r.projPart + (role ? (1 - ROLE_LEAD) * avg : pj != null ? (avg != null ? (1 - S.blend) * avg : 0) : (avg ?? 0));
   const add = (key, label, raw, note, short) => { const v = clamp(raw * I * (S.w[key] ?? 1), -0.25, 0.25); r.factors.push({ key, label, pct: v, note, short }); };
   const itT = implied(g, T), itO = implied(g, O), lgI = D.lgImplied;
   const st = staffOf(T), so = staffOf(O);
@@ -1789,7 +1791,7 @@ function evalPlayer(id) {
       const [om, st] = persOwn(T), v = clamp((om - 1 + st / Math.max(r.base, 4)) * wgt, -0.25, 0.25), t = D.pers[T];
       const mv = t && (t.moves.find(x => (v > 0 ? x.val > 0 : x.val < 0)) || t.stMoves.find(x => (v > 0 ? x.val > 0 : x.val < 0)));
       r.factors.push({ key: 'pers', label: 'Defensive personnel', pct: v, short: s => s > 0 ? `${T} defense upgraded` : `${T} defense weakened`,
-        note: Math.abs(v) < 0.01 ? `No notable roster changes to the ${T} defense or return units` : `${T} defense ${v > 0 ? 'stronger' : 'weaker'} than its stats${mv ? ': ' + moveText(mv) : ''}` });
+        note: Math.abs(v) < 0.01 ? `No notable roster changes to the ${T} defense or return units` : `${T} defense ${v > 0 ? 'stronger' : 'weaker'} than its stats${mv ? ': ' + moveText(mv) : ''}${persAsOf()}` });
     } else {
       const v = clamp((persMult(O, pos) - 1) * wgt, -0.25, 0.25);
       r.factors.push({ key: 'pers', label: 'Opponent defensive personnel', pct: v, short: s => s > 0 ? `${O} defense weakened` : `${O} defense upgraded`,
@@ -1806,8 +1808,13 @@ function evalPlayer(id) {
   r.newStaff = bits.length > 0;
   r.scheme = bits.length ? bits.join('. ') + `. Last season’s tendencies count less, so the range is wider.` : `Same play-callers as last season on both sides, so ${D.season - 1} tendencies are blended in with ${curG} game${curG === 1 ? '' : 's'} of ${D.season} data.`;
   const tr = trendTxt(O, 'fpa' + (pos === 'DEF' ? 'DEF' : pos), true); if (tr) r.scheme += tr;
-  r.mult = clamp(r.factors.reduce((m, f) => m * (1 + f.pct), 1), 0.6, 1.4);
-  r.mean = r.base * r.mult;
+  /* The factors move only the scoring-average part of the base: Sleeper's projection already accounts for the opponent,
+     the betting line and the weather, so scaling it too would count them twice. r.mult is the matchup's strength (what the
+     grade rates); r.eff is how much it moves this projection, and each factor's eff is its share of that. */
+  r.mult = clamp(r.factors.reduce((m, f) => m * (1 + f.pct), 1), 0.8, 1.2);
+  const avgPart = r.base - r.projPart; r.share = r.base > 0 ? avgPart / r.base : 0;
+  r.mean = r.projPart + (avgPart > 0 ? avgPart * r.mult : avgPart); r.eff = r.base > 0 ? r.mean / r.base - 1 : 0;
+  for (const f of r.factors) f.eff = f.pct * r.share;
   const n = h?.n || 0, dsd = CV[pos] * Math.max(r.mean, 3);
   r.sd = Math.sqrt(((n > 1 ? n * h.sd ** 2 : 0) + 3 * dsd ** 2) / ((n > 1 ? n : 0) + 3)) * (r.newStaff ? 1.1 : 1);
   const adj = r.mult - 1; r.grade = adj >= 0.12 ? 'A' : adj >= 0.04 ? 'B' : adj > -0.04 ? 'C' : adj > -0.12 ? 'D' : 'F';
@@ -1818,8 +1825,8 @@ function evalPlayer(id) {
    wind hurts deep passing and kicking most; rain and snow add carries and cost passers and pass-catchers; cold costs
    kickers and passers a little. How much depends on the player: a deep threat feels wind more than a slot receiver,
    a running quarterback less than a pocket passer, a two-down back gains while a receiving back doesn't. Covered stadiums
-   give passers and kickers a small lift. Last, his own scores indoors vs. outdoors this season, pulled hard toward no
-   difference since the samples are small. The factor uses only its own weight, not the matchup-strength scaling. */
+   give passers and kickers a small lift. His own scores indoors vs. outdoors are shown for context only: a few games
+   each way, often from a different role or against different defenses, can't separate the roof from the rest. The factor uses only its own weight, not the matchup-strength scaling. */
 function wxFactor(r, g) {
   const s = siteOf(g); if (!s) return null;
   const pos = r.pos, p = D.prof?.[r.id], cov = covered(s), w = cov ? null : D.wx?.[g.id], L = wxLoad(w);
@@ -1840,22 +1847,19 @@ function wxFactor(r, g) {
     short = main || 'Good weather';
     if (main) reason = `Forecast at ${s.name}: ${condTxt}`;
   } else condTxt = 'forecast not available yet (forecasts reach about two weeks ahead)';
-  // his own record in this kind of stadium, this season and last; it needs 3+ games of each kind and is pulled hard toward no difference
-  let split = 0, splitTxt = '';
+  // his own record in this kind of stadium, this season and last (3+ games of each kind): context in the note, not in the number
+  let splitTxt = '';
   const here = cov ? 'indoors' : 'outdoors', there = cov ? 'outdoors' : 'indoors', last = D.split?.[r.id];
   const side = (list, k) => { const n = (list?.length || 0) + (last ? last[k + 2] : 0); return n ? { n, avg: ((list || []).reduce((s, x) => s + x, 0) + (last ? fmtPts(last[k], last[k + 1], pos) : 0)) / n } : null; };
   const mine = side(cov ? p?.inP : p?.outP, cov ? 0 : 3), other = side(cov ? p?.outP : p?.inP, cov ? 3 : 0);
   if (mine?.n >= 3 && other?.n >= 3) {
     const all = (mine.avg * mine.n + other.avg * other.n) / (mine.n + other.n);
     if (all >= 4) {
-      // dome teams play most indoor games at home, so part of a split is home-field edge: shrink it hard and cap it at ±5%
-      split = clamp((mine.avg / all - 1) * mine.n / (mine.n + 10), -0.05, 0.05);
       const since = last ? 'since last season' : 'this season', verb = pos === 'DEF' ? 'scores' : 'averages';
-      splitTxt = ` · ${verb} ${f1(mine.avg)} ${here} vs ${f1(other.avg)} ${there} ${since} (${mine.n} and ${other.n} games)`;
-      if (Math.abs(split) > Math.abs(cond)) { short = split > 0 ? `Better ${here}` : `Worse ${here}`; reason = `${verb[0].toUpperCase() + verb.slice(1)} ${f1(mine.avg)} ${here} vs ${f1(other.avg)} ${there} ${since}`; }
+      splitTxt = ` · ${verb} ${f1(mine.avg)} ${here} vs ${f1(other.avg)} ${there} ${since} (${mine.n} and ${other.n} games; context only, not in the projection)`;
     }
   }
-  const pct = clamp((cond + split) * (state.settings.w.wx ?? 1), -0.25, 0.25);
+  const pct = clamp(cond * (state.settings.w.wx ?? 1), -0.25, 0.25);
   return { key: 'wx', label: 'Weather & stadium', pct, note: `${at}: ${condTxt}${splitTxt}`, short: () => short || (pct >= 0 ? 'Good conditions' : 'Tough conditions'), reason };
 }
 function trendTxt(T, k, def) {
@@ -1865,6 +1869,7 @@ function trendTxt(T, k, def) {
 }
 function finish(r) {
   const ov = state.overrides[r.id];
+  r.model = r.mean;   // the model's own number, before any override
   if (ov != null && ok(+ov)) { r.override = +ov; r.mean = +ov; }
   const m = r.mean, sd = r.sd || 0;
   r.floor = m - 0.674 * sd; r.ceil = m + 0.674 * sd; r.boom = m + 1.2816 * sd;
@@ -2692,11 +2697,13 @@ function teamNeeds(roster, V, weeks, H, slotsAt, base) {
 }
 const INJ_WORDS = { IR: 'on IR', Out: 'out', PUP: 'on PUP', Sus: 'suspended', Doubtful: 'doubtful', NA: 'not active', questionable: 'questionable' };
 const moveText = mv => `${mv.name} ${/^(added|left|back|rookie|no longer)/.test(mv.kind) ? mv.kind : INJ_WORDS[mv.kind] || mv.kind}`;
+// when the rosters behind a personnel note were read: the change is measured against the stats blend as of that day
+const persAsOf = () => D.loadedAt ? `, rosters as of ${D.loadedAt.toLocaleDateString([], { month: 'short', day: 'numeric' })}` : '';
 /* One line on why a defense plays differently than its stats, from the point of view of a player at `pos`. */
 function persNote(T, pos) {
   const t = D.pers?.[T], m = persMult(T, pos) - 1; if (!t || Math.abs(m) < 0.02) return '';
   const top = t.moves.find(x => (m < 0 ? x.val > 0 : x.val < 0));
-  return `${T} defense ${m < 0 ? 'stronger' : 'weaker'} than its stats (${spct(m)} pts allowed)${top ? ': ' + moveText(top) : ''}`;
+  return `${T} defense ${m < 0 ? 'stronger' : 'weaker'} than its stats (${spct(m)} pts allowed)${top ? ': ' + moveText(top) : ''}${persAsOf()}`;
 }
 function schedStrip(id, weeks, H) {
   const u = D.U.get(id); if (!u) return '';
@@ -3091,8 +3098,17 @@ function factorList(r) {
 /* Expanded player: the three strongest reasons and the key odds first; every factor, the math and the coaching
    profiles sit behind disclosures. */
 function topReasons(r, n = 3) {
+  // picked by the factor's strength, shown as what it does to this projection (eff: it moves only the scoring-average part)
   return [...r.factors].filter(f => Math.abs(f.pct) >= 0.02).sort((a, b) => Math.abs(b.pct) - Math.abs(a.pct)).slice(0, n)
-    .map(f => ({ up: f.pct > 0, pct: f.pct, text: factorReason(r, f) || `${f.label}: ${String(f.note).split(' · ')[0]}` }));
+    .map(f => ({ up: f.pct > 0, pct: f.eff ?? f.pct, text: factorReason(r, f) || `${f.label}: ${String(f.note).split(' · ')[0]}` }));
+}
+/* His volume this season: targets and carries a game, and his share of his team's in the weeks he played. Role and
+   volume explain a projection better than any matchup factor, so the explanation leads with them. */
+function oppText(r) {
+  const h = r.h, t = D.teamUse?.[r.T]; if (!h?.n || !['RB', 'WR', 'TE'].includes(r.pos)) return '';
+  const per = (x, k) => { const tg = t && t.wks.size ? t[k] / t.wks.size : 0; return `${f1(x / h.n)} ${k === 'tgt' ? 'targets' : 'carries'} a game${tg > 0 ? ` (${pct(x / h.n / tg)} of ${r.T}’s)` : ''}`; };
+  const bits = []; if (r.pos === 'RB' && h.ra / h.n >= 1) bits.push(per(h.ra, 'ra')); if (h.tgt / h.n >= 0.5) bits.push(per(h.tgt, 'tgt'));
+  return bits.length ? `${bits.join(', ')} over ${h.n} game${h.n === 1 ? '' : 's'}` : '';
 }
 function probTiles(r) {
   const h = r.h;
@@ -3117,16 +3133,17 @@ function detailBlock(r) {
   return `<div class="detail"><div class="section">
     <h3 class="dh">Why ${f1(r.mean)} points</h3>
     ${r.role ? `<div class="small"><strong>${esc(roleText(r.role))}.</strong></div>` : ''}
-    ${r.status === 'bye' ? '<div class="small muted">Bye week.</div>' : `<div class="small muted">Baseline ${f1(r.base)} (Sleeper projection blended with his season average), ${spct(r.mult - 1)} for this matchup${r.override != null ? `; your override sets it to ${f1(r.override)}` : ''}.</div>
+    ${oppText(r) ? `<div class="small"><strong>Opportunity:</strong> ${esc(oppText(r))}.</div>` : ''}
+    ${r.status === 'bye' ? '<div class="small muted">Bye week.</div>' : `<div class="small muted">Baseline ${f1(r.base)}${r.projPart > 0 && r.share > 0 ? `: ${f1(r.projPart)} from Sleeper’s projection, which already counts this matchup, and ${f1(r.base - r.projPart)} from his scoring average` : r.projPart > 0 ? ', Sleeper’s projection, which already counts this matchup' : ', his scoring average'}. Matchup strength ${spct(r.mult - 1)}${r.share > 0 ? `, applied to the scoring-average part: ${spct(r.eff)} overall` : ', already in the projection'}${r.override != null ? `; your override sets it to ${f1(r.override)}` : ''}.</div>
     ${why.length ? `<ul class="reasons">${why.map(x => `<li class="${x.up ? 'up' : 'down'}"><span class="rv">${spct(x.pct)}</span> ${esc(x.text)}</li>`).join('')}</ul>` : '<div class="small muted">No matchup factor moves him much this week.</div>'}`}
   </div>
   <div class="section">${probTiles(r)}${modelNote()}</div>
   ${researchLinks(r)}
   ${!isPro() ? `<div style="grid-column:1/-1">${lockLine('Every matchup factor, the math and the coaching matchup')}</div>` : `<details class="more"><summary>All matchup factors and the math</summary><div class="section">${factorList(r)}${r.scheme ? `<div class="scheme"><strong>Scheme:</strong> ${esc(r.scheme)}</div>` : ''}
-  <div class="math">Sleeper projection ${f1(r.projPts)} · season avg ${f1(h?.avg)} → base ${f1(r.base)} × matchup ${f1(r.mult)} = <strong>${f1(r.base * r.mult)}</strong>${r.override != null ? ` · your override ${f1(r.override)}` : ''}${h?.n ? ` · weekly scores: ${h.pts.map(x => x.toFixed(1)).join(', ')}` : ''}</div>
+  <div class="math">Sleeper projection ${f1(r.projPts)} · season avg ${f1(h?.avg)} → ${f1(r.projPart)} from the projection + ${f1(r.base - r.projPart)} from the average × matchup ${r.mult.toFixed(2)} = <strong>${f1(r.model)}</strong>${r.override != null ? ` · your override ${f1(r.override)}` : ''}${h?.n ? ` · weekly scores: ${h.pts.map(x => x.toFixed(1)).join(', ')}` : ''}</div>
   </div></details>
   <details class="more"><summary>Coaching and scheme matchup</summary><div class="section">${schemeBlock(r)}</div></details>`}
-  <div class="ovr" style="grid-column:1/-1"><label for="ov-${esc(r.id)}">Override projection</label><input class="inp" id="ov-${esc(r.id)}" type="number" step="0.1" data-ovr="${esc(r.id)}" value="${r.override ?? ''}" placeholder="${f1(r.base * r.mult)}">${r.override != null ? `<button type="button" class="btn sm" data-clearovr="${esc(r.id)}">Clear</button>` : ''}</div>
+  <div class="ovr" style="grid-column:1/-1"><label for="ov-${esc(r.id)}">Override projection</label><input class="inp" id="ov-${esc(r.id)}" type="number" step="0.1" data-ovr="${esc(r.id)}" value="${r.override ?? ''}" placeholder="${f1(r.model)}">${r.override != null ? `<button type="button" class="btn sm" data-clearovr="${esc(r.id)}">Clear</button>` : ''}</div>
   </div>`;
 }
 /* Projected starter total for any saved team, by running the optimizer against that team's roster and slots. */
@@ -3730,7 +3747,7 @@ function lineupBody() {
   const startTags = st.filter(x => tagged(x.r)).map(x => x.r), benchTags = bench.filter(tagged);
   const tagTxt = list => list.slice(0, 3).map(r => `${shortName(r.id)} ${r.inj === 'Questionable' ? 'Q' : r.inj === 'Doubtful' ? 'D' : r.inj}`).join(', ') + (list.length > 3 ? '…' : '');
   const strat = strategy(), sLab = { mean: 'Projected', floor: 'Safe (low end)', ceil: 'Boom (high end)' };
-  const head = `<div class="prow lhead" aria-hidden="true"><span class="label">Slot</span><span class="label">Player</span><span class="label">Opponent</span><span class="label" title="Matchup grade: how this week’s matchup moves each player from his own baseline. It doesn’t rank players.">Matchup</span><span class="label" style="text-align:right">Proj</span><span class="label" style="text-align:right" title="Middle half of outcomes (25th–75th percentile). Scores can land outside it.">Likely range</span><span class="label" style="text-align:right" title="Model estimate of the chance he beats his season average">Beat avg</span></div>`;
+  const head = `<div class="prow lhead" aria-hidden="true"><span class="label">Slot</span><span class="label">Player</span><span class="label">Opponent</span><span class="label" title="Matchup grade: how favorable this week’s matchup is for each player. It doesn’t rank players.">Matchup</span><span class="label" style="text-align:right">Proj</span><span class="label" style="text-align:right" title="Middle half of outcomes (25th–75th percentile). Scores can land outside it.">Likely range</span><span class="label" style="text-align:right" title="Model estimate of the chance he beats his season average">Beat avg</span></div>`;
   return `<div class="section">
   <div class="gm-row">${gradeCard()}${movesCard()}</div>
   <div class="summary">
@@ -3781,7 +3798,7 @@ function viewCompare() {
   const dec = reviewDecisions(), decShown = isPro() ? dec : dec.slice(0, 1), decMore = dec.length - decShown.length;
   const decBar = dec.length ? `<div class="decisions"><span class="label">Decisions to review</span>${decShown.map(d => { const s = D.M[d.start], b = D.M[d.alt], on = a === d.start && Bp?.id === d.alt; return `<button type="button" class="chip dchip" data-decide="${esc(d.start)}|${esc(d.alt)}" aria-pressed="${on}">${esc(d.slot)}: ${esc(shortName(s.id))} or ${esc(shortName(b.id))}${d.tagged ? ` <span class="pill q">${esc(s.inj === 'Questionable' ? 'Q' : 'D')}</span>` : ''}</button>`; }).join('')}${decMore ? lockLine(`${decMore} more close call${decMore === 1 ? '' : 's'} this week`) : ''}</div>` : '';
   const col = r => { if (!r) return `<div class="card small muted">Pick a player.</div>`; const why = topReasons(r);
-    return `<div class="card"><div><div class="pname" style="font-size:18px">${esc(r.u.name)}</div><div class="psub">${r.pos} · ${r.T} ${injPill(r)} · <span title="${esc(gradeTip(r))}">matchup grade ${r.grade}</span></div></div>${matchCell(r)}
+    return `<div class="card"><div><div class="pname" style="font-size:18px">${esc(r.u.name)}</div><div class="psub">${r.pos} · ${r.T} ${injPill(r)} · <span title="${esc(gradeTip(r))}">matchup grade ${r.grade}</span></div>${r.role ? `<div class="small"><strong>${esc(roleText(r.role))}.</strong></div>` : ''}${oppText(r) ? `<div class="small muted">${esc(oppText(r))}</div>` : ''}</div>${matchCell(r)}
     <div class="probs"><div><span class="label">Projection</span><span class="num">${r.status === 'bye' ? 'Bye' : f1(r.mean)}</span></div><div><span class="label">Likely range</span><span class="num">${f1(r.floor)}–${f1(r.ceil)}</span></div></div>
     ${why.length ? `<ul class="reasons">${why.map(x => `<li class="${x.up ? 'up' : 'down'}"><span class="rv">${spct(x.pct)}</span> ${esc(x.text)}</li>`).join('')}</ul>` : ''}
     ${isPro() ? `<details class="more"><summary>All factors</summary>${factorList(r)}${r.scheme ? `<div class="scheme"><strong>Scheme:</strong> ${esc(r.scheme)}</div>` : ''}</details>
@@ -3810,12 +3827,12 @@ function factorReason(r, f) {
 const GRADE_ORDER = 'ABCDF';
 function gradeTip(r) {
   if (r.status === 'bye') return 'Bye week';
-  return `Matchup grade ${r.grade}: this week’s matchup moves ${r.u.name} ${spct(r.mult - 1)} from his own baseline (A = +12% or better, F = −12% or worse). It grades the matchup, not the player, so a strong player with an F can still outscore a weaker player with an A.`;
+  return `Matchup grade ${r.grade}: this week’s matchup strength for ${r.u.name} is ${spct(r.mult - 1)} (A = +12% or better, F = −12% or worse). Sleeper’s projection already counts the matchup, so it moves only the part of his projection from his scoring average: ${spct(r.eff)} overall. It grades the matchup, not the player, so a strong player with an F can still outscore a weaker player with an A.`;
 }
 /* When Benny picks the player with the worse matchup grade, say why in plain words. */
 function gradeNote(w, l) {
   if (GRADE_ORDER.indexOf(w.grade) <= GRADE_ORDER.indexOf(l.grade) || w.status === 'bye' || l.status === 'bye') return '';
-  return `Why the lower matchup grade? Grades only measure how this week’s matchup moves each player from his own baseline. ${shortName(w.id)}’s matchup is tougher (${w.grade} vs ${l.grade}), but his baseline of ${f1(w.base)} points is high enough that he still projects ${f1(w.mean - l.mean)} more.`;
+  return `Why the lower matchup grade? Grades only rate how favorable this week’s matchup is, not how good the player is. ${shortName(w.id)}’s matchup is tougher (${w.grade} vs ${l.grade}), but his baseline of ${f1(w.base)} points is high enough that he still projects ${f1(w.mean - l.mean)} more.`;
 }
 function pickReasons(w, l) {
   const last = r => shortName(r.id), out = [];
@@ -3934,15 +3951,15 @@ function viewSettings() {
     ${sl('intensity', 'Matchup strength', S.intensity, 0, 1.5, 0.05, v => Math.round(v * 100) + '%')}
     ${sl('priorWeeks', `${D.season - 1} season counts as (games)`, S.priorWeeks, 0, 8, 0.5, v => (+v).toFixed(1))}
     ${FACTOR_KEYS.map(([k, l]) => sl('w.' + k, l, S.w[k], 0, 2, 0.1, v => '×' + (+v).toFixed(1))).join('')}
-    <div class="small muted">Sleeper’s projection already accounts for some of the matchup, so matchup strength starts at 60% to avoid counting it twice.</div></div>
+    <div class="small muted">Sleeper’s projection already accounts for the matchup, so matchup factors move only the season-average part of the base, and matchup strength starts at 60%.</div></div>
   <div class="card panel"><h3>Coaching staffs</h3><p class="small muted" style="margin:0">From offseason hiring reports as of ${STAFF_AS_OF}. Check "new" when a team changes its offensive or defensive play-caller; add the coach’s previous team so the model borrows that team’s tendencies.</p>
     <div class="tscroll staff"><table><thead><tr><th class="l">Team</th><th class="l">Head coach</th><th class="l">Offense play-caller</th><th class="l">New</th><th class="l">From</th><th class="l">Defense play-caller</th><th class="l">New</th><th class="l">From</th></tr></thead><tbody>
     ${ABBR.map(T => { const s = staffOf(T); const ti = (f, cls = '') => `<input class="inp ${cls}" type="text" id="st-${T}-${f}" data-staff="${T}.${f}" value="${esc(s[f])}" aria-label="${T} ${f}">`; const cb = f => `<input type="checkbox" id="st-${T}-${f}" data-staff="${T}.${f}" ${s[f] ? 'checked' : ''} aria-label="${T} ${f}">`; return `<tr><td><strong>${T}</strong></td><td class="l">${ti('hc')}</td><td class="l">${ti('offCaller')}</td><td class="l">${cb('offNew')}</td><td class="l">${ti('offPrev', 'ab')}</td><td class="l">${ti('defCaller')}</td><td class="l">${cb('defNew')}</td><td class="l">${ti('defPrev', 'ab')}</td></tr>`; }).join('')}
     </tbody></table></div><div class="toolbar"><button type="button" class="btn" data-act="resetstaff">Restore researched staffs</button></div></div>
   <div class="card panel"><details class="how"><summary>How the projection works</summary>
-    <ol><li><strong>Base:</strong> Sleeper’s weekly projection, converted to each team’s scoring (PPR, half-PPR or standard), blended with the player’s season average (slider above).</li>
-    <li><strong>Matchup factors</strong>, each capped at ±25%: fantasy points the opponent allows to the position; secondary (pass yards allowed) or run defense (yards per carry allowed, plus the player’s own line); sacks allowed by the offense vs. sacks by the opposing defense; the team’s Vegas implied total and spread, with the opponent’s record; the offense’s pass rate and pace; and the opponent’s defensive roster changes (signings, trades, injuries) that its stats don’t show yet.</li>
-    <li><strong>Weather &amp; stadium:</strong> domes and closed retractable roofs give passers and kickers a small lift. Outdoors, the forecast for the three hours from kickoff (Open-Meteo) moves points between passing, running and kicking: wind over 10 mph hurts deep passing and kickers most, rain and snow add carries, and freezing cold costs kickers and passers a little. The betting total already lowers everyone in bad weather, so this factor doesn’t cut them all again. Each player’s role sets how much he feels it (a deep threat more than a slot receiver, a running quarterback less than a pocket passer), and his own scores indoors vs. outdoors this season count a little.</li>
+    <ol><li><strong>Base:</strong> Sleeper’s weekly projection, converted to each team’s scoring (PPR, half-PPR or standard), blended with the player’s season average (slider above). A healthy player Sleeper doesn’t project while it projects a teammate at his position is a backup, with a base of 0 however he scored filling in. When the projection is under half or over 1.6× his average, his role changed and the projection leads (90%).</li>
+    <li><strong>Matchup factors</strong>, each capped at ±25%: fantasy points the opponent allows to the position; secondary (pass yards allowed) or run defense (yards per carry allowed, plus the player’s own line); sacks allowed by the offense vs. sacks by the opposing defense; the team’s Vegas implied total and spread, with the opponent’s record; the offense’s pass rate and pace; and the opponent’s defensive roster changes (signings, trades, injuries) that its stats don’t show yet. Together they’re capped at ±20%, and they move only the season-average part of the base, since Sleeper’s projection already counts the matchup.</li>
+    <li><strong>Weather &amp; stadium:</strong> domes and closed retractable roofs give passers and kickers a small lift. Outdoors, the forecast for the three hours from kickoff (Open-Meteo) moves points between passing, running and kicking: wind over 10 mph hurts deep passing and kickers most, rain and snow add carries, and freezing cold costs kickers and passers a little. The betting total already lowers everyone in bad weather, so this factor doesn’t cut them all again. Each player’s role sets how much he feels it (a deep threat more than a slot receiver, a running quarterback less than a pocket passer), and his own scores indoors vs. outdoors are shown for context but don’t move the projection. Like every matchup factor, it moves only the part of the projection that comes from his scoring average, since Sleeper’s projection already counts the weather.</li>
     <li><strong>Scheme history:</strong> each team’s numbers blend ${D.season} games with last season. When the play-caller is unchanged, last season counts as ${S.priorWeeks} games. When the play-caller is new, it counts as at most 1.5 games, mixed with the new coach’s old team, and the player’s range widens by 10%.</li>
     <li><strong>Probabilities:</strong> scores are treated as a bell curve around the projection, with spread from the player’s weekly scores (shrunk toward a typical spread for the position).</li>
     <li><strong>Lineup:</strong> an exact assignment fills every slot to maximize the chosen strategy. Bye weeks and players ruled Out or on IR sit automatically.</li></ol></details>
