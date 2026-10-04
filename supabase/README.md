@@ -62,6 +62,85 @@ Supabase's built-in email sender allows only a few emails an hour, which is fine
 - **Rows are private.** In Supabase, open **Table Editor → user_state**. There is one row per person. Signed in as a different person, a request for someone else's row returns nothing.
 - **Delete account.** Delete a test account from **Account → Delete account**. Its row disappears from both tables and from **Authentication → Users**.
 
+# Setting up Pro payments (Stripe)
+
+Pro ($4.99/month, or $14.99 for the season) runs on Stripe. Three small server functions live in Supabase (`functions/`):
+- **`checkout`** starts a payment;
+- **`stripe-webhook`** is the only thing that grants or ends Pro, and only after Stripe's signature checks out;
+- **`billing-portal`** lets monthly members cancel or change their card.
+
+Until these steps are done, the **Go Pro** buttons show an error and nobody can be charged. Do everything in **test mode** first. It takes about 30 minutes.
+
+## 1. Stripe account and products
+
+1. Sign up at [stripe.com](https://stripe.com) and stay in **Test mode** (the toggle at the top).
+2. Go to **Product catalog → Add product** and add two products:
+   - **Benny's Picks Pro Monthly**: price $4.99, **Recurring**, monthly.
+   - **Benny's Picks Pro Season Pass**: price $14.99, **One-off**.
+3. Open each product and copy its **price ID** (it starts with `price_`).
+4. **Settings → Billing → Customer portal:** turn it on and allow customers to cancel subscriptions and update payment methods.
+5. Optional: **Stripe Tax** works out and collects US sales tax for an extra 0.5% per transaction. If you skip it, you're responsible for any sales tax yourself.
+
+## 2. Database
+
+In Supabase, open **SQL Editor** and run the whole of [`schema.sql`](schema.sql) again. It's safe to re-run, and it adds the `entitlements` table, which records who has Pro and until when. People can read only their own row, and nobody can write it from the website.
+
+## 3. The three functions
+
+For each folder in `functions/` (`checkout`, `stripe-webhook`, `billing-portal`):
+1. Go to **Edge Functions → Deploy a new function → Via editor**.
+2. Name it exactly like the folder.
+3. Paste in that folder's `index.ts` and deploy.
+
+Then open **stripe-webhook → Details** and turn **Enforce JWT verification** **off**. Stripe can't send a Supabase sign-in token, so the function checks Stripe's signature instead. Leave it on for the other two.
+
+## 4. Secrets
+
+**Edge Functions → Secrets.** Add these:
+
+| Name | Value |
+|---|---|
+| `STRIPE_SECRET_KEY` | Stripe → Developers → API keys → **Secret key** (`sk_test_…`) |
+| `PRICE_MONTHLY` | the monthly price ID (`price_…`) |
+| `PRICE_SEASON` | the season pass price ID |
+| `SEASON_END` | `2027-02-28T23:59:59Z`, when this season's pass ends. Change it each season, together with `SEASON_END_LABEL` in `index.html`. |
+| `SITE_URL` | `https://bennyspicks.us/` |
+| `STRIPE_WEBHOOK_SECRET` | from step 5 |
+
+## 5. The webhook
+
+1. In Stripe, go to **Developers → Webhooks → Add endpoint**.
+2. Set the **Endpoint URL** to `https://<your-project-ref>.supabase.co/functions/v1/stripe-webhook`.
+3. Under **Events**, select `checkout.session.completed`, `customer.subscription.updated` and `customer.subscription.deleted`.
+4. Save, then copy the endpoint's **Signing secret** (`whsec_…`) into the `STRIPE_WEBHOOK_SECRET` secret above.
+
+## 6. Test it
+
+1. On the site, sign in, open **Pro**, and press **Get the Season Pass**. On Stripe's page, pay with the test card `4242 4242 4242 4242` (any future date, any CVC).
+2. Back on the site, "Activating Pro…" turns into "Welcome to Pro". The ads disappear and every recommendation unlocks. In Supabase, **Table Editor → entitlements** shows your row with `plan = season`.
+3. With a second test account, buy **Monthly**. Then go to **Account → Manage billing** and cancel. Pro stays on until the end of the month, and the account panel says "ends …".
+4. In Stripe, **Webhooks → your endpoint** should show every event delivered with status 200.
+
+## 7. Go live
+
+Switch Stripe to **Live mode** and recreate the two products there; live and test products are separate. Then, in Supabase:
+- update `STRIPE_SECRET_KEY` (`sk_live_…`), `PRICE_MONTHLY` and `PRICE_SEASON`;
+- add a live-mode webhook endpoint the same way, and update `STRIPE_WEBHOOK_SECRET` with its new signing secret.
+
+Before taking real payments, fill in the bracketed parts of `privacy.html` and `terms.html`: your name, a contact email and the refund policy.
+
+## Each new season
+
+1. Update `SEASON_END` in Supabase and `SEASON_END_LABEL` in `index.html`.
+2. If the season pass price changes, update the Stripe price, the `PRICE_SEASON` secret and `PRO_PRICE` in `index.html`.
+
+# Ads (Google AdSense)
+
+Free users see one ad on research-style pages: Waivers, Start / Sit, Research and Roster. Until AdSense approves the site, that slot shows Benny's own Pro promotions.
+1. Apply at [adsense.google.com](https://adsense.google.com) with `bennyspicks.us`. The privacy policy and terms pages are already linked in the site's footer.
+2. In AdSense, turn on **Privacy & messaging → European regulations** (Google's consent message for EU/UK visitors).
+3. Once you're approved, create a **Display ad** unit and send me the publisher ID (`ca-pub-…`) and the ad unit's slot ID. I'll fill in `ADS` in `index.html` and add the `ads.txt` file Google asks for.
+
 ## Updating the Supabase library
 
 `index.html` loads a pinned version of `@supabase/supabase-js` from jsDelivr, checked with a hash (`SB_LIB`). To move to a newer version:

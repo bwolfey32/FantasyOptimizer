@@ -38,6 +38,28 @@ drop policy if exists "own lineups" on public.lineups;
 create policy "own lineups" on public.lineups for all to authenticated
   using ((select auth.uid()) = user_id) with check ((select auth.uid()) = user_id);
 
+-- Pro: one row per person who has paid. Only the Stripe webhook (using the service-role key) writes it; people can read
+-- their own row and nothing else, so nobody can grant themselves Pro through the API.
+-- pro_until is the later of season_until (season pass) and sub_until (monthly plan, paid through); plan names the one
+-- that runs longer. status mirrors the monthly subscription ('active', 'canceling', 'canceled', 'past_due', ...).
+create table if not exists public.entitlements (
+  user_id uuid primary key references auth.users (id) on delete cascade,
+  plan text check (plan in ('monthly', 'season')),
+  status text,
+  pro_until timestamptz,
+  season_until timestamptz,
+  sub_until timestamptz,
+  stripe_customer_id text unique,
+  stripe_subscription_id text,
+  updated_at timestamptz not null default now()
+);
+drop trigger if exists entitlements_touch on public.entitlements;
+create trigger entitlements_touch before update on public.entitlements for each row execute function public.touch_updated_at();
+alter table public.entitlements enable row level security;
+drop policy if exists "read own entitlement" on public.entitlements;
+create policy "read own entitlement" on public.entitlements for select to authenticated
+  using ((select auth.uid()) = user_id);
+
 -- Delete account: removes the sign-in and, through the foreign keys, every row above.
 create or replace function public.delete_my_account() returns void
   language sql security definer set search_path = '' as $$

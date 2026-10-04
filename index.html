@@ -127,6 +127,61 @@ a { color: var(--accent); }
 .hist .hdet > td { padding: 4px 10px 12px; background: var(--surface-2); }
 .hist .hdet table { background: var(--surface); border: 1px solid var(--line); border-radius: 8px; margin-bottom: 6px; }
 .hist .hbench td { color: var(--muted); }
+/* Pro: header button, lock lines, the Pro page */
+.gopro { border-color: color-mix(in srgb, var(--gold) 55%, var(--line)); color: var(--gold); font-weight: 600; }
+.gopro.is-pro { color: var(--accent); border-color: var(--accent); }
+.gopro[aria-pressed="true"] { background: color-mix(in srgb, var(--gold) 10%, var(--surface)); }
+.lock { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 10px; padding: 10px 14px; border: 1px dashed color-mix(in srgb, var(--gold) 55%, var(--line)); border-radius: 8px; background: color-mix(in srgb, var(--gold) 6%, var(--surface)); color: var(--ink); text-decoration: none; font-size: 14px; }
+.lock:hover { border-style: solid; }
+.lock-txt { font-weight: 600; }
+.lock-cta { margin-left: auto; color: var(--gold); font-weight: 600; font-size: 13px; }
+.lock-row { padding: 10px 14px; }
+.decisions .lock { padding: 3px 10px; font-size: 13px; }
+.tchip.locked { color: var(--muted); text-decoration: none; }
+.acct-plan { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 8px; font-size: 14.5px; }
+.pro-page { max-width: 820px; }
+.pro-hero h2 { font-size: 32px; margin-top: 2px; }
+.pro-hero p { margin: 8px 0 0; font-size: 16px; max-width: 62ch; }
+.pro-hero .label { color: var(--gold); }
+.plans { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
+.plan { position: relative; padding: 18px; display: flex; flex-direction: column; gap: 6px; }
+.plan p { margin: 0 0 6px; }
+.plan.best { border: 2px solid var(--accent); box-shadow: 0 6px 20px color-mix(in srgb, var(--accent) 15%, transparent); }
+.plan-tag { position: absolute; top: -10px; right: 14px; background: var(--surface); }
+.price { font-size: 40px; line-height: 1; }
+.price span { font-size: 15px; color: var(--muted); font-family: var(--font-body); font-weight: 400; }
+.plan .btn { margin-top: auto; padding: 10px 14px; }
+.pro-feats { list-style: none; margin: 0; padding: 0; display: grid; gap: 10px; }
+.pro-feats li { display: flex; flex-direction: column; padding-left: 26px; position: relative; }
+.pro-feats li::before { content: "✓"; position: absolute; left: 2px; top: 0; color: var(--good); font-weight: 700; }
+@media (max-width: 600px) { .plans { grid-template-columns: minmax(0, 1fr); } .pro-hero h2 { font-size: 26px; } .lock-cta { margin-left: 0; } }
+/* Team Grade and Benny's Moves */
+.gm-row { display: grid; grid-template-columns: minmax(0, 0.9fr) minmax(0, 2fr); gap: 12px; align-items: start; }
+.grade-card { padding: 14px 16px; display: grid; grid-template-columns: auto minmax(0, 1fr); gap: 4px 14px; align-items: center; }
+.gc-letter { grid-row: span 2; width: 64px; height: 64px; border-radius: 12px; display: grid; place-items: center; font-family: var(--font-display); font-weight: 700; font-size: 34px; border: 1px solid var(--line); }
+.gc-score { font-size: 30px; line-height: 1; }
+.gc-pos { grid-column: 1 / -1; display: flex; flex-wrap: wrap; gap: 4px; margin-top: 6px; }
+.moves-card { padding: 14px 16px; display: flex; flex-direction: column; gap: 10px; }
+.mv-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; }
+.mv { display: grid; grid-template-columns: 24px minmax(0, 1fr) auto; gap: 10px; align-items: start; padding: 9px 0; }
+.mv + .mv { border-top: 1px solid var(--line); }
+.mv-n { font-size: 20px; color: var(--accent); line-height: 1.2; }
+.mv-body { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.mv-side { display: flex; flex-direction: column; align-items: flex-end; gap: 4px; }
+.mv-gain { color: var(--good); font-size: 17px; white-space: nowrap; }
+@media (max-width: 780px) { .gm-row { grid-template-columns: minmax(0, 1fr); } }
+@media (max-width: 600px) { .mv { grid-template-columns: 20px minmax(0, 1fr); } .mv-side { grid-column: 2; flex-direction: row; align-items: center; justify-content: space-between; } }
+/* Ad slot and footer */
+.adslot { min-height: 100px; display: flex; flex-direction: column; justify-content: center; }
+.adslot .ad-label { font-size: 11px; letter-spacing: .08em; text-transform: uppercase; color: var(--muted); }
+.adslot ins { min-height: 90px; }
+.house { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 14px; padding: 12px 16px; border: 1px solid var(--line); border-radius: var(--radius); background: color-mix(in srgb, var(--gold) 5%, var(--surface)); color: var(--ink); text-decoration: none; }
+.house .ad-label { flex-basis: 100%; color: var(--gold); }
+.house strong { font-size: 16px; }
+.house .btn { margin-left: auto; }
+.foot { display: flex; flex-wrap: wrap; gap: 6px 16px; padding-top: 8px; border-top: 1px solid var(--line); }
+.foot a { color: var(--muted); }
+body.welcome .adslot { display: none !important; }
 /* Welcome walkthrough: full screen, no navigation */
 body.welcome .controls, body.welcome #tabs, body.welcome #teamctx, body.welcome #panels, body.welcome #brief, body.welcome #msgs, body.welcome #fresh { display: none !important; }
 .wl { width: 100%; max-width: 760px; margin: 0 auto; display: flex; flex-direction: column; gap: 16px; }
@@ -494,6 +549,7 @@ td .wks { flex-wrap: nowrap; }
     <div class="controls">
       <button type="button" class="status" id="status" data-act="fresh" aria-expanded="false" aria-controls="fresh" title="When each kind of data was last updated"><i></i><span>Loading…</span></button>
       <button class="btn" data-act="reload" type="button" title="Get the newest projections, injuries and lines">Refresh projections</button>
+      <button class="btn gopro" data-tab="pro" type="button" id="proBtn" hidden>Go Pro</button>
       <button class="btn" data-act="account" type="button" id="acctBtn" aria-expanded="false" hidden>Sign in</button>
       <button class="btn" data-tab="settings" type="button" id="settingsBtn">Settings</button>
     </div>
@@ -504,7 +560,9 @@ td .wks { flex-wrap: nowrap; }
   <div id="panels"></div>
   <section class="brief" id="brief" aria-label="This week at a glance"></section>
   <div id="msgs" class="section"></div>
+  <aside id="adSlot" class="adslot" aria-label="Advertisement" hidden></aside>
   <main id="main"></main>
+  <footer class="foot small muted"><span>© 2026 Benny’s Picks</span><a href="privacy.html">Privacy</a><a href="terms.html">Terms</a><a href="#pro" data-tab="pro">Pro</a></footer>
   <div class="toast" id="toast" role="status" aria-live="polite" hidden></div>
 </div>
 
@@ -898,6 +956,9 @@ function signedInDone() {
   acct.toastNext = false; D.acctOpen = false; D.wSignin = false;
   if (D.onboard === 'account') { D.onboard = null; go('lineup', { keepFlash: true }); } else render();
   toast('Signed in. Your teams now sync to this account.');
+  // they picked a Pro plan before signing in: carry on to checkout
+  let buy = null; try { buy = sessionStorage.getItem('fo1:buy'); sessionStorage.removeItem('fo1:buy'); } catch {}
+  if (buy) loadPro().then(() => isPro() ? go('pro') : goPro(buy));
 }
 
 /* auth: an emailed code, or Google (PKCE: Google sends people back with ?code=, which leaves the #page routes alone) */
@@ -921,7 +982,9 @@ function onAuth(ev, session) {
   const u = session?.user || null;
   if (u && u.id !== acct.user?.id) {
     acct.user = u; acct.step = 'email'; acct.code = ''; acct.msg = null; stripAuthParams();
+    const c = store.get('fo1:pro'); acct.pro = c && c.uid === u.id ? c : null;
     startSync().then(() => {
+      loadPro().then(() => { if (D.proActivating) pollPro(); });
       if (!acct.toastNext || acct.choice) return;
       signedInDone();
     });
@@ -929,7 +992,7 @@ function onAuth(ev, session) {
   } else if (!u && acct.user && ev === 'SIGNED_OUT') { acct.user = null; acct.ready = false; render(); }   // session ended elsewhere: keep this browser's copy
   renderAcct();
 }
-function stripAuthParams() { if (/[?&](code|error|error_description)=/.test(location.search)) try { history.replaceState(null, '', location.pathname + location.hash); } catch {} }
+function stripAuthParams() { if (/[?&](code|error|error_description|checkout)=/.test(location.search)) try { history.replaceState(null, '', location.pathname + location.hash); } catch {} }
 const authErr = e => !acct.sb ? 'Couldn’t reach the sign-in service. Check your connection and try again.'
   : e?.status === 429 ? 'Too many tries. Wait a minute, then try again.'
   : /expired|invalid|otp/i.test(e?.message || '') ? 'That code didn’t work. Check it, or send a new one.'
@@ -971,7 +1034,7 @@ async function signOut(deleted) {
   toast(deleted ? 'Account deleted. Everything it held is gone.' : 'Signed out. Your teams are in your account, not in this browser.');
 }
 function wipeLocal() {
-  ['fo1:state', HIST_KEY, 'fo1:sync'].forEach(k => store.del(k));
+  ['fo1:state', HIST_KEY, 'fo1:sync', 'fo1:pro'].forEach(k => store.del(k)); acct.pro = acct.bootPro = null;
   const tab = state.tab; state = ensureTeams(JSON.parse(JSON.stringify(DEFAULT_STATE))); state.tab = tab;
   D.hist = null; D.acctOpen = false; D.histOpen = false; D.flow = null; D.tsOpen = false; D.ioOpen = false; D.onboard = null; D.open.clear(); D.wCache = null;
   primeSigs();
@@ -979,6 +1042,8 @@ function wipeLocal() {
   save(); render();   // no team now, so the welcome walkthrough shows
 }
 async function deleteAccount() {
+  // deleting the account doesn't stop Stripe billing, so a running monthly plan has to be cancelled first
+  if (subActive()) { acct.msg = ['err', 'Cancel your monthly Pro plan in Manage billing first, then delete the account.']; render(); return; }
   acct.msg = ['info', 'Deleting your account…']; render();
   try { const { error } = await acct.sb.rpc('delete_my_account'); if (error) throw error; }
   catch (e) { acct.msg = ['err', 'Couldn’t delete the account. ' + authErr(e)]; render(); return; }
@@ -988,6 +1053,11 @@ async function deleteAccount() {
 function acctBoot() {
   if (!acct.on) return;
   const q = new URLSearchParams(location.search), back = q.has('code') || q.has('error_description');
+  // back from Stripe Checkout
+  if (q.has('checkout')) {
+    if (q.get('checkout') === 'success') D.proActivating = true; else D.proMsg = ['info', 'Checkout cancelled. You haven’t been charged.'];
+    if (!back) stripAuthParams();
+  }
   if (back) {
     let ret = null; try { ret = sessionStorage.getItem('fo1:ret'); sessionStorage.removeItem('fo1:ret'); } catch {}
     if (ret && !location.hash) try { history.replaceState(null, '', location.pathname + location.search + ret); } catch {}
@@ -995,6 +1065,7 @@ function acctBoot() {
     acct.toastNext = true;
   }
   let saved = false; try { saved = Object.keys(localStorage).some(k => /^sb-.+-auth-token$/.test(k)); } catch {}
+  if (saved) acct.bootPro = store.get('fo1:pro');   // a Pro member's page shows no ads even before the session is restored
   if (!saved && !back) return;
   cloudReady().then(sb => sb.auth.getSession()).then(({ data }) => {
     if (back) { stripAuthParams(); if (!data?.session) { acct.msg = ['err', 'Google sign-in didn’t finish. Try again.']; D.acctOpen = true; render(); } }
@@ -1003,9 +1074,61 @@ function acctBoot() {
 document.addEventListener('visibilitychange', () => {
   if (!acct.user || !acct.ready) return;
   if (document.visibilityState === 'hidden') push();
-  else if (Date.now() - acct.pulledAt > 10000) pull().then(() => { if (Date.now() - acct.histAt > 60000) pullHist(); });
+  else if (Date.now() - acct.pulledAt > 10000) pull().then(() => { if (Date.now() - acct.histAt > 60000) pullHist(); loadPro(); });
 });
 window.addEventListener('pagehide', () => { if (acct.user && acct.ready) push(); });
+
+/* ---------- Pro ----------
+   Pro lives in the account's `entitlements` row, which only the Stripe webhook can write (see supabase/functions).
+   The site reads it after sign-in and when the tab comes back into view, and keeps a copy so the page is right at once.
+   The checks run in the browser, like the rest of the app; payments themselves never touch this page. */
+const PRO_PRICE = { monthly: '$4.99', season: '$14.99' }, SEASON_END_LABEL = 'February 28, 2027';
+function isPro() { const p = acct.user ? acct.pro : acct.bootPro; return !!p && p.until > Date.now(); }
+const canAddTeam = () => isPro() || needsTeam();
+async function loadPro() {
+  if (!acct.user || !acct.sb) return;
+  try {
+    const { data, error } = await acct.sb.from('entitlements').select('plan, status, pro_until').eq('user_id', acct.user.id).maybeSingle();
+    if (error) throw error;
+    const was = isPro();
+    acct.pro = data ? { plan: data.plan, status: data.status, until: data.pro_until ? Date.parse(data.pro_until) : 0 } : null;
+    store.set('fo1:pro', acct.pro ? Object.assign({ uid: acct.user.id }, acct.pro) : null);
+    if (was !== isPro()) render(); else renderAcct();
+  } catch {}
+}
+// a function's own error message, when it sent one
+async function fnErr(e) { try { const j = await e?.context?.json?.(); if (j?.error) return j.error; } catch {} return e?.message || 'Something went wrong. Try again.'; }
+async function goPro(plan) {
+  if (!acct.on) return toast('Pro isn’t available yet.');
+  if (!acct.user) {   // Pro belongs to an account, so sign in first; checkout continues right after
+    try { sessionStorage.setItem('fo1:buy', plan); } catch {}
+    D.acctOpen = true; acct.msg = ['info', 'Sign in first so Pro follows you to every device. Checkout opens right after.'];
+    cloudReady().catch(() => {}); render(); revealPanel($('.acct')); deskFocus('#acctEmail'); return;
+  }
+  D.proBusy = plan; D.proMsg = null; render();
+  try {
+    const { data, error } = await acct.sb.functions.invoke('checkout', { body: { plan } });
+    if (error) throw error; if (data?.error) throw new Error(data.error);
+    location.href = data.url;
+  } catch (e) { D.proBusy = null; D.proMsg = ['err', await fnErr(e)]; render(); }
+}
+async function openBilling() {
+  try {
+    const { data, error } = await acct.sb.functions.invoke('billing-portal', {});
+    if (error) throw error; if (data?.error) throw new Error(data.error);
+    location.href = data.url;
+  } catch (e) { const m = await fnErr(e); acct.msg = ['err', m]; D.proMsg = ['err', m]; render(); }
+}
+// back from Stripe: the webhook usually lands within seconds, so check a few times before saying anything
+async function pollPro() {
+  D.proActivating = false; D.proMsg = ['info', 'Activating Pro…']; render();
+  for (let i = 0; i < 15 && !isPro(); i++) { await loadPro(); if (!isPro()) await new Promise(r => setTimeout(r, 2000)); }
+  D.proMsg = isPro() ? null : ['info', 'Payment received. Pro is still activating; it usually takes under a minute. Refresh this page shortly.'];
+  render(); if (isPro()) toast('Welcome to Pro! Ads are gone and every recommendation is unlocked.');
+}
+const proLine = p => !p ? '' : p.plan === 'season' ? `Pro · Season Pass through ${new Date(p.until).toLocaleDateString([], { month: 'long', day: 'numeric', year: 'numeric' })}`
+  : `Pro Monthly · ${p.status === 'canceling' || p.status === 'canceled' ? 'ends' : 'renews'} ${new Date(p.until).toLocaleDateString([], { month: 'long', day: 'numeric' })}`;
+const subActive = () => !!acct.pro && ['active', 'trialing', 'past_due'].includes(acct.pro.status);
 
 function staffOf(T) {
   const b = STAFF_BASE[T] || ['','','','','',0,0,0,'','',''];
@@ -1626,7 +1749,9 @@ function computeAll() {
   computeTeams(); computePersonnel(); D.M = {};
   for (const id of D.U.keys()) { const r = evalPlayer(id); if (r) D.M[id] = r; }
 }
-const metricOf = r => { if (r.locked && ok(r.actual)) return r.actual; const s = state.settings.strategy; return s === 'floor' ? r.floor : s === 'ceil' ? r.ceil : r.mean; };
+// Safe (floor) and Boom (ceiling) lineups are Pro; free lineups optimize the projection
+const strategy = () => isPro() ? state.settings.strategy : 'mean';
+const metricOf = r => { if (r.locked && ok(r.actual)) return r.actual; const s = strategy(); return s === 'floor' ? r.floor : s === 'ceil' ? r.ceil : r.mean; };
 
 /* ---------- lineup optimizer (Hungarian assignment, exact for any slot mix) ---------- */
 function hungarian(cost) {
@@ -1690,7 +1815,7 @@ function recordLineup(starters) {
   const on = new Set(st.map(e => e[1]).filter(Boolean));
   const act = Object.assign({}, prev?.act);
   for (const id of state.roster) { const r = D.M[id]; if (r?.locked && ok(r.actual)) act[id] = Math.round(r.actual * 10) / 10; }
-  const snap = { team: curTeam()?.name || '', fmt: fmtName(), strategy: state.settings.strategy, starters: st,
+  const snap = { team: curTeam()?.name || '', fmt: fmtName(), strategy: strategy(), starters: st,
     bench: state.roster.filter(id => !on.has(id) && D.M[id]).map(id => ent(D.M[id])), act };
   if (prev && canon(Object.assign({}, prev, { savedAt: 0 })) === canon(Object.assign({}, snap, { savedAt: 0 }))) return;
   histPut(k, Object.assign(snap, { savedAt: Date.now() }));
@@ -2176,7 +2301,25 @@ function computeWaivers() {
   // keep the list varied: at most two moves of the same kind (same position added, same player dropped)
   const seen = {}, shown = moves.filter(m => { const k = posOf(m.f) + '|' + m.d; seen[k] = (seen[k] || 0) + 1; return seen[k] <= 2; }).slice(0, 12);
   const needs = teamNeeds(roster, V, weeks, H, slots, base);
+  for (const m of shown) m.whyText = waiverWhy(m, needs, weeks, H);
   return (D.wCache = { key, weeks, H, V, pool, moves: shown, needs, byH, sumH, base, stashes });
+}
+// why a waiver move helps, in one line (shown on Waivers and in Benny's Moves)
+function waiverWhy(m, needs, weeks, H) {
+  const fu = D.U.get(m.f), why = [];
+  const nd = needs.list.find(n => n.P === fu.pos); if (nd && nd.level === 'Weak') why.push(`fills your weak ${fu.pos === 'DEF' ? 'D/ST' : fu.pos} spot`);
+  if (m.starts.length) why.push(`starts in ${m.starts.length === H ? 'every week' : 'week' + (m.starts.length > 1 ? 's ' : ' ') + m.starts.map(s => s[0]).join(', ')} of the next ${H} (${[...new Set(m.starts.map(s => s[1]))].join('/')})`);
+  else why.push('adds depth for later weeks');
+  if (m.d && !m.lost.length) why.push(`${D.U.get(m.d).name} wouldn’t have started in that stretch`);
+  if (m.d && m.depLost > 0.5) why.push(`costs ${f1(m.depLost)} pts of injury cover as a backup ${D.U.get(m.d).pos === 'DEF' ? 'D/ST' : D.U.get(m.d).pos} (already counted in the gain)`);
+  const fi = fillInFor(m.f); if (fi) why.push(`short-term: filling in for ${fi.name} (${fi.inj}), so later weeks count half`);
+  const sm = mean(weeks.slice(1, H).map(w => { const s = schedOpp(fu.team, w); return s.opp ? matchupMult(fu.pos, s.opp, w) : null; }).filter(ok));
+  if (sm && sm >= 1.04) why.push('soft upcoming schedule'); else if (sm && sm <= 0.96) why.push('tough upcoming schedule');
+  if (fu.pos === 'DEF' && D.pers?.[fu.team]) {
+    const [om, st] = persOwn(fu.team), net = om - 1 + st / 8, t = D.pers[fu.team], mv = t.moves.find(x => (net > 0 ? x.val > 0 : x.val < 0)) || t.stMoves.find(x => (net > 0 ? x.val > 0 : x.val < 0));
+    if (Math.abs(net) >= 0.02) why.push(`${fu.team} defense ${net > 0 ? 'improved' : 'weakened'} (${spct(om - 1)}${mv ? ', ' + moveText(mv) : ''})`);
+  }
+  return why.join('; ').replace(/^./, c => c.toUpperCase());
 }
 function teamNeeds(roster, V, weeks, H, slots, base) {
   const W = state.waivers, out = [], mid = weeks[Math.floor((H - 1) / 2)];
@@ -2262,27 +2405,16 @@ function waiversBody() {
   const needCards = needs.list.map(n => `<div class="need"><div class="row-head"><h3>${n.P === 'DEF' ? 'D/ST' : n.P}</h3><span class="pill ${levelCls[n.level]}">${n.level}</span></div>
     ${n.rows.length ? n.rows.map(r => `<div class="small ${r.starter ? '' : 'muted'}">${esc(D.U.get(r.id).name)} <span class="muted">${r.away ? (returnWeek(r.id) > 18 ? 'out for season' : 'out until wk ' + returnWeek(r.id)) : (n.P === 'DEF' ? 'DST' : n.P) + (r.rank || '?')}</span></div>`).join('') : '<div class="small muted">Nobody at this position</div>'}
     <div class="small muted">${n.sched ? `Schedule: <strong class="${n.sched === 'Easy' ? 'trend-up' : n.sched === 'Hard' ? 'trend-down' : ''}">${n.sched}</strong>` : ''}${n.byes.length ? ` · Bye: ${esc(n.byes.join(', '))}` : ''}</div></div>`).join('');
-  const moveRows = moves.length ? moves.map((m, i) => {
-    const fu = D.U.get(m.f), why = [];
-    const nd = needs.list.find(n => n.P === fu.pos); if (nd && nd.level === 'Weak') why.push(`fills your weak ${fu.pos === 'DEF' ? 'D/ST' : fu.pos} spot`);
-    if (m.starts.length) why.push(`starts in ${m.starts.length === H ? 'every week' : 'week' + (m.starts.length > 1 ? 's ' : ' ') + m.starts.map(s => s[0]).join(', ')} of the next ${H} (${[...new Set(m.starts.map(s => s[1]))].join('/')})`);
-    else why.push('adds depth for later weeks');
-    if (m.d && !m.lost.length) why.push(`${D.U.get(m.d).name} wouldn’t have started in that stretch`);
-    if (m.d && m.depLost > 0.5) why.push(`costs ${f1(m.depLost)} pts of injury cover as a backup ${D.U.get(m.d).pos === 'DEF' ? 'D/ST' : D.U.get(m.d).pos} (already counted in the gain)`);
-    const fi = fillInFor(m.f); if (fi) why.push(`short-term: filling in for ${fi.name} (${fi.inj}), so later weeks count half`);
-    const sm = mean(weeks.slice(1, H).map(w => { const s = schedOpp(fu.team, w); return s.opp ? matchupMult(fu.pos, s.opp, w) : null; }).filter(ok));
-    if (sm && sm >= 1.04) why.push('soft upcoming schedule'); else if (sm && sm <= 0.96) why.push('tough upcoming schedule');
-    if (fu.pos === 'DEF' && D.pers?.[fu.team]) {
-      const [om, st] = persOwn(fu.team), net = om - 1 + st / 8, t = D.pers[fu.team], mv = t.moves.find(x => (net > 0 ? x.val > 0 : x.val < 0)) || t.stMoves.find(x => (net > 0 ? x.val > 0 : x.val < 0));
-      if (Math.abs(net) >= 0.02) why.push(`${fu.team} defense ${net > 0 ? 'improved' : 'weakened'} (${spct(om - 1)}${mv ? ', ' + moveText(mv) : ''})`);
-    }
-    m.whyText = why.join("; ").replace(/^./, c => c.toUpperCase());
+  // free: the best move and the next one; Pro: all of them
+  const shownMoves = isPro() ? moves : moves.slice(0, 2);
+  const moveRows = moves.length ? shownMoves.map((m, i) => {
     return `<div class="item move"><div class="mrank num">${i + 1}</div>
       <div class="mside"><span class="pill n">Add</span> <div>${pl(m.f)}<span class="psub">${ownTxt(m.f)}</span></div>${schedStrip(m.f, weeks, H)}</div>
       <div class="mside">${m.d ? `<span class="pill o">Drop</span> <div>${pl(m.d)}</div>${schedStrip(m.d, weeks, H)}` : `<span class="pill m">No drop</span> <div class="small muted">You have an open roster spot</div>`}</div>
       <div class="mgain"><span class="num">+${f1(m.hz)}</span><span class="small muted">expected lineup pts, next ${H} wk${H > 1 ? 's' : ''}</span>${H < weeks.length ? `<span class="small ${m.later >= 0 ? 'trend-up' : 'trend-down'}">${m.later >= 0 ? '+' : ''}${f1(m.later)} after that</span>` : ''}</div>
-      <div class="mwhy small">${esc(why.join('; ').replace(/^./, c => c.toUpperCase()))}. <button type="button" class="btn sm" data-taken="${esc(m.f)}">Taken in my league</button></div></div>`;
-  }).join('') : `<div class="item" style="padding:14px"><span class="muted">No free agent improves your lineup over ${hLab}. Try a longer window or a higher ownership limit.</span></div>`;
+      <div class="mwhy small">${esc(m.whyText)}. <button type="button" class="btn sm" data-taken="${esc(m.f)}">Taken in my league</button></div></div>`;
+  }).join('') + (moves.length > shownMoves.length ? `<div class="item lock-row">${lockLine(`Benny found ${moves.length - shownMoves.length} more move${moves.length - shownMoves.length === 1 ? '' : 's'} that improve your roster`)}</div>` : '')
+    : `<div class="item" style="padding:14px"><span class="muted">No free agent improves your lineup over ${hLab}. Try a longer window or a higher ownership limit.</span></div>`;
   const posBest = POS.map(p => { const top = R.byH.filter(id => D.U.get(id).pos === p).slice(0, 4); return top.map(id => `<tr><td><strong>${esc(D.U.get(id).name)}</strong> <span class="small muted">${p} · ${D.U.get(id).team}</span></td><td>${ownTxt(id)}</td><td>${f1(rosBase(id))}</td><td>${f1(R.sumH(id))}</td><td class="l">${schedStrip(id, weeks, Math.min(H, 6))}</td><td><button type="button" class="btn sm" data-taken="${esc(id)}">Taken</button></td></tr>`).join(''); }).join('');
   const stashCard = R.stashes.length ? `<div class="row-head"><h2>Injured players you’re holding</h2><span class="small muted">Players set to Keep are never suggested as drops. Startable players who’ll be back start on Keep.</span></div>
   <div class="card list">${[...R.stashes].sort((a, b) => b.keep - a.keep || a.rank - b.rank).map(s => {
@@ -2354,6 +2486,88 @@ function reviewDecisions() {
   const seen = new Set();
   return out.filter(d => !seen.has(d.alt) && seen.add(d.alt)).sort((a, b) => b.p - a.p);
 }
+/* ---------- Team Grade ----------
+   Each starter is ranked against every player at his position on season-long value (rosBase, so one matchup doesn't
+   swing it), the same ranking Waivers uses for team needs. A starter who ranks like an elite starter in a league this
+   size scores 100, a league-average starter about 70, and it drops from there. Kickers and defenses count less, good
+   bench depth at RB/WR/TE adds a little, and the total is out of 100 with a letter grade. */
+const GRADE_CUTS = [[93, 'A+'], [87, 'A'], [83, 'A−'], [79, 'B+'], [75, 'B'], [71, 'B−'], [67, 'C+'], [63, 'C'], [59, 'C−'], [55, 'D+'], [50, 'D'], [0, 'F']];
+const POS_WEIGHT = { QB: 1, RB: 1, WR: 1, TE: 0.8, K: 0.3, DEF: 0.4 };
+function teamGrade() {
+  if (!state.roster.length || !D.M) return null;
+  const { needs } = computeWaivers(), L = state.waivers.teams || 12, per = {};
+  let sum = 0, wsum = 0, depth = 0;
+  for (const n of needs.list) {
+    const need = Math.max(1, Math.round(posSlots(n.P))), share = posSlots(n.P) / need, w = POS_WEIGHT[n.P] ?? 1, scores = [];
+    for (let i = 0; i < need; i++) {
+      const r = n.rows[i], avgRank = L * (i + 0.5) * share, ratio = r && r.rank && !r.away ? r.rank / avgRank : 4;
+      scores.push(ratio <= 1 ? 100 - 30 * Math.max(0, ratio - 0.3) / 0.7 : Math.max(15, 70 - 30 * (ratio - 1)));
+    }
+    const s = mean(scores); per[n.P] = Math.round(s); sum += s * w * need; wsum += w * need;
+    // a bench player who'd start for many teams is real injury cover
+    if (['RB', 'WR', 'TE'].includes(n.P)) for (const r of n.rows.slice(need)) if (r.rank && r.rank <= L * (need + 1) * share) depth++;
+  }
+  if (!wsum) return null;
+  const score = clamp(Math.round(sum / wsum + Math.min(4, depth)), 0, 100), letter = GRADE_CUTS.find(([c]) => score >= c)[1];
+  const main = Object.entries(per).filter(([P]) => P !== 'K' && P !== 'DEF').sort((a, b) => b[1] - a[1]);
+  return { score, letter, per, best: main[0]?.[0], worst: main.length > 1 ? main[main.length - 1][0] : null };
+}
+const gradeClass = l => l[0] === 'A' ? 'A' : l[0] === 'B' ? 'B' : l[0] === 'C' ? 'C' : l[0] === 'D' ? 'D' : 'F';
+const posLabel = P => P === 'DEF' ? 'D/ST' : P;
+function gradeCard() {
+  const g = teamGrade(); if (!g) return '';
+  return `<div class="card grade-card"><span class="gc-letter g-${gradeClass(g.letter)}" aria-hidden="true">${g.letter}</span>
+    <div class="gc-main"><span class="label">Benny Grade</span><div><span class="num gc-score">${g.score}</span><span class="muted">/100</span> <span class="vh">${g.letter}</span></div>
+      <div class="small muted">${g.best ? `Strongest: <strong>${posLabel(g.best)}</strong>` : ''}${g.worst && g.worst !== g.best ? ` · Weakest: <strong>${posLabel(g.worst)}</strong>` : ''}</div></div>
+    <div class="gc-pos">${Object.entries(g.per).map(([P, s]) => `<span class="chip ${s >= 80 ? 'up' : s < 55 ? 'down' : ''}" title="${posLabel(P)} starters score ${s}/100">${posLabel(P)} ${s}</span>`).join('')}</div></div>`;
+}
+
+/* ---------- Benny's Moves ----------
+   The most useful things to do with this team now, from the engines the other pages use: lineup changes against the
+   lineup set in Sleeper or ESPN (or this week's closest calls when Benny doesn't know it), injured starters to bench,
+   the best waiver moves, and the weakest position. Ranked by points gained; position advice comes last. Free shows
+   the top two. */
+function bennysMoves() {
+  if (!state.roster.length || !D.M) return [];
+  const out = [], { starters } = optimize(), on = new Set(starters.filter(s => s.r).map(s => s.r.id)), nm = id => esc(D.U.get(id)?.name || '');
+  let app = null, appName = '';
+  if (state.sleeper?.starters) { app = new Set(state.sleeper.starters); appName = 'Sleeper'; }
+  else if (Object.keys(state.espn.slotOf || {}).length) { app = new Set(Object.entries(state.espn.slotOf).filter(([, s]) => !(s === 20 || s === 21)).map(([id]) => id)); appName = 'ESPN'; }
+  if (app) {
+    const ins = starters.filter(s => s.r && !s.r.locked && !app.has(s.r.id)).map(s => s.r);
+    const outs = state.roster.filter(id => app.has(id) && !on.has(id)).map(id => D.M[id]).filter(r => r && !r.locked);
+    const flex = p => ['RB', 'WR', 'TE'].includes(p);
+    for (const r of ins.sort((a, b) => b.mean - a.mean)) {
+      let i = outs.findIndex(o => o.pos === r.pos); if (i < 0) i = outs.findIndex(o => flex(o.pos) && flex(r.pos)); if (i < 0) continue;
+      const o = outs.splice(i, 1)[0], gone = o.status !== 'ok', gain = r.mean - (gone ? 0 : o.mean);
+      out.push({ gain, tab: 'lineup', title: gone ? `Bench ${nm(o.id)} (${esc(o.status === 'bye' ? 'bye week' : o.inj || 'out')}), start ${nm(r.id)}` : `Start ${nm(r.id)} over ${nm(o.id)}`,
+        detail: gone ? `${nm(o.id)} won’t play this week but is in your ${appName} lineup.` : `Your ${appName} lineup starts ${nm(o.id)}; Benny projects ${nm(r.id)} for ${f1(r.mean)} vs ${f1(o.mean)}.`, gainTxt: `+${f1(gain)} pts` });
+    }
+    for (const o of outs) if (o.status !== 'ok') out.push({ gain: o.status === 'bye' ? 3 : 5, tab: 'lineup', title: `Bench ${nm(o.id)}`, detail: `${o.status === 'bye' ? 'On bye' : esc(o.inj || 'Ruled out')} but in your ${appName} lineup.`, gainTxt: '' });
+  } else {
+    for (const d of reviewDecisions().slice(0, 3)) {
+      const s = D.M[d.start], b = D.M[d.alt];
+      out.push({ gain: Math.max(0.1, s.mean - b.mean), tab: 'compare', decide: `${d.start}|${d.alt}`, title: `Start ${nm(s.id)} over ${nm(b.id)} at ${esc(d.slot)}`,
+        detail: `A close call: ${nm(s.id)} has a ${pct(1 - d.p)} chance to outscore him${d.tagged ? `, but he’s ${esc((s.inj || '').toLowerCase())}, so check news before kickoff` : ''}.`, gainTxt: `+${f1(s.mean - b.mean)} pts` });
+    }
+  }
+  const W = computeWaivers(), usedPos = new Set(), usedDrop = new Set(), picks = [];
+  // one move per position added and per player dropped, compared per week so a 4-week gain doesn't outrank this week's lineup
+  for (const m of W.moves) { const p = D.U.get(m.f).pos; if (usedPos.has(p) || (m.d && usedDrop.has(m.d))) continue; usedPos.add(p); if (m.d) usedDrop.add(m.d); picks.push(m); if (picks.length === 3) break; }
+  for (const m of picks) out.push({ gain: m.hz / W.H, tab: 'waivers', title: `Add ${nm(m.f)}${m.d ? `, drop ${nm(m.d)}` : ''}`, detail: esc(m.whyText || '') + '.', gainTxt: `+${f1(m.hz)} pts over ${W.H} wk${W.H > 1 ? 's' : ''}` });
+  out.sort((a, b) => b.gain - a.gain);
+  const weak = W.needs.list.filter(n => n.level === 'Weak' && n.P !== 'K' && n.P !== 'DEF').sort((a, b) => b.worst - a.worst)[0];
+  if (weak) { const r = weak.rows[0]; out.push({ gain: 0, tab: 'waivers', title: `Upgrade ${posLabel(weak.P)}: your weakest spot`, detail: r?.rank ? `Your top ${posLabel(weak.P)} ranks ${posLabel(weak.P)}${r.rank} in a ${state.waivers.teams}-team league. Target one by trade or on waivers.` : `You’re short at ${posLabel(weak.P)}. Target one by trade or on waivers.`, gainTxt: '' }); }
+  return out;
+}
+function movesCard() {
+  const all = bennysMoves(), shown = isPro() ? all : all.slice(0, 2), more = all.length - shown.length;
+  const item = (m, i) => `<li class="mv"><span class="mv-n num">${i + 1}</span><div class="mv-body"><strong>${m.title}</strong><span class="small muted">${m.detail}</span></div>
+    <div class="mv-side">${m.gainTxt ? `<span class="mv-gain num">${m.gainTxt}</span>` : ''}<button type="button" class="btn sm" ${m.decide ? `data-decide="${esc(m.decide)}"` : `data-tab="${m.tab}"`}>${m.decide ? 'Compare' : m.tab === 'waivers' ? 'Waivers' : 'Lineup'}</button></div></li>`;
+  return `<div class="card moves-card"><div class="row-head"><h2>Benny’s Moves</h2><span class="small muted">${all.length ? `The ${all.length === 1 ? 'one thing' : `${all.length} things`} most worth doing for this team, best first` : ''}</span></div>
+    ${all.length ? `<ol class="mv-list">${shown.map(item).join('')}</ol>${more ? lockLine(`${more} more move${more === 1 ? '' : 's'} for your team`) : ''}`
+      : '<p class="small muted" style="margin:0">Nothing to change right now: your lineup is set and no free agent beats your bench.</p>'}</div>`;
+}
 /* The one-line briefing under the header: lineup total, calls to review, best waiver move. */
 function renderBrief() {
   const el = $('#brief'); if (!el) return;
@@ -2410,7 +2624,7 @@ setInterval(renderStatus, 60000);
    Five destinations, each with its own address (#lineup, #start-sit, #waivers, #roster, #research), so Back, refresh
    and shared links land on the same screen. Research has two subpages; Settings is a utility page off the header. */
 const NAV = [['lineup', 'Lineup'], ['compare', 'Start / Sit'], ['waivers', 'Waivers'], ['players', 'Roster'], ['defenses', 'Research']];
-const HASH = { lineup: 'lineup', compare: 'start-sit', waivers: 'waivers', players: 'roster', defenses: 'research', teams: 'research-teams', weather: 'research-weather', settings: 'settings' };
+const HASH = { lineup: 'lineup', compare: 'start-sit', waivers: 'waivers', players: 'roster', defenses: 'research', teams: 'research-teams', weather: 'research-weather', settings: 'settings', pro: 'pro' };
 const TAB_OF = Object.fromEntries(Object.entries(HASH).map(([k, v]) => [v, k]));
 const navOf = tab => tab === 'teams' || tab === 'weather' ? 'defenses' : tab;
 function go(tab, opts = {}) {
@@ -2434,12 +2648,13 @@ function render() {
   document.body.classList.toggle('welcome', welcome);
   if (welcome) {
     for (const s of ['#tabs', '#teamctx', '#panels', '#brief', '#msgs']) $(s).innerHTML = '';
-    renderStatus(); renderAcct(); $('#main').innerHTML = viewWelcome(); return;
+    renderStatus(); renderAcct(); renderAd(); $('#main').innerHTML = viewWelcome(); return;
   }
   const nav = navOf(state.tab);
   $('#tabs').innerHTML = NAV.map(([k, l]) => `<a href="#${HASH[k]}" class="navlink" data-tab="${k}" ${nav === k ? 'aria-current="page"' : ''}>${l}</a>`).join('');
   $('#settingsBtn')?.setAttribute('aria-pressed', String(state.tab === 'settings'));
-  renderStatus(); renderAcct();
+  const pb = $('#proBtn'); if (pb) { pb.hidden = !acct.on; pb.textContent = isPro() ? 'Pro ✓' : 'Go Pro'; pb.classList.toggle('is-pro', isPro()); pb.setAttribute('aria-pressed', String(state.tab === 'pro')); }
+  renderStatus(); renderAcct(); renderAd();
   $('#teamctx').innerHTML = D.loading || D.failed ? '' : teamBar();
   $('#panels').innerHTML = D.acctOpen && acct.on ? accountPanel() : D.loading || D.failed ? '' : D.flow ? flowPanel() : D.tsOpen ? teamSettingsPanel() : D.ioOpen ? sharePanel() : '';
   const msgs = [];
@@ -2455,7 +2670,7 @@ function render() {
   if (D.failed) { renderBrief(); main.innerHTML = `<div class="card panel"><h2>Couldn’t load this week’s data</h2><p style="margin:0">Sleeper and ESPN didn’t respond. Check your connection and press Refresh projections.</p></div>`; return; }
   if (D.loading) { renderBrief(); main.innerHTML = `<div class="card loading"><h3>Loading week ${D.week || ''}</h3><div class="small">Projections, stats and schedules. Past seasons are saved after your first visit.</div><div class="bar"><span id="lbar" style="width:${Math.round(D.progress * 100)}%"></span></div></div>`; return; }
   renderBrief();
-  main.innerHTML = ({ lineup: viewLineup, compare: viewCompare, waivers: viewWaivers, defenses: viewResearch, teams: viewResearch, players: viewPlayers, settings: viewSettings, weather: viewResearch })[state.tab]();
+  main.innerHTML = ({ lineup: viewLineup, compare: viewCompare, waivers: viewWaivers, defenses: viewResearch, teams: viewResearch, players: viewPlayers, settings: viewSettings, weather: viewResearch, pro: viewPro })[state.tab]();
 }
 function injPill(r) {
   const i = r.inj || ''; if (!i) return '';
@@ -2529,10 +2744,10 @@ function detailBlock(r) {
   </div>
   <div class="section">${probTiles(r)}${modelNote()}</div>
   ${researchLinks(r)}
-  <details class="more"><summary>All matchup factors and the math</summary><div class="section">${factorList(r)}${r.scheme ? `<div class="scheme"><strong>Scheme:</strong> ${esc(r.scheme)}</div>` : ''}
+  ${!isPro() ? `<div style="grid-column:1/-1">${lockLine('Every matchup factor, the math and the coaching matchup')}</div>` : `<details class="more"><summary>All matchup factors and the math</summary><div class="section">${factorList(r)}${r.scheme ? `<div class="scheme"><strong>Scheme:</strong> ${esc(r.scheme)}</div>` : ''}
   <div class="math">Sleeper projection ${f1(r.projPts)} · season avg ${f1(h?.avg)} → base ${f1(r.base)} × matchup ${f1(r.mult)} = <strong>${f1(r.base * r.mult)}</strong>${r.override != null ? ` · your override ${f1(r.override)}` : ''}${h?.n ? ` · weekly scores: ${h.pts.map(x => x.toFixed(1)).join(', ')}` : ''}</div>
   </div></details>
-  <details class="more"><summary>Coaching and scheme matchup</summary><div class="section">${schemeBlock(r)}</div></details>
+  <details class="more"><summary>Coaching and scheme matchup</summary><div class="section">${schemeBlock(r)}</div></details>`}
   <div class="ovr" style="grid-column:1/-1"><label for="ov-${esc(r.id)}">Override projection</label><input class="inp" id="ov-${esc(r.id)}" type="number" step="0.1" data-ovr="${esc(r.id)}" value="${r.override ?? ''}" placeholder="${f1(r.base * r.mult)}">${r.override != null ? `<button type="button" class="btn sm" data-clearovr="${esc(r.id)}">Clear</button>` : ''}</div>
   </div>`;
 }
@@ -2578,7 +2793,9 @@ function parseBundle(text) {
 function importBundle(obj, replace) {
   stashTeam();
   let added = 0, replaced = 0, firstId = null; const missed = [], got = new Set();
-  for (const t of obj.teams) {
+  // free keeps one team: the code's first team comes in, in place of the current one if there already is a team
+  const oneTeam = !isPro(), into = oneTeam && !needsTeam() ? curTeam() : null, teams = oneTeam ? obj.teams.slice(0, 1) : obj.teams, skipped = obj.teams.length - teams.length;
+  for (const t of teams) {
     const roster = [];
     for (const [id, name, pos] of t.roster || []) {
       let pid = D.U.has(id) ? id : null;
@@ -2592,6 +2809,7 @@ function importBundle(obj, replace) {
       espn: Object.assign({}, DEFAULT_STATE.espn, t.espn || {}, { slotOf: {} }),
       waivers: Object.assign(JSON.parse(JSON.stringify(DEFAULT_STATE.waivers)), t.waivers || {}) };
     let target = replace ? state.teams.find(x => x.name.toLowerCase() === name.toLowerCase()) : null;
+    if (!target && into) { target = into; data.name = name; }
     if (target) { Object.assign(target, data); replaced++; }
     else {
       let nm = name, n = 2; while (state.teams.some(x => x.name.toLowerCase() === nm.toLowerCase())) nm = `${name} (${n++})`;
@@ -2605,7 +2823,8 @@ function importBundle(obj, replace) {
   if (added) state.teams = state.teams.filter(t => got.has(t.id) || !isPlaceholder(t));
   state.activeTeam = firstId; applyTeam(curTeam());
   D.open.clear(); D.wCache = null; D.delArm = false; computeAll(); syncScoring(); save();
-  return `Imported ${added + replaced} team${added + replaced === 1 ? '' : 's'}${replaced ? ` (${replaced} replaced)` : ''}.` + (missed.length ? ` Not found this week: ${missed.slice(0, 5).join(', ')}${missed.length > 5 ? '…' : ''}.` : '');
+  return `Imported ${added + replaced} team${added + replaced === 1 ? '' : 's'}${replaced ? ` (${replaced} replaced)` : ''}.` + (missed.length ? ` Not found this week: ${missed.slice(0, 5).join(', ')}${missed.length > 5 ? '…' : ''}.` : '')
+    + (skipped || into ? ` Free keeps one team${skipped ? `, so the code’s other ${skipped} team${skipped === 1 ? ' wasn’t' : 's weren’t'} added` : ', so it took the place of your previous team'}; Pro keeps them all.` : '');
 }
 /* ---------- team bar (every page) ----------
    Team chips to switch teams, then one line of context: week, scoring, where the roster comes from, and the team
@@ -2621,7 +2840,7 @@ function teamBar() {
     const tag = t.sleeper?.leagueId ? 'Sleeper' : `${(t.roster || []).length} players`;
     return `<button type="button" class="tchip" data-fteam="${esc(t.id)}" aria-pressed="${t.id === state.activeTeam}" title="${esc(t.name)}"><span class="tn">${esc(t.name)}</span><span class="tm">${esc(tag)}</span></button>`;
   }).join('');
-  return `<div class="tb-teams" role="group" aria-label="Your teams">${chips}<button type="button" class="tchip add" data-act="flow" data-method="sleeper" data-dest="new">+ Add team</button></div>
+  return `<div class="tb-teams" role="group" aria-label="Your teams">${chips}${canAddTeam() ? '<button type="button" class="tchip add" data-act="flow" data-method="sleeper" data-dest="new">+ Add team</button>' : '<a href="#pro" class="tchip add locked" data-tab="pro" title="More than one team is part of Pro">+ Add team <span class="tm">🔒 Pro</span></a>'}</div>
   <div class="tb-ctx">
     <span class="tb-item"><label for="weekSel" class="muted">Week</label> <select id="weekSel" class="sel sm" ${D.snapshot ? 'disabled' : ''}>${weekOptions()}</select></span>
     <span class="tb-item">${esc(fmtName())}</span>
@@ -2690,6 +2909,8 @@ function accountPanel() {
   }
   if (acct.user) return `<div class="card panel acct"><div class="row-head"><h2>Account <span class="hsub">${esc(acct.user.email || '')}</span></h2>${close}</div>
     <p style="margin:0">Your teams, settings and Benny’s weekly lineups sync to this account. Sign in with the same email on your phone or computer to see them there. <span id="acctSync" class="muted">${esc(syncText())}</span></p>
+    <div class="acct-plan">${isPro() ? `<span class="pill n">Pro</span> <span>${esc(proLine(acct.pro))}</span>${acct.pro?.plan === 'monthly' || subActive() ? ' <button type="button" class="linkbtn" data-act="billing">Manage billing</button>' : ''}`
+      : `<span class="pill m">Free</span> <span>No ads and every one of Benny’s moves with Pro.</span> <a href="#pro" data-tab="pro">See Pro</a>`}</div>
     ${msg}
     <div class="toolbar"><button type="button" class="btn" data-act="acctsync">Sync now</button><button type="button" class="btn" data-act="acctout">Sign out</button>
       <button type="button" class="btn danger" data-act="acctdel">${acct.delArm ? 'Press again to delete your account' : 'Delete account'}</button></div>
@@ -2749,7 +2970,72 @@ function viewWelcome() {
     ${step(1, 'Bring in your team', 'Pick how your league is set up. You’ll review everything before it’s saved.', true)}
     ${body}
     ${acct.on && !acct.user ? step(2, 'Keep it on all your devices', 'Optional: sign in after your team is saved.', false) : ''}
+    <div class="small muted">By using Benny’s Picks you agree to the <a href="terms.html">Terms</a>. <a href="privacy.html">Privacy</a>.</div>
   </div>`;
+}
+
+/* ---------- Free vs Pro: lock lines and the Pro page ---------- */
+// where a free user reaches something Pro adds: say what's there and link to the Pro page
+const lockLine = text => `<a href="#pro" class="lock" data-tab="pro"><span class="lock-ico" aria-hidden="true">🔒</span><span class="lock-txt">${text}</span><span class="lock-cta">Unlock with Pro · ${PRO_PRICE.season}/season</span></a>`;
+const PRO_FEATURES = [
+  ['All of Benny’s Moves', 'Every lineup change, pickup and drop for your team, ranked by points gained.'],
+  ['Full waiver recommendations', 'Every add/drop move that improves your roster, not just the top two.'],
+  ['Full lineup analysis', 'Safe and Boom lineups for when you’re favored or the underdog, plus every matchup factor, the math and the coaching matchup.'],
+  ['Every start/sit call', 'All of this week’s close decisions, not just the first one.'],
+  ['Multiple teams', 'Every league you play in, in one place.'],
+  ['No ads', 'Anywhere on Benny’s Picks.'],
+];
+const PRO_SOON = 'Coming to Pro: a trade analyzer that looks at your whole roster, rest-of-season and playoff tools.';
+function viewPro() {
+  const pro = isPro(), p = acct.pro, busy = D.proBusy;
+  const msg = D.proMsg ? `<div class="banner ${D.proMsg[0] === 'err' ? 'err' : 'info'}" role="status">${esc(D.proMsg[1])}</div>` : '';
+  const feats = `<ul class="pro-feats">${PRO_FEATURES.map(([t, d]) => `<li><strong>${t}</strong><span class="small muted">${d}</span></li>`).join('')}</ul><p class="small muted" style="margin:0">${PRO_SOON}</p>`;
+  const buy = (plan, label, cls) => `<button type="button" class="btn ${cls}" data-act="buy" data-plan="${plan}" ${busy || !acct.on ? 'disabled' : ''}>${busy === plan ? 'Opening checkout…' : label}</button>`;
+  const plans = pro ? `<div class="card panel pro-have"><div class="row-head"><h3>You’re Pro</h3><span class="pill n">Pro</span></div><p style="margin:0">${esc(proLine(p))}. Thanks for supporting Benny’s Picks!</p>
+      <div class="toolbar">${p?.plan === 'monthly' || subActive() ? '<button type="button" class="btn" data-act="billing">Manage billing</button>' : ''}${p?.plan === 'monthly' ? buy('season', `Switch to the Season Pass · ${PRO_PRICE.season}`, '') : ''}</div>
+      ${p?.plan === 'monthly' ? '<p class="small muted" style="margin:0">Switching ends your monthly plan when the time you’ve paid for runs out, so you never pay twice.</p>' : ''}</div>`
+    : `<div class="plans">
+      <div class="card plan best"><span class="pill n plan-tag">Best value</span><h3>Season Pass</h3><div class="price num">${PRO_PRICE.season}<span>/season</span></div>
+        <p class="small muted">One payment. Pro through ${SEASON_END_LABEL}, playoffs included.</p>${buy('season', 'Get the Season Pass', 'primary')}</div>
+      <div class="card plan"><h3>Monthly</h3><div class="price num">${PRO_PRICE.monthly}<span>/month</span></div>
+        <p class="small muted">Cancel anytime. Three months costs about what the Season Pass does.</p>${buy('monthly', 'Go monthly', '')}</div></div>
+      ${!acct.on ? '<p class="small muted">Pro is coming soon.</p>' : !acct.user ? '<p class="small muted">You’ll sign in first (email code or Google, no password) so Pro follows you to every device.</p>' : ''}`;
+  return `<div class="section pro-page">
+    <div class="pro-hero"><span class="label">Benny’s Picks Pro</span><h2>Benny does more of the work for you</h2>
+      <p>Free shows what the data says. Pro tells you what to do about it: every move for your team, the full analysis behind each call, all your leagues and no ads.</p></div>
+    ${msg}${plans}
+    <div class="card panel"><h3>What Pro adds</h3>${feats}</div>
+    <div class="card panel"><h3>Always free</h3><p class="small" style="margin:0">Player research and search, weekly projections, matchups and weather, your team’s optimized lineup, Team Grade, Benny’s top two moves, Benny’s Pick for any two players, the best waiver move, and syncing your team across devices.</p></div>
+    <p class="small muted">Payments are handled by Stripe; Benny’s Picks never sees your card. <a href="terms.html">Terms</a> · <a href="privacy.html">Privacy</a></p>
+  </div>`;
+}
+
+/* ---------- ads (free users only) ----------
+   One slot above the page content on research-style pages (Waivers, Start / Sit, Research, Roster), none on Lineup, the
+   welcome, Settings or Pro. It changes only when the page changes, never on clicks within a page. Until Google approves
+   the site for AdSense it shows Benny's own promotions; fill in ADS to switch to AdSense. Pro members get no slot and the
+   ad script never loads for them. */
+const ADS = { client: '', slot: '' };   // AdSense publisher ID ('ca-pub-…') and display ad unit ID, once approved
+const AD_TABS = new Set(['waivers', 'compare', 'defenses', 'teams', 'weather', 'players']);
+const HOUSE_ADS = [
+  ['No ads. All of Benny’s moves.', 'Pro unlocks every lineup change, pickup and drop for your team.', `${PRO_PRICE.season} for the whole season`],
+  ['Play in more than one league?', 'Pro keeps every team in one place, each with its own lineup, waivers and moves.', 'See Pro'],
+  ['Every close call, explained', 'Pro shows all of this week’s start/sit decisions and the full math behind each one.', 'See Pro'],
+];
+function renderAd() {
+  const el = $('#adSlot'); if (!el) return;
+  const show = acct.on && !D.welcome && !D.loading && !D.failed && !isPro() && AD_TABS.has(state.tab) && location.hash !== '#export';
+  if (!show) { if (!el.hidden) { el.hidden = true; el.innerHTML = ''; } D.adFor = null; return; }
+  if (D.adFor === state.tab) return;
+  D.adFor = state.tab; el.hidden = false;
+  if (ADS.client && ADS.slot) {
+    el.innerHTML = `<span class="ad-label">Advertisement</span><ins class="adsbygoogle" style="display:block" data-ad-client="${esc(ADS.client)}" data-ad-slot="${esc(ADS.slot)}" data-ad-format="horizontal" data-full-width-responsive="true"></ins>`;
+    if (!D.adsLoaded) { D.adsLoaded = true; const s = document.createElement('script'); s.async = true; s.crossOrigin = 'anonymous'; s.src = 'https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=' + encodeURIComponent(ADS.client); document.head.appendChild(s); }
+    try { (window.adsbygoogle = window.adsbygoogle || []).push({}); } catch {}
+  } else {
+    const [t, d, cta] = HOUSE_ADS[D.houseAd = ((D.houseAd ?? -1) + 1) % HOUSE_ADS.length];
+    el.innerHTML = `<a href="#pro" class="house" data-tab="pro"><span class="ad-label">Benny’s Picks Pro</span><strong>${t}</strong><span class="small">${d}</span><span class="btn sm primary">${cta}</span></a>`;
+  }
 }
 
 /* ---------- one setup flow ----------
@@ -2759,6 +3045,7 @@ const FLOW_METHODS = [['sleeper', 'Connect Sleeper'], ['espn', 'Import ESPN'], [
 D.drafts = D.drafts || {};   // unfinished text in the flow survives closing it and moving between pages
 function openFlow(method, dest, espnMode) {
   D.tsOpen = false; D.ioOpen = false; D.acctOpen = false; D.flash = null;
+  if (dest === 'new' && !canAddTeam()) dest = 'replace';   // a second team is Pro; the flow still lets them replace this one
   D.flow = { method: method || 'sleeper', dest: dest || 'replace', step: 'pick', espnMode: espnMode || D.flow?.espnMode || 'league', manual: D.flow?.manual || [], draft: null, msg: null };
   render(); revealPanel($('.flow'));
   deskFocus({ sleeper: '#slQuery', espn: D.flow.espnMode === 'paste' ? '#rosterPaste' : '#leagueId', manual: '#mq', restore: '#ioIn' }[D.flow.method]);
@@ -2834,8 +3121,8 @@ function reviewHTML() {
         <label class="small muted" for="flowTep">TE premium</label><select class="sel" id="flowTep">${[0, 0.25, 0.5, 0.75, 1].map(v => `<option value="${v}" ${+d.tePrem === v ? 'selected' : ''}>${v ? '+' + v : 'None'}</option>`).join('')}</select></span></div>
       <div class="field"><span class="label">Lineup slots</span><div class="small">${esc(slotsSummary(d.slots))}</div><div class="small muted">Change these anytime in Team settings.</div></div>
       ${needsTeam() ? '' : `<fieldset class="field rv-dest"><legend class="label">Save to</legend>
-        <label><input type="radio" name="flowDest" value="new" ${destReplace ? '' : 'checked'}> Create a new team</label>
-        <label><input type="radio" name="flowDest" value="replace" ${destReplace ? 'checked' : ''}> Replace ${esc(ct.name)}’s roster (${state.roster.length} players)</label></fieldset>`}
+        <label><input type="radio" name="flowDest" value="new" ${destReplace || !canAddTeam() ? '' : 'checked'} ${canAddTeam() ? '' : 'disabled'}> Create a new team${canAddTeam() ? '' : ' <a href="#pro" data-tab="pro" class="small">🔒 Pro</a>'}</label>
+        <label><input type="radio" name="flowDest" value="replace" ${destReplace || !canAddTeam() ? 'checked' : ''}> Replace ${esc(ct.name)}’s roster (${state.roster.length} players)</label></fieldset>`}
     </div></div>
     <div class="toolbar"><button type="button" class="btn primary" data-act="flowsave" ${d.roster.length ? '' : 'disabled'}>Save team</button><button type="button" class="btn" data-act="flowback">Back</button></div>`;
 }
@@ -2851,7 +3138,7 @@ function commitDraft() {
     D.drafts.code = ''; D.flow = null; D.flash = { html: `<strong>${esc(msg)}</strong> <a href="#roster" data-tab="players">Edit roster</a>` }; slAutoSync(true); return afterSave();
   }
   if (!d.roster.length) return;
-  const dest = D.welcome ? 'replace' : $('input[name=flowDest]:checked')?.value || F.dest, name = ($('#flowName')?.value || d.name || 'My team').trim().slice(0, 40) || 'My team';
+  const pick = D.welcome ? 'replace' : $('input[name=flowDest]:checked')?.value || F.dest, dest = pick === 'new' && !canAddTeam() ? 'replace' : pick, name = ($('#flowName')?.value || d.name || 'My team').trim().slice(0, 40) || 'My team';
   const data = { roster: d.roster.slice(), compare: [null, null], scoring: $('#flowScoring')?.value || d.scoring, tePrem: +($('#flowTep')?.value ?? d.tePrem) || 0,
     slots: Object.assign({}, DEFAULT_STATE.slots, d.slots), sleeper: d.sleeper || null, espn: Object.assign({}, DEFAULT_STATE.espn, d.espn || {}),
     waivers: Object.assign(JSON.parse(JSON.stringify(DEFAULT_STATE.waivers)), dest === 'replace' ? JSON.parse(JSON.stringify(state.waivers)) : {}, d.waivers || {}) };
@@ -3025,9 +3312,10 @@ function lineupBody() {
   const tagged = r => r && r.inj && r.status !== 'bye', empty = starters.length - st.length;
   const startTags = st.filter(x => tagged(x.r)).map(x => x.r), benchTags = bench.filter(tagged);
   const tagTxt = list => list.slice(0, 3).map(r => `${shortName(r.id)} ${r.inj === 'Questionable' ? 'Q' : r.inj === 'Doubtful' ? 'D' : r.inj}`).join(', ') + (list.length > 3 ? '…' : '');
-  const strat = state.settings.strategy, sLab = { mean: 'Projected', floor: 'Safe (low end)', ceil: 'Boom (high end)' };
+  const strat = strategy(), sLab = { mean: 'Projected', floor: 'Safe (low end)', ceil: 'Boom (high end)' };
   const head = `<div class="prow lhead" aria-hidden="true"><span class="label">Slot</span><span class="label">Player</span><span class="label">Opponent</span><span class="label" title="Matchup grade: how this week’s matchup moves each player from his own baseline. It doesn’t rank players.">Matchup</span><span class="label" style="text-align:right">Proj</span><span class="label" style="text-align:right" title="Middle half of outcomes (25th–75th percentile). Scores can land outside it.">Likely range</span><span class="label" style="text-align:right" title="Model estimate of the chance he beats his season average">Beat avg</span></div>`;
   return `<div class="section">
+  <div class="gm-row">${gradeCard()}${movesCard()}</div>
   <div class="summary">
     <div><span class="label">Starters project</span><span class="big num">${f1(mu)}</span><span class="small muted">${fmtName()} points, week ${D.week}</span></div>
     <div><span class="label">Likely range</span><span class="big num">${f0(mu - 0.674 * sdT)}–${f0(mu + 0.674 * sdT)}</span><span class="small muted">middle 50% of outcomes</span></div>
@@ -3035,7 +3323,7 @@ function lineupBody() {
     <div><span class="label">Injury alerts</span><span class="big num">${startTags.length}<span class="small muted" style="font-family:var(--font-body);font-size:14px;font-weight:400"> starter${startTags.length === 1 ? '' : 's'} · ${benchTags.length} bench</span></span><span class="small muted">${startTags.length ? 'Starting: ' + esc(tagTxt(startTags)) : 'No starters tagged'}${benchTags.length ? ' · Bench: ' + esc(tagTxt(benchTags)) : ''}${empty ? ` · ${empty} empty slot${empty === 1 ? '' : 's'}` : ''}</span></div>
   </div>
   ${D.histOpen ? histPanel() : ''}
-  <div class="row-head"><h2>Start</h2><span class="toolbar"><button type="button" class="btn sm" data-act="hist" aria-expanded="${!!D.histOpen}">Past weeks</button><span class="seg" role="group" aria-label="Strategy">${['mean', 'floor', 'ceil'].map(k => `<button type="button" data-strategy="${k}" aria-pressed="${strat === k}">${{ mean: 'Projected', floor: 'Safe', ceil: 'Boom' }[k]}</button>`).join('')}</span></span></div>
+  <div class="row-head"><h2>Start</h2><span class="toolbar"><button type="button" class="btn sm" data-act="hist" aria-expanded="${!!D.histOpen}">Past weeks</button><span class="seg" role="group" aria-label="Strategy">${['mean', 'floor', 'ceil'].map(k => k === 'mean' || isPro() ? `<button type="button" data-strategy="${k}" aria-pressed="${strat === k}">${{ mean: 'Projected', floor: 'Safe', ceil: 'Boom' }[k]}</button>` : `<button type="button" data-tab="pro" title="Safe and Boom lineups are part of Pro">${{ floor: 'Safe', ceil: 'Boom' }[k]} <span aria-hidden="true">🔒</span></button>`).join('')}</span></span></div>
   <div class="card list">${head}${starters.map(s => s.r ? playerRow(s.r, s.slot.label || s.slot.k, true) : `<div class="item"><div class="prow"><span class="slot">${esc(s.slot.label || s.slot.k)}</span><span class="pwho muted">No eligible player. <a href="#roster" data-tab="players">Add one in Roster</a>.</span></div></div>`).join('')}</div>
   <div class="row-head"><h2>Bench</h2><span class="small muted">Tap any player for the full matchup breakdown</span></div>
   <div class="card list">${bench.length ? bench.map(r => playerRow(r, 'BN', false)).join('') : '<div class="item"><div class="prow"><span></span><span class="muted">Nobody on the bench.</span></div></div>'}</div>
@@ -3069,14 +3357,14 @@ function viewCompare() {
       ${gnote ? `<div class="pick-note">${esc(gnote)}</div>` : ''}
       ${modelNote()}</div>`;
   }
-  const dec = reviewDecisions();
-  const decBar = dec.length ? `<div class="decisions"><span class="label">Decisions to review</span>${dec.map(d => { const s = D.M[d.start], b = D.M[d.alt], on = a === d.start && Bp?.id === d.alt; return `<button type="button" class="chip dchip" data-decide="${esc(d.start)}|${esc(d.alt)}" aria-pressed="${on}">${esc(d.slot)}: ${esc(shortName(s.id))} or ${esc(shortName(b.id))}${d.tagged ? ` <span class="pill q">${esc(s.inj === 'Questionable' ? 'Q' : 'D')}</span>` : ''}</button>`; }).join('')}</div>` : '';
+  const dec = reviewDecisions(), decShown = isPro() ? dec : dec.slice(0, 1), decMore = dec.length - decShown.length;
+  const decBar = dec.length ? `<div class="decisions"><span class="label">Decisions to review</span>${decShown.map(d => { const s = D.M[d.start], b = D.M[d.alt], on = a === d.start && Bp?.id === d.alt; return `<button type="button" class="chip dchip" data-decide="${esc(d.start)}|${esc(d.alt)}" aria-pressed="${on}">${esc(d.slot)}: ${esc(shortName(s.id))} or ${esc(shortName(b.id))}${d.tagged ? ` <span class="pill q">${esc(s.inj === 'Questionable' ? 'Q' : 'D')}</span>` : ''}</button>`; }).join('')}${decMore ? lockLine(`${decMore} more close call${decMore === 1 ? '' : 's'} this week`) : ''}</div>` : '';
   const col = r => { if (!r) return `<div class="card small muted">Pick a player.</div>`; const why = topReasons(r);
     return `<div class="card"><div><div class="pname" style="font-size:18px">${esc(r.u.name)}</div><div class="psub">${r.pos} · ${r.T} ${injPill(r)} · <span title="${esc(gradeTip(r))}">matchup grade ${r.grade}</span></div></div>${matchCell(r)}
     <div class="probs"><div><span class="label">Projection</span><span class="num">${r.status === 'bye' ? 'Bye' : f1(r.mean)}</span></div><div><span class="label">Likely range</span><span class="num">${f1(r.floor)}–${f1(r.ceil)}</span></div></div>
     ${why.length ? `<ul class="reasons">${why.map(x => `<li class="${x.up ? 'up' : 'down'}"><span class="rv">${spct(x.pct)}</span> ${esc(x.text)}</li>`).join('')}</ul>` : ''}
-    <details class="more"><summary>All factors</summary>${factorList(r)}${r.scheme ? `<div class="scheme"><strong>Scheme:</strong> ${esc(r.scheme)}</div>` : ''}</details>
-    <details class="more"><summary>Coaching and scheme matchup</summary>${schemeBlock(r)}</details></div>`; };
+    ${isPro() ? `<details class="more"><summary>All factors</summary>${factorList(r)}${r.scheme ? `<div class="scheme"><strong>Scheme:</strong> ${esc(r.scheme)}</div>` : ''}</details>
+    <details class="more"><summary>Coaching and scheme matchup</summary>${schemeBlock(r)}</details>` : lockLine('Every matchup factor and the coaching matchup')}</div>`; };
   return `<div class="section"><datalist id="plist">${playerOptions()}</datalist>${decBar}<div class="cmp"><div class="field"><label class="label" for="cmp0">Player A</label>${pick(0, A)}</div><div class="field"><label class="label" for="cmp1">Player B</label>${pick(1, Bp)}</div></div>${verdict}<h2>Side by side</h2><div class="cmp">${col(A)}${col(Bp)}</div></div>`;
 }
 /* Two or three plain reasons for a pick: the projection gap, then the biggest matchup factors in the winner's favor
@@ -3201,7 +3489,7 @@ document.addEventListener('click', e => {
   if (t.dataset.hweek) { D.histWeek = D.histWeek === t.dataset.hweek ? null : t.dataset.hweek; render(); return; }
   if (t.dataset.research) { e.preventDefault(); D.teamOpen = t.dataset.research; D.after = () => $(`[data-team="${D.teamOpen}"]`)?.scrollIntoView({ block: 'center' }); go('teams'); return; }
   if (t.dataset.wrank) { state.waivers.rank = t.dataset.wrank; save(); render(); return; }
-  if (t.dataset.decide) { state.compare = t.dataset.decide.split('|'); save(); render(); return; }
+  if (t.dataset.decide) { state.compare = t.dataset.decide.split('|'); save(); if (state.tab !== 'compare') go('compare'); else render(); return; }
   if (t.dataset.brief === 'decide') { const d = reviewDecisions()[0]; if (d) state.compare = [d.start, d.alt]; save(); go('compare'); return; }
   if (t.dataset.brief === 'waiver') { D.after = () => revealPanel($('.wbest')); go('waivers'); return; }
   if (t.dataset.fteam) { switchTeam(t.dataset.fteam); return; }
@@ -3249,6 +3537,8 @@ document.addEventListener('click', e => {
     render(); if (D.acctOpen) { revealPanel($('.acct')); deskFocus(acct.step === 'code' ? '#acctCode' : '#acctEmail'); }
   }
   else if (a === 'wsignin') { D.wSignin = !D.wSignin; acct.msg = null; if (D.wSignin) cloudReady().catch(() => {}); render(); if (D.wSignin) deskFocus(acct.step === 'code' ? '#acctCode' : '#acctEmail'); }
+  else if (a === 'buy') goPro(t.dataset.plan);
+  else if (a === 'billing') openBilling();
   else if (a === 'wskip') { store.set('fo1:nudge', 'show'); D.onboard = null; go('lineup', { keepFlash: true }); }
   else if (a === 'nudgeoff') { store.set('fo1:nudge', 'done'); render(); }
   else if (a === 'acctsend') sendCode();
@@ -3299,6 +3589,7 @@ document.addEventListener('click', e => {
     if (!D.resetArm) { D.resetArm = true; render(); setTimeout(() => { D.resetArm = false; if (state.tab === 'settings') render(); }, 4000); return; }
     try { Object.keys(localStorage).filter(k => k.startsWith('fo1:')).forEach(k => localStorage.removeItem(k)); } catch {}
     if (acct.user) { acct.sb.auth.signOut({ scope: 'local' }).catch(() => {}); acct.user = null; acct.ready = false; acct.choice = null; clearTimeout(acct.pushT); }
+    acct.pro = acct.bootPro = null;
     state = ensureTeams(JSON.parse(JSON.stringify(DEFAULT_STATE))); D.hist = null; primeSigs(); D.resetArm = false; D.open.clear(); load({ fresh: true });
   }
 });

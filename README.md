@@ -10,7 +10,11 @@ A free weekly lineup optimizer for ESPN fantasy football. It sets your best line
 
 The site has five sections, plus Settings in the header:
 
-- **Lineup:** who should I start this week? Benny picks the starters that score the most for your lineup slots and benches anyone on bye, ruled out, or on IR. Each player gets a matchup grade (A–F), a projected score with a likely range, and the chance of beating his season average. Tap a player for the three biggest reasons, with the full breakdown and coaching profiles one tap further. **Past weeks** shows Benny's lineup from each earlier week, what it projected and what it scored.
+- **Lineup:** who should I start this week? At the top:
+  - **Benny Grade** scores your roster out of 100, with its strongest and weakest positions.
+  - **Benny's Moves** lists the most useful things to do: lineup changes against the lineup set in Sleeper or ESPN, pickups and drops, and your weakest spot, ranked by points gained.
+
+  Below that, Benny picks the starters that score the most for your lineup slots and benches anyone on bye, ruled out, or on IR. Each player gets a matchup grade (A–F), a projected score with a likely range, and the chance of beating his season average. Tap a player for the three biggest reasons, with the full breakdown and coaching profiles one tap further. **Past weeks** shows Benny's lineup from each earlier week, what it projected and what it scored.
 - **Start / Sit:** which of these two players should I choose? **Benny's Pick** names the start, the chance he outscores the other player, the projected edge, and the reasons why. It opens on your closest calls.
 - **Waivers:** which available players improve my team? Add/drop moves ranked by the expected lineup points they add over the window you choose, using each player's schedule. Injured players worth keeping are never suggested as drops, and bench depth counts as injury cover.
 - **Roster:** who's on my team, and how do I change it? Search every player as you type, add or remove (with Undo), filter by position, and set projection overrides under Advanced.
@@ -50,7 +54,26 @@ If you sign in, the site also keeps a copy in its database so every device you s
 - your overrides and settings;
 - Benny's weekly lineups.
 
-Only you can read them. **Sign out** removes them from that browser but keeps them in your account. **Delete account** erases everything.
+Only you and the site's owner can read them. **Sign out** removes them from that browser but keeps them in your account. **Delete account** erases everything.
+
+If you buy Pro, Stripe handles the payment; Benny's Picks never sees your card and stores only your plan and its end date. Free users see ads: Benny's own promotions, and Google ads once AdSense is set up. The details are in the [privacy policy](privacy.html) and [terms](terms.html).
+
+## Free and Pro
+
+Benny's Picks is free, with ads. **Pro** ($4.99/month, or $14.99 for the whole season) does more of the work for you. Pro is tied to your account, so you sign in first, and it works on every device you sign in on.
+
+| | Free | Pro |
+|---|---|---|
+| Player research, projections, matchups, weather | ✓ | ✓ |
+| Your optimized lineup, Team Grade, Benny's Pick for any two players | ✓ | ✓ |
+| Benny's Moves (lineup changes, pickups and drops, best first) | top 2 | all |
+| Waiver moves for your roster | best 2 | all |
+| This week's close start/sit calls | first 1 | all |
+| Safe and Boom lineups, every matchup factor and the math | | ✓ |
+| Teams | 1 | unlimited |
+| Ads | yes | none |
+
+The Pro checks run in your browser, like the rest of the app. Payments go only through Stripe, and Pro is granted only by Stripe's confirmation. [`supabase/README.md`](supabase/README.md) covers setting up Stripe and AdSense.
 
 ## Data sources
 
