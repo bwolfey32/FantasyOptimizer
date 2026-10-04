@@ -24,12 +24,12 @@ ul { padding-left: 20px; }
 <div class="wrap">
   <a class="home" href="./"><img src="assets/icon-192.png" alt="">Benny’s Picks</a>
   <h1>Privacy Policy</h1>
-  <p class="muted">Last updated October 3, 2026</p>
+  <p class="muted">Last updated October 4, 2026</p>
 
   <p>Benny’s Picks (“we”) is a fantasy football lineup tool at bennyspicks.us, run by Ben Wolfe. This page explains what we collect and why. Questions: benjimanwolfe@gmail.com.</p>
 
   <h2>Without an account</h2>
-  <p>Your teams, settings and saved lineups are stored only in your own browser (its local storage). We don’t receive them. To show projections, your browser loads public data directly from Sleeper, ESPN and Open-Meteo, so those services see a normal web request from you, as they would when you visit them.</p>
+  <p>Your teams, settings and saved lineups are stored only in your own browser (its local storage). We don’t receive them. To show projections, your browser loads public data directly from Sleeper, ESPN and Open-Meteo, so those services see a normal web request from you, as they would when you visit them. We do count how the site is used; see Analytics below.</p>
 
   <h2>With an account</h2>
   <ul>
@@ -42,13 +42,23 @@ ul { padding-left: 20px; }
   <h2>Payments (Pro)</h2>
   <p>Payments are processed by Stripe. Your card details go directly to Stripe; we never see or store them. We keep a record of your plan (monthly or season pass), its status and when it ends, plus the Stripe customer ID that links your account to your payments. Stripe’s own privacy policy covers what Stripe collects.</p>
 
+  <h2>Analytics</h2>
+  <p>To learn which features help and where people get stuck, we record a short list of actions with PostHog, an analytics service. For example: a visit and the link or campaign that brought you, starting and finishing team setup (and, if it fails, what kind of problem it was, such as “league is private”), seeing your lineup, opening a player breakdown, using Start / Sit or Waivers, and the steps of upgrading to Pro.</p>
+  <ul>
+    <li><strong>What comes with each action:</strong> phone or computer, free or Pro, signed in or not, the NFL week, and simple details such as the import method, scoring format or number of players. PostHog also receives your IP address, as any website does, and we keep it along with the approximate location it indicates (country, region and city), to see where visitors come from.</li>
+    <li><strong>What we never record:</strong> your name, your email address, your rosters or player names, league IDs or usernames, anything you type, or payment details. We don’t record your screen or your clicks in general, and we don’t use your location for anything but these counts.</li>
+    <li><strong>How visits are linked:</strong> a random ID saved in your browser’s local storage (no cookies). If you sign in, it’s linked to your account’s internal ID, not your email, so your activity is counted together across devices. Signing out starts a new random ID.</li>
+    <li><strong>Payments:</strong> when Stripe confirms a Pro purchase, our server records the plan and amount under the same internal ID.</li>
+    <li><strong>Opting out:</strong> analytics is off if your browser sends Do Not Track or Global Privacy Control. You can also <a href="./?analytics=off">turn it off for this browser</a> (<a href="./?analytics=on">turn it back on</a>).</li>
+  </ul>
+
   <h2>Advertising</h2>
   <p>Free users see ads. Until our advertising partner is set up, these are only our own promotions for Pro, which use no cookies or tracking. Once we use Google AdSense, Google and its partners may use cookies to show and measure ads, including ads based on your visits to this and other sites. You can manage ad personalization at <a href="https://adssettings.google.com">adssettings.google.com</a>. Visitors in the EEA, UK and Switzerland are asked for consent first. Pro members see no ads, and the ad code isn’t loaded for them.</p>
 
   <h2>What we don’t do</h2>
   <ul>
     <li>We don’t sell your personal information.</li>
-    <li>We don’t use analytics or tracking scripts beyond the advertising described above.</li>
+    <li>We don’t use tracking scripts beyond the analytics and advertising described above, and we don’t share analytics data with advertisers.</li>
   </ul>
 
   <h2>Children</h2>

@@ -1,7 +1,8 @@
 // Stripe calls this after a payment or a subscription change; it is the only thing that grants or ends Pro.
 // Deploy with "Enforce JWT verification" OFF: Stripe can't send a Supabase token, so the request is trusted only after its
 // Stripe signature checks out. Events: checkout.session.completed, customer.subscription.updated, customer.subscription.deleted.
-// Secrets: STRIPE_SECRET_KEY, STRIPE_WEBHOOK_SECRET, SEASON_END (e.g. 2027-02-28T23:59:59Z).
+// Secrets: STRIPE_SECRET_KEY, STRIPE_WEBHOOK_SECRET, SEASON_END (e.g. 2027-02-28T23:59:59Z), and optionally POSTHOG_KEY
+// (the site's public PostHog project key) to record confirmed payments in analytics.
 import Stripe from 'npm:stripe@18.0.0';
 import { createClient } from 'npm:@supabase/supabase-js@2';
 
@@ -29,6 +30,16 @@ async function save(userId: string, fields: Record<string, unknown>) {
   const row = { user_id: userId, ...fields, pro_until: s || m ? new Date(Math.max(s, m)).toISOString() : null, plan: s || m ? (s >= m ? 'season' : 'monthly') : null };
   const { error } = await admin.from('entitlements').upsert(row, { onConflict: 'user_id' });
   if (error) throw error;
+}
+
+// Analytics: a paid or ended plan, under the account's internal id (the same id the site uses after sign-in; never the
+// email). Best effort: a slow or failed PostHog call never fails the webhook.
+async function track(userId: string, event: string, properties: Record<string, unknown>) {
+  const key = Deno.env.get('POSTHOG_KEY'); if (!key) return;
+  try {
+    await fetch('https://us.i.posthog.com/i/v0/e/', { method: 'POST', headers: { 'Content-Type': 'application/json' }, signal: AbortSignal.timeout(3000),
+      body: JSON.stringify({ api_key: key, event, distinct_id: userId, properties: { ...properties, source: 'stripe_webhook' } }) });
+  } catch (e) { console.error('analytics', e); }
 }
 
 function subFields(s: Stripe.Subscription) {
@@ -59,15 +70,20 @@ Deno.serve(async (req) => {
           const sub = await stripe.subscriptions.update(cur.stripe_subscription_id, { cancel_at_period_end: true }).catch(() => null);
           if (sub) await save(userId, subFields(sub));
         }
+        await track(userId, 'payment_confirmed', { plan: 'season', amount: (s.amount_total ?? 0) / 100, currency: s.currency, upgraded_from_monthly: !!cur?.stripe_subscription_id });
       } else if (s.mode === 'subscription' && s.subscription) {
         const sub = await stripe.subscriptions.retrieve(typeof s.subscription === 'string' ? s.subscription : s.subscription.id);
         await save(userId, { stripe_customer_id: customer, ...subFields(sub) });
+        await track(userId, 'payment_confirmed', { plan: 'monthly', amount: (s.amount_total ?? 0) / 100, currency: s.currency });
       }
     } else if (event.type === 'customer.subscription.updated' || event.type === 'customer.subscription.deleted') {
       const sub = event.data.object as Stripe.Subscription;
       const customer = typeof sub.customer === 'string' ? sub.customer : sub.customer.id;
       const userId = await userFor(customer, sub.metadata?.user_id);
-      if (userId) await save(userId, subFields(sub));
+      if (userId) {
+        await save(userId, subFields(sub));
+        if (event.type === 'customer.subscription.deleted') await track(userId, 'subscription_ended', { plan: 'monthly' });
+      }
     }
     return new Response('ok', { status: 200 });
   } catch (e) {

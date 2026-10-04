@@ -795,6 +795,45 @@ const CLOUD = { url: 'https://hwfppigktdpjmnfretgo.supabase.co', key: 'sb_publis
 const SB_LIB = { src: 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.117.2/dist/umd/supabase.js', sri: 'sha384-Rj26LVGvoeRVR6+mwQmFfcR3QOBEwT+ZmuCWpuiqeTzJpCs0ER4ITAWGb4Hiy3Ok' };
 const acct = { on: !!(CLOUD.url && CLOUD.key) && location.hash !== '#export', sb: null, lib: null, user: null, ready: false, sync: 'ok', rev: 0, h: null, hs: {}, at: 0, pulledAt: 0, histAt: 0,
   busy: false, again: false, retries: 0, pushT: null, choice: null, step: 'email', email: '', code: '', msg: null, delArm: false, toastNext: false };
+
+/* ---------- analytics ----------
+   PostHog with a short list of named events: no automatic click capture, no session recordings and no cookies (the
+   visitor ID lives in localStorage). Events carry categories and counts only, never names, emails, rosters, league IDs
+   or anything typed. After sign-in the visitor is linked to the account's internal ID. Analytics stays off for the
+   data-refresh export, on localhost, with Do Not Track or Global Privacy Control, and in any browser that has opened the
+   site with ?analytics=off (?analytics=on undoes it). The library loads after the first render. Payments are recorded
+   by the Stripe webhook, not here. */
+const PH = { key: 'phc_w2pVgo7e9LxeAKLXUemtyXDRWZfgVE29UtvBm3fKX3HQ', host: 'https://us.i.posthog.com', lib: 'https://cdn.jsdelivr.net/npm/posthog-js@1.435.8/dist/module.js' };
+const anFlag = new URLSearchParams(location.search).get('analytics');
+if (anFlag === 'off') store.set('fo1:noan', 1); else if (anFlag === 'on') store.del('fo1:noan');
+const an = { ph: null, q: [], user: null, once: new Set(), loading: false,
+  on: !!PH.key && location.hash !== '#export' && /^https?:$/.test(location.protocol) && !/^(localhost|127\.|\[::1\])/.test(location.hostname)
+    && !store.get('fo1:noan') && navigator.doNotTrack !== '1' && !navigator.globalPrivacyControl };
+const anCtx = () => ({ device: matchMedia('(pointer: coarse)').matches || innerWidth < 700 ? 'mobile' : 'desktop', tier: isPro() ? 'pro' : 'free', signed_in: !!acct.user, nfl_week: D.week || null });
+function track(ev, props, now) {
+  if (!an.on) return; const p = Object.assign(anCtx(), props);
+  // send_instantly for an event right before leaving the page (checkout), so it isn't lost in the queue
+  an.ph ? an.ph.capture(ev, p, now ? { send_instantly: true, transport: 'sendBeacon' } : undefined) : an.q.push([ev, p]);
+}
+const trackOnce = (key, ev, props) => { if (!an.once.has(key)) { an.once.add(key); track(ev, props); } };
+function anIdentify(id) { if (!an.on) return; an.user = id; if (an.ph) id ? an.ph.identify(id) : an.ph.reset(); }
+function anStart() {
+  if (!an.on || an.ph || an.loading) return; an.loading = true;
+  import(PH.lib).then(m => {
+    const ph = m.posthog || m.default;
+    ph.init(PH.key, { api_host: PH.host, autocapture: false, capture_pageview: true, capture_pageleave: false, disable_session_recording: true,
+      persistence: 'localStorage', person_profiles: 'always', respect_dnt: true, disable_surveys: true, advanced_disable_feature_flags: true, disable_external_dependency_loading: true });
+    an.ph = ph; if (an.user) ph.identify(an.user);
+    for (const [e, p] of an.q.splice(0)) ph.capture(e, p);
+  }).catch(() => { an.on = false; an.q = []; });
+}
+// team setup: a start is counted once per method each time the setup panel opens; failures are counted by kind
+const flowMethod = () => { const F = D.flow; return !F ? null : F.method === 'espn' ? (F.espnMode === 'paste' ? 'espn_paste' : 'espn_league') : F.method; };
+function flowTry() {
+  const F = D.flow, m = flowMethod(); if (!F) return; F.tried = F.tried || new Set();
+  if (!F.tried.has(m)) { F.tried.add(m); track('import_started', { method: m, first_team: needsTeam() }); }
+}
+function flowFail(error) { if (D.flow) track('import_failed', { method: flowMethod(), error }); }
 // JSON with sorted keys, so the same data always gives the same text (the database stores keys in its own order)
 const canon = v => JSON.stringify(v, (k, x) => x && typeof x === 'object' && !Array.isArray(x) ? Object.fromEntries(Object.keys(x).sort().map(j => [j, x[j]])) : x);
 function hash53(s) {
@@ -972,7 +1011,7 @@ function signedInDone() {
   toast('Signed in. Your teams now sync to this account.');
   // they picked a Pro plan before signing in: carry on to checkout
   let buy = null; try { buy = sessionStorage.getItem('fo1:buy'); sessionStorage.removeItem('fo1:buy'); } catch {}
-  if (buy) loadPro().then(() => isPro() ? go('pro') : goPro(buy));
+  if (buy) loadPro().then(() => isPro() ? go('pro') : goPro(buy, true));
 }
 
 /* auth: an emailed code, or Google (PKCE: Google sends people back with ?code=, which leaves the #page routes alone) */
@@ -996,6 +1035,7 @@ function onAuth(ev, session) {
   const u = session?.user || null;
   if (u && u.id !== acct.user?.id) {
     acct.user = u; acct.step = 'email'; acct.code = ''; acct.msg = null; stripAuthParams();
+    anIdentify(u.id); if (acct.toastNext) track('signed_in', { method: acct.signVia || 'email' });   // a fresh sign-in, not a restored session
     const c = store.get('fo1:pro'); acct.pro = c && c.uid === u.id ? c : null;
     startSync().then(() => {
       loadPro().then(() => { if (D.proActivating) pollPro(); });
@@ -1003,7 +1043,7 @@ function onAuth(ev, session) {
       signedInDone();
     });
     render();
-  } else if (!u && acct.user && ev === 'SIGNED_OUT') { acct.user = null; acct.ready = false; render(); }   // session ended elsewhere: keep this browser's copy
+  } else if (!u && acct.user && ev === 'SIGNED_OUT') { acct.user = null; acct.ready = false; anIdentify(null); render(); }   // session ended elsewhere: keep this browser's copy
   renderAcct();
 }
 function stripAuthParams() { if (/[?&](code|error|error_description|checkout)=/.test(location.search)) try { history.replaceState(null, '', location.pathname + location.hash); } catch {} }
@@ -1044,7 +1084,7 @@ async function signOut(deleted) {
   if (!deleted) await push().catch(() => {});
   try { await acct.sb?.auth.signOut({ scope: 'local' }); } catch {}
   acct.user = null; acct.ready = false; acct.choice = null; acct.delArm = false; acct.msg = null; acct.step = 'email'; clearTimeout(acct.pushT);
-  wipeLocal();
+  anIdentify(null); wipeLocal();
   toast(deleted ? 'Account deleted. Everything it held is gone.' : 'Signed out. Your teams are in your account, not in this browser.');
 }
 function wipeLocal() {
@@ -1076,7 +1116,7 @@ function acctBoot() {
     let ret = null; try { ret = sessionStorage.getItem('fo1:ret'); sessionStorage.removeItem('fo1:ret'); } catch {}
     if (ret && !location.hash) try { history.replaceState(null, '', location.pathname + location.search + ret); } catch {}
     if (q.has('error_description')) { acct.msg = ['err', 'Google sign-in didn’t finish: ' + q.get('error_description')]; D.acctOpen = true; stripAuthParams(); return; }
-    acct.toastNext = true;
+    acct.toastNext = true; acct.signVia = 'google';
   }
   let saved = false; try { saved = Object.keys(localStorage).some(k => /^sb-.+-auth-token$/.test(k)); } catch {}
   if (saved) acct.bootPro = store.get('fo1:pro');   // a Pro member's page shows no ads even before the session is restored
@@ -1112,8 +1152,9 @@ async function loadPro() {
 }
 // a function's own error message, when it sent one
 async function fnErr(e) { try { const j = await e?.context?.json?.(); if (j?.error) return j.error; } catch {} return e?.message || 'Something went wrong. Try again.'; }
-async function goPro(plan) {
+async function goPro(plan, resumed) {
   if (!acct.on) return toast('Pro isn’t available yet.');
+  if (!resumed) track('upgrade_clicked', { plan, needs_sign_in: !acct.user });
   if (!acct.user) {   // Pro belongs to an account, so sign in first; checkout continues right after
     try { sessionStorage.setItem('fo1:buy', plan); } catch {}
     D.acctOpen = true; acct.msg = ['info', 'Sign in first so Pro follows you to every device. Checkout opens right after.'];
@@ -1123,6 +1164,7 @@ async function goPro(plan) {
   try {
     const { data, error } = await acct.sb.functions.invoke('checkout', { body: { plan } });
     if (error) throw error; if (data?.error) throw new Error(data.error);
+    track('checkout_started', { plan }, true);
     location.href = data.url;
   } catch (e) { D.proBusy = null; D.proMsg = ['err', await fnErr(e)]; render(); }
 }
@@ -1901,16 +1943,18 @@ async function checkCoaches(season) {
 
 /* ---------- ESPN league import ---------- */
 async function loadLeague() {
-  const id = (state.espn.leagueId || '').trim(); D.espnMsg = null;
-  if (!/^\d+$/.test(id)) { D.espnMsg = ['err', 'Enter the number after leagueId= in your ESPN league URL.']; return render(); }
-  if (D.snapshot && !D.refreshing) { D.espnMsg = ['err', 'ESPN can’t be reached from here right now. Paste your roster instead.']; return render(); }
+  const id = (state.espn.leagueId || '').trim(); D.espnMsg = null; flowTry();
+  if (!/^\d+$/.test(id)) { flowFail('bad_league_id'); D.espnMsg = ['err', 'Enter the number after leagueId= in your ESPN league URL.']; return render(); }
+  if (D.snapshot && !D.refreshing) { flowFail('espn_unreachable'); D.espnMsg = ['err', 'ESPN can’t be reached from here right now. Paste your roster instead.']; return render(); }
   D.espnMsg = ['info', 'Loading league…']; render();
   try {
     const j = await fetchJSON(API.league(D.season, id));
     D.espnLeague = j;
     D.espnTeams = (j.teams || []).map(t => ({ id: t.id, name: t.name || [t.location, t.nickname].filter(Boolean).join(' ') || ('Team ' + t.id), entries: t.roster?.entries || [] }));
     D.espnMsg = D.espnTeams.length ? ['info', `Found ${D.espnTeams.length} teams. Pick yours and press Use this team.`] : ['err', 'ESPN returned no teams for that league and season.'];
+    if (!D.espnTeams.length) flowFail('no_teams');
   } catch (e) {
+    flowFail(e.status === 401 || e.status === 403 ? 'private_league' : e.status === 404 ? 'league_not_found' : 'network');
     D.espnMsg = ['err', e.status === 401 || e.status === 403 ? 'This league is private, so ESPN won’t share it with this page. Paste your roster from ESPN instead (it stays saved here). Or ask your league manager to make the league viewable to the public in ESPN’s league settings, then load it again.' : e.status === 404 ? 'ESPN has no league with that ID for this season.' : 'Could not reach ESPN (' + e.message + '). Try again, or add players in the Players tab.'];
   }
   render();
@@ -1944,29 +1988,30 @@ function slApply(lg, rosters, rosterId) {
 async function slFind() {
   const q = ($('#slQuery')?.value || '').trim(); D.sl = { q, msg: null };
   if (!q) { D.sl.msg = ['err', 'Enter your Sleeper username or a league ID.']; return render(); }
-  D.sl.msg = ['info', 'Looking up Sleeper…']; render();
+  D.sl.msg = ['info', 'Looking up Sleeper…']; flowTry(); render();
   try {
     if (/^\d{8,}$/.test(q)) return await slLoadLeague(q);
     const u = await fetchJSON(`${SL}/user/${encodeURIComponent(q)}`);
-    if (!u?.user_id) { D.sl.msg = ['err', `No Sleeper user named “${q}”. Check the spelling, or paste a league ID instead.`]; return render(); }
+    if (!u?.user_id) { flowFail('user_not_found'); D.sl.msg = ['err', `No Sleeper user named “${q}”. Check the spelling, or paste a league ID instead.`]; return render(); }
     const ls = await fetchJSON(`${SL}/user/${u.user_id}/leagues/nfl/${D.season}`);
     D.sl.userId = u.user_id; D.sl.leagues = (ls || []).map(l => ({ id: l.league_id, name: l.name, size: l.total_rosters }));
-    if (!D.sl.leagues.length) { D.sl.msg = ['err', `${u.display_name} has no ${D.season} leagues on Sleeper.`]; return render(); }
+    if (!D.sl.leagues.length) { flowFail('no_leagues'); D.sl.msg = ['err', `${u.display_name} has no ${D.season} leagues on Sleeper.`]; return render(); }
     if (D.sl.leagues.length === 1) return await slLoadLeague(D.sl.leagues[0].id);
     D.sl.msg = ['info', `Found ${D.sl.leagues.length} leagues. Pick one.`]; render();
-  } catch { D.sl.msg = ['err', 'Couldn’t reach Sleeper. Try again in a moment.']; render(); }
+  } catch { flowFail('network'); D.sl.msg = ['err', 'Couldn’t reach Sleeper. Try again in a moment.']; render(); }
 }
 async function slLoadLeague(id) {
-  D.sl = Object.assign(D.sl || {}, { msg: ['info', 'Loading league…'], league: null }); render();
+  D.sl = Object.assign(D.sl || {}, { msg: ['info', 'Loading league…'], league: null }); flowTry(); render();
   try {
     const [lg, ros, users] = await Promise.all([fetchJSON(`${SL}/league/${id}`), fetchJSON(`${SL}/league/${id}/rosters`), fetchJSON(`${SL}/league/${id}/users`)]);
-    if (!lg?.league_id) { D.sl.msg = ['err', 'No Sleeper league with that ID.']; return render(); }
+    if (!lg?.league_id) { flowFail('league_not_found'); D.sl.msg = ['err', 'No Sleeper league with that ID.']; return render(); }
     const byUser = Object.fromEntries((users || []).map(u => [u.user_id, u]));
     D.sl.league = lg; D.sl.rosters = ros || [];
     D.sl.teams = D.sl.rosters.map(r => { const u = byUser[r.owner_id]; return { rosterId: r.roster_id, ownerId: r.owner_id, name: u?.metadata?.team_name || u?.display_name || `Team ${r.roster_id}`, owner: u?.display_name || 'no owner', n: (r.players || []).length }; });
     D.sl.pick = (D.sl.teams.find(t => t.ownerId === D.sl.userId) || D.sl.teams[0])?.rosterId;
     D.sl.msg = lg.season !== String(D.season) ? ['err', `That league is from the ${lg.season} season; Benny is set to ${D.season}.`] : ['info', `${lg.name}: pick your team and press Sync this team.`];
-  } catch { D.sl.msg = ['err', 'Couldn’t reach Sleeper. Try again in a moment.']; }
+    if (lg.season !== String(D.season)) flowFail('wrong_season');
+  } catch { flowFail('network'); D.sl.msg = ['err', 'Couldn’t reach Sleeper. Try again in a moment.']; }
   render();
 }
 // the chosen Sleeper team becomes a draft for the review step; nothing is saved until Save team
@@ -2447,6 +2492,7 @@ function waiversBody() {
   const W = state.waivers;
   if (!state.roster.length) return `<div class="card panel"><h2>Add your roster first</h2><p style="margin:0">Waiver suggestions compare free agents against your players. <button type="button" class="linkbtn" data-act="flow" data-method="sleeper" data-dest="replace">Import your team</button> or add players in <a href="#roster" data-tab="players">Roster</a>.</p></div>`;
   const R = computeWaivers(), { weeks, H, moves, needs } = R;
+  trackOnce('wv:' + D.week, 'waivers_viewed', { has_move: moves.length > 0, best_gain: moves[0] ? Math.round(moves[0].hz) : 0, window: W.horizon, source: W.source });
   const hLab = H === 1 ? `week ${weeks[0]}` : `weeks ${weeks[0]}–${weeks[H - 1]}`;
   const ownTxt = id => D.own.has(id) ? `${D.own.get(id) < 1 ? '<1' : Math.round(D.own.get(id))}% owned` : 'unowned';
   const pl = id => { const u = D.U.get(id), r = D.M[id]; return `<span class="pname">${esc(u.name)}</span><span class="psub">${u.pos} · ${u.team || 'FA'} ${injPill(r)} · ${f1(rosBase(id))} pts/g</span>`; };
@@ -2687,6 +2733,7 @@ function go(tab, opts = {}) {
 }
 window.addEventListener('hashchange', () => {
   const tab = TAB_OF[location.hash.slice(1)]; if (!tab) return;
+  track('screen_viewed', { screen: HASH[tab], has_team: !needsTeam() });
   state.tab = tab; save(); render(); if (D.navScroll !== false) window.scrollTo(0, 0); D.navScroll = true; runAfter();
 });
 // a one-shot step to run after the next page renders (scroll to a team, highlight the best move)
@@ -3188,8 +3235,10 @@ function afterSave() {
 }
 function commitDraft() {
   const F = D.flow, d = F?.draft; if (!d) return;
+  const first = needsTeam(), method = flowMethod();
   if (d.bundle) {
-    let msg; try { msg = importBundle(d.bundle, !!$('#ioReplace')?.checked); } catch (err) { F.msg = ['err', err.message]; return render(); }
+    let msg; try { msg = importBundle(d.bundle, !!$('#ioReplace')?.checked); } catch (err) { flowFail('bad_code'); F.msg = ['err', err.message]; return render(); }
+    track('team_saved', { method, teams: d.bundle.teams.length, first_team: first });
     D.drafts.code = ''; D.flow = null; D.flash = { html: `<strong>${esc(msg)}</strong> <a href="#roster" data-tab="players">Edit roster</a>` }; slAutoSync(true); return afterSave();
   }
   if (!d.roster.length) return;
@@ -3206,14 +3255,15 @@ function commitDraft() {
   } else Object.assign(curTeam(), data, { name });
   applyTeam(curTeam()); syncScoring();
   if (d.src) D.drafts[d.src] = '';
+  track('team_saved', { method, scoring: data.scoring, te_premium: data.tePrem > 0, players: data.roster.length, unmatched: d.unresolved.length, new_team: dest === 'new', first_team: first });
   D.flow = null; D.open.clear(); D.wCache = null; D.sl = null; save();
   D.flash = { html: `<strong>Saved ${esc(curTeam().name)}:</strong> ${data.roster.length} players, ${esc(fmtName(true))} scoring${d.unresolved.length ? `; ${d.unresolved.length} name${d.unresolved.length === 1 ? '' : 's'} not found` : ''}. <a href="#roster" data-tab="players">Edit roster</a>` };
   afterSave();
 }
 function flowPaste(src) {
   const text = $(src === 'paste' ? '#rosterPaste' : '#manualPaste')?.value || '';
-  const { ids, miss } = matchPasted(text);
-  if (!ids.length) { D.flow.msg = ['err', 'No player names found in that text. Paste one name per line, or ESPN’s roster table.']; return render(); }
+  const { ids, miss } = matchPasted(text); flowTry();
+  if (!ids.length) { flowFail('no_players_matched'); D.flow.msg = ['err', 'No player names found in that text. Paste one name per line, or ESPN’s roster table.']; return render(); }
   if (src === 'paste') return makeDraft({ roster: ids, unresolved: miss, source: 'pasted ESPN roster', src: 'paste' });
   const set = D.flow.manual; for (const id of ids) if (!set.includes(id)) set.push(id);
   D.drafts.manualPaste = ''; D.flow.manualMiss = miss;
@@ -3247,7 +3297,7 @@ function renderAc(inputId) {
 function acPick(id, mode) {
   const u = D.U.get(id); if (!u) return;
   if (mode === 'manual') {
-    const set = D.flow.manual; if (!set.includes(id)) set.push(id);
+    const set = D.flow.manual; if (!set.includes(id)) set.push(id); flowTry();
     const ml = $('#manualList'); if (ml) ml.innerHTML = manualListHTML();
     const rb = $('[data-act=flowmanual]'); if (rb) { rb.disabled = false; rb.textContent = `Review ${set.length} player${set.length === 1 ? '' : 's'}`; }
     const q = $('#mq'); if (q) { q.value = ''; renderAc('mq'); }
@@ -3362,6 +3412,9 @@ function viewWeather() {
 function lineupBody() {
   const { starters, bench } = optimize();
   recordLineup(starters);
+  // activation: Benny's lineup shown for a real team, counted once per NFL week in this browser (weekly retention uses it)
+  const luKey = `${D.season}-${D.week}`;
+  if (an.on && store.get('fo1:anlu') !== luKey) { store.set('fo1:anlu', luKey); track('lineup_shown', { players: state.roster.length, starters: starters.filter(s => s.r).length, teams: state.teams.length, scoring: state.scoring }); }
   const st = starters.filter(s => s.r), tot = st.reduce((s, x) => s + metricOf(x.r), 0), mu = st.reduce((s, x) => s + x.r.mean, 0), sdT = Math.sqrt(st.reduce((s, x) => s + x.r.sd ** 2, 0));
   // injury alerts: starters and bench counted separately (out/IR players are already benched, so they show as bench alerts)
   const tagged = r => r && r.inj && r.status !== 'bye', empty = starters.length - st.length;
@@ -3399,6 +3452,8 @@ function viewCompare() {
   const pick = (k, r) => `<input class="inp" list="plist" id="cmp${k}" data-cmp="${k}" value="${r ? esc(r.u.name + ' · ' + r.pos + ' ' + (r.T || 'FA')) : ''}" placeholder="Search a player" style="width:100%">`;
   let verdict = '';
   if (A && Bp) {
+    // counted once per pair; "picked" is a pair the user chose, as opposed to the one Start / Sit opens on
+    trackOnce('ss:' + [a, b].sort().join('|'), 'start_sit_used', { picked: state.compare[0] === a && state.compare[1] === b, pos: A.pos });
     const pA = pBeats(A, Bp), w = pA >= 0.5 ? A : Bp, l = w === A ? Bp : A, pw = Math.max(pA, 1 - pA), edge = w.mean - l.mean;
     const call = pw < 0.55 ? 'Toss-up' : pw < 0.65 ? 'Lean' : pw < 0.8 ? 'Start' : 'Easy call';
     const why = pickReasons(w, l), gnote = gradeNote(w, l);
@@ -3610,11 +3665,11 @@ document.addEventListener('click', e => {
     save(); render(); return;
   }
   if (t.dataset.tab) { e.preventDefault(); go(t.dataset.tab); return; }
-  if (t.dataset.expand) { const id = t.dataset.expand; D.open.has(id) ? D.open.delete(id) : D.open.add(id); render(); return; }
+  if (t.dataset.expand) { const id = t.dataset.expand; if (D.open.has(id)) D.open.delete(id); else { D.open.add(id); track('breakdown_opened', { pos: D.U.get(id)?.pos, screen: state.tab }); } render(); return; }
   if (t.dataset.add) { addToRoster(t.dataset.add); return; }
   if (t.dataset.remove) { removeFromRoster(t.dataset.remove); return; }
   if (t.dataset.clearovr) { delete state.overrides[t.dataset.clearovr]; save(); computeAll(); render(); return; }
-  if (t.dataset.strategy) { state.settings.strategy = t.dataset.strategy; save(); render(); return; }
+  if (t.dataset.strategy) { state.settings.strategy = t.dataset.strategy; track('strategy_changed', { strategy: t.dataset.strategy }); save(); render(); return; }
   if (t.dataset.sort) { const k = t.dataset.sort; D.defSort = D.defSort[0] === k ? [k, -D.defSort[1]] : [k, -1]; render(); return; }
   if (t.dataset.team) { D.teamOpen = D.teamOpen === t.dataset.team ? null : t.dataset.team; render(); return; }
   const a = t.dataset.act;
@@ -3635,7 +3690,7 @@ document.addEventListener('click', e => {
   else if (a === 'flowsave') commitDraft();
   else if (a === 'flowpaste') flowPaste(t.dataset.src);
   else if (a === 'flowmanual') { if (D.flow.manual.length) makeDraft({ roster: D.flow.manual.slice(), unresolved: D.flow.manualMiss || [], source: 'players you picked' }); }
-  else if (a === 'flowrestore') { try { D.flow.draft = { bundle: parseBundle($('#ioIn')?.value) }; D.flow.step = 'review'; D.flow.msg = null; } catch (err) { D.flow.msg = ['err', err.message]; } render(); }
+  else if (a === 'flowrestore') { flowTry(); try { D.flow.draft = { bundle: parseBundle($('#ioIn')?.value) }; D.flow.step = 'review'; D.flow.msg = null; } catch (err) { flowFail('bad_code'); D.flow.msg = ['err', err.message]; } render(); }
   else if (a === 'teamsettings') { D.tsOpen = !D.tsOpen; D.flow = null; D.ioOpen = false; D.acctOpen = false; D.delArm = false; render(); if (D.tsOpen) revealPanel($('.tsp')); }
   else if (a === 'copyteam') makeEditableCopy();
   else if (a === 'undo') { const u = D.undo; if (u && u.team === state.activeTeam && !state.roster.includes(u.id)) { state.roster.splice(Math.min(u.idx, state.roster.length), 0, u.id); D.wCache = null; save(); refreshPlayers(); toast(`Restored ${D.U.get(u.id)?.name || 'player'}.`); } D.undo = null; }
@@ -3744,7 +3799,7 @@ document.addEventListener('change', e => {
     const f = t.files?.[0]; if (!f) return;
     const rd = new FileReader();
     rd.onload = () => { D.drafts.code = String(rd.result || ''); const box = $('#ioIn'); if (box) box.value = D.drafts.code; if (D.flow) { D.flow.msg = ['info', `Loaded ${f.name}. Press Review.`]; render(); } };
-    rd.onerror = () => { if (D.flow) { D.flow.msg = ['err', 'Couldn’t read that file.']; render(); } };
+    rd.onerror = () => { if (D.flow) { flowTry(); flowFail('file_unreadable'); D.flow.msg = ['err', 'Couldn’t read that file.']; render(); } };
     rd.readAsText(f); return;
   }
   if (t.hasAttribute('data-teprem')) { state.tePrem = +t.value || 0; save(); if (D.inp) ingest(D.inp); D.open.clear(); render(); return; }
@@ -3798,4 +3853,9 @@ acctBoot();
 { const tab = TAB_OF[location.hash.slice(1)]; if (tab) state.tab = tab; else if (location.hash !== '#export' && HASH[state.tab]) { try { history.replaceState(null, '', '#' + HASH[state.tab]); } catch {} } }
 render();
 load();
+setTimeout(anStart, 1500);
+if (anFlag === 'off' || anFlag === 'on') {
+  toast(anFlag === 'off' ? 'Analytics is off in this browser.' : an.on ? 'Analytics is on again in this browser.' : 'Analytics stays off: this browser sends Do Not Track or Global Privacy Control.');
+  try { const u = new URL(location.href); u.searchParams.delete('analytics'); history.replaceState(null, '', u.pathname + u.search + u.hash); } catch {}
+}
 </script>

@@ -106,6 +106,7 @@ Then open **stripe-webhook → Details** and turn **Enforce JWT verification** *
 | `SEASON_END` | `2027-02-28T23:59:59Z`, when this season's pass ends. Change it each season, together with `SEASON_END_LABEL` in `index.html`. |
 | `SITE_URL` | `https://bennyspicks.us/` |
 | `STRIPE_WEBHOOK_SECRET` | from step 5 |
+| `POSTHOG_KEY` | optional: the site's PostHog project key (`phc_…`, the same public key as `PH.key` in `index.html`), so `stripe-webhook` records confirmed payments in analytics |
 
 ## 5. The webhook
 
