@@ -135,6 +135,13 @@ a { color: var(--accent); }
 .gopro { border-color: color-mix(in srgb, var(--gold) 55%, var(--line)); color: var(--gold); font-weight: 600; }
 .gopro.is-pro { color: var(--accent); border-color: var(--accent); }
 .gopro[aria-pressed="true"] { background: color-mix(in srgb, var(--gold) 10%, var(--surface)); }
+/* the Pro button rides on the end of Account / Sign in as a small token, one control in the header */
+.acct-grp { display: inline-flex; align-items: stretch; }
+.acct-grp #acctBtn:not([hidden]) + .gopro { margin-left: -1px; border-top-left-radius: 0; border-bottom-left-radius: 0; }
+.acct-grp #acctBtn:has(+ .gopro:not([hidden])) { border-top-right-radius: 0; border-bottom-right-radius: 0; }
+.acct-grp .gopro { padding: 0 9px; font-family: var(--font-display); font-size: 14px; font-weight: 700; letter-spacing: .05em; text-transform: uppercase; background: color-mix(in srgb, var(--gold) 12%, var(--surface)); }
+.acct-grp .gopro.is-pro { background: color-mix(in srgb, var(--accent) 14%, var(--surface)); }
+.acct-grp .btn:hover, .acct-grp .btn[aria-expanded="true"], .acct-grp .gopro[aria-pressed="true"] { position: relative; z-index: 1; }
 .lock { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 10px; padding: 10px 14px; border: 1px dashed color-mix(in srgb, var(--gold) 55%, var(--line)); border-radius: 8px; background: color-mix(in srgb, var(--gold) 6%, var(--surface)); color: var(--ink); text-decoration: none; font-size: 14px; }
 .lock:hover { border-style: solid; }
 .lock-txt { font-weight: 600; }
@@ -598,8 +605,7 @@ td .wks { flex-wrap: nowrap; }
     <div class="controls">
       <button type="button" class="status" id="status" data-act="fresh" aria-expanded="false" aria-controls="fresh" title="When each kind of data was last updated"><i></i><span>Loading…</span></button>
       <button class="btn" data-act="reload" type="button" title="Get the newest projections, injuries and lines">Refresh projections</button>
-      <button class="btn gopro" data-tab="pro" type="button" id="proBtn" hidden>Go Pro</button>
-      <button class="btn" data-act="account" type="button" id="acctBtn" aria-expanded="false" hidden>Sign in</button>
+      <span class="acct-grp"><button class="btn" data-act="account" type="button" id="acctBtn" aria-expanded="false" hidden>Sign in</button><button class="btn gopro" data-tab="pro" type="button" id="proBtn" hidden>Go Pro</button></span>
     </div>
   </header>
   <div class="freshp card" id="fresh" hidden></div>
