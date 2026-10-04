@@ -257,6 +257,34 @@ test('picking a missing name clears its "not found" note', () => {
   finally { D.flow = null; }
 });
 
+/* ---------- D/ST streaming (reviewer: "add Raiders D/ST, drop Seahawks D/ST, +19.0 over 15 weeks") ---------- */
+const withDef = (T, hz) => setup(st => { st.roster[st.roster.indexOf('PIT')] = T; st.waivers.horizon = hz; });
+test('a D/ST takeaway streak is regressed: Raiders (15.7 a game, mostly turnovers) value below Seahawks', () => {
+  setup(); const sa = ev('seasonAvg'); return sa('SEA') > sa('LV') + 1 || `SEA ${sa('SEA').toFixed(2)}, LV ${sa('LV').toFixed(2)}`;
+});
+test('Raiders for Seahawks is never a recommended move, any window', () => {
+  for (const hz of [2, 4, 'ros']) { withDef('SEA', hz); const m = ev('computeWaivers')().moves.find(m => m.f === 'LV' && m.d === 'SEA'); if (m && !m.marginal) return `window ${hz}: +${m.hz.toFixed(1)}`; }
+});
+test('kicker and D/ST moves count three weeks at most, even over the rest of the season', () => {
+  withDef('SEA', 'ros'); const W = ev('computeWaivers')(), bad = W.moves.filter(m => ['K', 'DEF'].includes(ev('D').U.get(m.f).pos) && m.H > 3);
+  return !bad.length || bad.map(m => `${name(m.f)} ${m.H} wks`).join(', ');
+});
+test('a top-half D/ST is never dropped for a lower-ranked one; the reason says to keep it', () => {
+  const D = ev('D'), top = [...D.U.values()].filter(u => u.pos === 'DEF' && D.M[u.id]).map(u => u.id).sort((a, b) => ev('seasonAvg')(b) - ev('seasonAvg')(a)).slice(0, 6);
+  let held = 0;
+  for (const T of top) for (const hz of [2, 'ros']) {
+    withDef(T, hz); const W = ev('computeWaivers')();
+    for (const m of W.moves.filter(m => m.d === T && D.U.get(m.f).pos === 'DEF')) {
+      if (m.hold) { held++; if (!m.marginal || !/don’t drop/i.test(m.whyText)) return `${name(m.f)} for ${name(T)}: ${m.whyText}`; }
+      else if (W.VS[m.f][0] < W.VS[T][0] && !m.marginal) return `${name(m.f)} for ${name(T)} recommended without the hold check`;
+    }
+    if (W.best && W.best.d === T && W.best.hold) return 'a held move became the best move';
+  }
+  // the wording itself, on a made-up hold: a streamer week when one stands out
+  const why = ev('waiverWhy')({ f: 'LV', d: 'SEA', H: 3, h2h: [-1, 4.2, 0.3], hold: { rf: 12, rd: 3 } }, { list: [] }, [4, 5, 6], 3);
+  return /streaming option for week 5 \(\+4\.2\), but don’t drop Seahawks D\/ST/.test(why) && /#3 rest of season, Raiders D\/ST #12/.test(why) || why;
+});
+
 /* ---------- weakest spot: pickups at the position Benny Grade rates lowest ---------- */
 test('weakest spot follows Benny Grade, lists free agents there, and skips one marked Taken', () => {
   setup(); const g = ev('teamGrade')(), ws = ev('weakSpot')(), D = ev('D');

@@ -1653,7 +1653,7 @@ function ingest(inp) {
       if (T) { const t = D.teamUse[T] || (D.teamUse[T] = { tgt: 0, ra: 0, wks: new Set() }); t.tgt += tg; t.ra += ra; t.wks.add(wi); }
       if (!D.U.has(id)) D.U.set(id, { id, name, pos, team: T, inj: null });
     }
-    for (const d of wk.D) { const id = d[0]; const h = D.H[id] || (D.H[id] = { pts: [], tgt: 0, ra: 0, wks: [] }); h.pts.push(d[11]); h.wks.push(wi + 1); if (!D.U.has(id)) D.U.set(id, { id, name: TEAMS[id][1] + ' D/ST', pos: 'DEF', team: id, inj: null }); }
+    for (const d of wk.D) { const id = d[0]; const h = D.H[id] || (D.H[id] = { pts: [], tgt: 0, ra: 0, wks: [] }); h.pts.push(d[11]); h.wks.push(wi + 1); (h.stab ||= []).push(d[8] + defPaPts(d[9])); if (!D.U.has(id)) D.U.set(id, { id, name: TEAMS[id][1] + ' D/ST', pos: 'DEF', team: id, inj: null }); }
   });
   for (const id in D.H) { const h = D.H[id], n = h.pts.length; h.n = n; h.avg = mean(h.pts); h.sd = n > 1 ? Math.sqrt(h.pts.reduce((s, x) => s + (x - h.avg) ** 2, 0) / (n - 1)) : null; }
   D.nameIdx = new Map(); for (const u of D.U.values()) { const k = norm(u.name); if (!D.nameIdx.has(k)) D.nameIdx.set(k, []); D.nameIdx.get(k).push(u.id); }
@@ -2005,6 +2005,8 @@ function computeAll() {
   for (const k in D.depth) D.depth[k].sort((a, b) => D.proj[b].pts - D.proj[a].pts);
   // this season's average score of a regular D/ST and kicker (2+ games), for seasonAvg
   D.posAvg = {}; for (const P of ['DEF', 'K']) D.posAvg[P] = mean(Object.entries(D.H).filter(([id, h]) => h.n >= 2 && D.U.get(id)?.pos === P).map(([, h]) => h.avg));
+  // a D/ST's average turnover and touchdown points a game, league-wide (seasonAvg)
+  { let s = 0, n = 0; for (const [id, h] of Object.entries(D.H)) if (h.stab && D.U.get(id)?.pos === 'DEF') { s += h.pts.reduce((a, x) => a + x, 0) - h.stab.reduce((a, x) => a + x, 0); n += h.n; } D.defVol = n ? s / n : null; }
   for (const id of D.U.keys()) { const r = evalPlayer(id); if (r) D.M[id] = r; }
 }
 // Safe (floor) and Boom (ceiling) lineups are Pro; free lineups optimize the projection
@@ -2498,11 +2500,21 @@ function healthyBase(id) {
   if (cur != null && prev != null) return (cur * h.n + prev * 4) / (h.n + 4);
   return cur ?? prev ?? 0;
 }
+/* Points a D/ST scores for points allowed (Sleeper's default tiers). With sacks, the part of its score that holds up. */
+const defPaPts = pa => pa <= 0 ? 10 : pa <= 6 ? 7 : pa <= 13 ? 4 : pa <= 20 ? 1 : pa <= 27 ? 0 : pa <= 34 ? -1 : -4;
+const DEF_VOL_GAMES = 12;   // league-average games blended into a D/ST's turnover and TD points
 /* Season average for rest-of-season value. D/ST and kicker scores swing a lot from week to week, so for them this
-   season's games are blended with last season (worth 4 games) and this season's league average at the position (3 games). */
+   season's games are blended with last season (worth 4 games) and this season's league average at the position (3 games).
+   A D/ST's sacks and points allowed count as played, but its turnovers and touchdowns (everything else it scored) barely
+   carry from week to week, so that part is pulled most of the way to the league average first: a defense on a takeaway
+   streak isn't valued as if the streak goes on. */
 function seasonAvg(id) {
-  const r = D.M[id], h = r?.h, avg = h?.n ? h.avg : null;
+  const r = D.M[id], h = r?.h; let avg = h?.n ? h.avg : null;
   if (r?.pos !== 'DEF' && r?.pos !== 'K') return avg;
+  if (r.pos === 'DEF' && avg != null && h.stab?.length === h.n && ok(D.defVol)) {
+    const stab = h.stab.reduce((a, x) => a + x, 0), vol = h.pts.reduce((a, x) => a + x, 0) - stab;
+    avg = stab / h.n + (vol + D.defVol * DEF_VOL_GAMES) / (h.n + DEF_VOL_GAMES);
+  }
   const prev = D.prevPPG?.[id]?.[0], lg = D.posAvg?.[r.pos]; let s = 0, n = 0;
   if (avg != null) { s += avg * h.n; n += h.n; }
   if (ok(prev)) { s += prev * 4; n += 4; }
@@ -2524,6 +2536,7 @@ function rosBase(id) {
   const b = r.role ? ROLE_LEAD : state.settings.blend * ROS_PROJ;
   return pj != null && avg != null ? b * pj + (1 - b) * avg : (pj ?? avg ?? 0);
 }
+const STREAM_H = 3;   // weeks a kicker or D/ST move counts (computeWaivers)
 const SLOT_SHARE = { QB: { OP: .7 }, RB: { FLEX: .45, 'RB/WR': .5, OP: .1 }, WR: { FLEX: .45, 'RB/WR': .5, 'WR/TE': .75, OP: .1 }, TE: { FLEX: .1, 'WR/TE': .25, OP: .1 }, K: {}, DEF: {} };
 /* How many lineup spots a position fills per team, counting its share of flex slots. */
 function posSlots(P) { const own = { QB: 'QB', RB: 'RB', WR: 'WR', TE: 'TE', K: 'K', DEF: 'D/ST' }[P]; return (state.slots[own] || 0) + Object.entries(SLOT_SHARE[P]).reduce((s, [k, f]) => s + (state.slots[k] || 0) * f, 0); }
@@ -2645,9 +2658,15 @@ function computeWaivers() {
   const droppable = roster.filter(id => !kept.has(id));
   const moves = [], posOf = id => D.U.get(id).pos, longTerm = W.rank === 'blend';
   const count = p => roster.filter(id => posOf(id) === p).length;
+  // every kicker and D/ST ranked on usual-week value, rostered elsewhere or not, for the hold rule below
+  const posRank = {};
+  for (const P of ['K', 'DEF']) [...D.U.values()].filter(u => u.pos === P && D.M[u.id]).map(u => { V[u.id] ||= weekVals(u.id, weeks); return [u.id, usual(u.id)]; })
+    .sort((a, b) => b[1] - a[1]).forEach(([id], i) => { posRank[id] = i + 1; });
   for (const f of cand) {
     let best = null, bestSame = null;
     const fp = posOf(f), single = fp === 'K' || fp === 'DEF';
+    // kickers and D/STs are streamed on matchups, so their moves count only the next few weeks, whatever the window
+    const h = single ? Math.min(H, STREAM_H) : H;
     // a kicker or defense when you already have one: swap it for yours, or take an open roster spot; never drop a
     // player at another position to carry two (and never three)
     const mustSwap = single && count(fp) >= 1, openOk = canAddFree && !(single && count(fp) >= 2);
@@ -2658,31 +2677,35 @@ function computeWaivers() {
       let hz = 0, later = 0, depLost = 0; const starts = [], lost = [];
       for (let wi = 0; wi < weeks.length; wi++) {
         const L2 = bestLineup(nr, wi, V, slotsAt(wi)), diff = (L2.total + L2.depth) - (base[wi].total + base[wi].depth);
-        if (wi < H) { hz += diff; depLost += base[wi].depth - L2.depth; const st = L2.starters.find(s => s[1] === f); if (st) starts.push([weeks[wi], st[0].label || st[0].k]); if (d && base[wi].starters.some(s => s[1] === d)) lost.push(weeks[wi]); }
+        if (wi < h) { hz += diff; depLost += base[wi].depth - L2.depth; const st = L2.starters.find(s => s[1] === f); if (st) starts.push([weeks[wi], st[0].label || st[0].k]); if (d && base[wi].starters.some(s => s[1] === d)) lost.push(weeks[wi]); }
         else later += diff;
       }
       // how much the move raises your usual lineup, per week
       const LS = bestLineup(nr, 0, VS, slots), strength = (LS.total + LS.depth) - (baseS.total + baseS.depth);
       // Ranked by the window's lineup points (byes and injuries included) plus the usual-lineup gain over the same weeks,
       // so an upgrade at a weak spot beats a one-week patch. "window": later weeks just break ties; "blend" adds a third
-      // of the value after the window, but only for a move that doesn't cost points in the window.
-      const score = hz + strength * H + (longTerm && hz >= 0 ? 0.35 : 0.001) * later, mv = { f, d, hz, later, strength, score, starts, lost, depLost };
+      // of the value after the window, but only for a move that doesn't cost points in the window (never for a kicker
+      // or D/ST: you'll stream another by then).
+      const score = hz + strength * h + (longTerm && !single && hz >= 0 ? 0.35 : 0.001) * later, mv = { f, d, hz, later, strength, score, starts, lost, depLost, H: h };
       if (!best || score > best.score) best = mv;
       if (single && d && posOf(d) === fp && (!bestSame || score > bestSame.score)) bestSame = mv;
     }
     // streaming a kicker or defense: swap for the one you have when that's nearly as good
     if (best && bestSame && bestSame !== best && bestSame.score >= 0.7 * best.score) best = bestSame;
     // a kicker or D/ST for another: keep the week-by-week difference, so the reason can compare them head to head
-    if (best && single && best.d && posOf(best.d) === fp) best.h2h = weeks.slice(0, H).map((_, wi) => V[f][wi] - V[best.d][wi]);
-    if (!best || best.score <= 1 || !(best.hz > 0.5 || best.strength * H > 1 || (longTerm && best.hz >= 0 && best.later > 0))) continue;
+    if (best && single && best.d && posOf(best.d) === fp) best.h2h = weeks.slice(0, h).map((_, wi) => V[f][wi] - V[best.d][wi]);
+    if (!best || best.score <= 1 || !(best.hz > 0.5 || best.strength * h > 1 || (longTerm && !single && best.hz >= 0 && best.later > 0))) continue;
     /* Worth the roster churn? Projections miss by several points a week, so a small expected gain is no reason to give
        up a player: a move must add HOLD_BAR window points (or raise the usual lineup by as much), and a kicker or D/ST
        swap must average 1 pt a week. With long-term value on, a move that clears the bar only on later weeks is a
-       "long-term bet". Anything else is marginal: listed, never the best move, and holding is fine. */
-    const swap = single && best.d && posOf(best.d) === fp, bar = Math.max(1.5, 0.75 * H);
-    const clears = swap ? best.hz / H >= 1 : Math.max(best.hz, best.strength * H) >= bar;
-    best.longBet = !clears && longTerm && best.hz >= 0 && (swap ? (best.hz + best.later) / weeks.length >= 1 : 0.35 * best.later >= bar);
-    best.marginal = !clears && !best.longBet;
+       "long-term bet". Anything else is marginal: listed, never the best move, and holding is fine.
+       Never drop a top-half kicker or D/ST (rest of season, league size) for one that ranks below it: that one is a
+       streamer for a good week, not a replacement (hold). */
+    const swap = single && best.d && posOf(best.d) === fp, bar = Math.max(1.5, 0.75 * h);
+    const clears = swap ? best.hz / h >= 1 : Math.max(best.hz, best.strength * h) >= bar;
+    best.longBet = !single && !clears && longTerm && best.hz >= 0 && 0.35 * best.later >= bar;
+    best.hold = swap && posRank[best.d] <= Math.ceil(W.teams / 2) && posRank[f] > posRank[best.d] ? { rf: posRank[f], rd: posRank[best.d] } : null;
+    best.marginal = (!clears && !best.longBet) || !!best.hold;
     moves.push(best);
   }
   moves.sort((a, b) => a.marginal - b.marginal || b.score - a.score);
@@ -2694,7 +2717,15 @@ function computeWaivers() {
 }
 // why a waiver move helps, in one line (shown on Waivers and in Benny's Moves)
 function waiverWhy(m, needs, weeks, H) {
+  H = m.H ?? H;
   const fu = D.U.get(m.f), why = [], P = fu.pos === 'DEF' ? 'D/ST' : fu.pos;
+  if (m.hold) {
+    // a lower-ranked kicker or D/ST for a top one: name the week he's worth streaming, and say to keep yours
+    const nm = id => D.U.get(id).name, i = m.h2h.indexOf(Math.max(...m.h2h)), up = m.h2h[i];
+    const rank = `${nm(m.d)} ranks ${P} #${m.hold.rd} rest of season, ${nm(m.f)} #${m.hold.rf}`;
+    return up > 0.5 ? `${nm(m.f)} is a streaming option for week ${weeks[i]} (+${f1(up)}), but don’t drop ${nm(m.d)} for ${fu.pos === 'DEF' ? 'them' : 'him'}: ${rank}`
+      : `Don’t drop ${nm(m.d)} for ${nm(m.f)}: ${rank}`;
+  }
   const nd = needs.list.find(n => n.P === fu.pos), weak = nd && nd.level === 'Weak';
   if (m.strength >= 1) why.push(`raises your usual lineup by +${f1(m.strength)} pts a week at ${weak ? `${P}, your weak spot` : P}`);
   else if (weak) why.push(`fills your weak ${P} spot`);
@@ -2759,18 +2790,18 @@ function schedStrip(id, weeks, H) {
 }
 /* The headline of the Waiver Optimizer: ADD X / DROP Y / +n expected lineup points. */
 function bestMoveCard(m, weeks, H, ownTxt, near) {
-  if (!m) return `<div class="card wbest"><span class="label">Best move</span><div class="wb-none">${near ? `<strong>Hold.</strong> No move clears Benny’s bar. The closest, add ${esc(D.U.get(near.f).name)}${near.d ? `, drop ${esc(D.U.get(near.d).name)}` : ''}, gains +${f1(near.hz)} over ${H} week${H > 1 ? 's' : ''}, less than projections typically miss by.` : 'Your roster is already the best Benny can build from these free agents. Check back after this week’s games.'}</div></div>`;
+  if (!m) return `<div class="card wbest"><span class="label">Best move</span><div class="wb-none">${near ? `<strong>Hold.</strong> No move clears Benny’s bar. The closest, add ${esc(D.U.get(near.f).name)}${near.d ? `, drop ${esc(D.U.get(near.d).name)}` : ''}, gains +${f1(near.hz)} over ${near.H} week${near.H > 1 ? 's' : ''}, less than projections typically miss by.` : 'Your roster is already the best Benny can build from these free agents. Check back after this week’s games.'}</div></div>`;
   const side = (kind, id) => { const u = D.U.get(id); return `<div class="wb-side"><span class="wb-kind ${kind}">${kind === 'add' ? 'Add' : 'Drop'}</span><span class="wb-name">${esc(u.name)}</span><span class="small muted">${u.pos === 'DEF' ? 'D/ST' : u.pos} · ${u.team || 'FA'}${kind === 'add' ? ' · ' + ownTxt(id) : ''}</span></div>`; };
   return `<div class="card wbest"><div class="row-head"><span class="label">Best move</span><button type="button" class="btn sm" data-act="sharemove">Share</button></div>
     <div class="wb-row">${side('add', m.f)}${m.d ? side('drop', m.d) : `<div class="wb-side"><span class="wb-kind keep">No drop</span><span class="small muted">You have an open roster spot</span></div>`}
-      <div class="wb-gain"><span class="num">+${f1(m.hz)}</span><span class="small muted">expected lineup pts over the next ${H} week${H > 1 ? 's' : ''}</span></div></div>
+      <div class="wb-gain"><span class="num">+${f1(m.hz)}</span><span class="small muted">expected lineup pts over the next ${m.H} week${m.H > 1 ? 's' : ''}</span></div></div>
     ${m.whyText ? `<div class="small">${esc(m.whyText)}.</div>` : ''}</div>`;
 }
 /* Share the best move as a short line of text plus a link that opens Waivers (for a new visitor, the waivers welcome).
    Phones get the share sheet; elsewhere it's copied. The analytics event says only that a move was shared. */
 async function shareMove() {
   const R = D.wCache, m = R?.best; if (!m) return;
-  const nm = id => D.U.get(id)?.name || id, H = R.H;
+  const nm = id => D.U.get(id)?.name || id, H = m.H;
   const text = `Benny’s Picks: add ${nm(m.f)}${m.d ? `, drop ${nm(m.d)}` : ''}, +${f1(m.hz)} expected lineup points over the next ${H} week${H === 1 ? '' : 's'} (week ${D.week}).`;
   const url = 'https://bennyspicks.us/?utm_source=share&utm_medium=waiver_move#waivers';
   const done = how => track('result_shared', { kind: 'waiver_move', how, gain: Math.round(m.hz), pos: D.U.get(m.f)?.pos });
@@ -2852,8 +2883,8 @@ function waiversBody() {
     return `<div class="item move"><div class="mrank num">${i + 1}</div>
       <div class="mside"><span class="pill n">Add</span> <div>${pl(m.f)}<span class="psub">${ownTxt(m.f)}</span></div>${schedStrip(m.f, weeks, H)}</div>
       <div class="mside">${m.d ? `<span class="pill o">Drop</span> <div>${pl(m.d)}</div>${schedStrip(m.d, weeks, H)}` : `<span class="pill m">No drop</span> <div class="small muted">You have an open roster spot</div>`}</div>
-      <div class="mgain"><span class="num">+${f1(m.hz)}</span><span class="small muted">expected lineup pts, next ${H} wk${H > 1 ? 's' : ''}</span>${H < weeks.length ? `<span class="small ${m.later >= 0 ? 'trend-up' : 'trend-down'}">${m.later >= 0 ? '+' : ''}${f1(m.later)} after that</span>` : ''}</div>
-      <div class="mwhy small">${m.marginal ? '<span class="pill m">Marginal: holding is fine</span> ' : m.longBet ? '<span class="pill q">Long-term bet</span> ' : ''}${esc(m.whyText)}. <button type="button" class="btn sm" data-taken="${esc(m.f)}">Taken in my league</button></div></div>`;
+      <div class="mgain"><span class="num">+${f1(m.hz)}</span><span class="small muted">expected lineup pts, next ${m.H} wk${m.H > 1 ? 's' : ''}</span>${m.H === H && H < weeks.length ? `<span class="small ${m.later >= 0 ? 'trend-up' : 'trend-down'}">${m.later >= 0 ? '+' : ''}${f1(m.later)} after that</span>` : ''}</div>
+      <div class="mwhy small">${m.hold ? '<span class="pill o">Keep yours</span> ' : m.marginal ? '<span class="pill m">Marginal: holding is fine</span> ' : m.longBet ? '<span class="pill q">Long-term bet</span> ' : ''}${esc(m.whyText)}. <button type="button" class="btn sm" data-taken="${esc(m.f)}">Taken in my league</button></div></div>`;
   }).join('') + (moves.length > shownMoves.length ? `<div class="item lock-row">${lockLine(hiddenTxt(moves.slice(shownMoves.length)))}</div>` : '')
     : `<div class="item" style="padding:14px"><span class="muted">No free agent improves your lineup over ${hLab}. Try a longer window or a higher ownership limit.</span></div>`;
   const posBest = POS.map(p => { const top = R.byH.filter(id => D.U.get(id).pos === p).slice(0, 4); return top.map(id => `<tr><td><strong>${esc(D.U.get(id).name)}</strong> <span class="small muted">${p} · ${D.U.get(id).team}</span></td><td>${ownTxt(id)}</td><td>${f1(rosBase(id))}</td><td>${f1(R.sumH(id))}</td><td class="l">${schedStrip(id, weeks, Math.min(H, 6))}</td><td><button type="button" class="btn sm" data-taken="${esc(id)}">Taken</button></td></tr>`).join(''); }).join('');
@@ -2900,7 +2931,7 @@ function waiversBody() {
   <div class="needs">${needCards}</div>
   ${needs.holes.length ? `<div class="banner small"><strong>Lineup holes:</strong> ${esc(needs.holes.join(' · '))}. A pickup at that position is worth more than usual.</div>` : ''}
   ${stashCard}
-  <div class="row-head"><h2>All moves, ranked</h2><span class="small muted">Ranked by expected lineup points over ${hLab} plus how much each move raises your usual lineup, so an upgrade at a weak spot outranks a one-week bye patch${longTerm ? ', plus a third of the gain after that' : ''}. The big number is the ${hLab} gain only. A move needs +${f1(Math.max(1.5, 0.75 * H))} (a kicker or D/ST swap, +1 a week) to be worth the churn; smaller ones are marked Marginal. Kickers and D/STs are swapped for yours, never added by dropping another position. Bench players count as injury cover. Week chips: green is a soft matchup, red is tough, • means the defense changed.</span></div>
+  <div class="row-head"><h2>All moves, ranked</h2><span class="small muted">Ranked by expected lineup points over ${hLab} plus how much each move raises your usual lineup, so an upgrade at a weak spot outranks a one-week bye patch${longTerm ? ', plus a third of the gain after that' : ''}. The big number is the ${hLab} gain only. A move needs +${f1(Math.max(1.5, 0.75 * H))} (a kicker or D/ST swap, +1 a week) to be worth the churn; smaller ones are marked Marginal. Kickers and D/STs are swapped for yours, never added by dropping another position, and judged on the next ${Math.min(H, STREAM_H)} weeks only, since they're streamed; a top-half one is never dropped for one ranked below it. Bench players count as injury cover. Week chips: green is a soft matchup, red is tough, • means the defense changed.</span></div>
   <div class="card list">${moveRows}</div>
   ${persSection(weeks, H)}
   <div class="row-head"><h2>Top free agents by position</h2><span class="small muted">Projected points over ${hLab}</span></div>
@@ -3017,7 +3048,7 @@ function bennysMoves() {
   const W = computeWaivers(), usedPos = new Set(), usedDrop = new Set(), picks = [];
   // one move per position added and per player dropped, compared per week so a 4-week gain doesn't outrank this week's lineup
   for (const m of W.moves) { if (m.marginal) continue; const p = D.U.get(m.f).pos; if (usedPos.has(p) || (m.d && usedDrop.has(m.d))) continue; usedPos.add(p); if (m.d) usedDrop.add(m.d); picks.push(m); if (picks.length === 3) break; }
-  for (const m of picks) out.push({ gain: m.score / W.H, tab: 'waivers', title: `Add ${nm(m.f)}${m.d ? `, drop ${nm(m.d)}` : ''}`, detail: esc(m.whyText || '') + '.', gainTxt: `+${f1(m.hz)} pts over ${W.H} wk${W.H > 1 ? 's' : ''}` });
+  for (const m of picks) out.push({ gain: m.score / m.H, tab: 'waivers', title: `Add ${nm(m.f)}${m.d ? `, drop ${nm(m.d)}` : ''}`, detail: esc(m.whyText || '') + '.', gainTxt: `+${f1(m.hz)} pts over ${m.H} wk${m.H > 1 ? 's' : ''}` });
   out.sort((a, b) => b.gain - a.gain);
   /* Your weakest position by Benny Grade, with the best free agent there by name. It goes second, so a free account
      (top two) always sees it; a waiver move above that already adds the player isn't repeated. */
@@ -3049,7 +3080,7 @@ function renderBrief() {
   const { starters } = optimize(), proj = starters.reduce((s, x) => s + (x.r ? x.r.mean : 0), 0);
   const dec = reviewDecisions(), W = computeWaivers(), best = W.best;
   const decTxt = dec.length ? `<button type="button" class="blink" data-brief="decide"><span class="n">${dec.length}</span> decision${dec.length === 1 ? '' : 's'} to review</button>` : `<span>no close calls</span>`;
-  const bestTxt = best ? `<button type="button" class="blink" data-brief="waiver">best waiver move <span class="n up">+${f1(best.hz)}</span> pts over ${W.H} week${W.H === 1 ? '' : 's'}</button>` : `<span>no waiver move worth making</span>`;
+  const bestTxt = best ? `<button type="button" class="blink" data-brief="waiver">best waiver move <span class="n up">+${f1(best.hz)}</span> pts over ${best.H} week${best.H === 1 ? '' : 's'}</button>` : `<span>no waiver move worth making</span>`;
   el.innerHTML = `<span class="bteam">${team}:</span> your optimal lineup projects for <button type="button" class="blink" data-tab="lineup"><span class="n">${f1(proj)}</span> points</button><span class="sep">·</span>${decTxt}<span class="sep">·</span>${bestTxt}`;
 }
 /* Freshness: "Updated 12 minutes ago", refreshed every minute. Live data is just-now; a saved copy shows its age. */

@@ -29,8 +29,11 @@ $server = Start-Job -ArgumentList $root, $Port -ScriptBlock {
 try {
   Start-Sleep -Milliseconds 800
   $prof = Join-Path ([IO.Path]::GetTempPath()) ('bp-selftest-' + [Guid]::NewGuid())
+  # Chrome logs harmless errors to stderr on longer runs; under 'Stop' Windows PowerShell would abort on them
+  $ErrorActionPreference = 'Continue'
   $dom = & $chrome --headless=new --disable-gpu --no-first-run --user-data-dir="$prof" --virtual-time-budget=120000 `
     --dump-dom "http://localhost:$Port/$Page" 2>$null | Out-String
+  $ErrorActionPreference = 'Stop'
   Remove-Item -Recurse -Force $prof -ErrorAction SilentlyContinue
   $m = [regex]::Match($dom, '<pre id="selftest-out">(.*?)</pre>', 'Singleline')
   if (-not $m.Success) { Write-Host 'FAIL no results in the page'; exit 1 }
