@@ -1647,6 +1647,7 @@ function ingest(inp) {
   }
   D.prevPPG = Object.fromEntries(Object.entries(inp.prevPPG || {}).map(([id, [ppg, gp, rpg]]) => [id, [+fmtPts(ppg, rpg, D.U.get(id)?.pos).toFixed(1), gp]]));
   D.idp = inp.idp && inp.idp.now?.length ? inp.idp : null;
+  updateInjLog(inp);
   D.wCache = null; D.usage = null;
   computeAll();
 }
@@ -1717,18 +1718,42 @@ function computeTeams() {
 const ratio = (a, b) => ok(a) && ok(b) && b ? a / b - 1 : 0;
 
 /* ---------- player model ---------- */
+/* A player's role this week, read from Sleeper's projections, which follow depth charts. A healthy player with no
+   projection while Sleeper projects a teammate at his position is a backup: points he scored filling in for an injured
+   starter say nothing about this week. A projection far from his scoring average (under half, or over 1.6×) means his
+   role changed, so the projection leads (ROLE_LEAD) instead of the usual blend. D.depth is built in computeAll. */
+const ROLE_POS = new Set(['QB', 'RB', 'WR', 'TE']), ROLE_LEAD = 0.9;
+function roleOf(id, avg) {
+  const u = D.U.get(id); if (!u?.team || !ROLE_POS.has(u.pos) || !D.tg[u.team] || /^(out|ir|pup|sus|na|cov|doubtful)/i.test(u.inj || '')) return null;
+  const pts = D.proj[id]?.pts, mates = (D.depth?.[u.team + '|' + u.pos] || []).filter(x => x !== id);
+  if (!(pts > 0)) return mates.length && avg > 0 ? { kind: 'backup', behind: mates[0], avg } : null;
+  if (!(avg >= 4) || !(D.H[id]?.n >= 2 || D.prevPPG?.[id])) return null;
+  const k = pts / avg;
+  return k < 0.5 ? { kind: 'reduced', pts, avg } : k > 1.6 ? { kind: 'expanded', pts, avg } : null;
+}
+function roleText(role, short) {
+  if (!role) return '';
+  if (role.kind === 'backup') return short ? `Backup to ${shortName(role.behind)}` : `Backup: Sleeper projects ${D.U.get(role.behind)?.name || 'a teammate'} to start, so his value depends on that player missing time (he averaged ${f1(role.avg)} when he played)`;
+  const big = role.kind === 'expanded';
+  return short ? (big ? 'Bigger role' : 'Smaller role') : `${big ? 'Bigger' : 'Smaller'} role: Sleeper projects ${f1(role.pts)} vs his ${f1(role.avg)} average, so the projection leads`;
+}
 function evalPlayer(id) {
   const u = D.U.get(id); if (!u) return null;
   const S = state.settings, I = S.intensity, pos = u.pos, T = u.team;
   const h = D.H[id], pr = D.proj[id], tg = T ? D.tg[T] : null;
   const r = { id, u, pos, T, h, projPts: pr ? pr.pts : null, factors: [], status: 'ok', inj: u.inj };
-  if (/^(out|ir|pup|sus|na|cov)/i.test(u.inj || '')) r.status = 'out';
+  // the injury report is about now: for a later week he's out only until his expected return, as on Waivers (returnWeek)
+  const later = D.season === D.detSeason && D.week > D.detWeek;
+  if (/^(out|ir|pup|sus|na|cov)/i.test(u.inj || '') && !(later && injKind(u.inj) && D.week >= returnWeek(id))) r.status = 'out';
   if (!tg) { r.status = 'bye'; r.mean = 0; r.sd = 0; r.grade = '–'; r.mult = 1; r.base = 0; return finish(r); }
   const O = r.O = tg.opp, g = r.game = tg.g, tb = D.B[T] || {}, ob = D.B[O] || {}, L = D.L;
   if (g.state !== 'pre') { r.locked = true; r.actual = D.actual[id]; }
   // his scoring average, with last season counted as 2 games so a few early games don't carry it alone
   const prev = D.prevPPG?.[id]?.[0], avg = h?.n ? (ok(prev) ? (h.avg * h.n + prev * 2) / (h.n + 2) : h.avg) : (ok(prev) ? prev : null);
-  r.base = r.projPts != null ? (avg != null ? S.blend * r.projPts + (1 - S.blend) * avg : r.projPts) : (avg ?? 0);
+  // a backup is worth nothing this week however he scored filling in; after a role change the projection leads
+  const role = r.role = roleOf(id, avg);
+  r.base = role?.kind === 'backup' ? 0 : role ? ROLE_LEAD * r.projPts + (1 - ROLE_LEAD) * avg
+    : r.projPts != null ? (avg != null ? S.blend * r.projPts + (1 - S.blend) * avg : r.projPts) : (avg ?? 0);
   const add = (key, label, raw, note, short) => { const v = clamp(raw * I * (S.w[key] ?? 1), -0.25, 0.25); r.factors.push({ key, label, pct: v, note, short }); };
   const itT = implied(g, T), itO = implied(g, O), lgI = D.lgImplied;
   const st = staffOf(T), so = staffOf(O);
@@ -1845,7 +1870,8 @@ function finish(r) {
   r.pAvg = r.h?.n && r.status !== 'bye' ? pAbove(r.h.avg, m, sd) : null;
   r.p10 = pAbove(10, m, sd); r.p15 = pAbove(15, m, sd); r.p20 = pAbove(20, m, sd);
   const top = [...r.factors].filter(f => Math.abs(f.pct) >= 0.03).sort((a, b) => Math.abs(b.pct) - Math.abs(a.pct))[0];
-  r.chip = top ? { text: top.short(top.pct), dir: top.pct > 0 ? 'up' : 'down' } : null;
+  // a role change matters more than any matchup factor, so it takes the chip
+  r.chip = r.role ? { text: roleText(r.role, true), dir: r.role.kind === 'expanded' ? 'up' : 'down' } : top ? { text: top.short(top.pct), dir: top.pct > 0 ? 'up' : 'down' } : null;
   return r;
 }
 /* ---------- defensive & special-teams personnel ----------
@@ -1920,6 +1946,10 @@ function persOwn(T, share = 1 - state.settings.blend) {
 }
 function computeAll() {
   computeTeams(); computePersonnel(); D.M = {};
+  // who Sleeper projects at each team and position this week, best first (roleOf)
+  D.depth = {};
+  for (const id in D.proj) { const u = D.U.get(id); if (u?.team && D.proj[id].pts > 0) (D.depth[u.team + '|' + u.pos] ||= []).push(id); }
+  for (const k in D.depth) D.depth[k].sort((a, b) => D.proj[b].pts - D.proj[a].pts);
   // this season's average score of a regular D/ST and kicker (2+ games), for seasonAvg
   D.posAvg = {}; for (const P of ['DEF', 'K']) D.posAvg[P] = mean(Object.entries(D.H).filter(([id, h]) => h.n >= 2 && D.U.get(id)?.pos === P).map(([, h]) => h.avg));
   for (const id of D.U.keys()) { const r = evalPlayer(id); if (r) D.M[id] = r; }
@@ -2342,10 +2372,40 @@ const isLongInj = inj => /^(ir|pup|sus|na)/i.test(inj || '');
 /* Injured players: 'long' (IR, PUP, suspended, NFI) or 'short' (Out, Doubtful). They score 0 until their expected
    return week (default: next week for short, four weeks out for long, editable in Waivers), then at their healthy level. */
 const injKind = inj => isLongInj(inj) ? 'long' : /^(out|doubtful)/i.test(inj || '') ? 'short' : null;
+/* Expected return counts from the week he was first listed (D.injLog), never from the week being viewed: the NFL minimum
+   of one game for Out or Doubtful and four for IR, PUP or a suspension, counting his team's games so a bye doesn't count.
+   Still listed after that, he's back next week at the earliest. It's an estimate of the earliest return; set it in Waivers
+   when the team says more (e.g. "three weeks minimum"). */
+const INJ_GAMES = { short: 1, long: 4 };
+function autoReturnWeek(id) {
+  const u = D.U.get(id), k = injKind(u?.inj); if (!k) return D.week;
+  const cur = D.season === D.detSeason, now = cur ? D.detWeek : D.week, first = (cur && D.injLog?.[id]?.[2]) || now;
+  let w = first, games = 0;
+  while (games < INJ_GAMES[k] && w <= 18) { if (!u.team || !schedOpp(u.team, w).bye) games++; w++; }
+  return Math.min(19, Math.max(w, now + 1));
+}
+/* Your own expected-back week, kept per season ({w, s}); a bare number is from before seasons were kept. */
+function rwOverride(id) {
+  const v = state.returnWeek?.[id]; if (v == null) return null;
+  return typeof v === 'number' ? v : v.s === D.season ? v.w : null;
+}
 function returnWeek(id) {
-  const k = injKind(D.U.get(id)?.inj); if (!k) return D.week;
-  const set = state.returnWeek?.[id]; if (set != null) return set;
-  return Math.min(19, D.week + (k === 'long' ? 4 : 1));
+  if (!injKind(D.U.get(id)?.inj)) return D.week;
+  return rwOverride(id) ?? autoReturnWeek(id);
+}
+/* Injury log: for each injured player, the week he was first listed with his current kind of injury, so a return estimate
+   doesn't move with the week you view. The saved copy carries the log the data refresh keeps (scripts/extract_snapshot.py);
+   this browser keeps its own too, and the earlier sighting wins. A change of kind (Out to IR) starts a new entry. */
+function updateInjLog(inp) {
+  const S = D.detSeason, key = `fo1:injlog:${S}`, mine = store.get(key, {}) || {}, saved = inp.injLog || {}, log = {};
+  const today = new Date().toISOString().slice(0, 10);
+  for (const u of D.U.values()) {
+    const k = injKind(u.inj); if (!k) continue;
+    const seen = [saved[u.id], mine[u.id]].filter(e => e && e[1] === S && injKind(e[0]) === k).sort((a, b) => a[2] - b[2])[0];
+    log[u.id] = seen ? [u.inj, S, seen[2], seen[3]] : [u.inj, S, D.detWeek, today];
+  }
+  if (D.season === S) store.set(key, log);
+  D.injLog = log;
 }
 /* Healthy per-game value: this season's average blended with last season's (last season counts as 4 games). */
 function healthyBase(id) {
@@ -2372,9 +2432,11 @@ function rosBase(id) {
   const r = D.M[id]; if (!r) return 0;
   if (state.overrides[id] != null && ok(+state.overrides[id])) return +state.overrides[id];
   if (injKind(r.u.inj)) return healthyBase(id);
+  // a backup's fill-in scoring isn't his value; after a role change the projection leads here too (roleOf)
+  if (r.role?.kind === 'backup') return 0;
   const P = r.pos, avg = P === 'DEF' || P === 'K' ? seasonAvg(id) : (D.H[id]?.n || D.prevPPG?.[id] ? healthyBase(id) : null);
   const opp = r.u.team ? D.tg[r.u.team]?.opp : null, pj = r.projPts != null && opp ? r.projPts / matchupMult(P, opp, D.week, r.u.team) : null;
-  const b = state.settings.blend * ROS_PROJ;
+  const b = r.role ? ROLE_LEAD : state.settings.blend * ROS_PROJ;
   return pj != null && avg != null ? b * pj + (1 - b) * avg : (pj ?? avg ?? 0);
 }
 const SLOT_SHARE = { QB: { OP: .7 }, RB: { FLEX: .45, 'RB/WR': .5, OP: .1 }, WR: { FLEX: .45, 'RB/WR': .5, 'WR/TE': .75, OP: .1 }, TE: { FLEX: .1, 'WR/TE': .25, OP: .1 }, K: {}, DEF: {} };
@@ -2460,7 +2522,8 @@ function availablePool() {
   const list = W.source === 'list' && W.faList.length ? new Set(W.faList) : null;
   // a synced Sleeper league knows every rostered player, so its free agents are exact
   const sl = W.source === 'sleeper' && state.sleeper?.rostered ? new Set(state.sleeper.rostered) : null;
-  return [...D.U.values()].filter(u => D.M[u.id] && !ros.has(u.id) && !W.taken[u.id] && (D.proj[u.id]?.pts > 0 || D.H[u.id]?.n) && !isLongInj(u.inj)
+  // backups (roleOf) aren't pickups: their value depends on a starter missing time, not on their fill-in scoring
+  return [...D.U.values()].filter(u => D.M[u.id] && !ros.has(u.id) && !W.taken[u.id] && (D.proj[u.id]?.pts > 0 || D.H[u.id]?.n) && !isLongInj(u.inj) && D.M[u.id].role?.kind !== 'backup'
     && (sl ? !sl.has(u.id) : list ? list.has(u.id) : (D.own.get(u.id) ?? 0) < W.ownMax)).map(u => u.id);
 }
 function computeWaivers() {
@@ -2651,7 +2714,7 @@ function waiversBody() {
   trackOnce('wv:' + D.week, 'waivers_viewed', { has_move: moves.length > 0, waiver_count: moves.length, best_gain: moves[0] ? Math.round(moves[0].hz) : 0, window: W.horizon, source: W.source });
   const hLab = H === 1 ? `week ${weeks[0]}` : `weeks ${weeks[0]}–${weeks[H - 1]}`;
   const ownTxt = id => D.own.has(id) ? `${D.own.get(id) < 1 ? '<1' : Math.round(D.own.get(id))}% owned` : 'unowned';
-  const pl = id => { const u = D.U.get(id), r = D.M[id]; return `<span class="pname">${esc(u.name)}</span><span class="psub">${u.pos} · ${u.team || 'FA'} ${injPill(r)} · ${f1(rosBase(id))} pts/g</span>`; };
+  const pl = id => { const u = D.U.get(id), r = D.M[id]; return `<span class="pname">${esc(u.name)}</span><span class="psub">${u.pos} · ${u.team || 'FA'} ${injPill(r)}${r?.role ? ' · ' + esc(roleText(r.role, true)) : ''} · ${f1(rosBase(id))} pts/g</span>`; };
   const src = W.source === 'list' && W.faList.length ? `your league’s free-agent list (${W.faList.length} players, pasted ${esc(new Date(W.faListAt).toLocaleDateString([], { month: 'short', day: 'numeric' }))})` : `players under ${W.ownMax}% owned across ESPN leagues`;
   const warn = [];
   if (W.source === 'own' && !D.own.size) warn.push('ESPN ownership didn’t load, so every player not on your roster counts as available. Paste your league’s free agents below for accurate suggestions.');
@@ -2683,9 +2746,9 @@ function waiversBody() {
   const posBest = POS.map(p => { const top = R.byH.filter(id => D.U.get(id).pos === p).slice(0, 4); return top.map(id => `<tr><td><strong>${esc(D.U.get(id).name)}</strong> <span class="small muted">${p} · ${D.U.get(id).team}</span></td><td>${ownTxt(id)}</td><td>${f1(rosBase(id))}</td><td>${f1(R.sumH(id))}</td><td class="l">${schedStrip(id, weeks, Math.min(H, 6))}</td><td><button type="button" class="btn sm" data-taken="${esc(id)}">Taken</button></td></tr>`).join(''); }).join('');
   const stashCard = R.stashes.length ? `<div class="row-head"><h2>Injured players you’re holding</h2><span class="small muted">Players set to Keep are never suggested as drops. Startable players who’ll be back start on Keep.</span></div>
   <div class="card list">${[...R.stashes].sort((a, b) => b.keep - a.keep || a.rank - b.rank).map(s => {
-    const u = D.U.get(s.id), auto = Math.min(19, D.week + (injKind(u.inj) === 'long' ? 4 : 1)), set = state.returnWeek?.[s.id];
-    const opts = [`<option value="" ${set == null ? 'selected' : ''}>Auto (${auto > 18 ? 'out for season' : 'wk ' + auto})</option>`]
-      .concat(Array.from({ length: 18 - D.week }, (_, i) => D.week + 1 + i).map(w => `<option value="${w}" ${set === w ? 'selected' : ''}>Week ${w}</option>`), `<option value="19" ${set === 19 ? 'selected' : ''}>Out for season</option>`).join('');
+    const u = D.U.get(s.id), auto = autoReturnWeek(s.id), set = rwOverride(s.id), w0 = D.season === D.detSeason ? D.detWeek : D.week;
+    const opts = [`<option value="" ${set == null ? 'selected' : ''}>Auto (${auto > 18 ? 'out for season' : 'earliest wk ' + auto})</option>`]
+      .concat(Array.from({ length: Math.max(0, 18 - w0) }, (_, i) => w0 + 1 + i).map(w => `<option value="${w}" ${set === w ? 'selected' : ''}>Week ${w}</option>`), `<option value="19" ${set === 19 ? 'selected' : ''}>Out for season</option>`).join('');
     const W = state.waivers;
     // One switch per player. Picking what the automatic rule would pick clears your override.
     const mine = W.forceKeep?.[s.id] || W.allowDrop?.[s.id];
@@ -3011,6 +3074,7 @@ function detailBlock(r) {
   const h = r.h, why = topReasons(r);
   return `<div class="detail"><div class="section">
     <h3 class="dh">Why ${f1(r.mean)} points</h3>
+    ${r.role ? `<div class="small"><strong>${esc(roleText(r.role))}.</strong></div>` : ''}
     ${r.status === 'bye' ? '<div class="small muted">Bye week.</div>' : `<div class="small muted">Baseline ${f1(r.base)} (Sleeper projection blended with his season average), ${spct(r.mult - 1)} for this matchup${r.override != null ? `; your override sets it to ${f1(r.override)}` : ''}.</div>
     ${why.length ? `<ul class="reasons">${why.map(x => `<li class="${x.up ? 'up' : 'down'}"><span class="rv">${spct(x.pct)}</span> ${esc(x.text)}</li>`).join('')}</ul>` : '<div class="small muted">No matchup factor moves him much this week.</div>'}`}
   </div>
@@ -4011,7 +4075,7 @@ document.addEventListener('change', e => {
   if (t.hasAttribute('data-teprem')) { state.tePrem = +t.value || 0; save(); if (D.inp) ingest(D.inp); D.open.clear(); render(); return; }
   if (t.hasAttribute('data-scoring')) { if (SCORING[t.value]) { state.scoring = t.value; save(); if (D.inp) ingest(D.inp); D.open.clear(); render(); } return; }
   if (t.id === 'teamName') { const ct = curTeam(), v = t.value.trim(); if (ct && v) ct.name = v; save(); render(); return; }
-  if (t.dataset.rw) { const rw = state.returnWeek || (state.returnWeek = {}); if (t.value === '') delete rw[t.dataset.rw]; else rw[t.dataset.rw] = +t.value; save(); render(); return; }
+  if (t.dataset.rw) { const rw = state.returnWeek || (state.returnWeek = {}); if (t.value === '') delete rw[t.dataset.rw]; else rw[t.dataset.rw] = { w: +t.value, s: D.season }; save(); render(); return; }
   if (t.hasAttribute('data-wteams')) { state.waivers.teams = +t.value; D.wCache = null; save(); render(); return; }
   if (t.id === 'showOvr') { D.showOvr = t.checked; const b = $('#plistBox'); if (b) b.innerHTML = playerListHTML(); return; }
   if (t.id === 'wOwn') { state.waivers.ownMax = +t.value; save(); render(); return; }

@@ -1,7 +1,7 @@
 # Runs tests/selftest.html in headless Chrome against a throwaway local web server and prints the results.
 # Usage (from the repo folder): powershell -ExecutionPolicy Bypass -File scripts/selftest.ps1
 # Exits 1 if any check fails or the page never finishes. CI runs the same page from .github/workflows/selftest.yml.
-param([int]$Port = 8123)
+param([int]$Port = 8123, [string]$Page = 'tests/selftest.html')
 $ErrorActionPreference = 'Stop'
 $root = (Resolve-Path (Join-Path $PSScriptRoot '..')).Path
 
@@ -30,7 +30,7 @@ try {
   Start-Sleep -Milliseconds 800
   $prof = Join-Path ([IO.Path]::GetTempPath()) ('bp-selftest-' + [Guid]::NewGuid())
   $dom = & $chrome --headless=new --disable-gpu --no-first-run --user-data-dir="$prof" --virtual-time-budget=120000 `
-    --dump-dom "http://localhost:$Port/tests/selftest.html" 2>$null | Out-String
+    --dump-dom "http://localhost:$Port/$Page" 2>$null | Out-String
   Remove-Item -Recurse -Force $prof -ErrorAction SilentlyContinue
   $m = [regex]::Match($dom, '<pre id="selftest-out">(.*?)</pre>', 'Singleline')
   if (-not $m.Success) { Write-Host 'FAIL no results in the page'; exit 1 }

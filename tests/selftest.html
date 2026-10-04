@@ -63,6 +63,52 @@ test('fixture loaded (week 4, 2026)', () => { const D = ev('D'); return D.season
 test('reviewer roster resolves to 17 players', () => { setup(); const r = ev('state').roster; return r.every(Boolean) && r.length === 17 || 'missing: ' + ROSTER.filter((n, i) => !r[i]).join(', '); });
 test('lineup fills every slot', () => { setup(); const { starters } = ev('optimize')(); return starters.every(s => s.r) || 'empty: ' + starters.filter(s => !s.r).map(s => s.slot.k).join(', '); });
 
+/* ---------- Phase 1: player roles and injury timelines ---------- */
+test('backup QB (Drew Lock) is a backup worth 0 this week', () => {
+  setup(); const r = M(idOf('Drew Lock'));
+  return r.role?.kind === 'backup' && r.mean === 0 && name(r.role.behind) === 'Sam Darnold' || `role ${JSON.stringify(r.role)}, mean ${r.mean}`;
+});
+test('backups are not waiver pickups', () => { setup(); return !ev('availablePool')().includes(idOf('Drew Lock')); });
+test('no waiver move adds a backup', () => {
+  setup(); const W = ev('computeWaivers')();
+  const bad = W.moves.filter(m => M(m.f)?.role?.kind === 'backup');
+  return !bad.length || 'adds ' + bad.map(m => name(m.f)).join(', ');
+});
+test('a starter keeps his usual blend (no role flag)', () => { setup(); const r = M(idOf('Jared Goff')); return !r.role || JSON.stringify(r.role); });
+test('return weeks do not move with the week viewed', () => {
+  setup(); const D = ev('D'), rw = ev('returnWeek'), ids = [idOf('Baker Mayfield'), idOf('Zach Charbonnet')];
+  const at = w => { const keep = D.week; D.week = w; try { return ids.map(rw); } finally { D.week = keep; } };
+  const a = at(4), b = at(6), c = at(4);
+  return JSON.stringify(a) === JSON.stringify(b) && JSON.stringify(a) === JSON.stringify(c) || `wk4 ${a}, wk6 ${b}, back to wk4 ${c}`;
+});
+test('return week counts from when he was first listed', () => {
+  setup(); const D = ev('D'), id = idOf('Baker Mayfield'), keep = D.injLog[id];
+  try {
+    D.injLog[id] = ['Out', 2026, 4, '2026-09-28']; const a = ev('returnWeek')(id);   // listed this week: back next week
+    D.injLog[id] = ['Out', 2026, 2, '2026-09-14']; const b = ev('returnWeek')(id);   // still listed two weeks on: next week at the earliest
+    return a === 5 && b === 5 || `first listed wk 4 → ${a}, wk 2 → ${b}`;
+  } finally { D.injLog[id] = keep; }
+});
+test('IR/PUP counts four team games, skipping a bye', () => {
+  setup(); const D = ev('D'), id = idOf('Zach Charbonnet'), keep = D.injLog[id], T = D.U.get(id).team;
+  try {
+    D.injLog[id] = ['PUP', 2026, 4, '2026-09-28']; let w = 4, g = 0; while (g < 4) { if (!ev('schedOpp')(T, w).bye) g++; w++; }
+    const got = ev('returnWeek')(id); return got === w || `expected ${w}, got ${got}`;
+  } finally { D.injLog[id] = keep; }
+});
+test('your expected-back week only applies to its season', () => {
+  setup(st => { st.returnWeek = { [idOf('Baker Mayfield')]: { w: 9, s: 2025 } }; });
+  const a = ev('returnWeek')(idOf('Baker Mayfield'));
+  setup(st => { st.returnWeek = { [idOf('Baker Mayfield')]: { w: 9, s: 2026 } }; });
+  const b = ev('returnWeek')(idOf('Baker Mayfield'));
+  return a !== 9 && b === 9 || `last season's override → ${a}, this season's → ${b}`;
+});
+test('a later week counts an injured player in once he is back', () => {
+  setup(); const D = ev('D'), id = idOf('Baker Mayfield'), back = ev('returnWeek')(id), keep = D.week;
+  try { D.week = back; const r = ev('evalPlayer')(id); D.week = back - 1; const r2 = ev('evalPlayer')(id); return r.status !== 'out' && r2.status === 'out' || `wk ${back}: ${r.status}, wk ${back - 1}: ${r2.status}`; }
+  finally { D.week = keep; ev('computeAll')(); }
+});
+
 window.addEventListener('load', () => {
   const t0 = Date.now();
   (function wait() {

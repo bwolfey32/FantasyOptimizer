@@ -35,6 +35,39 @@ if not snap.get("wx"):
 if not snap.get("split"):
     print("Warning: last season's indoor/outdoor splits didn't build; the weather factor will skip personal splits.")
 
+
+def injury_kind(status):
+    """Same groups as injKind in index.html: long (IR, PUP, suspended, NFI) or short (Out, Doubtful)."""
+    s = (status or "").lower()
+    if re.match(r"(ir|pup|sus|na)", s):
+        return "long"
+    if re.match(r"(out|doubtful)", s):
+        return "short"
+    return None
+
+
+# Injury log: the week each injured player was first listed with his current kind of injury, carried over from the
+# previous snapshot so an expected return counts from when he got hurt (returnWeek in index.html). Sleeper's
+# injury_start_date is empty, so this log is the only record of it. Players who are healthy again drop out.
+try:
+    with open(out_path, encoding="utf-8") as f:
+        old = json.load(f)
+    prev_log = (old.get("injLog") or {}) if old.get("season") == snap["season"] else {}
+except (OSError, ValueError):
+    prev_log = {}
+log = {}
+for row in snap.get("proj", []):
+    pid, status = row[0], row[4]
+    kind = injury_kind(status)
+    if not kind or pid in log:
+        continue
+    seen = prev_log.get(pid)
+    if seen and seen[1] == snap["season"] and injury_kind(seen[0]) == kind:
+        log[pid] = [status, seen[1], seen[2], seen[3]]
+    else:
+        log[pid] = [status, snap["season"], snap["detWeek"], snap["createdAt"][:10]]
+snap["injLog"] = log
+
 with open(out_path, "w", encoding="utf-8") as f:
     json.dump(snap, f, ensure_ascii=False, separators=(",", ":"))
 print(f"Saved snapshot for {snap['season']} week {snap['week']}: {len(snap['proj'])} players, created {snap['createdAt']}")
