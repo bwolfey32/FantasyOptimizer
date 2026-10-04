@@ -113,7 +113,7 @@ a { color: var(--accent); }
 .tabs .navlink { flex: 0 0 auto; text-decoration: none; border-bottom: 3px solid transparent; padding: 8px 14px; font-family: var(--font-display); font-size: 18px; font-weight: 600; text-transform: uppercase; letter-spacing: .03em; color: var(--muted); white-space: nowrap; text-align: center; }
 .tabs .navlink:hover { color: var(--ink); }
 .tabs .navlink[aria-current="page"] { color: var(--ink); border-bottom-color: var(--accent); }
-#settingsBtn[aria-pressed="true"], #acctBtn[aria-expanded="true"] { border-color: var(--accent); color: var(--accent); }
+#acctBtn[aria-expanded="true"] { border-color: var(--accent); color: var(--accent); }
 #acctBtn { display: inline-flex; align-items: center; gap: 7px; }
 #acctBtn i { width: 8px; height: 8px; border-radius: 50%; background: var(--good); }
 #acctBtn i.busy { background: var(--accent); animation: pulse 1.2s ease-in-out infinite; }
@@ -220,7 +220,8 @@ body.welcome .controls, body.welcome #tabs, body.welcome #teamctx, body.welcome 
   .wxt td:empty { display: none; }
 }
 @media (max-width: 600px) { .hist th, .hist td { padding: 6px 6px; } .hist .hdet > td { padding: 4px 4px 10px; } }
-@media (max-width: 600px) { .tabs { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 0; } .tabs .navlink { padding: 8px 2px; font-size: 14.5px; letter-spacing: .01em; white-space: normal; line-height: 1.1; } }
+@media (max-width: 600px) { .tabs { display: grid; grid-template-columns: repeat(6, minmax(0, 1fr)); gap: 0; } .tabs .navlink { padding: 8px 1px; font-size: 14.5px; letter-spacing: 0; white-space: normal; line-height: 1.1; } }
+@media (max-width: 370px) { .tabs .navlink { font-size: 13px; } }
 
 /* Team context bar (every page) */
 .teamctx { display: flex; flex-direction: column; gap: 8px; }
@@ -552,7 +553,6 @@ td .wks { flex-wrap: nowrap; }
       <button class="btn" data-act="reload" type="button" title="Get the newest projections, injuries and lines">Refresh projections</button>
       <button class="btn gopro" data-tab="pro" type="button" id="proBtn" hidden>Go Pro</button>
       <button class="btn" data-act="account" type="button" id="acctBtn" aria-expanded="false" hidden>Sign in</button>
-      <button class="btn" data-tab="settings" type="button" id="settingsBtn">Settings</button>
     </div>
   </header>
   <div class="freshp card" id="fresh" hidden></div>
@@ -1567,23 +1567,23 @@ function evalPlayer(id) {
   const lineTxt = g.fav ? (g.fav === T ? `${T} favored by ${g.line}` : `${T} +${g.line} underdog`) : (g.ou ? 'Pick’em' : '');
   if (['QB','RB','WR','TE'].includes(pos)) {
     const fk = 'fpa' + pos, rank = rk(fk, O);
-    add('dvp', `Defense vs. ${pos}`, ratio(ob[fk], L[fk]), `${O} allows ${f1(ob[fk])} ${fmtName(true)} pts/game to ${pos}s, the ${rank ? ord(rank) : '?'} most of 32 (avg ${f1(L[fk])})`, s => s > 0 ? `Soft vs. ${pos}` : `Tough vs. ${pos}`);
-    if (pos === 'RB') add('cover', 'Run defense & run blocking', 0.6 * ratio(ob.ypcA, L.ypcA) + 0.4 * ratio(tb.ypc, L.ypc), `${O} allows ${f1(ob.ypcA)} yds/carry (avg ${f1(L.ypcA)}) · ${T} gains ${f1(tb.ypc)} yds/carry behind its line`, s => s > 0 ? 'Weak run D' : 'Stout run D');
-    else add('cover', 'Secondary', ratio(ob.passYdA, L.passYdA), `${O} allows ${f0(ob.passYdA)} passing yds/game (avg ${f0(L.passYdA)}), ${ord(rk('passYdA', O) || 16)} most`, s => s > 0 ? 'Leaky secondary' : 'Tough secondary');
+    add('dvp', `Defense vs. ${pos}`, ratio(ob[fk], L[fk]), `${O} allows ${f1(ob[fk])} ${fmtName(true)} pts/game to ${pos}s, the ${rank ? ord(rank) : '?'} most of 32 (avg ${f1(L[fk])})`, s => s > 0 ? `${O} weak vs. ${pos}s` : `${O} tough vs. ${pos}s`);
+    if (pos === 'RB') add('cover', 'Run defense & run blocking', 0.6 * ratio(ob.ypcA, L.ypcA) + 0.4 * ratio(tb.ypc, L.ypc), `${O} allows ${f1(ob.ypcA)} yds/carry (avg ${f1(L.ypcA)}) · ${T} gains ${f1(tb.ypc)} yds/carry behind its line`, s => s > 0 ? `${O} weak vs. the run` : `${O} tough vs. the run`);
+    else add('cover', 'Secondary', ratio(ob.passYdA, L.passYdA), `${O} allows ${f0(ob.passYdA)} passing yds/game (avg ${f0(L.passYdA)}), ${ord(rk('passYdA', O) || 16)} most`, s => s > 0 ? `${O} weak vs. the pass` : `${O} tough vs. the pass`);
     const pm = { QB: 1, WR: 0.5, TE: 0.5, RB: 0 }[pos];
-    if (pm) { const idx = (ratio(tb.sacksTaken, L.sacksTaken) + ratio(ob.sacks, L.sacks)) / 2; add('protect', 'Pass protection vs. pass rush', -0.6 * idx * pm, `${T} allows ${f1(tb.sacksTaken)} sacks/game · ${O} gets ${f1(ob.sacks)} sacks/game (avg ${f1(L.sacks)})`, s => s > 0 ? 'Clean pocket' : 'Heavy pass rush'); }
-    if (itT != null) { const edge = itT - itO; const tilt = pos === 'RB' ? 0.01 * edge : -0.005 * edge; add('script', 'Game script & opponent', ratio(itT, lgI) + tilt, `${T} implied ${f1(itT)} pts (avg ${f1(lgI)}) · ${lineTxt} · O/U ${g.ou} · ${O} is ${D.rec[O] || '0-0'}`, s => s > 0 ? 'High team total' : 'Low team total'); }
+    if (pm) { const idx = (ratio(tb.sacksTaken, L.sacksTaken) + ratio(ob.sacks, L.sacks)) / 2; add('protect', 'Pass protection vs. pass rush', -0.6 * idx * pm, `${T} allows ${f1(tb.sacksTaken)} sacks/game · ${O} gets ${f1(ob.sacks)} sacks/game (avg ${f1(L.sacks)})`, s => s > 0 ? 'Clean pocket likely' : `${O} pass rush is a threat`); }
+    if (itT != null) { const edge = itT - itO; const tilt = pos === 'RB' ? 0.01 * edge : -0.005 * edge; add('script', 'Game script & opponent', ratio(itT, lgI) + tilt, `${T} implied ${f1(itT)} pts (avg ${f1(lgI)}) · ${lineTxt} · O/U ${g.ou} · ${O} is ${D.rec[O] || '0-0'}`, s => s > 0 ? `${T} expected to score a lot` : `${T} expected to score little`); }
     else add('script', 'Game script & opponent', 0, `No betting line posted yet · ${O} is ${D.rec[O] || '0-0'}`, () => '');
     const pr2 = pos === 'RB' ? ratio(1 - tb.passRate, 1 - L.passRate) : ratio(tb.passRate, L.passRate);
     add('style', 'Offensive style & pace', 0.7 * pr2 + 0.5 * ratio(tb.plays, L.plays), `${T} passes on ${pct(tb.passRate)} of plays (avg ${pct(L.passRate)}) · ${f1(tb.plays)} plays/game (avg ${f1(L.plays)})${trendTxt(T, 'passRate')}`, s => s > 0 ? (pos === 'RB' ? 'Run-heavy offense' : 'Pass-heavy offense') : (pos === 'RB' ? 'Pass-first offense' : 'Run-first offense'));
   } else if (pos === 'K') {
-    add('dvp', 'Defense vs. K', ratio(ob.fpaK, L.fpaK), `Kickers average ${f1(ob.fpaK)} pts against ${O} (avg ${f1(L.fpaK)})`, s => s > 0 ? 'Kicker-friendly D' : 'Tough for kickers');
-    if (itT != null) add('script', 'Game script & opponent', 0.8 * ratio(itT, lgI), `${T} implied ${f1(itT)} pts · ${lineTxt} · O/U ${g.ou}`, s => s > 0 ? 'High team total' : 'Low team total');
+    add('dvp', 'Defense vs. K', ratio(ob.fpaK, L.fpaK), `Kickers average ${f1(ob.fpaK)} pts against ${O} (avg ${f1(L.fpaK)})`, s => s > 0 ? `${O} gives up kicks` : `${O} tough on kickers`);
+    if (itT != null) add('script', 'Game script & opponent', 0.8 * ratio(itT, lgI), `${T} implied ${f1(itT)} pts · ${lineTxt} · O/U ${g.ou}`, s => s > 0 ? `${T} expected to score a lot` : `${T} expected to score little`);
     add('style', 'Offensive style & pace', 0.5 * ratio(tb.plays, L.plays), `${T} runs ${f1(tb.plays)} plays/game (avg ${f1(L.plays)})`, s => s > 0 ? 'Fast pace' : 'Slow pace');
   } else if (pos === 'DEF') {
-    add('dvp', 'Opponent offense', ratio(ob.fpaDEF, L.fpaDEF), `D/STs average ${f1(ob.fpaDEF)} pts against ${O}’s offense (avg ${f1(L.fpaDEF)}), ${ord(rk('fpaDEF', O) || 16)} most`, s => s > 0 ? 'Mistake-prone offense' : 'Careful offense');
-    add('protect', 'Pass rush vs. protection', 0.6 * (ratio(ob.sacksTaken, L.sacksTaken) + ratio(tb.sacks, L.sacks)) / 2, `${T} gets ${f1(tb.sacks)} sacks/game · ${O} allows ${f1(ob.sacksTaken)} (avg ${f1(L.sacksTaken)})`, s => s > 0 ? 'Sack chances' : 'Few sacks likely');
-    if (itO != null) add('script', 'Game script & opponent', -1.2 * ratio(itO, lgI) + 0.3 * ((winPct(D.rec[T]) ?? .5) - (winPct(D.rec[O]) ?? .5)), `${O} implied ${f1(itO)} pts (avg ${f1(lgI)}) · ${O} is ${D.rec[O] || '0-0'} · ${lineTxt}`, s => s > 0 ? 'Low opponent total' : 'High opponent total');
+    add('dvp', 'Opponent offense', ratio(ob.fpaDEF, L.fpaDEF), `D/STs average ${f1(ob.fpaDEF)} pts against ${O}’s offense (avg ${f1(L.fpaDEF)}), ${ord(rk('fpaDEF', O) || 16)} most`, s => s > 0 ? `${O} offense makes mistakes` : `${O} offense is careful`);
+    add('protect', 'Pass rush vs. protection', 0.6 * (ratio(ob.sacksTaken, L.sacksTaken) + ratio(tb.sacks, L.sacks)) / 2, `${T} gets ${f1(tb.sacks)} sacks/game · ${O} allows ${f1(ob.sacksTaken)} (avg ${f1(L.sacksTaken)})`, s => s > 0 ? 'Sacks likely' : 'Few sacks likely');
+    if (itO != null) add('script', 'Game script & opponent', -1.2 * ratio(itO, lgI) + 0.3 * ((winPct(D.rec[T]) ?? .5) - (winPct(D.rec[O]) ?? .5)), `${O} implied ${f1(itO)} pts (avg ${f1(lgI)}) · ${O} is ${D.rec[O] || '0-0'} · ${lineTxt}`, s => s > 0 ? `${O} expected to score little` : `${O} expected to score a lot`);
   }
   // defensive & special-teams personnel changes the stats don't show yet. persMult/persOwn are already capped at ±10%,
   // so this factor skips the matchup-strength scaling and uses only its own weight.
@@ -1592,11 +1592,11 @@ function evalPlayer(id) {
     if (pos === 'DEF') {
       const [om, st] = persOwn(T), v = clamp((om - 1 + st / Math.max(r.base, 4)) * wgt, -0.25, 0.25), t = D.pers[T];
       const mv = t && (t.moves.find(x => (v > 0 ? x.val > 0 : x.val < 0)) || t.stMoves.find(x => (v > 0 ? x.val > 0 : x.val < 0)));
-      r.factors.push({ key: 'pers', label: 'Defensive personnel', pct: v, short: s => s > 0 ? 'Defense upgraded' : 'Defense weakened',
+      r.factors.push({ key: 'pers', label: 'Defensive personnel', pct: v, short: s => s > 0 ? `${T} defense upgraded` : `${T} defense weakened`,
         note: Math.abs(v) < 0.01 ? `No notable roster changes to the ${T} defense or return units` : `${T} defense ${v > 0 ? 'stronger' : 'weaker'} than its stats${mv ? ': ' + moveText(mv) : ''}` });
     } else {
       const v = clamp((persMult(O, pos) - 1) * wgt, -0.25, 0.25);
-      r.factors.push({ key: 'pers', label: 'Opponent defensive personnel', pct: v, short: s => s > 0 ? 'Weakened defense' : 'Upgraded defense',
+      r.factors.push({ key: 'pers', label: 'Opponent defensive personnel', pct: v, short: s => s > 0 ? `${O} defense weakened` : `${O} defense upgraded`,
         note: persNote(O, pos) || `No notable roster changes to the ${O} defense` });
     }
   }
@@ -2104,7 +2104,7 @@ function teamUsage(T) {
   if (!D.usage) { D.usage = {}; for (const wk of D.weeks || []) for (const [, , t, , , , , , ra, , tg] of wk.P) { const u = D.usage[t] || (D.usage[t] = { tgt: 0, ra: 0 }); u.tgt += tg; u.ra += ra; } }
   return D.usage[T] || { tgt: 0, ra: 0 };
 }
-function lean(n) { return n > 0.4 ? ['Helps', 'up'] : n < -0.4 ? ['Hurts', 'down'] : ['Neutral', '']; }
+function lean(n) { return n > 0.4 ? ['Helps', 'up'] : n < -0.4 ? ['Hurts', 'down'] : ['Neutral for', '']; }
 function sideCard(kind, team, caller, title, statLines, famLean, dataLean, dataTxt, posLabel) {
   const c = COACH[caller], fam = c ? (kind === 'O' ? OFF_FAM : DEF_FAM)[c[0]] : null;
   const fl = fam ? fam[posLabel] || [0, ''] : [0, ''];
@@ -2622,9 +2622,9 @@ function renderFresh() {
 }
 setInterval(renderStatus, 60000);
 /* ---------- navigation ----------
-   Five destinations, each with its own address (#lineup, #start-sit, #waivers, #roster, #research), so Back, refresh
-   and shared links land on the same screen. Research has two subpages; Settings is a utility page off the header. */
-const NAV = [['lineup', 'Lineup'], ['compare', 'Start / Sit'], ['waivers', 'Waivers'], ['players', 'Roster'], ['defenses', 'Research']];
+   Six destinations, each with its own address (#lineup, #start-sit, #waivers, #roster, #research, #settings), so Back,
+   refresh and shared links land on the same screen. Research has three subpages. */
+const NAV = [['lineup', 'Lineup'], ['compare', 'Start / Sit'], ['waivers', 'Waivers'], ['players', 'Roster'], ['defenses', 'Research'], ['settings', 'Settings']];
 const HASH = { lineup: 'lineup', compare: 'start-sit', waivers: 'waivers', players: 'roster', defenses: 'research', teams: 'research-teams', weather: 'research-weather', settings: 'settings', pro: 'pro' };
 const TAB_OF = Object.fromEntries(Object.entries(HASH).map(([k, v]) => [v, k]));
 const navOf = tab => tab === 'teams' || tab === 'weather' ? 'defenses' : tab;
@@ -2653,7 +2653,6 @@ function render() {
   }
   const nav = navOf(state.tab);
   $('#tabs').innerHTML = NAV.map(([k, l]) => `<a href="#${HASH[k]}" class="navlink" data-tab="${k}" ${nav === k ? 'aria-current="page"' : ''}>${l}</a>`).join('');
-  $('#settingsBtn')?.setAttribute('aria-pressed', String(state.tab === 'settings'));
   const pb = $('#proBtn'); if (pb) { pb.hidden = !acct.on; pb.textContent = isPro() ? 'Pro ✓' : 'Go Pro'; pb.classList.toggle('is-pro', isPro()); pb.setAttribute('aria-pressed', String(state.tab === 'pro')); }
   renderStatus(); renderAcct(); renderAd();
   $('#teamctx').innerHTML = D.loading || D.failed ? '' : teamBar();
