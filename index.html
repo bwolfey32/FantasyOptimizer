@@ -1710,7 +1710,8 @@ function evalPlayer(id) {
   if (!tg) { r.status = 'bye'; r.mean = 0; r.sd = 0; r.grade = '–'; r.mult = 1; r.base = 0; return finish(r); }
   const O = r.O = tg.opp, g = r.game = tg.g, tb = D.B[T] || {}, ob = D.B[O] || {}, L = D.L;
   if (g.state !== 'pre') { r.locked = true; r.actual = D.actual[id]; }
-  const avg = h?.n ? h.avg : null;
+  // his scoring average, with last season counted as 2 games so a few early games don't carry it alone
+  const prev = D.prevPPG?.[id]?.[0], avg = h?.n ? (ok(prev) ? (h.avg * h.n + prev * 2) / (h.n + 2) : h.avg) : (ok(prev) ? prev : null);
   r.base = r.projPts != null ? (avg != null ? S.blend * r.projPts + (1 - S.blend) * avg : r.projPts) : (avg ?? 0);
   const add = (key, label, raw, note, short) => { const v = clamp(raw * I * (S.w[key] ?? 1), -0.25, 0.25); r.factors.push({ key, label, pct: v, note, short }); };
   const itT = implied(g, T), itO = implied(g, O), lgI = D.lgImplied;
@@ -2347,11 +2348,17 @@ function seasonAvg(id) {
   if (ok(lg) && n) { s += lg * 3; n += 3; }
   return n ? s / n : null;
 }
+/* Rest-of-season value per game, the same for every opponent (matchupMult adds each week's own). It leans on scoring
+   averages (this season plus last, see healthyBase; D/ST and kicker see seasonAvg) more than the weekly lineup does,
+   with this week's projection, minus this week's matchup, as the rest. A team on bye has no projection to use. */
+const ROS_PROJ = 0.75;   // share of the "weekly projection vs. season average" setting given to the projection here
 function rosBase(id) {
   const r = D.M[id]; if (!r) return 0;
   if (state.overrides[id] != null && ok(+state.overrides[id])) return +state.overrides[id];
   if (injKind(r.u.inj)) return healthyBase(id);
-  const avg = seasonAvg(id), pj = r.projPts, b = state.settings.blend;
+  const P = r.pos, avg = P === 'DEF' || P === 'K' ? seasonAvg(id) : (D.H[id]?.n || D.prevPPG?.[id] ? healthyBase(id) : null);
+  const opp = r.u.team ? D.tg[r.u.team]?.opp : null, pj = r.projPts != null && opp ? r.projPts / matchupMult(P, opp, D.week, r.u.team) : null;
+  const b = state.settings.blend * ROS_PROJ;
   return pj != null && avg != null ? b * pj + (1 - b) * avg : (pj ?? avg ?? 0);
 }
 const SLOT_SHARE = { QB: { OP: .7 }, RB: { FLEX: .45, 'RB/WR': .5, OP: .1 }, WR: { FLEX: .45, 'RB/WR': .5, 'WR/TE': .75, OP: .1 }, TE: { FLEX: .1, 'WR/TE': .25, OP: .1 }, K: {}, DEF: {} };
@@ -2372,10 +2379,21 @@ function stashInfo(id) {
   return { id, rw, hv, rv, rank, cut, prev, auto, keep };
 }
 function schedOpp(T, w) { const m = D.sched?.[w]; if (!m || !Object.keys(m).length) return { opp: null, bye: false, unknown: true }; const g = m[T]; return g ? { opp: g.opp, home: g.home, bye: false } : { opp: null, bye: true }; }
-function matchupMult(pos, opp, w) {
-  if (!opp) return 1; const k = pos === 'DEF' ? 'fpaDEF' : 'fpa' + pos, fade = clamp(1 - (w - D.week - 1) * 0.1, 0.4, 1);
+/* A week's matchup for a player at `pos` facing `opp`, as a multiplier. Mostly the opponent's points allowed to the
+   position; then, at half strength, its pass or run defense and the scoring environment, which stands in for the
+   betting total that later weeks don't have yet: this team's points per game and the opponent's points allowed
+   (for a D/ST, the opponent's scoring, the other way round). Per-game team stats, so byes don't skew them. Faded for
+   weeks further out. */
+function matchupMult(pos, opp, w, team) {
+  if (!opp) return 1; const S = state.settings, W = S.w, k = pos === 'DEF' ? 'fpaDEF' : 'fpa' + pos, fade = clamp(1 - (w - D.week - 1) * 0.1, 0.4, 1);
+  const ob = D.B[opp] || {}, L = D.L, T = team || null, tb = T ? D.B[T] || {} : {};
+  let adj = (W.dvp ?? 1) * ratio(ob[k], L[k]);
+  if (pos === 'RB') adj += 0.5 * (W.cover ?? 1) * ratio(ob.ypcA, L.ypcA);
+  else if (['QB', 'WR', 'TE'].includes(pos)) adj += 0.5 * (W.cover ?? 1) * ratio(ob.passYdA, L.passYdA);
+  if (pos === 'DEF') adj -= 0.5 * (W.script ?? 1) * ratio(ob.ptsFor, L.ptsFor);
+  else if (T && ok(tb.ptsFor) && ok(ob.ptsA) && ok(L.ptsFor) && ok(L.ptsA)) adj += 0.5 * (W.script ?? 1) * ratio(tb.ptsFor + ob.ptsA, L.ptsFor + L.ptsA);
   // the opponent's defensive personnel changes apply on top of its stats (D/ST players face offenses, so not to them)
-  return clamp((1 + state.settings.intensity * (state.settings.w.dvp ?? 1) * ratio(D.B[opp]?.[k], D.L[k]) * fade) * persMult(opp, pos), 0.7, 1.3);
+  return clamp((1 + S.intensity * adj * fade) * persMult(opp, pos), 0.7, 1.3);
 }
 /* A backup filling in for an injured starter at his position: his current projection overstates his long-run value. */
 function fillInFor(id) {
@@ -2385,14 +2403,11 @@ function fillInFor(id) {
 function weekVals(id, weeks) {
   const r = D.M[id]; if (!r) return weeks.map(() => 0);
   const u = r.u, fill = fillInFor(id);
-  // The projection in rosBase is for this week's opponent. Take that matchup back out, so later weeks get only their own.
-  // A D/ST's or kicker's projection is mostly matchup, and Sleeper's read of it can differ from this model's, so for
-  // them later weeks start from the blended scoring average alone.
-  let rb = rosBase(id), avgOnly = false; const curOpp = u.team ? D.tg[u.team]?.opp : null, sa = seasonAvg(id);
-  if (r.projPts != null && curOpp && !injKind(u.inj) && !(state.overrides[id] != null && ok(+state.overrides[id]))) {
-    if ((u.pos === 'DEF' || u.pos === 'K') && sa != null) { rb = sa; avgOnly = true; }
-    else rb += (sa != null ? state.settings.blend : 1) * r.projPts * (1 / matchupMult(u.pos, curOpp, D.week) - 1);
-  }
+  // rosBase already has this week's matchup taken out, so later weeks get only their own. A D/ST's or kicker's
+  // projection is mostly matchup, and Sleeper's read of it can differ from this model's, so for them later weeks start
+  // from the blended scoring average alone.
+  let rb = rosBase(id), avgOnly = false; const sa = seasonAvg(id);
+  if ((u.pos === 'DEF' || u.pos === 'K') && sa != null && r.projPts != null && !injKind(u.inj) && !(state.overrides[id] != null && ok(+state.overrides[id]))) { rb = sa; avgOnly = true; }
   const own = u.pos === 'DEF' ? (avgOnly ? persOwn(u.team, 1) : persOwn(u.team)) : [1, 0];
   const base = rb * own[0] + own[1];   // a D/ST also gains or loses from its own defenders and returners
   const back = injKind(u.inj) ? returnWeek(id) : null;
@@ -2401,7 +2416,7 @@ function weekVals(id, weeks) {
     if (w === D.week && back == null) return r.status !== 'ok' || r.locked ? 0 : r.mean;
     if (w === D.week && r.locked) return 0;
     const s = schedOpp(u.team, w); if (s.bye || !u.team) return 0;
-    return Math.max(0, base * matchupMult(u.pos, s.opp, w) * (fill && i >= 2 ? 0.5 : 1));
+    return Math.max(0, base * matchupMult(u.pos, s.opp, w, u.team) * (fill && i >= 2 ? 0.5 : 1));
   });
 }
 function bestLineup(ids, wi, V, slots) {
@@ -2442,10 +2457,22 @@ function computeWaivers() {
   const pool = availablePool(), V = {};
   for (const id of [...roster, ...pool]) V[id] = weekVals(id, weeks);
   const sumH = id => V[id].slice(0, H).reduce((s, x) => s + x, 0), sumAll = id => V[id].reduce((s, x) => s + x, 0);
-  const base = weeks.map((_, wi) => bestLineup(roster, wi, V, slots));
-  // candidates: best 24 overall over the horizon plus the best 5 at each position
-  const byH = [...pool].sort((a, b) => sumH(b) - sumH(a)), cand = new Set(byH.slice(0, 24));
+  // This week, a starter whose game has kicked off has banked his points and can't be swapped out, so his slot is left
+  // out of this week's comparison (otherwise a free agent who hasn't played yet looks like he fills an empty spot).
+  const now = optimize().starters, slots0 = slots.filter((s, i) => !now[i]?.r?.locked), slotsAt = wi => wi ? slots : slots0;
+  const base = weeks.map((_, wi) => bestLineup(roster, wi, V, slotsAt(wi)));
+  /* A player's usual week: his average over the weeks left after this one, skipping his bye (weeks he's injured count
+     as 0). The best lineup on these values is your team's everyday strength, so a move that fixes a weak position
+     raises it, a pickup who only covers a bye or an injury doesn't, and dropping a good player on bye lowers it. */
+  const later1 = weeks.length > 1 ? 1 : 0;
+  const usual = id => { const T = D.U.get(id).team, vals = V[id].filter((x, wi) => wi >= later1 && T && !schedOpp(T, weeks[wi]).bye); return vals.length ? mean(vals) : 0; };
+  const VS = {}; for (const id of [...roster, ...pool]) VS[id] = [usual(id)];
+  const baseS = bestLineup(roster, 0, VS, slots);
+  // candidates: best 24 overall over the horizon plus the best 5 at each position, and the same by usual week
+  const byH = [...pool].sort((a, b) => sumH(b) - sumH(a)), byS = [...pool].sort((a, b) => VS[b][0] - VS[a][0]), cand = new Set(byH.slice(0, 24));
   for (const p of POS) byH.filter(id => D.U.get(id).pos === p).slice(0, 5).forEach(id => cand.add(id));
+  byS.slice(0, 12).forEach(id => cand.add(id));
+  for (const p of POS) byS.filter(id => D.U.get(id).pos === p).slice(0, 3).forEach(id => cand.add(id));
   // roster limit: exact for a synced Sleeper team (players on its IR don't count); otherwise lineup spots + 7 bench, with one IR spot
   const slr = state.sleeper?.rosterMax ? state.sleeper : null;
   const irHeld = slr ? roster.filter(id => (slr.reserve || []).includes(id)).length : Math.min(1, roster.filter(id => /^ir/i.test(D.U.get(id).inj || '')).length);
@@ -2465,12 +2492,16 @@ function computeWaivers() {
       const nr = roster.filter(x => x !== d).concat(f);
       let hz = 0, later = 0, depLost = 0; const starts = [], lost = [];
       for (let wi = 0; wi < weeks.length; wi++) {
-        const L2 = bestLineup(nr, wi, V, slots), diff = (L2.total + L2.depth) - (base[wi].total + base[wi].depth);
+        const L2 = bestLineup(nr, wi, V, slotsAt(wi)), diff = (L2.total + L2.depth) - (base[wi].total + base[wi].depth);
         if (wi < H) { hz += diff; depLost += base[wi].depth - L2.depth; const st = L2.starters.find(s => s[1] === f); if (st) starts.push([weeks[wi], st[0].label || st[0].k]); if (d && base[wi].starters.some(s => s[1] === d)) lost.push(weeks[wi]); }
         else later += diff;
       }
-      // "window" ranks by the selected weeks only (later weeks just break ties); "blend" adds a third of the value after the window
-      const score = longTerm ? hz + 0.35 * later : hz + 0.001 * later, mv = { f, d, hz, later, score, starts, lost, depLost };
+      // how much the move raises your usual lineup, per week
+      const LS = bestLineup(nr, 0, VS, slots), strength = (LS.total + LS.depth) - (baseS.total + baseS.depth);
+      // Ranked by the window's lineup points (byes and injuries included) plus the usual-lineup gain over the same weeks,
+      // so an upgrade at a weak spot beats a one-week patch. "window": later weeks just break ties; "blend" adds a third
+      // of the value after the window.
+      const score = hz + strength * H + (longTerm ? 0.35 : 0.001) * later, mv = { f, d, hz, later, strength, score, starts, lost, depLost };
       if (!best || score > best.score) best = mv;
       if (single && d && posOf(d) === fp && (!bestSame || score > bestSame.score)) bestSame = mv;
     }
@@ -2478,19 +2509,21 @@ function computeWaivers() {
     if (best && bestSame && bestSame !== best && bestSame.score >= 0.7 * best.score) best = bestSame;
     // a kicker or D/ST for another: keep the week-by-week difference, so the reason can compare them head to head
     if (best && single && best.d && posOf(best.d) === fp) best.h2h = weeks.slice(0, H).map((_, wi) => V[f][wi] - V[best.d][wi]);
-    if (best && (best.hz > 0.5 || (longTerm && best.score > 1))) moves.push(best);
+    if (best && best.score > 1 && (best.hz > 0.5 || best.strength * H > 1 || longTerm)) moves.push(best);
   }
   moves.sort((a, b) => b.score - a.score);
   // keep the list varied: at most two moves of the same kind (same position added, same player dropped)
   const seen = {}, shown = moves.filter(m => { const k = posOf(m.f) + '|' + m.d; seen[k] = (seen[k] || 0) + 1; return seen[k] <= 2; }).slice(0, 12);
-  const needs = teamNeeds(roster, V, weeks, H, slots, base);
+  const needs = teamNeeds(roster, V, weeks, H, slotsAt, base);
   for (const m of shown) m.whyText = waiverWhy(m, needs, weeks, H);
   return (D.wCache = { key, weeks, H, V, pool, moves: shown, needs, byH, sumH, base, stashes });
 }
 // why a waiver move helps, in one line (shown on Waivers and in Benny's Moves)
 function waiverWhy(m, needs, weeks, H) {
-  const fu = D.U.get(m.f), why = [];
-  const nd = needs.list.find(n => n.P === fu.pos); if (nd && nd.level === 'Weak') why.push(`fills your weak ${fu.pos === 'DEF' ? 'D/ST' : fu.pos} spot`);
+  const fu = D.U.get(m.f), why = [], P = fu.pos === 'DEF' ? 'D/ST' : fu.pos;
+  const nd = needs.list.find(n => n.P === fu.pos), weak = nd && nd.level === 'Weak';
+  if (m.strength >= 1) why.push(`raises your usual lineup by +${f1(m.strength)} pts a week at ${weak ? `${P}, your weak spot` : P}`);
+  else if (weak) why.push(`fills your weak ${P} spot`);
   if (m.h2h) {
     // one kicker or D/ST for another: which scores more, week by week, and how settled each one's average is
     const nm = id => { const u = D.U.get(id); return u.pos === 'DEF' ? u.team : shortName(id); }, F = nm(m.f), X = nm(m.d), n = m.h2h.length;
@@ -2499,12 +2532,12 @@ function waiverWhy(m, needs, weeks, H) {
     if (n > 1 && Math.abs(now) >= 0.3) why.push(`${now < 0 ? 'worse' : 'better'} this week (${now < 0 ? '−' : '+'}${f1(Math.abs(now))}${s.opp ? `, ${s.home ? 'vs' : 'at'} ${s.opp}` : ''})`);
     const hist = id => { const h = D.H[id], p = D.prevPPG?.[id]?.[0]; return h?.n ? `${nm(id)} ${f1(h.avg)} in ${h.n} game${h.n === 1 ? '' : 's'}${ok(p) ? ` (${f1(p)} last season)` : ''}` : null; };
     const hs = [hist(m.f), hist(m.d)].filter(Boolean); if (hs.length) why.push(`scoring averages ${hs.join(', ')}; small samples are blended with last season`);
-  } else if (m.starts.length) why.push(`starts in ${m.starts.length === H ? 'every week' : 'week' + (m.starts.length > 1 ? 's ' : ' ') + m.starts.map(s => s[0]).join(', ')} of the next ${H} (${[...new Set(m.starts.map(s => s[1]))].join('/')})`);
+  } else if (m.starts.length) why.push(`${m.strength < 1 && m.starts.length < H ? 'short-term cover: ' : ''}starts in ${m.starts.length === H ? 'every week' : 'week' + (m.starts.length > 1 ? 's ' : ' ') + m.starts.map(s => s[0]).join(', ')} of the next ${H} (${[...new Set(m.starts.map(s => s[1]))].join('/')})${m.strength < 1 && m.starts.length < H ? ', for byes or injuries' : ''}`);
   else why.push('adds depth for later weeks');
   if (m.d && !m.lost.length) why.push(`${D.U.get(m.d).name} wouldn’t have started in that stretch`);
   if (m.d && m.depLost > 0.5) why.push(`costs ${f1(m.depLost)} pts of injury cover as a backup ${D.U.get(m.d).pos === 'DEF' ? 'D/ST' : D.U.get(m.d).pos} (already counted in the gain)`);
   const fi = fillInFor(m.f); if (fi) why.push(`short-term: filling in for ${fi.name} (${fi.inj}), so later weeks count half`);
-  const sm = mean(weeks.slice(1, H).map(w => { const s = schedOpp(fu.team, w); return s.opp ? matchupMult(fu.pos, s.opp, w) : null; }).filter(ok));
+  const sm = mean(weeks.slice(1, H).map(w => { const s = schedOpp(fu.team, w); return s.opp ? matchupMult(fu.pos, s.opp, w, fu.team) : null; }).filter(ok));
   if (sm && sm >= 1.04) why.push('soft upcoming schedule'); else if (sm && sm <= 0.96) why.push('tough upcoming schedule');
   if (fu.pos === 'DEF' && D.pers?.[fu.team]) {
     const [om, st] = persOwn(fu.team, 1), net = om - 1 + st / 8, t = D.pers[fu.team], same = x => (net > 0 ? x.val > 0 : x.val < 0);
@@ -2513,7 +2546,7 @@ function waiverWhy(m, needs, weeks, H) {
   }
   return why.join('; ').replace(/^./, c => c.toUpperCase());
 }
-function teamNeeds(roster, V, weeks, H, slots, base) {
+function teamNeeds(roster, V, weeks, H, slotsAt, base) {
   const W = state.waivers, out = [], mid = weeks[Math.floor((H - 1) / 2)];
   for (const P of POS) {
     const nSlots = posSlots(P);
@@ -2528,12 +2561,12 @@ function teamNeeds(roster, V, weeks, H, slots, base) {
     for (let i = 0; i < need; i++) { const r = rows[i]; const thr = W.teams * (i + 1) * (nSlots / need); worst = Math.max(worst, r && r.rank ? r.rank / thr : 3); }
     const level = worst <= 0.7 ? 'Strong' : worst <= 1.15 ? 'OK' : 'Weak';
     const st = mine.slice(0, need); let ms = [];
-    for (const id of st) for (let wi = 1; wi < H; wi++) { const s = schedOpp(D.U.get(id).team, weeks[wi]); if (s.opp) ms.push(matchupMult(P, s.opp, weeks[wi])); }
+    for (const id of st) for (let wi = 1; wi < H; wi++) { const s = schedOpp(D.U.get(id).team, weeks[wi]); if (s.opp) ms.push(matchupMult(P, s.opp, weeks[wi], D.U.get(id).team)); }
     const sm = mean(ms), sched = sm == null ? null : sm >= 1.03 ? 'Easy' : sm <= 0.97 ? 'Hard' : 'Average';
     const byes = []; for (const id of st) for (let wi = 0; wi < H; wi++) if (schedOpp(D.U.get(id).team, weeks[wi]).bye) byes.push(`wk ${weeks[wi]} ${shortName(id)}`);
     out.push({ P, level, rows, sched, byes, worst });
   }
-  const holes = []; for (let wi = 0; wi < H; wi++) { const miss = slots.length - base[wi].starters.length; if (miss > 0) holes.push(`Week ${weeks[wi]}: ${miss} empty slot${miss > 1 ? 's' : ''}`); }
+  const holes = []; for (let wi = 0; wi < H; wi++) { const miss = slotsAt(wi).length - base[wi].starters.length; if (miss > 0) holes.push(`Week ${weeks[wi]}: ${miss} empty slot${miss > 1 ? 's' : ''}`); }
   return { list: out, holes };
 }
 const INJ_WORDS = { IR: 'on IR', Out: 'out', PUP: 'on PUP', Sus: 'suspended', Doubtful: 'doubtful', NA: 'not active', questionable: 'questionable' };
@@ -2546,7 +2579,7 @@ function persNote(T, pos) {
 }
 function schedStrip(id, weeks, H) {
   const u = D.U.get(id); if (!u) return '';
-  return `<span class="wks">${weeks.slice(0, H).map(w => { const s = schedOpp(u.team, w); if (s.bye) return `<span class="wk bye" title="Bye week">${w} BYE</span>`; if (!s.opp) return `<span class="wk">${w}</span>`; const m = matchupMult(u.pos, s.opp, w), d = m - 1, a = Math.min(36, Math.abs(d) * 220), note = persNote(s.opp, u.pos); return `<span class="wk" title="Week ${w}: ${s.home ? 'vs' : 'at'} ${s.opp}, matchup ${spct(d)}${note ? '. ' + esc(note) : ''}" style="background:color-mix(in srgb, var(${d >= 0 ? '--good' : '--bad'}) ${a.toFixed(0)}%, transparent)">${w} ${s.home ? '' : '@'}${s.opp}${note ? '<i class="pmark" aria-hidden="true">•</i>' : ''}</span>`; }).join('')}</span>`;
+  return `<span class="wks">${weeks.slice(0, H).map(w => { const s = schedOpp(u.team, w); if (s.bye) return `<span class="wk bye" title="Bye week">${w} BYE</span>`; if (!s.opp) return `<span class="wk">${w}</span>`; const m = matchupMult(u.pos, s.opp, w, u.team), d = m - 1, a = Math.min(36, Math.abs(d) * 220), note = persNote(s.opp, u.pos); return `<span class="wk" title="Week ${w}: ${s.home ? 'vs' : 'at'} ${s.opp}, matchup ${spct(d)}${note ? '. ' + esc(note) : ''}" style="background:color-mix(in srgb, var(${d >= 0 ? '--good' : '--bad'}) ${a.toFixed(0)}%, transparent)">${w} ${s.home ? '' : '@'}${s.opp}${note ? '<i class="pmark" aria-hidden="true">•</i>' : ''}</span>`; }).join('')}</span>`;
 }
 /* The headline of the Waiver Optimizer: ADD X / DROP Y / +n expected lineup points. */
 function bestMoveCard(m, weeks, H, ownTxt) {
@@ -2650,7 +2683,7 @@ function waiversBody() {
     <textarea class="inp" id="faPaste" placeholder="Paste ESPN's free-agent list"></textarea>
     <div class="toolbar"><button type="button" class="btn primary" data-act="pastefa">Use these free agents</button>${W.faList.length ? `<button type="button" class="btn" data-act="clearfa">Go back to estimates</button>` : ''}<span class="small muted">${esc(D.faMsg || '')}</span></div>` : (D.faMsg ? `<span class="small muted">${esc(D.faMsg)}</span>` : '')}</div>`;
   return `<div class="section">
-  <div class="row-head"><h2>Waiver Optimizer</h2><span class="small muted">Add/drop moves ranked by expected lineup points gained</span></div>
+  <div class="row-head"><h2>Waiver Optimizer</h2><span class="small muted">Add/drop moves ranked by the lineup points they add and how much they strengthen your usual lineup</span></div>
   ${faRow}
   <div class="toolbar"><span class="small muted">Window</span><div class="seg" role="group" aria-label="Time window">${[[2, 'Next 2'], [4, 'Next 4'], [6, 'Next 6'], ['ros', 'Rest of season']].map(([k, l]) => `<button type="button" data-wh="${k}" aria-pressed="${W.horizon === k}">${l}</button>`).join('')}</div>
     <label class="small muted" for="wTeams">League size</label><select class="sel" id="wTeams" data-wteams>${[...new Set([6, 8, 10, 12, 14, 16, 18, 20, W.teams])].sort((a, b) => a - b).map(n => `<option ${W.teams === n ? 'selected' : ''}>${n}</option>`).join('')}</select>
@@ -2663,7 +2696,7 @@ function waiversBody() {
   <div class="needs">${needCards}</div>
   ${needs.holes.length ? `<div class="banner small"><strong>Lineup holes:</strong> ${esc(needs.holes.join(' · '))}. A pickup at that position is worth more than usual.</div>` : ''}
   ${stashCard}
-  <div class="row-head"><h2>All moves, ranked</h2><span class="small muted">${longTerm ? `Ranked by expected lineup points over ${hLab}, plus a third of the gain after that. The big number is the ${hLab} gain only.` : `Ranked by expected lineup points over ${hLab}.`} Bench players count as injury cover. Week chips: green is a soft matchup, red is tough, • means the defense changed.</span></div>
+  <div class="row-head"><h2>All moves, ranked</h2><span class="small muted">Ranked by expected lineup points over ${hLab} plus how much each move raises your usual lineup, so an upgrade at a weak spot outranks a one-week bye patch${longTerm ? ', plus a third of the gain after that' : ''}. The big number is the ${hLab} gain only. Bench players count as injury cover. Week chips: green is a soft matchup, red is tough, • means the defense changed.</span></div>
   <div class="card list">${moveRows}</div>
   ${persSection(weeks, H)}
   <div class="row-head"><h2>Top free agents by position</h2><span class="small muted">Projected points over ${hLab}</span></div>
@@ -2759,7 +2792,7 @@ function bennysMoves() {
   const W = computeWaivers(), usedPos = new Set(), usedDrop = new Set(), picks = [];
   // one move per position added and per player dropped, compared per week so a 4-week gain doesn't outrank this week's lineup
   for (const m of W.moves) { const p = D.U.get(m.f).pos; if (usedPos.has(p) || (m.d && usedDrop.has(m.d))) continue; usedPos.add(p); if (m.d) usedDrop.add(m.d); picks.push(m); if (picks.length === 3) break; }
-  for (const m of picks) out.push({ gain: m.hz / W.H, tab: 'waivers', title: `Add ${nm(m.f)}${m.d ? `, drop ${nm(m.d)}` : ''}`, detail: esc(m.whyText || '') + '.', gainTxt: `+${f1(m.hz)} pts over ${W.H} wk${W.H > 1 ? 's' : ''}` });
+  for (const m of picks) out.push({ gain: m.score / W.H, tab: 'waivers', title: `Add ${nm(m.f)}${m.d ? `, drop ${nm(m.d)}` : ''}`, detail: esc(m.whyText || '') + '.', gainTxt: `+${f1(m.hz)} pts over ${W.H} wk${W.H > 1 ? 's' : ''}` });
   out.sort((a, b) => b.gain - a.gain);
   const weak = W.needs.list.filter(n => n.level === 'Weak' && n.P !== 'K' && n.P !== 'DEF').sort((a, b) => b.worst - a.worst)[0];
   if (weak) { const r = weak.rows[0]; out.push({ gain: 0, tab: 'waivers', title: `Upgrade ${posLabel(weak.P)}: your weakest spot`, detail: r?.rank ? `Your top ${posLabel(weak.P)} ranks ${posLabel(weak.P)}${r.rank} in a ${state.waivers.teams}-team league. Target one by trade or on waivers.` : `You’re short at ${posLabel(weak.P)}. Target one by trade or on waivers.`, gainTxt: '' }); }
