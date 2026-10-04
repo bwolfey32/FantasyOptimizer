@@ -1,0 +1,54 @@
+{
+  "method": "Built-in image generation",
+  "shared_prompt": "Use case: logo-brand. Asset type: one standalone weather UI icon for a fantasy football website's dark green table. Create ONE centered icon only, on a truly transparent background. Flat professional 2D pictogram; simple chunky smooth filled geometric shapes with a few rounded strokes, minimal detail, very legible when displayed at 32 to 40 pixels. Clean crisp vector-like edges, no gradients, no textures, no shadows, no glow, no black outline. No text, letters, logos, border, circle badge, surrounding tile, or visible background. Square 1024 by 1024 composition. The complete symbol fits inside the central 72 percent of the canvas, with generous equal transparent margins. Palette: cloud white #E7EEF3 and cool gray #A8BBC6, sun yellow #F8C95D and amber #EEA83C, rain blue #6EC9F4, mint #50C69A. Strong contrast against #0D1713 dark green. Match a cohesive restrained modern weather icon system.",
+  "icons": [
+    {
+      "name": "sunny",
+      "subject": "Sunny daytime: a solid warm golden circular sun with exactly eight short broad rays with rounded ends, evenly spaced at the cardinal and diagonal angles. All rays separate from the central disk. No cloud."
+    },
+    {
+      "name": "partly-cloudy",
+      "subject": "Partly cloudy daytime: one pale near-white simple three-lobed cloud in the foreground lower-right, obscuring the lower-right portion of a small golden sun behind the upper-left. Four or five short chunky golden rays visible above and left. Cloud has smooth flat lower edge. No rain."
+    },
+    {
+      "name": "cloudy",
+      "subject": "Cloudy / overcast: two simple overlapping clouds. One smaller cool-gray cloud behind to the upper-left, one larger near-white three-lobed cloud in the foreground lower-right with a smooth flat lower edge. No sun and no precipitation."
+    },
+    {
+      "name": "rain",
+      "subject": "Rain: a single pale near-white three-lobed cloud with a smooth flat lower edge in the upper half, and exactly three short chunky rounded sky-blue diagonal rain strokes below. Clear spacing between cloud and rain. No sun, no lightning."
+    },
+    {
+      "name": "clear-night",
+      "subject": "Clear nighttime: a single thick pale-gold crescent moon open to the upper-right, with one small four-point pale-gold star at its upper-right. Large simple clean shapes, no cloud, no face."
+    },
+    {
+      "name": "partly-cloudy-night",
+      "subject": "Partly cloudy nighttime: a single thick pale-gold crescent moon behind a simple pale near-white three-lobed cloud in the lower-right foreground. The crescent opens to the right, and remains clearly visible above-left of the cloud. No sun and no star."
+    },
+    {
+      "name": "thunderstorm",
+      "subject": "Thunderstorm: a simple cool-gray three-lobed cloud in the upper half, and one broad yellow zigzag lightning bolt extending downward from the bottom-center. Two separated short chunky sky-blue rain strokes, one below each side of the cloud. The lightning bolt is dominant and immediately recognizable."
+    },
+    {
+      "name": "snow",
+      "subject": "Snow: a simple pale near-white three-lobed cloud in the upper half, with two large separated pale ice-blue six-spoke snowflake asterisks below. The snowflakes are simple and chunky, with rounded stroke ends, no tiny branches."
+    },
+    {
+      "name": "sleet",
+      "subject": "Sleet / mixed rain and snow: a simple pale near-white three-lobed cloud in the upper half, with one large rounded sky-blue diagonal rain stroke below the left side and one large pale ice-blue six-spoke asterisk snowflake below the right side. Only these two precipitation symbols, no tiny details."
+    },
+    {
+      "name": "fog",
+      "subject": "Fog / mist: the top of a single pale near-white simple three-lobed cloud, with three broad parallel horizontal rounded cool-gray fog bars below it. Bars are clearly separated from one another with generous transparent gaps, middle bar slightly longer, balanced centered arrangement. No sun or precipitation."
+    },
+    {
+      "name": "wind",
+      "subject": "Wind: three broad mint-green horizontal wind-gust strokes with rounded ends. Top stroke ends in a simple curl turning upward on the right, bottom stroke ends in a simple curl turning downward on the right, middle straight stroke is longest. Flat simple familiar wind symbol. No clouds, leaves or other objects."
+    },
+    {
+      "name": "indoor",
+      "subject": "Indoor stadium with a CLOSED roof: a simple compact front-elevation covered sports stadium pictogram, pale near-white broad solid semi-elliptical domed roof, with a small gap separating a mint-green solid rounded rectangular stadium base beneath. Two narrow transparent vertical entrance cutouts in the mint base. The silhouette is clearly an enclosed domed building, not a house. Keep extremely minimal and bold: no football, no flags, no field, no crowd, no weather or sun."
+    }
+  ]
+}
