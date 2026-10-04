@@ -185,6 +185,8 @@ a { color: var(--accent); }
 body.welcome .adslot { display: none !important; }
 /* Welcome walkthrough: full screen, no navigation */
 body.welcome .controls, body.welcome #tabs, body.welcome #teamctx, body.welcome #panels, body.welcome #brief, body.welcome #msgs, body.welcome #fresh { display: none !important; }
+body.welcome.wpro #panels { display: block !important; }   /* the sign-in panel when buying Pro before setting up a team */
+.wl-back { font-size: 14.5px; }
 .wl { width: 100%; max-width: 760px; margin: 0 auto; display: flex; flex-direction: column; gap: 16px; }
 .wl-top { display: flex; justify-content: flex-end; min-height: 22px; font-size: 14.5px; }
 .wl-hero { padding: 8px 0 4px; }
@@ -2695,10 +2697,14 @@ function weekOptions() {
 function render() {
   // no team yet (or finishing the walkthrough): the welcome takes the whole page, with no navigation
   const welcome = D.welcome = needsTeam() || D.onboard === 'account';
-  document.body.classList.toggle('welcome', welcome);
+  // the Pro page (from the footer link) also opens before there's a team, with a way back to the setup
+  const wpro = welcome && state.tab === 'pro' && D.onboard !== 'account';
+  document.body.classList.toggle('welcome', welcome); document.body.classList.toggle('wpro', wpro);
   if (welcome) {
     for (const s of ['#tabs', '#teamctx', '#panels', '#brief', '#msgs']) $(s).innerHTML = '';
-    renderStatus(); renderAcct(); renderAd(); $('#main').innerHTML = viewWelcome(); return;
+    if (wpro && D.acctOpen && acct.on) $('#panels').innerHTML = accountPanel();   // buying Pro signs in first
+    renderStatus(); renderAcct(); renderAd();
+    $('#main').innerHTML = wpro ? `<div class="wl-back"><a href="#lineup" data-tab="lineup">‹ Back to setting up your team</a></div>${viewPro()}` : viewWelcome(); return;
   }
   const nav = navOf(state.tab);
   $('#tabs').innerHTML = NAV.map(([k, l]) => `<a href="#${HASH[k]}" class="navlink" data-tab="${k}" ${nav === k ? 'aria-current="page"' : ''}>${l}</a>`).join('');
