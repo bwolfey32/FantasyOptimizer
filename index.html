@@ -276,8 +276,12 @@ body.welcome.wpro #panels { display: block !important; }   /* the sign-in panel 
   .wxt td:empty { display: none; }
 }
 @media (max-width: 600px) { .hist th, .hist td { padding: 6px 6px; } .hist .hdet > td { padding: 4px 4px 10px; } }
-@media (max-width: 600px) { .tabs { display: grid; grid-template-columns: repeat(6, minmax(0, 1fr)); gap: 0; } .tabs .navlink { padding: 8px 1px; font-size: 14.5px; letter-spacing: 0; white-space: normal; line-height: 1.1; } }
-@media (max-width: 370px) { .tabs .navlink { font-size: 13px; } }
+/* phones: the six main tabs as a 3 x 2 grid of tiles, big enough to read and tap; the current one is tinted green */
+@media (max-width: 600px) {
+  .tabs { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 6px; border-bottom: 0; }
+  .tabs .navlink { display: grid; place-items: center; min-height: 46px; padding: 6px 4px; font-size: 18px; letter-spacing: .02em; line-height: 1.1; white-space: nowrap; border: 1px solid var(--line); border-radius: 8px; background: var(--surface); color: var(--ink); }
+  .tabs .navlink[aria-current="page"] { border-color: var(--accent); background: color-mix(in srgb, var(--accent) 14%, var(--surface)); color: var(--accent); box-shadow: inset 0 -3px 0 var(--accent); }
+}
 
 /* Team context bar (every page) */
 .teamctx { display: flex; flex-direction: column; gap: 8px; }
