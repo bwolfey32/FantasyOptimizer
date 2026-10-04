@@ -797,9 +797,9 @@ const acct = { on: !!(CLOUD.url && CLOUD.key) && location.hash !== '#export', sb
   busy: false, again: false, retries: 0, pushT: null, choice: null, step: 'email', email: '', code: '', msg: null, delArm: false, toastNext: false };
 
 /* ---------- analytics ----------
-   PostHog with a short list of named events: no automatic click capture, no session recordings and no cookies (the
-   visitor ID lives in localStorage). Events carry categories and counts only, never names, emails, rosters, league IDs
-   or anything typed. After sign-in the visitor is linked to the account's internal ID. Analytics stays off for the
+   PostHog with a short list of named events: no automatic click capture and no cookies (the visitor ID lives in
+   localStorage). Events carry categories and counts only, never names, emails, rosters, league IDs or anything typed.
+   Session replay records how the page is used, with typing and email addresses masked (see anStart). After sign-in the visitor is linked to the account's internal ID. Analytics stays off for the
    data-refresh export, on localhost, with Do Not Track or Global Privacy Control, and in any browser that has opened the
    site with ?analytics=off (?analytics=on undoes it). The library loads after the first render. Payments are recorded
    by the Stripe webhook, not here. */
@@ -830,8 +830,12 @@ function anStart() {
   if (!an.on || an.ph || an.loading) return; an.loading = true;
   import(PH.lib).then(m => {
     const ph = m.posthog || m.default;
-    ph.init(PH.key, { api_host: PH.host, autocapture: false, capture_pageview: true, capture_pageleave: false, disable_session_recording: true,
-      persistence: 'localStorage', person_profiles: 'always', respect_dnt: true, disable_surveys: true, advanced_disable_feature_flags: true, disable_external_dependency_loading: true });
+    // Session replay, to see where people get stuck: everything typed is masked, and so is any shown email address
+    // (.ph-mask). Whether to record, the sample rate and the minimum length are set in PostHog's replay settings; the
+    // recorder script loads from PostHog only when recording is on.
+    ph.init(PH.key, { api_host: PH.host, autocapture: false, capture_pageview: true, capture_pageleave: false,
+      disable_session_recording: false, session_recording: { maskAllInputs: true, maskTextSelector: '.ph-mask' },
+      persistence: 'localStorage', person_profiles: 'always', respect_dnt: true, disable_surveys: true, advanced_disable_feature_flags: true });
     an.ph = ph; if (an.user) ph.identify(an.user);
     for (const [s, o] of an.qp.splice(0)) ph.setPersonProperties(s, o);
     for (const [e, p] of an.q.splice(0)) ph.capture(e, p);
@@ -3024,7 +3028,7 @@ function accountPanel() {
   if (acct.user && acct.choice) {
     const names = ts => ts.map(t => esc(t.name)).join(', ') || 'none';
     const mine = state.teams.filter(t => (t.roster || []).length);
-    return `<div class="card panel acct"><div class="row-head"><h2>Your teams <span class="hsub">${esc(acct.user.email || '')}</span></h2></div>
+    return `<div class="card panel acct"><div class="row-head"><h2>Your teams <span class="hsub ph-mask">${esc(acct.user.email || '')}</span></h2></div>
       <p style="margin:0">This browser already has teams, and so does your account. Which should your account keep?</p>
       <div class="small"><div><strong>This browser:</strong> ${names(mine)}</div><div><strong>Your account:</strong> ${names(acct.choice.doc.teams || [])}</div></div>
       <div class="acct-choice">
@@ -3034,7 +3038,7 @@ function accountPanel() {
       </div>
       <p class="small muted" style="margin:0">Keep both adds this browser’s teams to your account, and a Sleeper or ESPN team on both counts once. The other two choices replace the teams on one side.</p></div>`;
   }
-  if (acct.user) return `<div class="card panel acct"><div class="row-head"><h2>Account <span class="hsub">${esc(acct.user.email || '')}</span></h2>${close}</div>
+  if (acct.user) return `<div class="card panel acct"><div class="row-head"><h2>Account <span class="hsub ph-mask">${esc(acct.user.email || '')}</span></h2>${close}</div>
     <p style="margin:0">Your teams, settings and Benny’s weekly lineups sync to this account. Sign in with the same email on your phone or computer to see them there. <span id="acctSync" class="muted">${esc(syncText())}</span></p>
     <div class="acct-plan">${isPro() ? `<span class="pill n">Pro</span> <span>${esc(proLine(acct.pro))}</span>${acct.pro?.plan === 'monthly' || subActive() ? ' <button type="button" class="linkbtn" data-act="billing">Manage billing</button>' : ''}`
       : `<span class="pill m">Free</span> <span>No ads and every one of Benny’s moves with Pro.</span> <a href="#pro" data-tab="pro">See Pro</a>`}</div>
@@ -3055,7 +3059,7 @@ function signInForm() {
     : `<div class="field"><label class="label" for="acctEmail">Email</label><div class="acct-form"><input class="inp" id="acctEmail" type="email" autocomplete="email" value="${esc(acct.email)}" placeholder="you@example.com"><button type="button" class="btn primary" data-act="acctsend">Email me a code</button></div></div>
        <div class="acct-or">or</div><div><button type="button" class="btn gbtn" data-act="acctgoogle"><svg viewBox="0 0 48 48" width="18" height="18" aria-hidden="true"><path fill="#EA4335" d="M24 9.5c3.54 0 6.71 1.22 9.21 3.6l6.85-6.85C35.9 2.38 30.47 0 24 0 14.62 0 6.51 5.38 2.56 13.22l7.98 6.19C12.43 13.72 17.74 9.5 24 9.5z"/><path fill="#4285F4" d="M46.98 24.55c0-1.57-.15-3.09-.38-4.55H24v9.02h12.94c-.58 2.96-2.26 5.48-4.78 7.18l7.73 6c4.51-4.18 7.09-10.36 7.09-17.65z"/><path fill="#FBBC05" d="M10.53 28.59c-.48-1.45-.76-2.99-.76-4.59s.27-3.14.76-4.59l-7.98-6.19C.92 16.46 0 20.12 0 24c0 3.88.92 7.54 2.56 10.78l7.97-6.19z"/><path fill="#34A853" d="M24 48c6.48 0 11.93-2.13 15.89-5.81l-7.73-6c-2.15 1.45-4.92 2.3-8.16 2.3-6.26 0-11.57-4.22-13.47-9.91l-7.98 6.19C6.51 42.62 14.62 48 24 48z"/></svg>Continue with Google</button></div>`;
 }
-const acctMsgHTML = () => acct.msg ? `<div class="banner ${acct.msg[0] === 'err' ? 'err' : 'info'}" role="status">${esc(acct.msg[1])}</div>` : '';
+const acctMsgHTML = () => acct.msg ? `<div class="banner ph-mask ${acct.msg[0] === 'err' ? 'err' : 'info'}" role="status">${esc(acct.msg[1])}</div>` : '';
 
 /* ---------- welcome walkthrough ----------
    Shown full screen, with no navigation, whenever no team has players yet: a first visit, after signing out, or after
@@ -3091,7 +3095,7 @@ function viewWelcome() {
       ${acct.user && acct.choice ? '' : `<div class="toolbar"><button type="button" class="btn" data-act="wskip">Skip for now</button><span class="small muted">You can sign in any time from the top of the page.</span></div>`}
     </div>`;
   }
-  const top = !acct.on ? '' : acct.user ? `<span class="small muted">Signed in as ${esc(acct.user.email || '')}. Your team will save to your account.</span>`
+  const top = !acct.on ? '' : acct.user ? `<span class="small muted ph-mask">Signed in as ${esc(acct.user.email || '')}. Your team will save to your account.</span>`
     : `<button type="button" class="linkbtn" data-act="wsignin" aria-expanded="${!!D.wSignin}">Already have an account? Sign in</button>`;
   const signIn = D.wSignin && acct.on && !acct.user ? `<div class="card panel wl-card"><div class="row-head"><h3>Sign in to get your teams back</h3><button type="button" class="btn sm" data-act="wsignin">Close</button></div>${acctMsgHTML()}${signInForm()}</div>` : '';
   let body;
