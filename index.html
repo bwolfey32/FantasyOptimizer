@@ -2808,6 +2808,17 @@ function hiddenTxt(rest) {
   const real = rest.filter(m => !m.marginal).length, marg = rest.length - real, s = k => k === 1 ? '' : 's';
   return real ? `Benny found ${real} more move${s(real)} worth making${marg ? `, plus ${marg} marginal` : ''}` : `${marg} more marginal move${s(marg)}`;
 }
+/* Waivers: the free agents at your weakest position (weakSpot), each with how widely available he is and a Taken button
+   that skips to the next one. */
+function weakSpotCard(pl, weeks, H) {
+  const ws = weakSpot(); if (!ws) return '';
+  const P = posLabel(ws.P), mn = ws.mine ? esc(D.U.get(ws.mine).name) : '';
+  const rows = ws.picks.map((p, i) => { const av = availTxt(p.id); return `<li class="mv"><span class="mv-n num">${i + 1}</span>
+    <div class="mv-body">${pl(p.id)}${av ? `<span class="small muted">${av[0].toUpperCase() + av.slice(1)}</span>` : ''}${schedStrip(p.id, weeks, H)}</div>
+    <div class="mv-side">${p.gain > 0.5 ? `<span class="mv-gain num">+${f1(p.gain)}/wk</span>` : `<span class="small muted">Not an upgrade yet</span>`}<button type="button" class="btn sm" data-taken="${esc(p.id)}" title="Already on a team in your league: skip to the next one">Taken? Skip</button></div></li>`; }).join('');
+  return `<div class="card moves-card"><div class="row-head"><h2>Your weakest spot: ${P}</h2><span class="small muted">Your ${P}s score ${ws.score}/100 on Benny Grade${mn ? `; your weakest starter there, ${mn}, projects ${f1(ws.mineVal)} pts a usual week` : ''}. Best free agents at ${P} first, gain is per usual week over ${mn || 'an empty slot'}. Taken in your league? Skip him and the next one moves up.</span></div>
+    ${rows ? `<ol class="mv-list">${rows}</ol>` : `<p class="small muted" style="margin:0">No free agent at ${P} is left. Target one by trade.</p>`}</div>`;
+}
 function viewWaivers() { return waiversBody(); }
 function waiversBody() {
   const W = state.waivers;
@@ -2884,6 +2895,7 @@ function waiversBody() {
   <div class="toolbar"><span class="small muted">Rank by</span><div class="seg" role="group" aria-label="Rank moves by"><button type="button" data-wrank="window" aria-pressed="${!longTerm}">${hLab[0].toUpperCase() + hLab.slice(1)} only</button><button type="button" data-wrank="blend" aria-pressed="${longTerm}">+ long-term value</button></div></div>
   ${warn.map(w => `<div class="banner small">${esc(w)}</div>`).join('')}
   ${bestMoveCard(R.best, weeks, H, ownTxt, moves.find(m => m.marginal))}
+  ${weakSpotCard(pl, weeks, H)}
   <h3>Your team, ${hLab}</h3>
   <div class="needs">${needCards}</div>
   ${needs.holes.length ? `<div class="banner small"><strong>Lineup holes:</strong> ${esc(needs.holes.join(' · '))}. A pickup at that position is worth more than usual.</div>` : ''}
@@ -2951,6 +2963,27 @@ function gradeCard() {
       <div class="small muted">${g.best ? `Strongest: <strong>${posLabel(g.best)}</strong>` : ''}${g.worst && g.worst !== g.best ? ` · Weakest: <strong>${posLabel(g.worst)}</strong>` : ''}</div></div>
     <div class="gc-pos">${Object.entries(g.per).map(([P, s]) => `<span class="chip ${s >= 80 ? 'up' : s < 55 ? 'down' : ''}" title="${posLabel(P)} starters score ${s}/100">${posLabel(P)} ${s}</span>`).join('')}</div></div>`;
 }
+/* Your weakest spot: the QB, RB, WR or TE group with the lowest Benny Grade score, and the free agents there most worth
+   adding. Candidates come from the Waivers pool (players available in most leagues, or your league's own free agents),
+   best usual week first, each against the weakest starter you have there. Marking one Taken skips him and the next
+   moves up. */
+function weakSpot(n = 5) {
+  const g = teamGrade(); if (!g?.worst) return null;
+  const R = computeWaivers(), P = g.worst, vs = id => R.VS[id]?.[0] ?? 0;
+  const st = (R.needs.list.find(x => x.P === P)?.rows || []).filter(r => r.starter).map(r => r.id);
+  const mine = st.length ? st.reduce((a, b) => vs(b) < vs(a) ? b : a) : null;
+  const picks = R.pool.filter(id => D.U.get(id).pos === P).sort((a, b) => vs(b) - vs(a)).slice(0, n)
+    .map(id => ({ id, val: vs(id), gain: vs(id) - (mine ? vs(mine) : 0) }));
+  return { P, score: g.per[P], mine, mineVal: mine ? vs(mine) : 0, picks };
+}
+// how likely a free agent is to be on your league's waiver wire, from the same source the Waivers pool uses
+function availTxt(id) {
+  const W = state.waivers;
+  if (W.source === 'sleeper' && state.sleeper?.rostered) return 'free agent in your league';
+  if (W.source === 'list' && W.faList.length) return 'on your league’s free-agent list';
+  if (!D.own.size) return '';
+  const o = D.own.get(id) ?? 0; return `available in ${o < 1 ? '99%+' : Math.round(100 - o) + '%'} of leagues`;
+}
 
 /* ---------- Benny's Moves ----------
    The most useful things to do with this team now, from the engines the other pages use: lineup changes against the
@@ -2986,14 +3019,23 @@ function bennysMoves() {
   for (const m of W.moves) { if (m.marginal) continue; const p = D.U.get(m.f).pos; if (usedPos.has(p) || (m.d && usedDrop.has(m.d))) continue; usedPos.add(p); if (m.d) usedDrop.add(m.d); picks.push(m); if (picks.length === 3) break; }
   for (const m of picks) out.push({ gain: m.score / W.H, tab: 'waivers', title: `Add ${nm(m.f)}${m.d ? `, drop ${nm(m.d)}` : ''}`, detail: esc(m.whyText || '') + '.', gainTxt: `+${f1(m.hz)} pts over ${W.H} wk${W.H > 1 ? 's' : ''}` });
   out.sort((a, b) => b.gain - a.gain);
-  const weak = W.needs.list.filter(n => n.level === 'Weak' && n.P !== 'K' && n.P !== 'DEF').sort((a, b) => b.worst - a.worst)[0];
-  if (weak) { const r = weak.rows[0]; out.push({ gain: 0, tab: 'waivers', title: `Upgrade ${posLabel(weak.P)}: your weakest spot`, detail: r?.rank ? `Your top ${posLabel(weak.P)} ranks ${posLabel(weak.P)}${r.rank} in a ${state.waivers.teams}-team league. Target one by trade or on waivers.` : `You’re short at ${posLabel(weak.P)}. Target one by trade or on waivers.`, gainTxt: '' }); }
+  /* Your weakest position by Benny Grade, with the best free agent there by name. It goes second, so a free account
+     (top two) always sees it; a waiver move above that already adds the player isn't repeated. */
+  const ws = weakSpot(), added = new Set(picks.map(m => m.f)), pk = ws?.picks.find(p => !added.has(p.id));
+  if (ws) {
+    const P = posLabel(ws.P), vs = ws.mine ? ` vs ${nm(ws.mine)}’s ${f1(ws.mineVal)}` : '', av = pk ? availTxt(pk.id) : '';
+    out.splice(Math.min(1, out.length), 0, pk
+      ? { gain: 0, tab: 'waivers', taken: pk.id, title: `Upgrade ${P}, your weakest spot: add ${nm(pk.id)}`,
+          detail: `Your ${P}s score ${ws.score}/100 on Benny Grade. ${nm(pk.id)} projects ${f1(pk.val)} pts a usual week${vs}${pk.gain > 0.5 ? '' : ', the best free agent there but not an upgrade yet'}${av ? `; ${av}` : ''}.`,
+          gainTxt: pk.gain > 0.5 ? `+${f1(pk.gain)} pts/wk` : '' }
+      : { gain: 0, tab: 'waivers', title: `Upgrade ${P}: your weakest spot`, detail: `Your ${P}s score ${ws.score}/100 on Benny Grade and no free agent there is left. Target one by trade.`, gainTxt: '' });
+  }
   return out;
 }
 function movesCard() {
   const all = bennysMoves(), shown = isPro() ? all : all.slice(0, 2), more = all.length - shown.length;
   const item = (m, i) => `<li class="mv"><span class="mv-n num">${i + 1}</span><div class="mv-body"><strong>${m.title}</strong><span class="small muted">${m.detail}</span></div>
-    <div class="mv-side">${m.gainTxt ? `<span class="mv-gain num">${m.gainTxt}</span>` : ''}<button type="button" class="btn sm" ${m.decide ? `data-decide="${esc(m.decide)}"` : `data-tab="${m.tab}"`}>${m.decide ? 'Compare' : m.tab === 'waivers' ? 'Waivers' : 'Lineup'}</button></div></li>`;
+    <div class="mv-side">${m.gainTxt ? `<span class="mv-gain num">${m.gainTxt}</span>` : ''}${m.taken ? `<button type="button" class="btn sm" data-taken="${esc(m.taken)}" title="Already on a team in your league: skip to the next one">Taken? Skip</button>` : ''}<button type="button" class="btn sm" ${m.decide ? `data-decide="${esc(m.decide)}"` : `data-tab="${m.tab}"`}>${m.decide ? 'Compare' : m.tab === 'waivers' ? 'Waivers' : 'Lineup'}</button></div></li>`;
   return `<div class="card moves-card"><div class="row-head"><h2>Benny’s Moves</h2><span class="small muted">${all.length ? `The ${all.length === 1 ? 'one thing' : `${all.length} things`} most worth doing for this team, best first` : ''}</span></div>
     ${all.length ? `<ol class="mv-list">${shown.map(item).join('')}</ol>${more ? lockLine(`${more} more move${more === 1 ? '' : 's'} for your team`) : ''}`
       : '<p class="small muted" style="margin:0">Nothing to change right now: your lineup is set and no free agent beats your bench.</p>'}</div>`;

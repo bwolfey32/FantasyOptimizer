@@ -257,6 +257,17 @@ test('picking a missing name clears its "not found" note', () => {
   finally { D.flow = null; }
 });
 
+/* ---------- weakest spot: pickups at the position Benny Grade rates lowest ---------- */
+test('weakest spot follows Benny Grade, lists free agents there, and skips one marked Taken', () => {
+  setup(); const g = ev('teamGrade')(), ws = ev('weakSpot')(), D = ev('D');
+  if (!ws || ws.P !== g.worst || ['K', 'DEF'].includes(ws.P)) return `grade weakest ${g.worst}, weak spot ${ws?.P}`;
+  if (!ws.picks.length || ws.picks.some(p => D.U.get(p.id).pos !== ws.P || ev('state').roster.includes(p.id))) return 'picks: ' + ws.picks.map(p => name(p.id)).join(', ');
+  const first = ws.picks[0].id, second = ws.picks[1]?.id; ev('state').waivers.taken[first] = 1;
+  const after = ev('weakSpot')(), mv = ev('bennysMoves')().slice(0, 2);
+  if (after.picks.some(p => p.id === first) || after.picks[0]?.id !== second) return `after skipping ${name(first)}: ${after.picks.map(p => name(p.id))}`;
+  return mv.some(m => m.taken === second) || 'Benny’s top two moves: ' + mv.map(m => m.title).join(' | ');
+});
+
 /* ---------- every phase: the views still render ---------- */
 test('Lineup, Start/Sit and Waivers render', () => {
   setup(); const lu = ev('viewLineup')(), cmp = ev('viewCompare')(), wv = ev('viewWaivers')();
