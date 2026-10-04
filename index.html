@@ -2020,15 +2020,17 @@ function histPut(k, snap) {
 function moveHist(from, to) { const H = histAll(); for (const k of Object.keys(H)) if (k.startsWith(from + '|')) { const nk = to + k.slice(from.length); if (!H[nk]) H[nk] = H[k]; delete H[k]; } store.set(HIST_KEY, H); }
 const slotOrder = k => SLOT_TYPES.findIndex(t => t.k === k);
 /* Who you started this week, for the lineup once games kick off: your Sleeper lineup when synced, else the ESPN lineup
-   from your import, else the lineup Benny showed before kickoff (the saved history). Your corrections on the Lineup tab
-   ("I started him" / "I didn't start him", state.liveFix) apply on top. `src` is '' when Benny has no source. */
+   from your import, else the lineup Benny showed before kickoff (the saved history). With none of those ('guess'), Benny
+   assumes his own pregame lineup: the best lineup on projections, as if no game had started. Your corrections on the
+   Lineup tab ("I started him" / "I didn't start him", state.liveFix) apply on top. */
 const liveKey = () => histKey(state.activeTeam, D.season, D.week);
 function knownStarters() {
-  let ids = null, src = '';
+  let ids, src;
+  const h = histAll()[liveKey()];
   if (state.sleeper?.starters) { ids = new Set(state.sleeper.starters); src = 'Sleeper'; }
   else if (Object.keys(state.espn.slotOf || {}).length) { ids = new Set(Object.entries(state.espn.slotOf).filter(([, s]) => !(s === 20 || s === 21)).map(([id]) => id)); src = 'ESPN'; }
-  else { const h = histAll()[liveKey()]; if (h) { ids = new Set((h.starters || []).map(e => e[1]).filter(Boolean)); src = 'Benny'; } }
-  ids = ids || new Set();
+  else if (h) { ids = new Set((h.starters || []).map(e => e[1]).filter(Boolean)); src = 'Benny'; }
+  else { ids = new Set(assignSlots(expandSlots(), state.roster.map(id => D.M[id]).filter(r => r && r.status === 'ok')).filter(a => a.r).map(a => a.r.id)); src = 'guess'; }
   const fix = state.liveFix?.[liveKey()] || {};
   for (const [id, on] of Object.entries(fix)) on ? ids.add(id) : ids.delete(id);
   return { ids, src, fixed: Object.keys(fix).length > 0 };
@@ -2593,9 +2595,10 @@ function computeWaivers() {
   for (const f of cand) {
     let best = null, bestSame = null;
     const fp = posOf(f), single = fp === 'K' || fp === 'DEF';
-    // kickers and defenses: never suggest carrying three
-    const mustSwap = single && count(fp) >= 2;
-    const drops = (canAddFree && !mustSwap ? [null, ...droppable] : droppable).filter(d => !mustSwap || posOf(d) === fp);
+    // a kicker or defense when you already have one: swap it for yours, or take an open roster spot; never drop a
+    // player at another position to carry two (and never three)
+    const mustSwap = single && count(fp) >= 1, openOk = canAddFree && !(single && count(fp) >= 2);
+    const drops = (openOk ? [null, ...droppable] : droppable).filter(d => !mustSwap || d === null || posOf(d) === fp);
     for (const d of drops) {
       if (d && sumAll(d) > 1.6 * sumAll(f) + 5) continue;
       const nr = roster.filter(x => x !== d).concat(f);
@@ -2609,8 +2612,8 @@ function computeWaivers() {
       const LS = bestLineup(nr, 0, VS, slots), strength = (LS.total + LS.depth) - (baseS.total + baseS.depth);
       // Ranked by the window's lineup points (byes and injuries included) plus the usual-lineup gain over the same weeks,
       // so an upgrade at a weak spot beats a one-week patch. "window": later weeks just break ties; "blend" adds a third
-      // of the value after the window.
-      const score = hz + strength * H + (longTerm ? 0.35 : 0.001) * later, mv = { f, d, hz, later, strength, score, starts, lost, depLost };
+      // of the value after the window, but only for a move that doesn't cost points in the window.
+      const score = hz + strength * H + (longTerm && hz >= 0 ? 0.35 : 0.001) * later, mv = { f, d, hz, later, strength, score, starts, lost, depLost };
       if (!best || score > best.score) best = mv;
       if (single && d && posOf(d) === fp && (!bestSame || score > bestSame.score)) bestSame = mv;
     }
@@ -2618,14 +2621,23 @@ function computeWaivers() {
     if (best && bestSame && bestSame !== best && bestSame.score >= 0.7 * best.score) best = bestSame;
     // a kicker or D/ST for another: keep the week-by-week difference, so the reason can compare them head to head
     if (best && single && best.d && posOf(best.d) === fp) best.h2h = weeks.slice(0, H).map((_, wi) => V[f][wi] - V[best.d][wi]);
-    if (best && best.score > 1 && (best.hz > 0.5 || best.strength * H > 1 || longTerm)) moves.push(best);
+    if (!best || best.score <= 1 || !(best.hz > 0.5 || best.strength * H > 1 || (longTerm && best.hz >= 0 && best.later > 0))) continue;
+    /* Worth the roster churn? Projections miss by several points a week, so a small expected gain is no reason to give
+       up a player: a move must add HOLD_BAR window points (or raise the usual lineup by as much), and a kicker or D/ST
+       swap must average 1 pt a week. With long-term value on, a move that clears the bar only on later weeks is a
+       "long-term bet". Anything else is marginal: listed, never the best move, and holding is fine. */
+    const swap = single && best.d && posOf(best.d) === fp, bar = Math.max(1.5, 0.75 * H);
+    const clears = swap ? best.hz / H >= 1 : Math.max(best.hz, best.strength * H) >= bar;
+    best.longBet = !clears && longTerm && best.hz >= 0 && (swap ? (best.hz + best.later) / weeks.length >= 1 : 0.35 * best.later >= bar);
+    best.marginal = !clears && !best.longBet;
+    moves.push(best);
   }
-  moves.sort((a, b) => b.score - a.score);
+  moves.sort((a, b) => a.marginal - b.marginal || b.score - a.score);
   // keep the list varied: at most two moves of the same kind (same position added, same player dropped)
   const seen = {}, shown = moves.filter(m => { const k = posOf(m.f) + '|' + m.d; seen[k] = (seen[k] || 0) + 1; return seen[k] <= 2; }).slice(0, 12);
   const needs = teamNeeds(roster, V, weeks, H, slotsAt, base);
   for (const m of shown) m.whyText = waiverWhy(m, needs, weeks, H);
-  return (D.wCache = { key, weeks, H, V, pool, moves: shown, needs, byH, sumH, base, stashes, VS });
+  return (D.wCache = { key, weeks, H, V, pool, moves: shown, best: shown.find(m => !m.marginal) || null, needs, byH, sumH, base, stashes, VS });
 }
 // why a waiver move helps, in one line (shown on Waivers and in Benny's Moves)
 function waiverWhy(m, needs, weeks, H) {
@@ -2691,8 +2703,8 @@ function schedStrip(id, weeks, H) {
   return `<span class="wks">${weeks.slice(0, H).map(w => { const s = schedOpp(u.team, w); if (s.bye) return `<span class="wk bye" title="Bye week">${w} BYE</span>`; if (!s.opp) return `<span class="wk">${w}</span>`; const m = matchupMult(u.pos, s.opp, w, u.team), d = m - 1, a = Math.min(36, Math.abs(d) * 220), note = persNote(s.opp, u.pos); return `<span class="wk" title="Week ${w}: ${s.home ? 'vs' : 'at'} ${s.opp}, matchup ${spct(d)}${note ? '. ' + esc(note) : ''}" style="background:color-mix(in srgb, var(${d >= 0 ? '--good' : '--bad'}) ${a.toFixed(0)}%, transparent)">${w} ${s.home ? '' : '@'}${s.opp}${note ? '<i class="pmark" aria-hidden="true">•</i>' : ''}</span>`; }).join('')}</span>`;
 }
 /* The headline of the Waiver Optimizer: ADD X / DROP Y / +n expected lineup points. */
-function bestMoveCard(m, weeks, H, ownTxt) {
-  if (!m) return `<div class="card wbest"><span class="label">Best move</span><div class="wb-none">Your roster is already the best Benny can build from these free agents. Check back after this week’s games.</div></div>`;
+function bestMoveCard(m, weeks, H, ownTxt, near) {
+  if (!m) return `<div class="card wbest"><span class="label">Best move</span><div class="wb-none">${near ? `<strong>Hold.</strong> No move clears Benny’s bar. The closest, add ${esc(D.U.get(near.f).name)}${near.d ? `, drop ${esc(D.U.get(near.d).name)}` : ''}, gains +${f1(near.hz)} over ${H} week${H > 1 ? 's' : ''}, less than projections typically miss by.` : 'Your roster is already the best Benny can build from these free agents. Check back after this week’s games.'}</div></div>`;
   const side = (kind, id) => { const u = D.U.get(id); return `<div class="wb-side"><span class="wb-kind ${kind}">${kind === 'add' ? 'Add' : 'Drop'}</span><span class="wb-name">${esc(u.name)}</span><span class="small muted">${u.pos === 'DEF' ? 'D/ST' : u.pos} · ${u.team || 'FA'}${kind === 'add' ? ' · ' + ownTxt(id) : ''}</span></div>`; };
   return `<div class="card wbest"><div class="row-head"><span class="label">Best move</span><button type="button" class="btn sm" data-act="sharemove">Share</button></div>
     <div class="wb-row">${side('add', m.f)}${m.d ? side('drop', m.d) : `<div class="wb-side"><span class="wb-kind keep">No drop</span><span class="small muted">You have an open roster spot</span></div>`}
@@ -2702,7 +2714,7 @@ function bestMoveCard(m, weeks, H, ownTxt) {
 /* Share the best move as a short line of text plus a link that opens Waivers (for a new visitor, the waivers welcome).
    Phones get the share sheet; elsewhere it's copied. The analytics event says only that a move was shared. */
 async function shareMove() {
-  const R = D.wCache, m = R?.moves?.[0]; if (!m) return;
+  const R = D.wCache, m = R?.best; if (!m) return;
   const nm = id => D.U.get(id)?.name || id, H = R.H;
   const text = `Benny’s Picks: add ${nm(m.f)}${m.d ? `, drop ${nm(m.d)}` : ''}, +${f1(m.hz)} expected lineup points over the next ${H} week${H === 1 ? '' : 's'} (week ${D.week}).`;
   const url = 'https://bennyspicks.us/?utm_source=share&utm_medium=waiver_move#waivers';
@@ -2741,7 +2753,7 @@ function waiversBody() {
   const W = state.waivers;
   if (!state.roster.length) return `<div class="card panel"><h2>Add your roster first</h2><p style="margin:0">Waiver suggestions compare free agents against your players. <button type="button" class="linkbtn" data-act="flow" data-method="sleeper" data-dest="replace">Import your team</button> or add players in <a href="#roster" data-tab="players">Roster</a>.</p></div>`;
   const R = computeWaivers(), { weeks, H, moves, needs } = R;
-  trackOnce('wv:' + D.week, 'waivers_viewed', { has_move: moves.length > 0, waiver_count: moves.length, best_gain: moves[0] ? Math.round(moves[0].hz) : 0, window: W.horizon, source: W.source });
+  trackOnce('wv:' + D.week, 'waivers_viewed', { has_move: moves.length > 0, waiver_count: moves.length, best_gain: R.best ? Math.round(R.best.hz) : 0, window: W.horizon, source: W.source });
   const hLab = H === 1 ? `week ${weeks[0]}` : `weeks ${weeks[0]}–${weeks[H - 1]}`;
   const ownTxt = id => D.own.has(id) ? `${D.own.get(id) < 1 ? '<1' : Math.round(D.own.get(id))}% owned` : 'unowned';
   const pl = id => { const u = D.U.get(id), r = D.M[id]; return `<span class="pname">${esc(u.name)}</span><span class="psub">${u.pos} · ${u.team || 'FA'} ${injPill(r)}${r?.role ? ' · ' + esc(roleText(r.role, true)) : ''} · ${f1(rosBase(id))} pts/g</span>`; };
@@ -2770,7 +2782,7 @@ function waiversBody() {
       <div class="mside"><span class="pill n">Add</span> <div>${pl(m.f)}<span class="psub">${ownTxt(m.f)}</span></div>${schedStrip(m.f, weeks, H)}</div>
       <div class="mside">${m.d ? `<span class="pill o">Drop</span> <div>${pl(m.d)}</div>${schedStrip(m.d, weeks, H)}` : `<span class="pill m">No drop</span> <div class="small muted">You have an open roster spot</div>`}</div>
       <div class="mgain"><span class="num">+${f1(m.hz)}</span><span class="small muted">expected lineup pts, next ${H} wk${H > 1 ? 's' : ''}</span>${H < weeks.length ? `<span class="small ${m.later >= 0 ? 'trend-up' : 'trend-down'}">${m.later >= 0 ? '+' : ''}${f1(m.later)} after that</span>` : ''}</div>
-      <div class="mwhy small">${esc(m.whyText)}. <button type="button" class="btn sm" data-taken="${esc(m.f)}">Taken in my league</button></div></div>`;
+      <div class="mwhy small">${m.marginal ? '<span class="pill m">Marginal: holding is fine</span> ' : m.longBet ? '<span class="pill q">Long-term bet</span> ' : ''}${esc(m.whyText)}. <button type="button" class="btn sm" data-taken="${esc(m.f)}">Taken in my league</button></div></div>`;
   }).join('') + (moves.length > shownMoves.length ? `<div class="item lock-row">${lockLine(`Benny found ${moves.length - shownMoves.length} more move${moves.length - shownMoves.length === 1 ? '' : 's'} that improve your roster`)}</div>` : '')
     : `<div class="item" style="padding:14px"><span class="muted">No free agent improves your lineup over ${hLab}. Try a longer window or a higher ownership limit.</span></div>`;
   const posBest = POS.map(p => { const top = R.byH.filter(id => D.U.get(id).pos === p).slice(0, 4); return top.map(id => `<tr><td><strong>${esc(D.U.get(id).name)}</strong> <span class="small muted">${p} · ${D.U.get(id).team}</span></td><td>${ownTxt(id)}</td><td>${f1(rosBase(id))}</td><td>${f1(R.sumH(id))}</td><td class="l">${schedStrip(id, weeks, Math.min(H, 6))}</td><td><button type="button" class="btn sm" data-taken="${esc(id)}">Taken</button></td></tr>`).join(''); }).join('');
@@ -2811,12 +2823,12 @@ function waiversBody() {
     ${nTaken ? `<button type="button" class="btn sm" data-act="untake">Show ${nTaken} hidden</button>` : ''}</div>
   <div class="toolbar"><span class="small muted">Rank by</span><div class="seg" role="group" aria-label="Rank moves by"><button type="button" data-wrank="window" aria-pressed="${!longTerm}">${hLab[0].toUpperCase() + hLab.slice(1)} only</button><button type="button" data-wrank="blend" aria-pressed="${longTerm}">+ long-term value</button></div></div>
   ${warn.map(w => `<div class="banner small">${esc(w)}</div>`).join('')}
-  ${bestMoveCard(moves[0], weeks, H, ownTxt)}
+  ${bestMoveCard(R.best, weeks, H, ownTxt, moves.find(m => m.marginal))}
   <h3>Your team, ${hLab}</h3>
   <div class="needs">${needCards}</div>
   ${needs.holes.length ? `<div class="banner small"><strong>Lineup holes:</strong> ${esc(needs.holes.join(' · '))}. A pickup at that position is worth more than usual.</div>` : ''}
   ${stashCard}
-  <div class="row-head"><h2>All moves, ranked</h2><span class="small muted">Ranked by expected lineup points over ${hLab} plus how much each move raises your usual lineup, so an upgrade at a weak spot outranks a one-week bye patch${longTerm ? ', plus a third of the gain after that' : ''}. The big number is the ${hLab} gain only. Bench players count as injury cover. Week chips: green is a soft matchup, red is tough, • means the defense changed.</span></div>
+  <div class="row-head"><h2>All moves, ranked</h2><span class="small muted">Ranked by expected lineup points over ${hLab} plus how much each move raises your usual lineup, so an upgrade at a weak spot outranks a one-week bye patch${longTerm ? ', plus a third of the gain after that' : ''}. The big number is the ${hLab} gain only. A move needs +${f1(Math.max(1.5, 0.75 * H))} (a kicker or D/ST swap, +1 a week) to be worth the churn; smaller ones are marked Marginal. Kickers and D/STs are swapped for yours, never added by dropping another position. Bench players count as injury cover. Week chips: green is a soft matchup, red is tough, • means the defense changed.</span></div>
   <div class="card list">${moveRows}</div>
   ${persSection(weeks, H)}
   <div class="row-head"><h2>Top free agents by position</h2><span class="small muted">Projected points over ${hLab}</span></div>
@@ -2911,7 +2923,7 @@ function bennysMoves() {
   }
   const W = computeWaivers(), usedPos = new Set(), usedDrop = new Set(), picks = [];
   // one move per position added and per player dropped, compared per week so a 4-week gain doesn't outrank this week's lineup
-  for (const m of W.moves) { const p = D.U.get(m.f).pos; if (usedPos.has(p) || (m.d && usedDrop.has(m.d))) continue; usedPos.add(p); if (m.d) usedDrop.add(m.d); picks.push(m); if (picks.length === 3) break; }
+  for (const m of W.moves) { if (m.marginal) continue; const p = D.U.get(m.f).pos; if (usedPos.has(p) || (m.d && usedDrop.has(m.d))) continue; usedPos.add(p); if (m.d) usedDrop.add(m.d); picks.push(m); if (picks.length === 3) break; }
   for (const m of picks) out.push({ gain: m.score / W.H, tab: 'waivers', title: `Add ${nm(m.f)}${m.d ? `, drop ${nm(m.d)}` : ''}`, detail: esc(m.whyText || '') + '.', gainTxt: `+${f1(m.hz)} pts over ${W.H} wk${W.H > 1 ? 's' : ''}` });
   out.sort((a, b) => b.gain - a.gain);
   const weak = W.needs.list.filter(n => n.level === 'Weak' && n.P !== 'K' && n.P !== 'DEF').sort((a, b) => b.worst - a.worst)[0];
@@ -2933,7 +2945,7 @@ function renderBrief() {
   const team = esc(curTeam().name);
   if (!state.roster.length) { el.innerHTML = `<span class="bteam">${team}:</span> import your roster to get Benny’s picks. <button type="button" class="blink" data-act="flow" data-method="sleeper" data-dest="replace">Import your team</button>`; return; }
   const { starters } = optimize(), proj = starters.reduce((s, x) => s + (x.r ? x.r.mean : 0), 0);
-  const dec = reviewDecisions(), W = computeWaivers(), best = W.moves[0];
+  const dec = reviewDecisions(), W = computeWaivers(), best = W.best;
   const decTxt = dec.length ? `<button type="button" class="blink" data-brief="decide"><span class="n">${dec.length}</span> decision${dec.length === 1 ? '' : 's'} to review</button>` : `<span>no close calls</span>`;
   const bestTxt = best ? `<button type="button" class="blink" data-brief="waiver">best waiver move <span class="n up">+${f1(best.hz)}</span> pts over ${W.H} week${W.H === 1 ? '' : 's'}</button>` : `<span>no waiver move worth making</span>`;
   el.innerHTML = `<span class="bteam">${team}:</span> your optimal lineup projects for <button type="button" class="blink" data-tab="lineup"><span class="n">${f1(proj)}</span> points</button><span class="sep">·</span>${decTxt}<span class="sep">·</span>${bestTxt}`;
@@ -3729,8 +3741,7 @@ function lineupBody() {
     <div><span class="label">Injury alerts</span><span class="big num">${startTags.length}<span class="small muted" style="font-family:var(--font-body);font-size:14px;font-weight:400"> starter${startTags.length === 1 ? '' : 's'} · ${benchTags.length} bench</span></span><span class="small muted">${startTags.length ? 'Starting: ' + esc(tagTxt(startTags)) : 'No starters tagged'}${benchTags.length ? ' · Bench: ' + esc(tagTxt(benchTags)) : ''}${empty ? ` · ${empty} empty slot${empty === 1 ? '' : 's'}` : ''}</span></div>
   </div>
   ${D.histOpen ? histPanel() : ''}
-  ${live ? `<div class="banner small">${ks.src || ks.fixed ? `Games have started. Players already playing stay where ${ks.src === 'Sleeper' ? 'your Sleeper lineup has them' : ks.src === 'ESPN' ? 'your imported ESPN lineup has them' : ks.src === 'Benny' ? 'Benny’s lineup had them before kickoff' : 'you marked them'}; only the open slots are picked, from players yet to play.${ks.src !== 'Sleeper' ? ' Started someone else? Use “I started him” on that player.' : ''}`
-    : 'Games have started and Benny doesn’t know who you started, so players already playing sit on the bench here and only the open slots are picked. Use “I started him” on anyone you started.'}</div>` : ''}
+  ${live ? `<div class="banner small">Games have started. Players already playing stay where ${ks.src === 'Sleeper' ? 'your Sleeper lineup has them' : ks.src === 'ESPN' ? 'your imported ESPN lineup has them' : ks.src === 'Benny' ? 'Benny’s lineup had them before kickoff' : 'Benny’s pregame lineup would have them (Benny doesn’t know who you started)'}; only the open slots are picked, from players yet to play.${ks.src !== 'Sleeper' ? ' Started someone else? Use “I started him” or “I didn’t start him” on that player.' : ''}</div>` : ''}
   <div class="row-head"><h2>Start</h2><span class="toolbar"><button type="button" class="btn sm" data-act="hist" aria-expanded="${!!D.histOpen}">Past weeks</button><span class="seg" role="group" aria-label="Strategy">${['mean', 'floor', 'ceil'].map(k => k === 'mean' || isPro() ? `<button type="button" data-strategy="${k}" aria-pressed="${strat === k}">${{ mean: 'Projected', floor: 'Safe', ceil: 'Boom' }[k]}</button>` : `<button type="button" data-tab="pro" title="Safe and Boom lineups are part of Pro">${{ floor: 'Safe', ceil: 'Boom' }[k]} <span aria-hidden="true">🔒</span></button>`).join('')}</span></span></div>
   <div class="card list">${head}${starters.map(s => s.r ? playerRow(s.r, s.slot.label || s.slot.k, true) : `<div class="item"><div class="prow"><span class="slot">${esc(s.slot.label || s.slot.k)}</span><span class="pwho muted">No eligible player. <a href="#roster" data-tab="players">Add one in Roster</a>.</span></div></div>`).join('')}</div>
   <div class="row-head"><h2>Bench</h2><span class="small muted">Tap any player for the full matchup breakdown</span></div>

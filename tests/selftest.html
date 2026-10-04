@@ -123,9 +123,15 @@ test('the lineup score ignores points already scored', () => {
   setup(); const r = M(lockedOnRoster().find(id => ev('ok')(M(id).actual)));
   return r && ev('metricOf')(r) === r.mean || `metric ${r && ev('metricOf')(r)}, mean ${r?.mean}, actual ${r?.actual}`;
 });
-test('with no known lineup, players already playing are not started', () => {
-  setup(); const bad = ev('optimize')().starters.filter(s => s.r?.locked);
-  return !bad.length || 'started: ' + bad.map(s => name(s.r.id)).join(', ');
+test('with no known lineup, Benny assumes his pregame lineup and fills every slot', () => {
+  setup(); const D = ev('D'), L = Object.values(D.M).filter(r => r.locked);
+  L.forEach(r => { r.locked = false; }); const pre = new Set(ev('optimize')().starters.filter(s => s.r).map(s => s.r.id)); L.forEach(r => { r.locked = true; });
+  const now = ev('optimize')().starters, stray = now.filter(s => s.r?.locked && !pre.has(s.r.id));
+  return ev('knownStarters')().src === 'guess' && now.every(s => s.r) && !stray.length || `src ${ev('knownStarters')().src}, empty ${now.filter(s => !s.r).length}, stray ${stray.map(s => name(s.r.id))}`;
+});
+test('waivers don\'t count slots already filled by started players as open', () => {
+  setup(); const W = ev('computeWaivers')(), wk = W.moves.map(m => m.hz).filter(x => x > 12);
+  return !wk.length || 'moves gaining over 12 points: ' + W.moves.filter(m => m.hz > 12).map(m => `${name(m.f)} +${m.hz.toFixed(1)}`).join(', ');
 });
 test('players you started keep their slots; others already playing stay benched', () => {
   setup(); const L = lockedOnRoster(), mine = L.slice(0, 2), D = ev('D');
@@ -134,17 +140,41 @@ test('players you started keep their slots; others already playing stay benched'
   const lost = mine.filter(id => !on.has(id)), promoted = L.filter(id => !mine.includes(id) && on.has(id));
   return !lost.length && !promoted.length || `lost ${lost.map(name)}, promoted ${promoted.map(name)}`;
 });
-test('"I started him" puts a player already playing into the lineup', () => {
-  setup(); const L = lockedOnRoster(), id = L[L.length - 1];
-  ev('toggleStarted')(id); const on = ev('optimize')().starters.some(s => s.r?.id === id);
-  ev('toggleStarted')(id); const off = ev('optimize')().starters.some(s => s.r?.id === id);
-  return on && !off || `after marking: ${on}, after unmarking: ${off}`;
+test('"I started him" / "I didn\'t start him" move a player already playing in and out', () => {
+  setup(); const L = lockedOnRoster(), inLineup = id => ev('optimize')().starters.some(s => s.r?.id === id);
+  const benched = L.find(id => !inLineup(id)), started = L.find(inLineup);
+  if (!benched || !started) return 'fixture needs a started and a benched player already playing';
+  ev('toggleStarted')(benched); ev('toggleStarted')(started);
+  const a = inLineup(benched), b = inLineup(started);
+  return a && !b || `${name(benched)} in lineup: ${a}; ${name(started)} in lineup: ${b}`;
 });
 test('Lineup and Start/Sit agree: no benched player projects more than the starter in a slot he fits', () => {
   setup(); const { starters, bench } = ev('optimize')(), bad = [];
   for (const s of starters) { if (!s.r || s.r.locked) continue;
     for (const b of bench) if (b.status === 'ok' && !b.locked && s.slot.elig.includes(b.pos) && b.mean > s.r.mean + 1e-9) bad.push(`${name(b.id)} ${b.mean.toFixed(1)} over ${name(s.r.id)} ${s.r.mean.toFixed(1)}`); }
   return !bad.length || bad.join('; ');
+});
+
+/* ---------- Phase 3: waiver decision quality ---------- */
+const single = id => ['K', 'DEF'].includes(ev('D').U.get(id)?.pos);
+for (const longTerm of [false, true]) {
+  const how = longTerm ? ' (+ long-term value)' : '';
+  const run = () => { setup(st => { st.waivers.rank = longTerm ? 'blend' : 'window'; }); return ev('computeWaivers')(); };
+  test('no move drops another position to carry a second kicker or D/ST' + how, () => {
+    const bad = run().moves.filter(m => single(m.f) && m.d && ev('D').U.get(m.d).pos !== ev('D').U.get(m.f).pos);
+    return !bad.length || bad.map(m => `${name(m.f)} for ${name(m.d)}`).join(', ');
+  });
+  test('the best move clears the hold bar' + how, () => {
+    const W = run(), b = W.best; if (!b) return true;
+    const bar = Math.max(1.5, 0.75 * W.H), swap = single(b.f) && b.d && single(b.d);
+    return !b.marginal && (b.longBet || (swap ? b.hz / W.H >= 1 : Math.max(b.hz, b.strength * W.H) >= bar)) || `${name(b.f)}: +${b.hz.toFixed(1)}`;
+  });
+}
+test('Shrader for Shakir is never suggested; Aubrey to Shrader is at most marginal', () => {
+  setup(st => { st.waivers.rank = 'blend'; }); const W = ev('computeWaivers')(), S = idOf('Spencer Shrader');
+  const forShakir = W.moves.find(m => m.f === S && m.d === idOf('Khalil Shakir')), swap = W.moves.find(m => m.f === S && m.d === idOf('Brandon Aubrey'));
+  if (forShakir) return 'Shrader for Shakir is listed';
+  return !swap || (swap.marginal && W.best !== swap) || `Aubrey to Shrader: +${swap.hz.toFixed(1)} over ${W.H} weeks, marginal ${swap.marginal}`;
 });
 
 /* ---------- every phase: the views still render ---------- */
