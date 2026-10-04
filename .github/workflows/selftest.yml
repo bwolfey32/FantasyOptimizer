@@ -30,3 +30,8 @@ jobs:
           print(text)
           sys.exit(1 if re.search(r"(?m)^FAIL", text) or not re.search(r"(?m)^DONE", text) else 0)
           EOF
+
+      - name: Check the data scripts
+        run: |
+          python3 -m py_compile scripts/extract_snapshot.py scripts/calibrate.py
+          python3 scripts/calibrate.py --selfcheck

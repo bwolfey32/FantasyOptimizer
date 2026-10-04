@@ -196,6 +196,32 @@ test('personal indoor/outdoor splits are context only', () => {
   return !bad.length || bad.slice(0, 5).map(r => r.u.name).join(', ');
 });
 
+/* ---------- Phase 5: probabilities and calibration ---------- */
+test('Start/Sit leads with a lean and the point gap; the % is small print', () => {
+  setup(); const free = ev('state').roster.filter(id => M(id) && !M(id).locked && M(id).status === 'ok' && ['WR', 'RB', 'TE'].includes(M(id).pos));
+  ev('state').compare = free.slice(0, 2); const html = ev('viewCompare')(); ev('state').compare = [null, null];
+  if (!/(Toss-up|Slight lean|Clear lean|Strong lean)/.test(html)) return 'no lean label';
+  if (/<span class="num">\d+%<\/span><span class="small muted">chance to outscore/.test(html)) return 'the % is still a headline number';
+  return /Model estimate of the chance to outscore/.test(html) && /Not yet checked against results/.test(html) || 'no model-estimate small print';
+});
+test('lineup range allows for correlated players', () => {
+  setup(); const c = ev('pairCorr'), D = ev('D');
+  const qb = M(idOf('Jared Goff')), wr = Object.values(D.M).find(r => r.T === qb.T && r.pos === 'WR' && r.status === 'ok'), rb = M(idOf('Jahmyr Gibbs'));
+  const dst = M('PIT'), facing = Object.values(D.M).find(r => r.pos === 'WR' && r.T === dst.O);
+  const got = [c(qb, wr), c(qb, rb), dst.O ? c(dst, facing) : -0.3];
+  return got[0] === 0.35 && got[1] === 0.15 && got[2] === -0.3 || 'correlations ' + got.join(', ');
+});
+test('forecast rows for the calibration record', () => {
+  setup(); const fc = ev('forecastRows')(), rows = Object.values(fc);
+  return rows.length > 200 && rows.every(r => r.length === 5 && ['pre', 'in', 'post'].includes(r[4]) && r[1] > 0) || `${rows.length} rows, sample ${JSON.stringify(rows[0])}`;
+});
+test('the model note reports calibration once three weeks are checked', () => {
+  setup(); const D = ev('D'), before = ev('modelNote')();
+  D.calib = { weeks: [1, 2, 3], n: 900, coverage50: 0.47, mae: { model: 6.1, sleeper: 6.4 }, pairs: { bins: [{ lo: 0.65, hi: 0.8, obs: 0.7, n: 120 }] } };
+  const after = ev('modelNote')(), note = ev('calibNote')(); D.calib = null;
+  return /isn’t available yet/.test(before) && /Checked against what players scored in weeks 1–3/.test(after) && /won 70%/.test(note) || 'notes didn\'t switch';
+});
+
 /* ---------- every phase: the views still render ---------- */
 test('Lineup, Start/Sit and Waivers render', () => {
   setup(); const lu = ev('viewLineup')(), cmp = ev('viewCompare')(), wv = ev('viewWaivers')();

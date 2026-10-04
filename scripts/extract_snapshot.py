@@ -7,6 +7,7 @@ thin snapshot means the export failed; the script then exits with an error and t
 """
 import html
 import json
+import os
 import re
 import sys
 
@@ -67,6 +68,28 @@ for row in snap.get("proj", []):
     else:
         log[pid] = [status, snap["season"], snap["detWeek"], snap["createdAt"][:10]]
 snap["injLog"] = log
+
+# Frozen forecasts, for scripts/calibrate.py: forecasts/<season>-wNN.json keeps each player's forecast as it stood before
+# his game. A player's entry is written only while his game hasn't started, so the record never picks up news or scores
+# from after kickoff. Rows: [mean, sd, base, Sleeper projection, saved at]. Not kept in snapshot.json itself.
+fc = snap.pop("fc", None) or {}
+if fc:
+    fdir = os.path.join(os.path.dirname(os.path.abspath(out_path)), "forecasts")
+    os.makedirs(fdir, exist_ok=True)
+    fpath = os.path.join(fdir, "%d-w%02d.json" % (snap["season"], snap["week"]))
+    try:
+        with open(fpath, encoding="utf-8") as f:
+            book = json.load(f)
+    except (OSError, ValueError):
+        book = {"season": snap["season"], "week": snap["week"], "players": {}}
+    frozen = 0
+    for pid, row in fc.items():
+        if row[4] == "pre":
+            book["players"][pid] = row[:4] + [snap["createdAt"]]
+            frozen += 1
+    with open(fpath, "w", encoding="utf-8") as f:
+        json.dump(book, f, separators=(",", ":"), sort_keys=True)
+    print(f"Forecasts: {frozen} pregame entries updated in {os.path.basename(fpath)} ({len(book['players'])} players)")
 
 with open(out_path, "w", encoding="utf-8") as f:
     json.dump(snap, f, ensure_ascii=False, separators=(",", ":"))

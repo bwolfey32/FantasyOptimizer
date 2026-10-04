@@ -1654,6 +1654,14 @@ function ingest(inp) {
   D.wCache = null; D.usage = null;
   computeAll();
 }
+/* This week's forecasts for the calibration record: [mean, sd, base, Sleeper's projection, game state] for every healthy
+   player with a projection, at default settings (PPR). scripts/extract_snapshot.py keeps each one only while his game
+   hasn't started, so what gets checked is the pregame forecast. */
+function forecastRows() {
+  const out = {}, r2 = x => x == null ? null : Math.round(x * 100) / 100;
+  for (const [id, r] of Object.entries(D.M)) if (r.status === 'ok' && r.game && r.pos !== 'DEF' && (r.projPts > 0 || r.base > 0)) out[id] = [r2(r.mean), r2(r.sd), r2(r.base), r2(r.projPts), r.game.state];
+  return out;
+}
 /* Loading order: the saved copy (snapshot.json, refreshed every few hours by a GitHub Action) paints the board
    right away, then live data from Sleeper and ESPN replaces it in the background. If live data can't be reached,
    the saved copy stays and the status line shows its age. `fresh` (a week or season change) skips the saved copy. */
@@ -1665,6 +1673,8 @@ async function load(opts = {}) {
     D.loading = false; D.failed = !D.inp; render(); window.__ready = true; return;
   }
   if (opts.fresh) D.inp = null;
+  // the forecast check (scripts/calibrate.py), shown in the "how sure is this?" notes once it covers three weeks
+  if (!D.calib && !exporting) fetchJSON('calibration.json', 8000).then(c => { D.calib = c; render(); }).catch(() => {});
   D.failed = false; D.errors = []; D.progress = 0;
   const useSaved = snap => { D.snapshot = snap; D.coaches = snap.coaches || D.coaches; ingest(snap); };
   if (!exporting && !opts.fresh && !D.inp && !state.settings.season && !state.settings.week) {
@@ -1686,7 +1696,7 @@ async function load(opts = {}) {
   if (location.hash === '#export') {
     await checkCoaches(D.season);
     const split = await pSplit;
-    const snap = Object.assign({}, inp, { coaches: D.coaches, split, proj: inp.proj.filter(p => (p[5] || 0) > 0 || D.H[p[0]] || D.prevPPG[p[0]]) });
+    const snap = Object.assign({}, inp, { coaches: D.coaches, split, fc: forecastRows(), proj: inp.proj.filter(p => (p[5] || 0) > 0 || D.H[p[0]] || D.prevPPG[p[0]]) });
     const pre = document.createElement('pre'); pre.id = 'snapshot-out'; pre.hidden = true; pre.textContent = JSON.stringify(snap); document.body.appendChild(pre);
   } else checkCoaches(D.season);
 }
@@ -2925,7 +2935,7 @@ function bennysMoves() {
     for (const d of reviewDecisions().slice(0, 3)) {
       const s = D.M[d.start], b = D.M[d.alt];
       out.push({ gain: Math.max(0.1, s.mean - b.mean), tab: 'compare', decide: `${d.start}|${d.alt}`, title: `Start ${nm(s.id)} over ${nm(b.id)} at ${esc(d.slot)}`,
-        detail: `A close call: ${nm(s.id)} has a ${pct(1 - d.p)} chance to outscore him${d.tagged ? `, but he’s ${esc((s.inj || '').toLowerCase())}, so check news before kickoff` : ''}.`, gainTxt: `+${f1(s.mean - b.mean)} pts` });
+        detail: `A close call: Benny leans ${nm(s.id)} by ${f1(Math.max(0, s.mean - b.mean))} pts${d.tagged ? `, but he’s ${esc((s.inj || '').toLowerCase())}, so check news before kickoff` : ''}.`, gainTxt: `+${f1(s.mean - b.mean)} pts` });
     }
   }
   const W = computeWaivers(), usedPos = new Set(), usedDrop = new Set(), picks = [];
@@ -3117,6 +3127,7 @@ function probTiles(r) {
     <div><span class="label">10+ points</span><span class="num">${pct(r.p10)}</span><span class="small muted">15+: ${pct(r.p15)} · 20+: ${pct(r.p20)}</span></div>
     <div><span class="label">Likely range</span><span class="num">${f1(r.floor)}–${f1(r.ceil)}</span><span class="small muted">middle half of outcomes</span></div>
     <div><span class="label">Big week</span><span class="num">${f1(r.boom)}+</span><span class="small muted">about 1 week in 10</span></div>
+    <div class="small muted" style="grid-column:1/-1">Model estimates. ${calibNote()}</div>
   </div>`;
 }
 /* Jump from a player explanation to the research behind it. */
@@ -3125,8 +3136,34 @@ function researchLinks(r) {
   const d = r.pos === 'DEF' ? r.T : r.O, o = r.pos === 'DEF' ? r.O : r.T;
   return `<div class="small rlinks"><span class="muted">Research:</span> <a href="#research-teams" data-research="${d}">${d} defense and coaches</a> · <a href="#research-teams" data-research="${o}">${o} offense</a> · <a href="#research" data-tab="defenses">all defenses</a></div>`;
 }
+/* calibration.json (scripts/calibrate.py) checks frozen pregame forecasts against what players scored. It counts once it
+   covers 3+ weeks; before that, every percentage says it hasn't been checked. */
+const calibOK = () => (D.calib?.weeks?.length || 0) >= 3;
+function calibNote() {
+  if (!calibOK()) return 'Not yet checked against results.';
+  const c = D.calib, b = (c.pairs?.bins || []).find(x => x.lo <= 0.65 && x.hi > 0.65);
+  return `Checked on ${c.n} player-weeks${b?.n >= 20 ? `: picks Benny gave ${pct(b.lo)}–${pct(b.hi)} won ${pct(b.obs)} of the time` : ''}.`;
+}
 function modelNote() {
-  return `<details class="model small"><summary>Model estimate: how sure is this?</summary><p>Percentages and ranges come from Benny’s model, not from past results. Each player’s score is treated as a bell curve around his projection, with the spread taken from his weekly scores this season (pulled toward a typical spread for his position). The likely range is the middle half of outcomes, the 25th to 75th percentile, so real scores land outside it about half the time. A check of these estimates against past weeks isn’t available yet.</p></details>`;
+  const c = D.calib, check = calibOK()
+    ? ` Checked against what players scored in weeks ${c.weeks[0]}–${c.weeks[c.weeks.length - 1]} (${c.n} player-weeks, forecasts frozen before each kickoff): the likely range caught ${pct(c.coverage50)} of scores (50% is the target), and projections missed by ${f1(c.mae.model)} points on average vs ${f1(c.mae.sleeper)} for Sleeper’s alone.${(c.pairs?.bins || []).filter(x => x.n >= 20).map(x => ` When Benny gave a player a ${pct(x.lo)}–${pct(x.hi)} chance to outscore another, he did ${pct(x.obs)} of the time.`).join('')}`
+    : ' A check of these estimates against past weeks isn’t available yet: Benny freezes each week’s forecasts before kickoff and compares them with results once three weeks are in.';
+  return `<details class="model small"><summary>Model estimate: how sure is this?</summary><p>Percentages and ranges come from Benny’s model. Each player’s score is treated as a bell curve around his projection, with the spread taken from his weekly scores this season (pulled toward a typical spread for his position). Real scores are lumpier than that, since one touchdown swings a week, so read the percentages as leans, not guarantees. The likely range is the middle half of outcomes, the 25th to 75th percentile, so real scores land outside it about half the time.${check}</p></details>`;
+}
+/* Spread of a lineup's total. Teammates' and opponents' scores rise and fall together (a QB and his receivers most; a D/ST
+   and the offense it faces the opposite way), so the total's range is wider than for independent players. These
+   correlations are assumptions in line with published fantasy research, not fitted here: QB and his own WR or TE 0.35,
+   other teammates 0.15, opponents in the same game 0.10, a D/ST and a player it faces −0.30. */
+function pairCorr(a, b) {
+  if (!a.T || !b.T || a.status === 'bye' || b.status === 'bye') return 0;
+  if (a.pos === 'DEF' || b.pos === 'DEF') { const d = a.pos === 'DEF' ? a : b, o = d === a ? b : a; return o.pos !== 'DEF' && o.T === d.O ? -0.3 : 0; }
+  if (a.T === b.T) { const qbCatch = (x, y) => x.pos === 'QB' && (y.pos === 'WR' || y.pos === 'TE'); return qbCatch(a, b) || qbCatch(b, a) ? 0.35 : 0.15; }
+  return a.O === b.T ? 0.1 : 0;
+}
+function lineupSD(rs) {
+  let v = 0;
+  for (let i = 0; i < rs.length; i++) { v += rs[i].sd ** 2; for (let j = i + 1; j < rs.length; j++) v += 2 * pairCorr(rs[i], rs[j]) * rs[i].sd * rs[j].sd; }
+  return Math.sqrt(Math.max(0, v));
 }
 function detailBlock(r) {
   const h = r.h, why = topReasons(r);
@@ -3738,7 +3775,7 @@ function lineupBody() {
   // activation: Benny's lineup shown for a real team, counted once per NFL week in this browser (weekly retention uses it)
   const luKey = `${D.season}-${D.week}`;
   if (an.on && store.get('fo1:anlu') !== luKey) { store.set('fo1:anlu', luKey); track('lineup_shown', { players: state.roster.length, starters: starters.filter(s => s.r).length, teams: state.teams.length, scoring: state.scoring }); }
-  const st = starters.filter(s => s.r), mu = st.reduce((s, x) => s + x.r.mean, 0), sdT = Math.sqrt(st.reduce((s, x) => s + x.r.sd ** 2, 0));
+  const st = starters.filter(s => s.r), mu = st.reduce((s, x) => s + x.r.mean, 0), sdT = lineupSD(st.map(x => x.r));
   // once games start: points banked by started players, shown apart from the pregame projection rather than mixed into it
   const live = state.roster.some(id => D.M[id]?.locked), played = st.filter(x => x.r.locked), sofar = played.reduce((s, x) => s + (ok(x.r.actual) ? x.r.actual : 0), 0);
   const ks = live ? knownStarters() : null;
@@ -3783,14 +3820,14 @@ function viewCompare() {
     // counted once per pair; "picked" is a pair the user chose, as opposed to the one Start / Sit opens on
     trackOnce('ss:' + [a, b].sort().join('|'), 'start_sit_used', { picked: state.compare[0] === a && state.compare[1] === b, pos: A.pos });
     const pA = pBeats(A, Bp), w = pA >= 0.5 ? A : Bp, l = w === A ? Bp : A, pw = Math.max(pA, 1 - pA), edge = w.mean - l.mean;
-    const call = pw < 0.55 ? 'Toss-up' : pw < 0.65 ? 'Lean' : pw < 0.8 ? 'Start' : 'Easy call';
+    // the lean and the point gap lead; the model's percentage is small print until it has been checked against results
+    const call = pw < 0.55 ? 'Toss-up' : pw < 0.65 ? 'Slight lean' : pw < 0.8 ? 'Clear lean' : 'Strong lean';
     const why = pickReasons(w, l), gnote = gradeNote(w, l);
     verdict = `<div class="card pick"><div class="pick-head"><span class="label">Benny’s Pick</span><span class="pill ${pw < 0.55 ? 'm' : 'n'}">${call}</span></div>
       <div class="pick-main"><div class="pick-who"><div class="pick-name">Start ${esc(w.u.name)}</div><div class="small muted">over ${esc(l.u.name)} · ${w.pos} · ${w.T || 'FA'} · matchup grades ${w.grade} vs ${l.grade}</div></div>
-        <div class="pick-stat"><span class="num">${pct(pw)}</span><span class="small muted">chance to outscore</span></div>
         <div class="pick-stat"><span class="num">${edge >= 0.05 ? '+' : ''}${f1(edge)}</span><span class="small muted">projected pts edge</span></div></div>
       <div class="meter" aria-label="${esc(A.u.name)} ${pct(pA)}, ${esc(Bp.u.name)} ${pct(1 - pA)}"><span style="width:${pA * 100}%"></span></div>
-      <div class="small muted pick-odds">${esc(shortName(A.id))} ${pct(pA)} · ${esc(shortName(Bp.id))} ${pct(1 - pA)}. ${pw < 0.55 ? 'Too close to call on projections alone; Benny leans this way. Check late injury news, or use Safe or Boom on the Lineup tab to break the tie.' : `${esc(w.u.name)} comes out ahead in roughly ${Math.round(pw * 10)} of 10 comparable outcomes.`}</div>
+      <div class="small muted pick-odds">${pw < 0.55 ? 'Too close to call on projections alone; Benny leans this way. Check late injury news, or use Safe or Boom on the Lineup tab to break the tie. ' : ''}Model estimate of the chance to outscore: ${esc(shortName(A.id))} ${pct(pA)}, ${esc(shortName(Bp.id))} ${pct(1 - pA)}. ${calibNote()}</div>
       ${why.length ? `<ul class="pick-why">${why.map(x => `<li>${esc(x)}</li>`).join('')}</ul>` : ''}
       ${gnote ? `<div class="pick-note">${esc(gnote)}</div>` : ''}
       ${modelNote()}</div>`;
@@ -3961,7 +3998,7 @@ function viewSettings() {
     <li><strong>Matchup factors</strong>, each capped at ±25%: fantasy points the opponent allows to the position; secondary (pass yards allowed) or run defense (yards per carry allowed, plus the player’s own line); sacks allowed by the offense vs. sacks by the opposing defense; the team’s Vegas implied total and spread, with the opponent’s record; the offense’s pass rate and pace; and the opponent’s defensive roster changes (signings, trades, injuries) that its stats don’t show yet. Together they’re capped at ±20%, and they move only the season-average part of the base, since Sleeper’s projection already counts the matchup.</li>
     <li><strong>Weather &amp; stadium:</strong> domes and closed retractable roofs give passers and kickers a small lift. Outdoors, the forecast for the three hours from kickoff (Open-Meteo) moves points between passing, running and kicking: wind over 10 mph hurts deep passing and kickers most, rain and snow add carries, and freezing cold costs kickers and passers a little. The betting total already lowers everyone in bad weather, so this factor doesn’t cut them all again. Each player’s role sets how much he feels it (a deep threat more than a slot receiver, a running quarterback less than a pocket passer), and his own scores indoors vs. outdoors are shown for context but don’t move the projection. Like every matchup factor, it moves only the part of the projection that comes from his scoring average, since Sleeper’s projection already counts the weather.</li>
     <li><strong>Scheme history:</strong> each team’s numbers blend ${D.season} games with last season. When the play-caller is unchanged, last season counts as ${S.priorWeeks} games. When the play-caller is new, it counts as at most 1.5 games, mixed with the new coach’s old team, and the player’s range widens by 10%.</li>
-    <li><strong>Probabilities:</strong> scores are treated as a bell curve around the projection, with spread from the player’s weekly scores (shrunk toward a typical spread for the position).</li>
+    <li><strong>Probabilities:</strong> scores are treated as a bell curve around the projection, with spread from the player’s weekly scores (shrunk toward a typical spread for the position). A lineup’s range allows for teammates and opponents scoring together (a QB and his receivers most). Every week’s forecasts are frozen before kickoff and later checked against what players scored.</li>
     <li><strong>Lineup:</strong> an exact assignment fills every slot to maximize the chosen strategy. Bye weeks and players ruled Out or on IR sit automatically.</li></ol></details>
     <div class="toolbar"><button type="button" class="btn danger" data-act="reset">${D.resetArm ? 'Press again to erase everything' : 'Reset all saved data'}</button><span class="small muted">Removes your roster, overrides, settings, saved lineups and cached stats from this browser${acct.user ? ', and signs you out (your account keeps its copy)' : ''}.</span></div></div>
   </div>`;
