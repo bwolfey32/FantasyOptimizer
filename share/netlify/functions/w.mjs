@@ -33,7 +33,7 @@ export default async req => {
 <meta name="theme-color" content="#075b37">
 <script>location.replace(${JSON.stringify(dest).replace(/</g, '\u003c')})</script>
 </head><body style="background:#0e1512;color:#e4ebe6;font:16px system-ui,sans-serif;padding:24px">
-<p><a href="${esc(dest)}" style="color:#4fc38e">Open this pick on Benny’s Picks</a></p>
+<p><a href="${esc(dest)}" style="color:#4fc38e;font-weight:600">Find your best move, free</a></p>
 </body></html>`;
   return new Response(html, { headers: { 'Content-Type': 'text/html; charset=utf-8', 'Cache-Control': 'public, max-age=300', 'Netlify-CDN-Cache-Control': 'public, durable, s-maxage=86400' } });
 };

@@ -301,6 +301,16 @@ test('an empty slot on a bye counts a streamer, not 0', () => {
   return wi > 0 && gain < 0.5 * W.V[idOf('Deshaun Watson')][wi] || `Goff's bye at index ${wi}, Watson move +${gain.toFixed(1)}`;
 });
 
+test('Waivers count from next week once nearly all of this week’s games have kicked off', () => {
+  setup(); const D = ev('D'), G = D.games, saved = G.map(g => g.state), run = st => { G.forEach((g, i) => { g.state = st(i); }); D.wCache = null; return ev('computeWaivers')(); };
+  try {
+    const a = run(() => 'pre').weeks[0], R = run(i => i < G.length - 2 ? 'post' : 'pre'), b = R.weeks[0];
+    const why = R.moves.map(m => m.whyText).join(' | ');
+    if (a !== 4 || b !== 5) return `all to play: from week ${a}; two left: from week ${b}`;
+    return !/starts in weeks|of the next \d+ \(/.test(why) || 'old wording: ' + why;
+  } finally { G.forEach((g, i) => { g.state = saved[i]; }); D.wCache = null; }
+});
+
 /* ---------- weakest spot: pickups at the position Benny Grade rates lowest ---------- */
 test('weakest spot follows Benny Grade, lists free agents there, and skips one marked Taken', () => {
   setup(); const g = ev('teamGrade')(), ws = ev('weakSpot')(), D = ev('D');

@@ -2681,11 +2681,17 @@ function availablePool() {
   return [...D.U.values()].filter(u => D.M[u.id] && !ros.has(u.id) && !W.taken[u.id] && (D.proj[u.id]?.pts > 0 || D.H[u.id]?.n) && !isLongInj(u.inj) && D.M[u.id].role?.kind !== 'backup'
     && (sl ? !sl.has(u.id) : list ? list.has(u.id) : (D.own.get(u.id) ?? 0) < W.ownMax)).map(u => u.id);
 }
+/* The first week a waiver pickup plays: this week, or next week once nearly all of this week’s games have kicked off (a
+   fifth or fewer still to start, so Sunday night and Monday), when people are already setting next week’s lineups. */
+function waiverStart() {
+  const G = D.games || [], left = G.filter(g => g.state === 'pre').length;
+  return D.season === D.detSeason && D.week === D.detWeek && D.week < 18 && G.length && left <= G.length / 5 ? D.week + 1 : D.week;
+}
 function computeWaivers() {
-  const W = state.waivers;
-  const key = JSON.stringify([state.roster, state.overrides, state.settings, state.slots, W, state.returnWeek, state.staffEdits, D.loadedAt?.getTime(), D.week]);
+  const W = state.waivers, start = waiverStart(), live = start === D.week;   // live: the window starts with this week
+  const key = JSON.stringify([state.roster, state.overrides, state.settings, state.slots, W, state.returnWeek, state.staffEdits, D.loadedAt?.getTime(), D.week, start]);
   if (D.wCache && D.wCache.key === key) return D.wCache;
-  const weeks = []; for (let w = D.week; w <= 18; w++) weeks.push(w);
+  const weeks = []; for (let w = start; w <= 18; w++) weeks.push(w);
   const H = W.horizon === 'ros' ? weeks.length : Math.min(W.horizon, weeks.length);
   const slots = expandSlots(), roster = state.roster.filter(id => D.M[id]);
   const pool = availablePool(), V = {};
@@ -2693,18 +2699,19 @@ function computeWaivers() {
   const sumH = id => V[id].slice(0, H).reduce((s, x) => s + x, 0), sumAll = id => V[id].reduce((s, x) => s + x, 0);
   // This week, a starter whose game has kicked off has banked his points and can't be swapped out, so his slot is left
   // out of this week's comparison (otherwise a free agent who hasn't played yet looks like he fills an empty spot).
-  const now = optimize().starters, slots0 = slots.filter((s, i) => !now[i]?.r?.locked), slotsAt = wi => wi ? slots : slots0;
+  const now = live ? optimize().starters : [], slots0 = slots.filter((s, i) => !now[i]?.r?.locked), slotsAt = wi => wi || !live ? slots : slots0;
   /* Replacement level: from next week on, a slot left empty by a bye or an injury, or held by someone worse, goes to a
      free agent, the third-best available at the position that week (other teams stream too). Moves are measured over
      that, not over an empty slot, so a backup QB for one bye or for injury cover gains only what he beats a streamer
      by. This week stays unfilled: the pickup you make now is the move itself. */
   const replAt = (VX, wi) => Object.fromEntries(POS.map(P => { const v = pool.filter(id => D.U.get(id).pos === P).map(id => VX[id][wi]).sort((a, b) => b - a); return [P, v[Math.min(2, v.length - 1)] || 0]; }));
-  const RW = weeks.map((_, wi) => wi ? replAt(V, wi) : null);
+  const RW = weeks.map((_, wi) => wi || !live ? replAt(V, wi) : null);
   const base = weeks.map((_, wi) => bestLineup(roster, wi, V, slotsAt(wi), RW[wi]));
-  /* A player's usual week: his average over the weeks left after this one, skipping his bye (weeks he's injured count
+  /* A player's usual week: his average over the weeks left after this one (all of them when the window starts next
+     week), skipping his bye (weeks he's injured count
      as 0). The best lineup on these values is your team's everyday strength, so a move that fixes a weak position
      raises it, a pickup who only covers a bye or an injury doesn't, and dropping a good player on bye lowers it. */
-  const later1 = weeks.length > 1 ? 1 : 0;
+  const later1 = live && weeks.length > 1 ? 1 : 0;
   const usual = id => { const T = D.U.get(id).team, vals = V[id].filter((x, wi) => wi >= later1 && T && !schedOpp(T, weeks[wi]).bye); return vals.length ? mean(vals) : 0; };
   const VS = {}; for (const id of [...roster, ...pool]) VS[id] = [usual(id)];
   const RS = replAt(VS, 0), baseS = bestLineup(roster, 0, VS, slots, RS);
@@ -2800,10 +2807,14 @@ function waiverWhy(m, needs, weeks, H) {
     const nm = id => { const u = D.U.get(id); return u.pos === 'DEF' ? u.team : shortName(id); }, F = nm(m.f), X = nm(m.d), n = m.h2h.length;
     const wins = m.h2h.filter(x => x > 0.05).length, avg = m.h2h.reduce((s, x) => s + x, 0) / n, now = m.h2h[0], s = schedOpp(fu.team, weeks[0]);
     why.push(`${F} projects more than ${X} in ${wins} of ${n} week${n === 1 ? '' : 's'}, ${avg >= 0 ? '+' : '−'}${f1(Math.abs(avg))} pts a week on average`);
-    if (n > 1 && Math.abs(now) >= 0.3) why.push(`${now < 0 ? 'worse' : 'better'} this week (${now < 0 ? '−' : '+'}${f1(Math.abs(now))}${s.opp ? `, ${s.home ? 'vs' : 'at'} ${s.opp}` : ''})`);
+    if (n > 1 && Math.abs(now) >= 0.3) why.push(`${now < 0 ? 'worse' : 'better'} ${weeks[0] === D.week ? 'this week' : `in week ${weeks[0]}`} (${now < 0 ? '−' : '+'}${f1(Math.abs(now))}${s.opp ? `, ${s.home ? 'vs' : 'at'} ${s.opp}` : ''})`);
     const hist = id => { const h = D.H[id], p = D.prevPPG?.[id]?.[0]; return h?.n ? `${nm(id)} ${f1(h.avg)} in ${h.n} game${h.n === 1 ? '' : 's'}${ok(p) ? ` (${f1(p)} last season)` : ''}` : null; };
     const hs = [hist(m.f), hist(m.d)].filter(Boolean); if (hs.length) why.push(`scoring averages ${hs.join(', ')}; small samples are blended with last season`);
-  } else if (m.starts.length) why.push(`${m.strength < 1 && m.starts.length < H ? 'short-term cover: ' : ''}starts in ${m.starts.length === H ? 'every week' : 'week' + (m.starts.length > 1 ? 's ' : ' ') + m.starts.map(s => s[0]).join(', ')} of the next ${H} (${[...new Set(m.starts.map(s => s[1]))].join('/')})${m.strength < 1 && m.starts.length < H ? ', for byes or injuries' : ''}`);
+  } else if (m.starts.length) {
+    // the slots he’d fill, named only when that says more than his position (a FLEX, or both WR and FLEX)
+    const sl = [...new Set(m.starts.map(s => s[1]))].sort((a, b) => (b === P) - (a === P)), n = m.starts.length, tag = sl.length === 1 && sl[0] === P ? '' : ` (${sl.join('/')})`;
+    why.push(`${m.strength < 1 && n < H ? 'short-term cover: ' : ''}${H === 1 ? `starts in week ${m.starts[0][0]}` : n === H ? `starts all ${H} of the next ${H} weeks` : `starts ${n} of the next ${H} weeks`}${tag}${m.strength < 1 && n < H ? ', for byes or injuries' : ''}`);
+  }
   else why.push('adds depth for later weeks');
   if (m.d && m.depLost > 0.5) why.push(`costs ${f1(m.depLost)} pts of injury cover as a backup ${D.U.get(m.d).pos === 'DEF' ? 'D/ST' : D.U.get(m.d).pos} (already counted in the gain)`);
   const fi = fillInFor(m.f); if (fi) why.push(`short-term: filling in for ${fi.name} (${fi.inj}), so later weeks count half`);
@@ -2879,7 +2890,7 @@ function sharedMoveCard(R) {
       : !R.pool.includes(S.add) ? `${name} isn’t among your free agents.`
       : `${name} wouldn’t add points to your lineup. Your best move is below.`;
   }
-  const old = S.wk && D.week && S.wk !== D.week ? `Shared in week ${S.wk}; the numbers have changed since.` : '';
+  const old = S.wk && D.week && S.wk !== waiverStart() ? `Shared for week ${S.wk}; the numbers have changed since.` : '';
   return `<div class="card wshared"><div class="row-head"><span class="label">Shared pick${S.wk ? ` · Week ${S.wk}` : ''}</span><button type="button" class="btn sm" data-act="sharedx">Dismiss</button></div>
     <div class="wb-row">${side('add', S.add)}${drop}${gain}</div>
     ${mine || old ? `<div class="small">${[mine, old].filter(Boolean).join(' ')}</div>` : ''}</div>`;
@@ -2893,11 +2904,11 @@ function sharedMoveCard(R) {
 const SHARE_URL = 'https://share.bennyspicks.us/w';   // share/ on Netlify (share/README.md); '' shares plain bennyspicks.us links
 async function shareMove() {
   const R = D.wCache, m = R?.best; if (!m) return;
-  const nm = id => D.U.get(id)?.name || id, H = m.H;
-  const text = `Benny’s Picks: add ${nm(m.f)}${m.d ? `, drop ${nm(m.d)}` : ''}, +${f1(m.hz)} expected lineup points over the next ${H} week${H === 1 ? '' : 's'} (week ${D.week}).`;
+  const nm = id => D.U.get(id)?.name || id, H = m.H, wk = R.weeks[0];
+  const text = `Benny’s Picks: add ${nm(m.f)}${m.d ? `, drop ${nm(m.d)}` : ''}, +${f1(m.hz)} expected lineup points over the next ${H} week${H === 1 ? '' : 's'} (from week ${wk}).`;
   const q = new URLSearchParams(SHARE_URL ? { add: m.f } : { utm_source: 'share', utm_medium: 'waiver_move', add: m.f });
   if (m.d) q.set('drop', m.d);
-  q.set('wk', D.week); q.set('g', f1(m.hz)); q.set('h', H);
+  q.set('wk', wk); q.set('g', f1(m.hz)); q.set('h', H);
   if (SHARE_URL) {
     if (D.own?.has(m.f)) q.set('o', +D.own.get(m.f).toFixed(1));
     // the reason's clauses, as many as fit the card's two lines
