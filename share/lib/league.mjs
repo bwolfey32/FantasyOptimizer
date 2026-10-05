@@ -49,7 +49,7 @@ export async function renderLeagueCard(L) {
   const per = Math.ceil(teams.length / 2), rowH = Math.min(54, Math.floor(320 / per)), fs = Math.round(rowH * 0.48);
   const row = t => { const [ink, bg] = GRADE_C[t.letter[0]];
     return el('div', { height: rowH, alignItems: 'center', borderBottom: `1px solid ${C.line}` },
-      el('div', { width: fs * 1.6, fontFamily: 'Saira Condensed', fontWeight: 700, fontSize: fs * 1.15, color: t.rank <= 3 ? C.gold : C.muted }, String(t.rank)),
+      el('div', { width: fs * (teams.length >= 10 ? 2 : 1.6), fontFamily: 'Saira Condensed', fontWeight: 700, fontSize: fs * 1.15, color: t.rank <= 3 ? C.gold : C.muted }, String(t.rank)),
       el('div', { flex: 1, minWidth: 0, fontSize: fs, color: C.ink, overflow: 'hidden', whiteSpace: 'nowrap', textOverflow: 'ellipsis', marginRight: 12 }, t.name),
       el('div', { width: fs * 2.1, height: rowH - 14, alignItems: 'center', justifyContent: 'center', borderRadius: 8, backgroundColor: bg, color: ink, fontFamily: 'Saira Condensed', fontWeight: 700, fontSize: fs * 1.05, marginRight: 10 }, t.letter),
       el('div', { width: fs * 1.6, justifyContent: 'flex-end', fontFamily: 'Saira Condensed', fontWeight: 600, fontSize: fs * 1.05, color: C.ink }, String(t.score)));
