@@ -249,7 +249,7 @@ a { color: var(--accent); }
 .foot a { color: var(--muted); }
 body.welcome .adslot { display: none !important; }
 /* Welcome walkthrough: the main tabs stay, so a visitor can look around first; the team tools wait for a team */
-body.welcome .controls, body.welcome #teamctx, body.welcome #panels, body.welcome #brief, body.welcome #msgs, body.welcome #fresh { display: none !important; }
+body.welcome .controls, body.welcome #teampin, body.welcome #teamctx, body.welcome #panels, body.welcome #brief, body.welcome #msgs, body.welcome #fresh { display: none !important; }
 /* on the welcome, Sign in sits top right in the header (only that button), in place of the link above the headline */
 body.welcome.wsign .top { align-items: center; }
 body.welcome.wsign .top > .controls { display: flex !important; }
@@ -335,6 +335,24 @@ body.welcome.wsign #acctBtn .acct-txt { position: static; width: auto; height: a
 
 /* Team context bar (every page) */
 .teamctx { display: flex; flex-direction: column; gap: 8px; }
+/* The tabs, team chips and week line pin to the top once scrolled to (#stick, pinBar); above that they sit in place.
+   The page background behind them hides what scrolls under, with a shadow once pinned. */
+#stickSentinel { height: 1px; margin-bottom: -17px; }
+.stick { position: sticky; top: env(safe-area-inset-top, 0px); z-index: 40; display: flex; flex-direction: column; gap: 10px;
+  margin: -6px -16px -8px; padding: 6px 16px 8px; background: var(--bg); }
+.stick.stuck { box-shadow: 0 6px 12px -8px rgba(0, 0, 0, .35); }
+.teampin { display: flex; flex-direction: column; gap: 8px; }
+.teampin:empty { display: none; }
+html { scroll-padding-top: calc(var(--stick-h, 0px) + 8px); }
+@media (max-width: 600px) {
+  .stick.stuck { gap: 6px; padding-top: 4px; padding-bottom: 6px; }
+  .stick.stuck .tabs { padding: 4px; }
+  .stick.stuck .tabs .navlink { min-height: 32px; padding: 3px 4px 7px; font-size: 16px; }
+  .stick.stuck .tabs .navlink::after { bottom: 3px; }
+  .stick.stuck .tchip { padding: 3px 10px; }
+  .stick.stuck .tchip .tm { display: none; }
+  .stick.stuck .tb-ctx { font-size: 13px; }
+}
 .teamctx:empty { display: none; }
 .tb-teams { display: flex; gap: 6px; overflow-x: auto; scrollbar-width: thin; padding-bottom: 2px; }
 .tchip { flex: 0 0 auto; display: flex; flex-direction: column; align-items: flex-start; max-width: 220px; padding: 5px 12px 6px; background: var(--surface); border: 1px solid var(--line); border-radius: 8px; text-align: left; }
@@ -768,7 +786,11 @@ button, .btn, [role="button"], [role="tab"], nav, nav a, summary { -webkit-touch
     </div>
   </header>
   <div class="freshp card" id="fresh" hidden></div>
-  <nav class="tabs" id="tabs" aria-label="Main"></nav>
+  <div id="stickSentinel" aria-hidden="true"></div>
+  <div class="stick" id="stick">
+    <nav class="tabs" id="tabs" aria-label="Main"></nav>
+    <section class="teampin" id="teampin" aria-label="Your team and week"></section>
+  </div>
   <section class="teamctx" id="teamctx" aria-label="Your team"></section>
   <div id="panels"></div>
   <section class="brief" id="brief" aria-label="This week at a glance"></section>
@@ -2513,7 +2535,7 @@ function slSyncLine() {
     <button type="button" class="btn sm" data-act="slsync">Sync now</button><button type="button" class="btn sm" data-act="slunlink">Unlink</button>
     ${s.notes?.length ? `<span class="muted">Your league also uses ${esc(s.notes.join(', '))}, which Benny doesn’t score yet.</span>` : ''}</div>`;
 }
-function renderSyncLine() { const el = $('#teamctx'); if (el && !D.loading && !D.failed) el.innerHTML = teamBar(); }
+function renderSyncLine() { const el = $('#teampin'); if (el && !D.loading && !D.failed && !needsTeam()) el.innerHTML = teamPin(); }
 function sleeperControls() {
   const s = D.sl || {};
   return `<div class="toolbar"><input class="inp" id="slQuery" placeholder="Sleeper username or league ID" aria-label="Sleeper username or league ID" value="${esc(s.q || '')}" style="flex:1 1 180px"><button type="button" class="btn primary" data-act="slfind">Find</button></div>
@@ -3647,17 +3669,28 @@ const TAB_OF = Object.fromEntries(Object.entries(HASH).map(([k, v]) => [v, k]));
 const navOf = tab => tab === 'teams' || tab === 'weather' ? 'defenses' : tab;
 const TEAM_TABS = new Set(['lineup', 'waivers', 'players']);
 const showWelcome = () => needsTeam() && TEAM_TABS.has(state.tab);
+/* Where a new page starts: the top, or, with the bar pinned, just where it pins, so the new page begins under it */
+function navTop() {
+  const st = $('#stick'), s = $('#stickSentinel'); if (!st?.classList.contains('stuck') || !s) return 0;
+  return Math.max(0, s.getBoundingClientRect().top + scrollY - (parseFloat(getComputedStyle(st).top) || 0));
+}
+/* The pinned bar: .stuck once the tabs reach the top (compact on phones), and its height for scroll-padding */
+function pinBar() {
+  const st = $('#stick'), s = $('#stickSentinel'); if (!st || !s || SELFTEST || location.hash === '#export') return;
+  if ('IntersectionObserver' in window) new IntersectionObserver(([e]) => st.classList.toggle('stuck', !e.isIntersecting && e.boundingClientRect.top < 0)).observe(s);
+  if ('ResizeObserver' in window) new ResizeObserver(() => document.documentElement.style.setProperty('--stick-h', st.offsetHeight + 'px')).observe(st);
+}
 function go(tab, opts = {}) {
   if (!HASH[tab]) return;
   D.flash = opts.keepFlash ? D.flash : null;
   if (location.hash.slice(1) !== HASH[tab]) { D.navScroll = opts.scroll !== false; location.hash = HASH[tab]; return; }   // hashchange renders
-  state.tab = tab; save(); render(); if (opts.scroll !== false) window.scrollTo(0, 0); runAfter();
+  state.tab = tab; save(); render(); if (opts.scroll !== false) window.scrollTo(0, navTop()); runAfter();
 }
 window.addEventListener('hashchange', () => {
   const tab = TAB_OF[location.hash.slice(1)]; if (!tab) return;
   track('screen_viewed', { screen: HASH[tab], has_team: !needsTeam() });
   if (needsTeam() && tab !== 'pro') D.intent = INTENT_TABS.has(tab) ? tab : null;   // before there's a team: where setup lands (INTENT_TABS)
-  state.tab = tab; save(); render(); if (D.navScroll !== false) window.scrollTo(0, 0); D.navScroll = true; runAfter();
+  state.tab = tab; save(); render(); if (D.navScroll !== false) window.scrollTo(0, navTop()); D.navScroll = true; runAfter();
 });
 // a one-shot step to run after the next page renders (scroll to a team, highlight the best move)
 function runAfter() { const f = D.after; D.after = null; if (f) setTimeout(f, 30); }
@@ -3673,13 +3706,14 @@ function render() {
   const nav = navOf(state.tab);
   $('#tabs').innerHTML = NAV.map(([k, l]) => `<a href="#${HASH[k]}" class="navlink" data-tab="${k}" ${nav === k ? 'aria-current="page"' : ''}>${l}</a>`).join('');
   if (welcome) {
-    for (const s of ['#teamctx', '#panels', '#brief', '#msgs']) $(s).innerHTML = '';
+    for (const s of ['#teampin', '#teamctx', '#panels', '#brief', '#msgs']) $(s).innerHTML = '';
     renderStatus(); renderAcct(); renderAd();
     $('#main').innerHTML = viewWelcome(); return;
   }
   const pb = $('#proBtn'); if (pb) { pb.hidden = !acct.on; pb.textContent = isPro() ? 'Pro ✓' : 'Go Pro'; pb.classList.toggle('is-pro', isPro()); pb.setAttribute('aria-pressed', String(state.tab === 'pro')); }
   renderStatus(); renderAcct(); renderAd();
-  $('#teamctx').innerHTML = D.loading || D.failed ? '' : needsTeam() ? guestBar() : teamBar();
+  $('#teampin').innerHTML = D.loading || D.failed || needsTeam() ? '' : teamPin();
+  $('#teamctx').innerHTML = D.loading || D.failed ? '' : needsTeam() ? guestBar() : teamActions();
   $('#panels').innerHTML = D.acctOpen && acct.on ? accountPanel() : D.loading || D.failed ? '' : D.flow ? flowPanel() : D.tsOpen ? teamSettingsPanel() : D.ioOpen ? sharePanel() : '';
   const msgs = [];
   if (D.flash && !D.loading) msgs.push(`<div class="banner info flash"><span>${D.flash.html}</span><button type="button" class="btn sm" data-act="flashclose" aria-label="Dismiss">Dismiss</button></div>`);
@@ -3950,7 +3984,8 @@ function sourceLabel() {
   if (s) return `<span class="src"><span class="sl-dot"></span>Sleeper · ${D.slSyncing ? 'syncing…' : 'synced ' + ago(s.syncedAt || 0)}</span> <button type="button" class="linkbtn" data-act="slsync">Sync roster</button>`;
   return `<span class="src">${Object.keys(state.espn.slotOf || {}).length ? 'ESPN import' : 'Manual roster'}</span>`;
 }
-function teamBar() {
+/* the team chips and the week, scoring and source line: pinned with the tabs as you scroll (#stick) */
+function teamPin() {
   const chips = state.teams.map(t => {
     const tag = t.sleeper?.leagueId ? 'Sleeper' : `${(t.roster || []).length} players`;
     return `<button type="button" class="tchip" data-fteam="${esc(t.id)}" aria-pressed="${t.id === state.activeTeam}" title="${esc(t.name)}"><span class="tn">${esc(t.name)}</span><span class="tm">${esc(tag)}</span></button>`;
@@ -3960,6 +3995,11 @@ function teamBar() {
     <span class="tb-item"><label for="weekSel" class="muted">Week</label> <select id="weekSel" class="sel sm" ${D.snapshot ? 'disabled' : ''}>${weekOptions()}</select></span>
     <span class="tb-item">${esc(fmtName())}</span>
     <span class="tb-item">${sourceLabel()}</span>
+  </div>`;
+}
+// the team actions, under the pinned bar: they scroll with the page
+function teamActions() {
+  return `<div class="tb-ctx">
     <span class="tb-actions">
       <button type="button" class="btn sm" data-act="teamsettings" aria-expanded="${!!D.tsOpen}">Team settings</button>
       <button type="button" class="btn sm" data-act="flow" data-method="${state.sleeper ? 'sleeper' : 'espn'}" data-dest="replace">Import / replace</button>
@@ -4462,7 +4502,7 @@ function refreshPlayers() {
   if (state.tab !== 'players') return render();
   const b = $('#plistBox'); if (b) b.innerHTML = playerListHTML();
   const c = $('#rosterCount'); if (c) c.textContent = `${curTeam().name} · ${state.roster.length} players`;
-  $('#teamctx').innerHTML = teamBar(); renderBrief();
+  $('#teampin').innerHTML = teamPin(); $('#teamctx').innerHTML = teamActions(); renderBrief();
 }
 
 /* ---------- Lineup and Research ---------- */
@@ -5108,6 +5148,7 @@ if (!SELFTEST && location.hash !== '#export') loadPlayerIds();
 load();
 setTimeout(anStart, 1500);
 installedApp();
+pinBar();
 if (anFlag === 'off' || anFlag === 'on') {
   toast(anFlag === 'off' ? 'Analytics is off in this browser.' : an.on ? 'Analytics is on again in this browser.' : 'Analytics stays off: this browser sends Do Not Track or Global Privacy Control.');
   try { const u = new URL(location.href); u.searchParams.delete('analytics'); history.replaceState(null, '', u.pathname + u.search + u.hash); } catch {}
