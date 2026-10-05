@@ -33,15 +33,16 @@ A team bar on every page shows the selected team, week, scoring and where the ro
 ## Getting started
 
 1. Open the site. Lineup, Waivers and Roster ask how you'd like to add your team. You can look around first: **Start / Sit** works for any two players (it opens on an example close call), and **Research** and **Settings** need no team either. A bar at the top of those pages adds your team right there. Already have an account? Press **Sign in** at the top and your teams come straight back.
-2. Pick one of three ways:
+2. Pick one of four ways:
    - **Sleeper:** enter your username or league ID and pick your team. It re-syncs every time you open the site, flags lineup differences from Sleeper, and the Waivers section uses your league's exact free agents.
    - **ESPN Fantasy:** load a public league by its ID, or, for any league, copy the roster table from **My Team** and paste it.
+   - **Yahoo Fantasy:** copy the roster table from **My Team** and paste it. Benny reads Yahoo's "Team - Pos" tags, so players who share a name and every D/ST come in right. Set your scoring and lineup slots on the next step, since Yahoo doesn't share them.
    - **Find your players:** search for each player and pick them from the suggestions, or paste a roster.
 
    To bring back a team saved from Benny's Picks, use **Restore a saved team** below the cards: paste a team code or open a file from **Share / back up**.
 3. Review what was found (players, any names that didn't match, scoring and lineup slots) and save. Benny opens your lineup.
 4. **Save your team across devices** (optional): a banner on your lineup offers sign-in with your email, typing in the code it sends, or with Google. There's no password. Until then your team is saved in this browser.
-5. Use **+ Add team** for more leagues, and **Waivers** for pickups. For exact suggestions in an ESPN league, use **Use my league's free agents** at the top of that section.
+5. Use **+ Add team** for more leagues, and **Waivers** for pickups. For exact suggestions in an ESPN or Yahoo league, use **Use my league's free agents** at the top of that section and paste the league's free-agent list.
 
 Each section has its own address (for example `#start-sit` or `#roster`), so the browser's Back button, refreshing, and shared links all land where you expect.
 

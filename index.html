@@ -62,21 +62,21 @@
   --font-display: "Saira Condensed", "Arial Narrow", "Roboto Condensed", sans-serif;
   --font-body: "IBM Plex Sans", system-ui, -apple-system, "Segoe UI", sans-serif;
   --radius: 10px;
-  --sleeper-tint: #e3eaf5; --sleeper-ink: #022047; --espn-tint: #fbe7e8; --espn-ink: #8f0009;   /* the setup tabs, in each platform's colors */
+  --sleeper-tint: #e3eaf5; --sleeper-ink: #022047; --espn-tint: #fbe7e8; --espn-ink: #8f0009; --yahoo-tint: #eee5fb; --yahoo-ink: #4a0aa6;   /* the setup tabs, in each platform's colors */
   --wx-tile: #123d2a;   /* weather icons are drawn light-on-dark, so on the light theme each sits on a dark tile */
 }
 @media (prefers-color-scheme: dark) {
   :root:not([data-theme="light"]) {
     --bg: #0e1512; --surface: #151e1a; --surface-2: #1c2722; --ink: #e4ebe6; --muted: #a9b7af;
     --line: #29352f; --accent: #4fc38e; --accent-ink: #07130d; --good: #4fc38e; --bad: #f07a6e; --warn: #e3b052; --gold: #e2bb52;
-    --sleeper-tint: #1b2a45; --sleeper-ink: #c4d4ea; --espn-tint: #3d1517; --espn-ink: #ffb4b8; --wx-tile: transparent;
+    --sleeper-tint: #1b2a45; --sleeper-ink: #c4d4ea; --espn-tint: #3d1517; --espn-ink: #ffb4b8; --yahoo-tint: #2a1a45; --yahoo-ink: #d2bdf5; --wx-tile: transparent;
     color-scheme: dark;
   }
 }
 :root[data-theme="dark"] {
   --bg: #0e1512; --surface: #151e1a; --surface-2: #1c2722; --ink: #e4ebe6; --muted: #a9b7af;
   --line: #29352f; --accent: #4fc38e; --accent-ink: #07130d; --good: #4fc38e; --bad: #f07a6e; --warn: #e3b052; --gold: #e2bb52;
-  --sleeper-tint: #1b2a45; --sleeper-ink: #c4d4ea; --espn-tint: #3d1517; --espn-ink: #ffb4b8; --wx-tile: transparent;
+  --sleeper-tint: #1b2a45; --sleeper-ink: #c4d4ea; --espn-tint: #3d1517; --espn-ink: #ffb4b8; --yahoo-tint: #2a1a45; --yahoo-ink: #d2bdf5; --wx-tile: transparent;
   color-scheme: dark;
 }
 * { box-sizing: border-box; }
@@ -281,13 +281,14 @@ body.welcome.wsign #acctBtn .acct-txt { position: static; width: auto; height: a
 .tb-guest { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 14px; padding: 10px 14px; background: var(--surface); border: 1.8px solid var(--accent); border-radius: var(--radius); font-size: 14.5px; }
 .tb-guest > span { flex: 1 1 320px; }
 .tb-guest .btn { padding: 7px 14px; }
-.wl-methods { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; }
+.wl-methods { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
 /* each card in its platform's colors (Sleeper navy, ESPN red); Find your players in Benny's green */
 .wl-method { --wl-bg: #075b37; --wl-fg: #ffffff; --wl-ico: #ffffff; position: relative; overflow: hidden; isolation: isolate; display: flex; flex-direction: column; align-items: flex-start; gap: 10px; padding: 16px 44px 18px 16px; text-align: left; color: var(--wl-fg); border: 1px solid color-mix(in srgb, var(--wl-bg) 70%, #000); border-radius: var(--radius);
   background: radial-gradient(120% 90% at 0% 0%, color-mix(in srgb, var(--wl-bg) 80%, #fff) 0%, transparent 60%), linear-gradient(150deg, var(--wl-bg) 35%, color-mix(in srgb, var(--wl-bg) 72%, #000) 100%);
   box-shadow: inset 0 1px 0 rgba(255, 255, 255, .2), 0 1px 2px rgba(0, 0, 0, .12), 0 4px 12px color-mix(in srgb, var(--wl-bg) 25%, transparent); transition: box-shadow .2s, transform .2s; }
 .wl-method.wl-sleeper { --wl-bg: #022047; --wl-fg: #ffffff; --wl-ico: #98b3d6; }
 .wl-method.wl-espn { --wl-bg: #b0000b; --wl-fg: #ffffff; --wl-ico: #ffffff; }
+.wl-method.wl-yahoo { --wl-bg: #5a0fc8; --wl-fg: #ffffff; --wl-ico: #ffffff; }
 .wl-method:hover { box-shadow: inset 0 1px 0 rgba(255, 255, 255, .2), 0 2px 4px rgba(0, 0, 0, .12), 0 10px 24px color-mix(in srgb, var(--wl-bg) 40%, transparent); transform: translateY(-2px); }
 .wl-method:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
 .wl-method .muted { color: inherit; opacity: .85; }
@@ -355,7 +356,7 @@ body.welcome.wsign #acctBtn .acct-txt { position: static; width: auto; height: a
 /* Panels: setup flow, team settings, share */
 #panels:empty { display: none; }
 .flow, .tsp, .io, .acct, .hist { scroll-margin-top: 12px; border: 1px solid color-mix(in srgb, var(--accent) 40%, var(--line)); }
-.seg.methods { display: grid; grid-template-columns: repeat(4, auto); max-width: 100%; }
+.seg.methods { display: grid; grid-template-columns: repeat(5, auto); max-width: 100%; }
 @media (max-width: 600px) { .seg.methods { grid-template-columns: repeat(2, minmax(0, 1fr)); align-self: stretch; } }
 .flow .seg, .tsp .seg { align-self: flex-start; }
 .seg a { padding: 6px 14px; font-weight: 500; font-size: 14px; text-decoration: none; color: var(--ink); }
@@ -425,6 +426,7 @@ body.welcome.wsign #acctBtn .acct-txt { position: static; width: auto; height: a
 /* the setup tabs show where the team comes from in that platform's colors; green stays for the main action */
 .seg.methods [data-flowmethod="sleeper"][aria-pressed="true"] { background: var(--sleeper-tint); color: var(--sleeper-ink); box-shadow: inset 0 -2px 0 var(--sleeper-ink); }
 .seg.methods [data-flowmethod="espn"][aria-pressed="true"] { background: var(--espn-tint); color: var(--espn-ink); box-shadow: inset 0 -2px 0 var(--espn-ink); }
+.seg.methods [data-flowmethod="yahoo"][aria-pressed="true"] { background: var(--yahoo-tint); color: var(--yahoo-ink); box-shadow: inset 0 -2px 0 var(--yahoo-ink); }
 /* a quieter, smaller switch for a choice inside a method (ESPN: public league or paste) */
 .seg.quiet { border-radius: 7px; background: var(--surface-2); padding: 2px; border-color: transparent; gap: 2px; }
 .seg.quiet button { padding: 3px 10px; font-size: 13px; border-radius: 5px; color: var(--muted); }
@@ -436,6 +438,7 @@ body.welcome.wsign #acctBtn .acct-txt { position: static; width: auto; height: a
 .flow-title .wl-ico svg { width: 20px; height: 20px; }
 .flow-title.m-sleeper { --wl-tint: var(--sleeper-tint); --wl-ink: var(--sleeper-ink); }
 .flow-title.m-espn { --wl-tint: var(--espn-tint); --wl-ink: var(--espn-ink); }
+.flow-title.m-yahoo { --wl-tint: var(--yahoo-tint); --wl-ink: var(--yahoo-ink); }
 .flow-title.m-manual { --wl-tint: color-mix(in srgb, var(--accent) 14%, var(--surface)); --wl-ink: var(--accent); }
 
 /* Fantasy team headers */
@@ -3310,8 +3313,8 @@ function waiversBody() {
       <button type="button" class="btn sm" data-act="slsync">Sync now</button></div></div>`
     : `<div class="card fasetup"><div class="fa-line"><span><strong>Free agents:</strong> ${W.source === 'list' && W.faList.length ? `your league’s list (${W.faList.length} players)` : `estimated: players under ${W.ownMax}% owned across ESPN leagues`}.${state.sleeper ? '' : ' On Sleeper? Sync your league for exact free agents.'}</span>
       <button type="button" class="btn sm ${W.source === 'list' && W.faList.length ? '' : 'primary'}" data-act="toggleFa" aria-expanded="${!!D.faOpen}">${W.source === 'list' && W.faList.length ? 'Update my league’s free agents' : 'Use my league’s free agents'}</button></div>
-    ${D.faOpen ? `<p class="small muted" style="margin:0">On ESPN, open Players → Add Players in your league, copy the free-agent table (a few positions or pages is fine), and paste it here.</p>
-    <textarea class="inp" id="faPaste" placeholder="Paste ESPN's free-agent list"></textarea>
+    ${D.faOpen ? `<p class="small muted" style="margin:0">On ESPN, open Players → Add Players in your league; on Yahoo, open Players. Copy the free-agent table (a few positions or pages is fine) and paste it here.</p>
+    <textarea class="inp" id="faPaste" placeholder="Paste your league’s free-agent list from ESPN or Yahoo"></textarea>
     <div class="toolbar"><button type="button" class="btn primary" data-act="pastefa">Use these free agents</button>${W.faList.length ? `<button type="button" class="btn" data-act="clearfa">Go back to estimates</button>` : ''}<span class="small muted">${esc(D.faMsg || '')}</span></div>` : (D.faMsg ? `<span class="small muted">${esc(D.faMsg)}</span>` : '')}</div>`;
   return `<div class="section">
   <div class="row-head"><h2>Waiver Optimizer</h2><span class="small muted">Add/drop moves ranked by the lineup points they add and how much they strengthen your usual lineup</span></div>
@@ -4066,6 +4069,7 @@ function goIntended(opts) { const t = D.intent && HASH[D.intent] ? D.intent : 'l
 const WELCOME_METHODS = [
   ['sleeper', 'Sleeper', 'Import and sync your league. No login needed.'],
   ['espn', 'ESPN Fantasy', 'Import a public league, or paste your ESPN roster.'],
+  ['yahoo', 'Yahoo Fantasy', 'Copy your roster on Yahoo and paste it here.'],
   ['manual', 'Find your players', 'Search and select your players, or paste a roster.'],
 ];
 const wlSvg = d => `<svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${d}</svg>`;
@@ -4073,9 +4077,10 @@ const WL_IMPORT = wlSvg('<path d="M12 3v12"/><path d="m7 10 5 5 5-5"/><path d="M
 const WL_ICONS = {
   sleeper: WL_IMPORT,
   espn: WL_IMPORT,
+  yahoo: wlSvg('<rect x="8" y="2" width="8" height="4" rx="1"/><path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"/><path d="M9 12h6"/><path d="M9 16h6"/>'),
   manual: wlSvg('<circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/>'),
 };
-const FLOW_TITLES = { sleeper: 'Import from Sleeper', espn: 'Import from ESPN', manual: 'Find your players', restore: 'Restore a saved team' };
+const FLOW_TITLES = { sleeper: 'Import from Sleeper', espn: 'Import from ESPN', yahoo: 'Paste your Yahoo roster', manual: 'Find your players', restore: 'Restore a saved team' };
 const WL_GO =wlSvg('<path d="M5 12h14"/><path d="m13 6 6 6-6 6"/>');
 // platform logos, shown in place of the icon once the files are in assets/: { sleeper: 'assets/logo-sleeper.svg', espn: 'assets/logo-espn.svg' }
 const WL_LOGOS = {};
@@ -4171,14 +4176,14 @@ function renderAd() {
 /* ---------- one setup flow ----------
    Every way to bring a team in (the welcome walkthrough, + Add team, Import / replace, Roster's Paste / import roster) opens
    this flow with a method preselected. Pick a method, review exactly what was found and where it goes, then save. */
-const FLOW_METHODS = [['sleeper', 'Connect Sleeper'], ['espn', 'Import ESPN'], ['manual', 'Find players'], ['restore', 'Restore saved team']];
+const FLOW_METHODS = [['sleeper', 'Connect Sleeper'], ['espn', 'Import ESPN'], ['yahoo', 'Paste Yahoo'], ['manual', 'Find players'], ['restore', 'Restore saved team']];
 D.drafts = D.drafts || {};   // unfinished text in the flow survives closing it and moving between pages
 function openFlow(method, dest, espnMode) {
   D.tsOpen = false; D.ioOpen = false; D.acctOpen = false; D.flash = null;
   if (dest === 'new' && !canAddTeam()) dest = 'replace';   // a second team is Pro; the flow still lets them replace this one
   D.flow = { method: method || 'sleeper', dest: dest || 'replace', step: 'pick', espnMode: espnMode || D.flow?.espnMode || 'league', manual: D.flow?.manual || [], draft: null, msg: null };
   render(); revealPanel($('.flow'));
-  deskFocus({ sleeper: '#slQuery', espn: D.flow.espnMode === 'paste' ? '#rosterPaste' : '#leagueId', manual: '#mq', restore: '#ioIn' }[D.flow.method]);
+  deskFocus({ sleeper: '#slQuery', espn: D.flow.espnMode === 'paste' ? '#rosterPaste' : '#leagueId', yahoo: '#yahooPaste', manual: '#mq', restore: '#ioIn' }[D.flow.method]);
 }
 function flowPanel() {
   const F = D.flow;
@@ -4190,7 +4195,7 @@ function flowPanel() {
     : `<div class="row-head"><h2>${title}</h2><button type="button" class="btn sm" data-act="flowclose">Cancel</button></div>`;
   if (F.step === 'review') return `<div class="card panel flow">${head}${reviewHTML()}</div>`;
   const methods = `<div class="seg methods" role="group" aria-label="How to bring in your team">${FLOW_METHODS.map(([k, l]) => `<button type="button" data-flowmethod="${k}" aria-pressed="${F.method === k}">${l}</button>`).join('')}</div>`;
-  const body = { sleeper: flowSleeper, espn: flowEspn, manual: flowManual, restore: flowRestore }[F.method]();
+  const body = { sleeper: flowSleeper, espn: flowEspn, yahoo: flowYahoo, manual: flowManual, restore: flowRestore }[F.method]();
   return `<div class="card panel flow">${head}${methods}<div class="flow-body">${body}</div>${F.msg ? `<div class="banner ${F.msg[0]} small" id="flowMsg">${esc(F.msg[1])}</div>` : ''}</div>`;
 }
 function flowSleeper() {
@@ -4208,6 +4213,14 @@ function flowEspn() {
     <div class="small muted" id="leagueIdHelp">Find this number after <code>leagueId=</code> in your ESPN league URL.</div></div>
     ${tms ? `<div class="toolbar"><select class="sel" id="espnTeam" data-espn="teamId" aria-label="Your ESPN team" style="flex:1 1 180px">${tms.map(t => `<option value="${t.id}" ${String(state.espn.teamId) === String(t.id) ? 'selected' : ''}>${esc(t.name)}</option>`).join('')}</select><button type="button" class="btn primary" data-act="useteam">Review this team</button></div>` : ''}
     ${D.espnMsg ? `<div class="banner ${D.espnMsg[0]} small">${esc(D.espnMsg[1])}</div>` : ''}`}`;
+}
+/* Yahoo has no public league data, so its roster comes in by paste: the roster table from My Team, matched by name
+   with Yahoo's "Team - Pos" tags (matchPasted). Scoring and lineup slots are set on the review step. */
+function flowYahoo() {
+  return `<p class="small muted">On Yahoo Fantasy, open <strong>My Team</strong>, select the roster table from your first player to your last, copy it, and paste it here. Works for any league, private ones included. A list of names, one per line, works too.</p>
+    <textarea class="inp" id="yahooPaste" data-draft="yahoo" placeholder="Josh Allen Buf - QB&#10;Bijan Robinson Atl - RB&#10;Ja'Marr Chase Cin - WR&#10;Pittsburgh Pit - DEF">${esc(D.drafts.yahoo || '')}</textarea>
+    <div class="toolbar"><button type="button" class="btn primary" data-act="flowpaste" data-src="yahoo">Match players</button></div>
+    <p class="small muted" style="margin:0">Next you’ll check your scoring (PPR, half or standard) and lineup slots, since Yahoo doesn’t share them.</p>`;
 }
 function manualListHTML() {
   const ids = D.flow?.manual || [];
@@ -4299,10 +4312,10 @@ function commitDraft() {
   afterSave(first);
 }
 function flowPaste(src) {
-  const text = $(src === 'paste' ? '#rosterPaste' : '#manualPaste')?.value || '';
+  const text = $(({ paste: '#rosterPaste', yahoo: '#yahooPaste' })[src] || '#manualPaste')?.value || '';
   const { ids, miss } = matchPasted(text); flowTry();
-  if (!ids.length) { flowFail('no_players_matched'); D.flow.msg = ['err', 'No player names found in that text. Paste one name per line, or ESPN’s roster table.']; return render(); }
-  if (src === 'paste') return makeDraft({ roster: ids, unresolved: miss, source: 'pasted ESPN roster', src: 'paste' });
+  if (!ids.length) { flowFail('no_players_matched'); D.flow.msg = ['err', `No player names found in that text. Paste one name per line, or ${src === 'yahoo' ? 'Yahoo' : 'ESPN'}’s roster table.`]; return render(); }
+  if (src === 'paste' || src === 'yahoo') return makeDraft({ roster: ids, unresolved: miss, source: `pasted ${src === 'yahoo' ? 'Yahoo' : 'ESPN'} roster`, src });
   const set = D.flow.manual; for (const id of ids) if (!set.includes(id)) set.push(id);
   D.drafts.manualPaste = ''; D.flow.manualMiss = miss;
   D.flow.msg = miss.length ? ['', `Added ${ids.length}. Not found: ${miss.slice(0, 6).join(', ')}${miss.length > 6 ? '…' : ''}`] : ['info', `Added ${ids.length} players.`];
@@ -4768,7 +4781,7 @@ document.addEventListener('click', e => {
   if (t.dataset.colmv) { const [k, d] = t.dataset.colmv.split('|'), c = defCols(), i = c.order.indexOf(k), j = i + +d; if (i < 0 || j < 0 || j >= c.order.length) return; [c.order[i], c.order[j]] = [c.order[j], c.order[i]]; saveDefCols(c); render(); $(`[data-colmv="${k}|${d}"]:not([disabled])`)?.focus(); return; }
   if (t.dataset.acadd) { e.preventDefault(); acPick(t.dataset.acadd, t.dataset.acmode); return; }
   if (t.dataset.mrem) { D.flow.manual = D.flow.manual.filter(x => x !== t.dataset.mrem); const ml = $('#manualList'); if (ml) ml.innerHTML = manualListHTML(); const rb = $('[data-act=flowmanual]'); if (rb) { const n = D.flow.manual.length; rb.disabled = !n; rb.textContent = `Review ${n || ''} player${n === 1 ? '' : 's'}`; } return; }
-  if (t.dataset.flowmethod) { D.flow.method = t.dataset.flowmethod; D.flow.msg = null; render(); deskFocus({ sleeper: '#slQuery', espn: '#leagueId', manual: '#mq', restore: '#ioIn' }[D.flow.method]); return; }
+  if (t.dataset.flowmethod) { D.flow.method = t.dataset.flowmethod; D.flow.msg = null; render(); deskFocus({ sleeper: '#slQuery', espn: '#leagueId', yahoo: '#yahooPaste', manual: '#mq', restore: '#ioIn' }[D.flow.method]); return; }
   if (t.dataset.espnmode) { D.flow.espnMode = t.dataset.espnmode; render(); return; }
   if (t.dataset.rview) { D.rview = t.dataset.rview; render(); return; }
   if (t.dataset.hweek) { D.histWeek = D.histWeek === t.dataset.hweek ? null : t.dataset.hweek; render(); return; }
@@ -4961,20 +4974,30 @@ document.addEventListener('change', e => {
   if (t.dataset.espn) { state.espn[t.dataset.espn] = t.value; save(); return; }
   if (t.dataset.staff) { const [T, f] = t.dataset.staff.split('.'); const v = t.type === 'checkbox' ? t.checked : (f.endsWith('Prev') ? fixAbbr(t.value.trim().toUpperCase()) || '' : t.value); state.staffEdits[T] = Object.assign({}, state.staffEdits[T], { [f]: v }); save(); computeAll(); return; }
 });
-/* Matches pasted text (ESPN's roster table, or one name per line) against every player with a projection or a game played.
-   Longest names are tried first so "Kenneth Walker" wins over "Ken Walker"-style partials. Used for rosters and free-agent lists. */
+/* Yahoo's roster and player tables tag each player "Team - Pos" ("Josh Allen Buf - QB", "Pittsburgh Pit - DEF"), maybe
+   with an injury status after it, and sometimes on a line of its own under the name. */
+const YAHOO_TAG = /\b([A-Za-z]{2,3})\s+-\s+((?:QB|RB|WR|TE|K|DEF)(?:\s*,\s*(?:QB|RB|WR|TE|K|DEF))*)\b.*$/;
+// lines in a pasted table that aren't players (kickoff times, scores, the header row, section headers, notes): never "not found"
+const PASTE_NOISE = /\d{1,2}:\d{2}\s*[ap]\.?m|\b[WLT]\s*\d+\s*-\s*\d+\b|^(pos|slot)\b.*\bplayers?\b|^(injured reserve|bench|starters?|reserves?|empty|bye( week)?|(no )?(new )?player notes?)$/i;
+/* Matches pasted text (ESPN's or Yahoo's roster table, or one name per line) against every player with a projection or a
+   game played. Longest names are tried first so "Kenneth Walker" wins over "Ken Walker"-style partials. A Yahoo tag picks
+   between players with the same name, and names a D/ST by its team. Used for rosters and free-agent lists. */
 function matchPasted(text) {
   const lines = text.split(/\r?\n/).map(l => l.trim()).filter(Boolean);
   const live = [...D.U.values()].filter(u => (D.proj[u.id]?.pts || 0) > 0 || D.H[u.id] || D.prevPPG?.[u.id]);
   const names = live.map(u => [norm(u.name), u]).filter(([n]) => n.includes(' ') && n.length >= 6).sort((a, b) => b[0].length - a[0].length || (D.M[b[1].id]?.mean || 0) - (D.M[a[1].id]?.mean || 0));
   const ids = [], miss = [];
-  for (const l of lines) {
-    const k = norm(l); if (k.length < 4 || /^\d/.test(k)) continue;
-    let u = (D.nameIdx.get(k) || []).map(id => D.U.get(id)).sort((a, b) => (D.M[b.id]?.mean || 0) - (D.M[a.id]?.mean || 0))[0];
+  for (const raw of lines) {
+    let l = raw, u = null;
+    const y = YAHOO_TAG.exec(l), yT = y ? fixAbbr(y[1].toUpperCase()) : null, yP = y ? y[2].split(',')[0].trim() : null;
+    if (y) { l = l.slice(0, y.index).trim(); if (yP === 'DEF' && TEAMS[yT]) u = D.U.get(yT); else if (!l) continue; }   // a tag on its own line goes with the name above it
+    const k = norm(l);
+    if (!u && (k.length < 4 || /^\d/.test(k))) continue;
+    if (!u) u = (D.nameIdx.get(k) || []).map(id => D.U.get(id)).sort((a, b) => (y ? (b.pos === yP) - (a.pos === yP) || (b.team === yT) - (a.team === yT) : 0) || (D.M[b.id]?.mean || 0) - (D.M[a.id]?.mean || 0))[0];
     if (!u) { const T = teamOf(k); if (T) u = D.U.get(T); }   // a line naming a team ("Pittsburgh Steelers", "PIT D/ST") is its D/ST
     if (!u) u = names.find(([n]) => k.includes(n))?.[1];
     if (!u && /d\/?st|defense|\bdef\b/.test(k)) { const T = ABBR.find(a => k.includes(TEAMS[a][1].toLowerCase())); if (T) u = D.U.get(T); }
-    if (u) { if (!ids.includes(u.id)) ids.push(u.id); } else if (/[a-z]{2,} [a-z]{2,}/.test(k) && k.length < 40) miss.push(l);
+    if (u) { if (!ids.includes(u.id)) ids.push(u.id); } else if (/[a-z]{2,} [a-z]{2,}/.test(k) && k.length < 40 && !PASTE_NOISE.test(l)) miss.push(y ? l : raw);
   }
   return { ids, miss };
 }

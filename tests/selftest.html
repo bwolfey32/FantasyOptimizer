@@ -282,6 +282,18 @@ test('pasting "Pittsburgh Steelers" adds the Steelers D/ST', () => {
   setup(); const { ids, miss } = ev('matchPasted')('Pittsburgh Steelers\nJosh Downs');
   return ids.includes('PIT') && ids.includes(idOf('Josh Downs')) && !miss.length || `ids ${ids}, missed ${miss}`;
 });
+test('a pasted Yahoo roster matches every player and D/ST, and its game lines aren’t "not found"', () => {
+  setup();
+  const text = ['Pos\tPlayers\tOpp', 'Starters', 'QB', 'Baker Mayfield TB - QB', 'Sun 1:00 pm vs NO', 'Jahmyr Gibbs Det - RB Q', 'W 31-10 @ GB', 'Tee Higgins', 'Cin - WR',
+    'Brandon Aubrey Dal - K', 'Pittsburgh Pit - DEF', 'Bench', 'No new player Notes', 'Injured Reserve'].join('\n');
+  const { ids, miss } = ev('matchPasted')(text), want = ['Baker Mayfield', 'Jahmyr Gibbs', 'Tee Higgins', 'Brandon Aubrey'].map(idOf).concat('PIT');
+  const lost = want.filter(id => !ids.includes(id));
+  return !lost.length && ids.length === want.length && !miss.length || `missing ${lost.map(name)}, extra ${ids.filter(id => !want.includes(id)).map(name)}, not found ${miss}`;
+});
+test('a pasted ESPN row with its kickoff time still matches the player', () => {
+  setup(); const { ids } = ev('matchPasted')('WR\tJaylen Waddle\tMIA\tWR\t@BUF\tSun 1:00pm');
+  return ids.includes(idOf('Jaylen Waddle')) || `got ${ids.map(name)}`;
+});
 test('searching "Pittsburgh" finds the Steelers D/ST', () => { setup(); return ev('acMatches')('Pittsburgh').some(u => u.id === 'PIT') || 'not in results'; });
 test('picking a missing name clears its "not found" note', () => {
   setup(); const D = ev('D');
