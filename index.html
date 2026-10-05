@@ -805,6 +805,8 @@ const SLOT_TYPES = [
 const ESPN_SLOT = {0:'QB', 2:'RB', 3:'RB/WR', 4:'WR', 5:'WR/TE', 6:'TE', 7:'OP', 16:'D/ST', 17:'K', 23:'FLEX'};
 const ESPN_POS = {1:'QB', 2:'RB', 3:'WR', 4:'TE', 5:'K', 16:'DEF'};
 const CV = {QB:.38, RB:.5, WR:.55, TE:.6, K:.45, DEF:.7};
+// widens every forecast's spread: at 1.0, 43% of scores landed inside the 50% likely range (backtest, docs/backtest-report.md)
+const SD_SCALE = 1.15;
 const FACTOR_KEYS = [['dvp','Defense vs. position'],['cover','Secondary / run defense'],['protect','Pass protection vs. pass rush'],['script','Game script & opponent'],['style','Offensive style & pace'],['pers','Defensive personnel changes'],['wx','Weather & stadium']];
 /* Home stadiums: name, latitude, longitude, roof. 'dome' is always covered; 'retract' is a retractable roof, closed in bad
    weather, so it counts as covered too; 'open' plays in the weather. Neutral sites (London, Munich, ...) come from ESPN.
@@ -1698,9 +1700,10 @@ function ingest(inp) {
     if (pts != null && !(id in D.proj)) D.proj[id] = { pts: fmtPts(pts, rec, pos), opp };
   }
   inp.weeks.forEach((wk, wi) => {
-    for (const [id, pos, T, , ppr, , , , ra, , tg, , name, rec] of wk.P) {
-      const pts = fmtPts(ppr, rec, pos);
-      const h = D.H[id] || (D.H[id] = { pts: [], tgt: 0, ra: 0, wks: [] }); h.pts.push(pts); h.tgt += tg; h.ra += ra; h.wks.push(wi + 1);
+    for (const [id, pos, T, , ppr, pa, , , ra, , tg, , name, rec] of wk.P) {
+      const pts = fmtPts(ppr, rec, pos), u = USAGE_PTS[pos];
+      const h = D.H[id] || (D.H[id] = { pts: [], use: [], tgt: 0, ra: 0, wks: [] }); h.pts.push(pts); h.tgt += tg; h.ra += ra; h.wks.push(wi + 1);
+      h.use.push(u ? fmtPts(u[0] + u[1] * tg + u[2] * ra + u[3] * pa, rec, pos) : null);   // what the game's usage is worth (formOf)
       if (T) { const t = D.teamUse[T] || (D.teamUse[T] = { tgt: 0, ra: 0, wks: new Set() }); t.tgt += tg; t.ra += ra; t.wks.add(wi); }
       if (!D.U.has(id)) D.U.set(id, { id, name, pos, team: T, inj: null });
     }
@@ -1825,6 +1828,12 @@ const ratio = (a, b) => ok(a) && ok(b) && b ? a / b - 1 : 0;
    role changed, so the projection leads (ROLE_LEAD) instead of the usual blend, unless his games this season say
    otherwise (projDoubt). D.depth is built in computeAll. */
 const ROLE_POS = new Set(['QB', 'RB', 'WR', 'TE']), ROLE_LEAD = 0.9;
+/* The projection's weight in the blend with his scoring form. When Sleeper projects him below his form, the projection
+   leads (at least PROJ_DOWN): a lower projection usually knows something his average doesn't (a smaller role, an injury,
+   a hot streak that won't last), and in the backtest following it almost fully was best. Above his form the usual
+   weight stands. Only a projection under half his average is called a smaller role (roleOf). */
+const PROJ_DOWN = 0.9;
+const projWeight = (b, pj, avg) => pj != null && avg != null && pj < avg ? Math.max(b, PROJ_DOWN) : b;
 function roleOf(id, avg) {
   const u = D.U.get(id); if (!u?.team || !ROLE_POS.has(u.pos) || !D.tg[u.team] || /^(out|ir|pup|sus|na|cov|doubtful)/i.test(u.inj || '')) return null;
   const pts = D.proj[id]?.pts, mates = (D.depth?.[u.team + '|' + u.pos] || []).filter(x => x !== id);
@@ -1841,26 +1850,33 @@ function priorGames(id) {
   return p[2] && T && p[2] !== T ? Math.min(k, 1.5) : k;
 }
 /* His scoring form: this season's games, the latest three a little heavier (RECENT_W, newest first), blended with last
-   season worth priorGames(id) games. withPrior false gives this season's games alone. */
-const RECENT_W = [1.5, 1.25, 1.1];
+   season worth priorGames(id) games. withPrior false gives this season's games alone. Each game counts mostly for what
+   his usage was worth (USAGE_W of it; see USAGE_PTS) and the rest for what he scored: targets and carries predict next
+   week better than points, which swing with touchdowns (backtest, docs/backtest-report.md). */
+const RECENT_W = [1.5, 1.25, 1.1], USAGE_W = 0.75;
+/* PPR points a game's usage is worth on average: [base, per target, per carry, per pass attempt], fitted on 2025 weeks
+   1-9 (scripts/backtest/analyze.py usage). Other scoring formats take the game's catches back out (fmtPts). */
+const USAGE_PTS = { QB: [-0.191, 0, 1.053, 0.422], RB: [-0.367, 1.242, 0.769, 0], WR: [0.06, 1.737, 0.682, 0], TE: [-0.002, 1.904, 0.572, 0] };
 function formOf(id, withPrior = true) {
   const h = D.H[id], k = withPrior ? priorGames(id) : 0; let s = 0, n = 0;
-  if (h?.n) h.pts.forEach((x, i) => { const w = RECENT_W[h.n - 1 - i] ?? 1; s += x * w; n += w; });
+  if (h?.n) h.pts.forEach((x, i) => { const w = RECENT_W[h.n - 1 - i] ?? 1, u = h.use?.[i]; s += (u != null ? (1 - USAGE_W) * x + USAGE_W * u : x) * w; n += w; });
   if (k) { s += D.prevPPG[id][0] * k; n += k; }
   return n ? s / n : null;
 }
-/* Sleeper's projection can lag what a player is doing: a big name on a new team, or a role that hasn't come, keeps a
-   projection his games don't back up. When this season's scoring (3+ games, or 2+ after a move or as a newcomer) is under
-   half the projection and 4+ points short, his last game is under 80% of it, and no regular at his position on his team
-   is out (the one real reason to expect more), the projection counts DOUBT_K of its usual weight. */
-const DOUBT_K = 0.4;
+/* Sleeper's projection can lag what a player is doing after a move: a big name on a new team keeps a projection his games
+   don't back up. When a running back, receiver or tight end who changed teams since last season has 2+ games of scoring
+   form under half the projection and 4+ points short, his last game is under 80% of it, and no regular at his position
+   on his team is out (the one real reason to expect more), the projection counts DOUBT_K of its usual weight. Rookies,
+   players without a last season and quarterbacks don't qualify: for them a projection well above their first games
+   usually means a real new role (a rookie's snaps growing, a backup taking over), and the backtest found it right. */
+const DOUBT_K = 0.4, DOUBT_POS = new Set(['RB', 'WR', 'TE']);
 function projDoubt(id, pts) {
-  const u = D.U.get(id), h = D.H[id], p = D.prevPPG?.[id]; if (!ROLE_POS.has(u?.pos) || !(pts > 0) || !h?.n) return null;
+  const u = D.U.get(id), h = D.H[id], p = D.prevPPG?.[id]; if (!DOUBT_POS.has(u?.pos) || !(pts > 0) || !h?.n) return null;
   const moved = !!(p?.[2] && u.team && p[2] !== u.team);
-  if (h.n < (moved || !p ? 2 : 3)) return null;
+  if (!moved || h.n < 2) return null;
   const cur = formOf(id, false);
   if (!(pts >= 2 * Math.max(cur, 2) && pts - cur >= 4) || h.pts[h.n - 1] >= 0.8 * pts || mateOut(id)) return null;
-  return { cur, n: h.n, pts, moved: moved ? u.team : null };
+  return { cur, scored: h.avg, n: h.n, pts, moved: u.team };
 }
 /* A regular (8+ pts a game this season or last) at his position on his team who is out: the work he leaves is what a
    teammate's bigger projection prices in. */
@@ -1872,7 +1888,7 @@ function mateOut(id) {
 }
 function doubtText(d, short) {
   if (!d) return '';
-  return short ? 'Slow start' : `Slow start: ${f1(d.cur)} pts a game ${d.moved ? `since joining ${d.moved}` : 'this season'} (${d.n} games), well under Sleeper’s ${f1(d.pts)}, so his games count more than the projection`;
+  return short ? 'Slow start' : `Slow start: ${f1(d.scored)} pts a game ${d.moved ? `since joining ${d.moved}` : 'this season'} (${d.n} games), well under Sleeper’s ${f1(d.pts)}, so his games count more than the projection`;
 }
 function roleText(role, short) {
   if (!role) return '';
@@ -1894,10 +1910,11 @@ function evalPlayer(id) {
   // his scoring form, with last season blended in so a few early games don't carry it alone (formOf)
   const avg = formOf(id);
   // a backup is worth nothing this week however he scored filling in; after a role change the projection leads, and
-  // when his games don't back the projection up it counts less (projDoubt).
+  // when his games don't back the projection up it counts less (projDoubt). A projection under his form leads too
+  // (PROJ_DOWN).
   // The base is two parts: Sleeper's projection (projPart), which already reflects this matchup, and his scoring average.
   const role = r.role = roleOf(id, avg), pj = r.projPts, doubt = r.doubt = role || avg == null ? null : projDoubt(id, pj);
-  const bl = S.blend * (doubt ? DOUBT_K : 1);
+  const bl = projWeight(S.blend * (doubt ? DOUBT_K : 1), pj, avg);
   r.projPart = role?.kind === 'backup' ? 0 : role ? ROLE_LEAD * pj : pj != null ? (avg != null ? bl * pj : pj) : 0;
   r.base = role?.kind === 'backup' ? 0 : r.projPart + (role ? (1 - ROLE_LEAD) * avg : pj != null ? (avg != null ? (1 - bl) * avg : 0) : (avg ?? 0));
   const add = (key, label, raw, note, short) => { const v = clamp(raw * I * (S.w[key] ?? 1), -0.25, 0.25); r.factors.push({ key, label, pct: v, note, short }); };
@@ -1958,7 +1975,7 @@ function evalPlayer(id) {
   r.mean = r.projPart + (avgPart > 0 ? avgPart * r.mult : avgPart); r.eff = r.base > 0 ? r.mean / r.base - 1 : 0;
   for (const f of r.factors) f.eff = f.pct * r.share;
   const n = h?.n || 0, dsd = CV[pos] * Math.max(r.mean, 3);
-  r.sd = Math.sqrt(((n > 1 ? n * h.sd ** 2 : 0) + 3 * dsd ** 2) / ((n > 1 ? n : 0) + 3)) * (r.newStaff ? 1.1 : 1);
+  r.sd = SD_SCALE * Math.sqrt(((n > 1 ? n * h.sd ** 2 : 0) + 3 * dsd ** 2) / ((n > 1 ? n : 0) + 3)) * (r.newStaff ? 1.1 : 1);
   const adj = r.mult - 1; r.grade = adj >= 0.12 ? 'A' : adj >= 0.04 ? 'B' : adj > -0.04 ? 'C' : adj > -0.12 ? 'D' : 'F';
   return finish(r);
 }
@@ -2625,7 +2642,8 @@ function rosBase(id) {
   if (r.role?.kind === 'backup') return 0;
   const P = r.pos, avg = P === 'DEF' || P === 'K' ? seasonAvg(id) : (D.H[id]?.n || D.prevPPG?.[id] ? healthyBase(id) : null);
   const opp = r.u.team ? D.tg[r.u.team]?.opp : null, pj = r.projPts != null && opp ? r.projPts / matchupMult(P, opp, D.week, r.u.team) : null;
-  const b = r.role ? ROLE_LEAD : state.settings.blend * ROS_PROJ * (r.doubt ? DOUBT_K : 1);
+  // a projection under his form leads here too (projWeight), unless a role change already sets the weight
+  const b0 = state.settings.blend * ROS_PROJ * (r.doubt ? DOUBT_K : 1), b = r.role ? ROLE_LEAD : projWeight(b0, pj, avg);
   return pj != null && avg != null ? b * pj + (1 - b) * avg : (pj ?? avg ?? 0);
 }
 const STREAM_H = 3;   // weeks a kicker or D/ST move counts (computeWaivers)
@@ -2651,7 +2669,10 @@ function schedOpp(T, w) { const m = D.sched?.[w]; if (!m || !Object.keys(m).leng
    position; then, at half strength, its pass or run defense and the scoring environment, which stands in for the
    betting total that later weeks don't have yet: this team's points per game and the opponent's points allowed
    (for a D/ST, the opponent's scoring, the other way round). Per-game team stats, so byes don't skew them. Faded for
-   weeks further out. */
+   weeks further out, and applied at MATCHUP_FUT of the matchup-strength setting: a matchup weeks away is much less
+   certain than this week's, and at full strength these values missed by more (backtest, docs/backtest-report.md). This
+   week's projection doesn't use this; its matchup factors are in evalPlayer. */
+const MATCHUP_FUT = 0.5;
 function matchupMult(pos, opp, w, team) {
   if (!opp) return 1; const S = state.settings, W = S.w, k = pos === 'DEF' ? 'fpaDEF' : 'fpa' + pos, fade = clamp(1 - (w - D.week - 1) * 0.1, 0.4, 1);
   const ob = D.B[opp] || {}, L = D.L, T = team || null, tb = T ? D.B[T] || {} : {};
@@ -2661,7 +2682,7 @@ function matchupMult(pos, opp, w, team) {
   if (pos === 'DEF') adj -= 0.5 * (W.script ?? 1) * ratio(ob.ptsFor, L.ptsFor);
   else if (T && ok(tb.ptsFor) && ok(ob.ptsA) && ok(L.ptsFor) && ok(L.ptsA)) adj += 0.5 * (W.script ?? 1) * ratio(tb.ptsFor + ob.ptsA, L.ptsFor + L.ptsA);
   // the opponent's defensive personnel changes apply on top of its stats (D/ST players face offenses, so not to them)
-  return clamp((1 + S.intensity * adj * fade) * persMult(opp, pos), 0.7, 1.3);
+  return clamp((1 + MATCHUP_FUT * S.intensity * adj * fade) * persMult(opp, pos), 0.7, 1.3);
 }
 /* A bigger role (roleOf) while a regular at his position is out (mateOut): the week that regular is expected back, and
    the player's value without the extra work, his own scoring form. Null when the role isn't borrowed, or the regular's
@@ -2870,7 +2891,7 @@ function waiverWhy(m, needs, weeks, H) {
   }
   else why.push('adds depth for later weeks');
   // a slow start is the first thing to know about a pickup the projection likes more than his games do (projDoubt)
-  const dq = D.M[m.f]?.doubt; if (dq) why.push(`but he has scored ${f1(dq.cur)} a game ${dq.moved ? `since joining ${dq.moved}` : 'this season'}, so this counts his games over Sleeper’s ${f1(dq.pts)} projection`);
+  const dq = D.M[m.f]?.doubt; if (dq) why.push(`but he has scored ${f1(dq.scored)} a game ${dq.moved ? `since joining ${dq.moved}` : 'this season'}, so this counts his games over Sleeper’s ${f1(dq.pts)} projection`);
   if (m.d && m.depLost > 0.5) why.push(`costs ${f1(m.depLost)} pts of injury cover as a backup ${D.U.get(m.d).pos === 'DEF' ? 'D/ST' : D.U.get(m.d).pos} (already counted in the gain)`);
   const bp = bumpOf(m.f), fi = !bp && fillInFor(m.f);
   if (bp) why.push(bp.back <= weeks[0] ? `his bigger projection is ${bp.mate.name}’s work (${bp.mate.inj}), and ${bp.mate.name} should be back, so this counts his own scoring (${f1(bp.own)} a game)` : `bigger role while ${bp.mate.name} is out (${bp.mate.inj}), expected back week ${bp.back}; after that this counts his own scoring (${f1(bp.own)} a game)`);
