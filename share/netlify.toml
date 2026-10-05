@@ -1,0 +1,13 @@
+# share.bennyspicks.us on Netlify, with "share" as the base directory (see README.md)
+[build]
+  publish = "public"
+  # the data refresh commits to this repo every few hours: build only when something in share/ changed
+  ignore = "git diff --quiet $CACHED_COMMIT_REF $COMMIT_REF -- ."
+
+[functions]
+  node_bundler = "esbuild"
+
+[[redirects]]
+  from = "/"
+  to = "https://bennyspicks.us/"
+  status = 301

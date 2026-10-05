@@ -1,4 +1,6 @@
 """Build player-ids.json: each Sleeper player's ESPN and NFL GSIS ids, which the site uses for player headshots.
+Also builds share-players.json next to it, for share.bennyspicks.us (share/ in this repo), which draws a shared move's
+card from player ids alone.
 
 Usage: python3 scripts/player_ids.py [player-ids.json] [--force]      (run by .github/workflows/refresh-data.yml)
 
@@ -6,8 +8,9 @@ Sleeper's player file (about 15 MB) carries an ESPN id for most players but not 
 missing one. Those are filled from ESPN's own player list, matched on name and position, and on team when two players
 share a name. Sleeper asks that its player file be fetched at most once a day, so a map less than 20 hours old is kept.
 
-Output: {"updated": ISO time, "ids": {sleeper id: [espn id or null, gsis id or null]}}. D/STs aren't listed: the site
-shows team logos for them.
+Output: {"updated": ISO time, "ids": {sleeper id: [espn id or null, gsis id or null]}}, and share-players.json:
+{"updated": ISO time, "p": {sleeper id: [name, position, team or null, espn id or null]}}. D/STs aren't listed in either:
+both show team logos for them.
 """
 import gzip
 import json
@@ -91,22 +94,26 @@ def build(sleeper, espn):
                 resolved[p["player_id"]] = exact
                 claimed.add(exact)
                 matched += 1
-    ids = {}
+    ids, share = {}, {}
     for p in players:
         espn_id, gsis = resolved[p["player_id"]], (p.get("gsis_id") or "").strip() or None
         if espn_id or gsis:
             ids[str(p["player_id"])] = [espn_id, gsis]
-    return ids, matched, len(players)
+        name = p.get("full_name") or f"{p.get('first_name', '')} {p.get('last_name', '')}".strip()
+        if name:
+            share[str(p["player_id"])] = [name, p["position"], FIX_ABBR.get(p.get("team"), p.get("team")) or None, espn_id]
+    return ids, share, matched, len(players)
 
 
 def main():
     args = [a for a in sys.argv[1:] if not a.startswith("--")]
     out_path = args[0] if args else "player-ids.json"
+    share_path = os.path.join(os.path.dirname(out_path), "share-players.json")
     try:
         with open(out_path, encoding="utf-8") as f:
             old = json.load(f)
         age = time.time() - datetime.fromisoformat(old["updated"].replace("Z", "+00:00")).timestamp()
-        if "--force" not in sys.argv and age < MAX_AGE_HOURS * 3600:
+        if "--force" not in sys.argv and age < MAX_AGE_HOURS * 3600 and os.path.exists(share_path):
             print(f"Player ids are {age / 3600:.1f} hours old; keeping them (Sleeper asks for one players fetch a day).")
             return
     except (OSError, ValueError, KeyError):
@@ -120,11 +127,13 @@ def main():
     except Exception as e:   # Sleeper's own ESPN ids still cover most players
         print(f"Warning: ESPN's player list didn't load ({e}); using Sleeper's ESPN ids only.")
         espn = []
-    ids, matched, n = build(sleeper, espn)
+    ids, share, matched, n = build(sleeper, espn)
     with_espn = sum(1 for v in ids.values() if v[0])
+    updated = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
     with open(out_path, "w", encoding="utf-8") as f:
-        json.dump({"updated": datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"), "ids": dict(sorted(ids.items()))},
-                  f, separators=(",", ":"))
+        json.dump({"updated": updated, "ids": dict(sorted(ids.items()))}, f, separators=(",", ":"))
+    with open(share_path, "w", encoding="utf-8") as f:
+        json.dump({"updated": updated, "p": dict(sorted(share.items()))}, f, separators=(",", ":"), ensure_ascii=False)
     print(f"Saved {len(ids)} players to {os.path.basename(out_path)}: {with_espn} of {n} with an ESPN id "
           f"({matched} matched by name from ESPN's list).")
 

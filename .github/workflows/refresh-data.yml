@@ -37,7 +37,7 @@ jobs:
       - name: Check past forecasts against results
         run: python3 scripts/calibrate.py || echo "Calibration skipped this run"
 
-      # Sleeper and ESPN ids for player headshots; rebuilt at most once a day, and a failure keeps the old map
+      # Sleeper and ESPN ids for player headshots, and share-players.json for share links' cards; rebuilt at most once a day, and a failure keeps the old map
       - name: Update player ids
         run: python3 scripts/player_ids.py player-ids.json || echo "Player ids kept from the last run"
 
@@ -47,7 +47,7 @@ jobs:
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898583+github-actions[bot]@users.noreply.github.com"
-          for p in snapshot.json forecasts calibration.json player-ids.json; do if [ -e "$p" ]; then git add "$p"; fi; done
+          for p in snapshot.json forecasts calibration.json player-ids.json share-players.json; do if [ -e "$p" ]; then git add "$p"; fi; done
           if git diff --cached --quiet; then echo "No changes"; exit 0; fi
           git commit -m "Refresh data snapshot"
           git pull --rebase --autostash

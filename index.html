@@ -2886,15 +2886,25 @@ function sharedMoveCard(R) {
 }
 /* Share the best move as a short line of text plus a link that carries the move (add, drop, week, gain) and opens
    Waivers, where sharedMoveCard shows it (for a new visitor, on the waivers welcome).
+   With SHARE_URL set, the link goes through share.bennyspicks.us (share/ in this repo), which gives chat apps a
+   preview image of the Best move card and sends people on to the same Waivers link; it also carries the added player's
+   ownership and the one-line reason, for the card.
    Phones get the share sheet; elsewhere it's copied. The analytics event says only that a move was shared. */
+const SHARE_URL = '';   // 'https://share.bennyspicks.us/w' once share/ is deployed (share/README.md)
 async function shareMove() {
   const R = D.wCache, m = R?.best; if (!m) return;
   const nm = id => D.U.get(id)?.name || id, H = m.H;
   const text = `Benny’s Picks: add ${nm(m.f)}${m.d ? `, drop ${nm(m.d)}` : ''}, +${f1(m.hz)} expected lineup points over the next ${H} week${H === 1 ? '' : 's'} (week ${D.week}).`;
-  const q = new URLSearchParams({ utm_source: 'share', utm_medium: 'waiver_move', add: m.f });
+  const q = new URLSearchParams(SHARE_URL ? { add: m.f } : { utm_source: 'share', utm_medium: 'waiver_move', add: m.f });
   if (m.d) q.set('drop', m.d);
   q.set('wk', D.week); q.set('g', f1(m.hz)); q.set('h', H);
-  const url = `https://bennyspicks.us/?${q}#waivers`;
+  if (SHARE_URL) {
+    if (D.own?.has(m.f)) q.set('o', +D.own.get(m.f).toFixed(1));
+    // the reason's clauses, as many as fit the card's two lines
+    const why = (m.whyText || '').split('; ').reduce((s, c) => !s ? c : s.length + c.length < 170 ? `${s}; ${c}` : s, '');
+    if (why) q.set('why', why.slice(0, 180));
+  }
+  const url = SHARE_URL ? `${SHARE_URL}?${q}` : `https://bennyspicks.us/?${q}#waivers`;
   const done = how => track('result_shared', { kind: 'waiver_move', how, gain: Math.round(m.hz), pos: D.U.get(m.f)?.pos });
   // desktop share sheets (Windows, macOS Chrome) mostly offer "Copy link", which drops the text: copy both there instead
   if (navigator.share && matchMedia('(pointer: coarse)').matches) { try { await navigator.share({ text, url }); done('share_sheet'); } catch {} return; }   // cancelled: nothing shared

@@ -1,0 +1,10 @@
+{
+  "name": "bennys-picks-share",
+  "private": true,
+  "type": "module",
+  "description": "share.bennyspicks.us: link previews for shared waiver moves (see README.md)",
+  "dependencies": {
+    "@resvg/resvg-wasm": "2.6.2",
+    "satori": "0.32.0"
+  }
+}
