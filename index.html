@@ -1,7 +1,7 @@
 <!doctype html>
 <html lang="en">
 <meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, viewport-fit=cover">
 <title>Benny’s Picks — Fantasy Optimizer</title>
 <meta name="description" content="Free weekly lineup optimizer for ESPN fantasy football: start/sit calls, matchup and scheme breakdowns, and waiver pickups, with live data.">
 <meta name="theme-color" content="#075b37">
@@ -20,6 +20,26 @@
 <link rel="icon" href="assets/favicon-32.png" type="image/png" sizes="32x32">
 <link rel="apple-touch-icon" href="assets/apple-touch-icon.png">
 <link rel="manifest" href="assets/site.webmanifest">
+<!-- installed to the home screen: full screen, white status-bar text over the green band at the top (.standalone below) -->
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Benny's Picks">
+<!-- iPhone launch screens, one per screen size in portrait (scripts/make_app_images.py) -->
+<link rel="apple-touch-startup-image" href="assets/splash/splash-1320x2868.png" media="(device-width: 440px) and (device-height: 956px) and (-webkit-device-pixel-ratio: 3) and (orientation: portrait)">
+<link rel="apple-touch-startup-image" href="assets/splash/splash-1206x2622.png" media="(device-width: 402px) and (device-height: 874px) and (-webkit-device-pixel-ratio: 3) and (orientation: portrait)">
+<link rel="apple-touch-startup-image" href="assets/splash/splash-1260x2736.png" media="(device-width: 420px) and (device-height: 912px) and (-webkit-device-pixel-ratio: 3) and (orientation: portrait)">
+<link rel="apple-touch-startup-image" href="assets/splash/splash-1290x2796.png" media="(device-width: 430px) and (device-height: 932px) and (-webkit-device-pixel-ratio: 3) and (orientation: portrait)">
+<link rel="apple-touch-startup-image" href="assets/splash/splash-1179x2556.png" media="(device-width: 393px) and (device-height: 852px) and (-webkit-device-pixel-ratio: 3) and (orientation: portrait)">
+<link rel="apple-touch-startup-image" href="assets/splash/splash-1170x2532.png" media="(device-width: 390px) and (device-height: 844px) and (-webkit-device-pixel-ratio: 3) and (orientation: portrait)">
+<link rel="apple-touch-startup-image" href="assets/splash/splash-1284x2778.png" media="(device-width: 428px) and (device-height: 926px) and (-webkit-device-pixel-ratio: 3) and (orientation: portrait)">
+<link rel="apple-touch-startup-image" href="assets/splash/splash-1125x2436.png" media="(device-width: 375px) and (device-height: 812px) and (-webkit-device-pixel-ratio: 3) and (orientation: portrait)">
+<link rel="apple-touch-startup-image" href="assets/splash/splash-1242x2688.png" media="(device-width: 414px) and (device-height: 896px) and (-webkit-device-pixel-ratio: 3) and (orientation: portrait)">
+<link rel="apple-touch-startup-image" href="assets/splash/splash-828x1792.png" media="(device-width: 414px) and (device-height: 896px) and (-webkit-device-pixel-ratio: 2) and (orientation: portrait)">
+<link rel="apple-touch-startup-image" href="assets/splash/splash-1242x2208.png" media="(device-width: 414px) and (device-height: 736px) and (-webkit-device-pixel-ratio: 3) and (orientation: portrait)">
+<link rel="apple-touch-startup-image" href="assets/splash/splash-750x1334.png" media="(device-width: 375px) and (device-height: 667px) and (-webkit-device-pixel-ratio: 2) and (orientation: portrait)">
+<!-- the installed app gets class="standalone" before the first paint, for tweaks that only apply there -->
+<script>if (matchMedia('(display-mode: standalone)').matches || navigator.standalone === true) document.documentElement.classList.add('standalone');</script>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600&family=Saira+Condensed:wght@500;600;700&display=swap">
@@ -62,6 +82,10 @@
 [hidden] { display: none !important; }
 body { margin: 0; background: var(--bg); color: var(--ink); font: 15px/1.5 var(--font-body); }
 .wrap { max-width: 1100px; min-height: 100vh; min-height: 100dvh; margin: 0 auto; padding-inline: 16px; padding-block: 18px 56px; display: flex; flex-direction: column; gap: 16px; }
+/* the page runs edge to edge (viewport-fit=cover): keep the header clear of the notch and status bar, the sides clear of
+   the notch in landscape, and the footer clear of the home indicator */
+.wrap { padding-top: calc(18px + env(safe-area-inset-top, 0px)); padding-bottom: calc(56px + env(safe-area-inset-bottom, 0px));
+  padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)); }
 h1, h2, h3 { font-family: var(--font-display); font-weight: 700; letter-spacing: .01em; margin: 0; text-wrap: balance; line-height: 1.1; }
 h1 { font-size: 30px; text-transform: uppercase; }
 h2 { font-size: 22px; text-transform: uppercase; }
@@ -689,8 +713,21 @@ td .wks { flex-wrap: nowrap; }
   .slider { grid-template-columns: minmax(0, 1fr) 110px 40px; }
 }
 @media (prefers-reduced-motion: reduce) { * { transition: none !important; } }
-/* iOS zooms into any focused text box whose text is under 16px, then stays zoomed; touch screens get 16px boxes */
-@media (pointer: coarse) { input, select, textarea, input.inp, select.sel, textarea.inp { font-size: 16px !important; } }
+/* iOS zooms into any focused text box whose text is under 16px, then stays zoomed: every box is 16px or more */
+input, select, textarea, input.inp, select.sel, textarea.inp { font-size: max(16px, 1em) !important; }
+/* Native feel. No rubber-band bounce or pull-to-refresh (Refresh projections reloads the data); no double-tap zoom
+   (pinch still works); no grey flash on tap. Buttons and navigation don't select text or open the long-press menu,
+   while everything else stays selectable. */
+html, body { overscroll-behavior: none; }
+html { touch-action: manipulation; -webkit-tap-highlight-color: transparent; -webkit-text-size-adjust: 100%; text-size-adjust: 100%; }
+button, .btn, [role="button"], [role="tab"], nav, nav a, summary { -webkit-touch-callout: none; -webkit-user-select: none; user-select: none; }
+/* Installed (class="standalone", set in <head>): iOS draws the status bar over the page in white (black-translucent),
+   so a green band sits behind it, and the top padding above clears it */
+.standalone body::before { content: ""; position: fixed; top: 0; left: 0; right: 0; height: env(safe-area-inset-top, 0px); background: #075b37; z-index: 60; pointer-events: none; }
+/* update ready: a small bar above the home indicator (installedApp) */
+.updbar { position: fixed; left: 50%; transform: translateX(-50%); bottom: calc(16px + env(safe-area-inset-bottom, 0px)); z-index: 55; display: flex; align-items: center; gap: 10px;
+  max-width: min(440px, calc(100vw - 24px)); padding: 10px 14px; border: 0; border-radius: 999px; background: #075b37; color: #fff; font: 600 14px/1.3 var(--font-body); box-shadow: 0 4px 14px rgba(0, 0, 0, .25); cursor: pointer; }
+.updbar b { font-weight: 700; text-decoration: underline; text-underline-offset: 2px; }
 </style>
 
 <div class="wrap">
@@ -858,11 +895,61 @@ const mean = a => a.length ? a.reduce((s, x) => s + x, 0) / a.length : null;
 /* index.html#selftest (with ?fixture=path) loads only that saved data bundle, for tests/selftest.html: no live data, account,
    analytics or Sleeper sync, and nothing read from or written to this browser's storage. */
 const SELFTEST = location.hash === '#selftest';
-const store = SELFTEST ? { get: (k, d = null) => d, set: () => true, del() {} } : {
-  get(k, d = null) { try { const v = localStorage.getItem(k); return v == null ? d : JSON.parse(v); } catch { return d; } },
-  set(k, v) { try { localStorage.setItem(k, JSON.stringify(v)); return true; } catch { return false; } },
-  del(k) { try { localStorage.removeItem(k); } catch {} },
-};
+/* ---------- this browser's storage ----------
+   Every key is STORE_PREFIX + a name ("bp:v1:state"), and STORE_SCHEMA_KEY holds the layout's version, so a later
+   change can move keys in a migration step on load. Version 1 moved the old "fo1:" keys under the prefix and dropped
+   the old data caches (fetched again on demand).
+   Storage can be full (QuotaExceededError) or blocked (private browsing, cookies off, an embedded frame): the data caches
+   (STORE_CACHES, all fetchable again) go first, and a write that still doesn't fit, or any write when storage is
+   blocked, is kept in memory so the page works for this visit. Nothing here crashes the page. The sign-in session is
+   Supabase's own (sb-...-auth-token) and stays as Supabase writes it. */
+const STORE_PREFIX = 'bp:v1:', STORE_SCHEMA = 1, STORE_SCHEMA_KEY = 'bp:schema';
+const STORE_CACHES = /^(sched|wk2|prior2|split|idp|ppg4|ret|pids|coach|geo):/;
+const storeKeys = ls => Array.from({ length: ls.length }, (_, i) => ls.key(i)).filter(k => k != null);
+const isQuotaErr = e => !!e && (e.name === 'QuotaExceededError' || e.name === 'NS_ERROR_DOM_QUOTA_REACHED' || e.code === 22 || e.code === 1014);
+function migrateStore(ls) {
+  let v = 0; try { v = +(ls.getItem(STORE_SCHEMA_KEY) || 0); } catch { return false; }
+  if (v >= STORE_SCHEMA) return true;
+  if (v < 1) {
+    const old = storeKeys(ls).filter(k => k.startsWith('fo1:'));
+    // the old data caches go first, which also frees room for the moves
+    for (const k of old.filter(k => STORE_CACHES.test(k.slice(4)))) ls.removeItem(k);
+    for (const k of old.filter(k => !STORE_CACHES.test(k.slice(4)))) {
+      const name = k.slice(4), val = ls.getItem(k); ls.removeItem(k);
+      if (val == null || ls.getItem(STORE_PREFIX + name) != null) continue;
+      // moving one key at a time never holds two copies; if it doesn't fit, put it back and try again on the next visit
+      try { ls.setItem(STORE_PREFIX + name, val); } catch { try { ls.setItem(k, val); } catch {} return false; }
+    }
+  }
+  try { ls.setItem(STORE_SCHEMA_KEY, String(STORE_SCHEMA)); } catch {}
+  return true;
+}
+function makeStore(ls) {
+  const mem = new Map();   // values that couldn't be written to storage this visit (JSON text)
+  let live = !!ls;
+  try { const t = STORE_PREFIX + '_t'; ls.setItem(t, '1'); ls.removeItem(t); } catch { live = false; }
+  if (live) try { migrateStore(ls); } catch {}
+  const K = k => STORE_PREFIX + k, parse = (v, d) => { try { return v == null ? d : JSON.parse(v); } catch { return d; } };
+  const evict = () => { let n = 0; try { for (const k of storeKeys(ls)) if (k.startsWith(STORE_PREFIX) && STORE_CACHES.test(k.slice(STORE_PREFIX.length))) { ls.removeItem(k); n++; } } catch {} return n; };
+  return {
+    get mode() { return live ? 'local' : 'memory'; },
+    get(k, d = null) { if (mem.has(k)) return parse(mem.get(k), d); if (!live) return d; try { return parse(ls.getItem(K(k)), d); } catch { return d; } },
+    set(k, v) {
+      const s = JSON.stringify(v);
+      if (live) {
+        for (let tries = 0; tries < 2; tries++) {
+          try { ls.setItem(K(k), s); mem.delete(k); return true; }
+          catch (e) { if (!isQuotaErr(e) || tries || !evict()) break; }
+        }
+      }
+      mem.set(k, s); return false;
+    },
+    del(k) { mem.delete(k); if (live) try { ls.removeItem(K(k)); } catch {} },
+    // everything this site keeps in storage, including keys from before the prefix (Settings > Reset)
+    clear() { mem.clear(); if (live) try { for (const k of storeKeys(ls)) if (k.startsWith('bp:') || k.startsWith('fo1:')) ls.removeItem(k); } catch {} },
+  };
+}
+const store = SELFTEST ? { mode: 'off', get: (k, d = null) => d, set: () => true, del() {}, clear() {} } : makeStore((() => { try { return window.localStorage; } catch { return null; } })());
 async function fetchJSON(url, ms = 30000, headers) {
   const ac = new AbortController(); const t = setTimeout(() => ac.abort(), ms);
   try {
@@ -916,7 +1003,7 @@ function switchTeam(id) {
   save(); render();
 }
 function loadState() {
-  const s = store.get('fo1:state');
+  const s = store.get('state');
   const st = JSON.parse(JSON.stringify(DEFAULT_STATE));
   if (s && s.v === 1) {
     Object.assign(st, s);
@@ -940,11 +1027,11 @@ function loadState() {
   return ensureTeams(st);
 }
 let state = loadState();
-const save = () => { stashTeam(); stampChanges(); store.set('fo1:state', state); queuePush(); };
+const save = () => { stashTeam(); stampChanges(); store.set('state', state); queuePush(); };
 const D = { loading: true, progress: 0, errors: [], open: new Set(), U: new Map(), proj: {}, H: {}, tg: {}, rec: {}, prior: {}, cur: {}, B: {}, L: {}, ranks: {}, M: {}, imgBad: new Set(), coaches: null, espnTeams: null, defSort: ['fpaWR', -1], teamOpen: null, resetArm: false };
 
 /* ---------- accounts and sync ----------
-   Signing in is optional. This browser's copy (fo1:state) stays the working copy; a signed-in account keeps a mirror of
+   Signing in is optional. This browser's copy (state) stays the working copy; a signed-in account keeps a mirror of
    it in Supabase: one row with every team plus the overrides, model weights and coaching edits, and one row per saved
    weekly lineup. A device pulls when it opens or comes back into view, and pushes a moment after each change.
    Teams merge by id and the most recently edited copy wins (a deleted team leaves a dated marker so it stays deleted);
@@ -964,10 +1051,10 @@ const acct = { on: !!(CLOUD.url && CLOUD.key) && location.hash !== '#export' && 
    by the Stripe webhook, not here. */
 const PH = { key: 'phc_w2pVgo7e9LxeAKLXUemtyXDRWZfgVE29UtvBm3fKX3HQ', host: 'https://us.i.posthog.com', lib: 'https://cdn.jsdelivr.net/npm/posthog-js@1.435.8/dist/module.js' };
 const anFlag = new URLSearchParams(location.search).get('analytics');
-if (anFlag === 'off') store.set('fo1:noan', 1); else if (anFlag === 'on') store.del('fo1:noan');
+if (anFlag === 'off') store.set('noan', 1); else if (anFlag === 'on') store.del('noan');
 const an = { ph: null, q: [], qp: [], user: null, once: new Set(), loading: false,
   on: !!PH.key && location.hash !== '#export' && !SELFTEST && /^https?:$/.test(location.protocol) && !/^(localhost|127\.|\[::1\])/.test(location.hostname)
-    && !store.get('fo1:noan') && navigator.doNotTrack !== '1' && !navigator.globalPrivacyControl };
+    && !store.get('noan') && navigator.doNotTrack !== '1' && !navigator.globalPrivacyControl };
 const anCtx = () => ({ device: matchMedia('(pointer: coarse)').matches || innerWidth < 700 ? 'mobile' : 'desktop', tier: isPro() ? 'pro' : 'free', signed_in: !!acct.user, nfl_week: D.week || null });
 function track(ev, props, now) {
   if (!an.on) return; const p = Object.assign(anCtx(), props);
@@ -1055,16 +1142,16 @@ function applyDoc(doc) {
   state.overrides = Object.assign({}, g.overrides); state.staffEdits = Object.assign({}, g.staffEdits); state.returnWeek = Object.assign({}, g.returnWeek);
   state.settings = Object.assign({}, DEFAULT_STATE.settings, g.settings, view);
   state.settings.w = Object.assign({}, DEFAULT_STATE.settings.w, g.settings?.w);
-  applyTeam(curTeam()); primeSigs(); store.set('fo1:state', state);
+  applyTeam(curTeam()); primeSigs(); store.set('state', state);
   D.open.clear(); D.wCache = null; D.delArm = false; D.flow = null; D.tsOpen = false;
   if (D.inp) { if (D.fmtLoaded !== fmtKey()) ingest(D.inp); else computeAll(); }
   render();
 }
-const syncMeta = () => store.set('fo1:sync', { uid: acct.user?.id, rev: acct.rev, h: acct.h, hs: acct.hs });
+const syncMeta = () => store.set('sync', { uid: acct.user?.id, rev: acct.rev, h: acct.h, hs: acct.hs });
 function setSync(s) { acct.sync = s; if (s === 'ok') acct.at = Date.now(); renderAcct(); }
 const queuePush = (ms = 1500) => { if (!acct.user || !acct.ready) return; clearTimeout(acct.pushT); acct.pushT = setTimeout(push, ms); };
 async function startSync() {
-  const m = store.get('fo1:sync') || {}, known = m.uid === acct.user.id;
+  const m = store.get('sync') || {}, known = m.uid === acct.user.id;
   acct.rev = known ? m.rev || 0 : 0; acct.h = known ? m.h || null : null; acct.hs = known ? m.hs || {} : {}; acct.ready = known;
   await pull();
   if (acct.ready) await pullHist();
@@ -1184,7 +1271,7 @@ function signedInDone() {
   render();
   toast('Signed in. Your teams now sync to this account.');
   // they picked a Pro plan before signing in: carry on to checkout
-  let buy = null; try { buy = sessionStorage.getItem('fo1:buy'); sessionStorage.removeItem('fo1:buy'); } catch {}
+  let buy = null; try { buy = sessionStorage.getItem('bp:buy'); sessionStorage.removeItem('bp:buy'); } catch {}
   if (buy) loadPro().then(() => isPro() ? go('pro') : goPro(buy, true));
 }
 
@@ -1210,7 +1297,7 @@ function onAuth(ev, session) {
   if (u && u.id !== acct.user?.id) {
     acct.user = u; acct.step = 'email'; acct.code = ''; acct.msg = null; stripAuthParams();
     anIdentify(u.id); anPerson(); if (acct.toastNext) track('signed_in', { method: acct.signVia || 'email' });   // a fresh sign-in, not a restored session
-    const c = store.get('fo1:pro'); acct.pro = c && c.uid === u.id ? c : null;
+    const c = store.get('pro'); acct.pro = c && c.uid === u.id ? c : null;
     startSync().then(() => {
       loadPro().then(() => { if (D.proActivating) pollPro(); });
       if (!acct.toastNext || acct.choice) return;
@@ -1248,7 +1335,7 @@ async function verifyCode() {
 async function googleSignIn() {
   try {
     const sb = await cloudReady();
-    try { sessionStorage.setItem('fo1:ret', location.hash); } catch {}
+    try { sessionStorage.setItem('bp:ret', location.hash); } catch {}
     const { error } = await sb.auth.signInWithOAuth({ provider: 'google', options: { redirectTo: location.origin + location.pathname } });
     if (error) throw error;
   } catch (e) { acct.msg = ['err', authErr(e)]; render(); }
@@ -1262,7 +1349,7 @@ async function signOut(deleted) {
   toast(deleted ? 'Account deleted. Everything it held is gone.' : 'Signed out. Your teams are in your account, not in this browser.');
 }
 function wipeLocal() {
-  ['fo1:state', HIST_KEY, 'fo1:sync', 'fo1:pro'].forEach(k => store.del(k)); acct.pro = acct.bootPro = null;
+  ['state', HIST_KEY, 'sync', 'pro'].forEach(k => store.del(k)); acct.pro = acct.bootPro = null;
   const tab = state.tab; state = ensureTeams(JSON.parse(JSON.stringify(DEFAULT_STATE))); state.tab = tab;
   D.hist = null; D.acctOpen = false; D.histOpen = false; D.flow = null; D.tsOpen = false; D.ioOpen = false; D.open.clear(); D.wCache = null;
   primeSigs();
@@ -1287,13 +1374,13 @@ function acctBoot() {
     if (!back) stripAuthParams();
   }
   if (back) {
-    let ret = null; try { ret = sessionStorage.getItem('fo1:ret'); sessionStorage.removeItem('fo1:ret'); } catch {}
+    let ret = null; try { ret = sessionStorage.getItem('bp:ret'); sessionStorage.removeItem('bp:ret'); } catch {}
     if (ret && !location.hash) try { history.replaceState(null, '', location.pathname + location.search + ret); } catch {}
     if (q.has('error_description')) { acct.msg = ['err', 'Google sign-in didn’t finish: ' + q.get('error_description')]; D.acctOpen = true; stripAuthParams(); return; }
     acct.toastNext = true; acct.signVia = 'google';
   }
   let saved = false; try { saved = Object.keys(localStorage).some(k => /^sb-.+-auth-token$/.test(k)); } catch {}
-  if (saved) acct.bootPro = store.get('fo1:pro');   // a Pro member's page shows no ads even before the session is restored
+  if (saved) acct.bootPro = store.get('pro');   // a Pro member's page shows no ads even before the session is restored
   if (!saved && !back) return;
   cloudReady().then(sb => sb.auth.getSession()).then(({ data }) => {
     if (back) { stripAuthParams(); if (!data?.session) { acct.msg = ['err', 'Google sign-in didn’t finish. Try again.']; D.acctOpen = true; render(); } }
@@ -1320,7 +1407,7 @@ async function loadPro() {
     if (error) throw error;
     const was = isPro();
     acct.pro = data ? { plan: data.plan, status: data.status, until: data.pro_until ? Date.parse(data.pro_until) : 0 } : null;
-    store.set('fo1:pro', acct.pro ? Object.assign({ uid: acct.user.id }, acct.pro) : null);
+    store.set('pro', acct.pro ? Object.assign({ uid: acct.user.id }, acct.pro) : null);
     if (was !== isPro()) { anPerson(); render(); } else renderAcct();
   } catch {}
 }
@@ -1330,7 +1417,7 @@ async function goPro(plan, resumed) {
   if (!acct.on) return toast('Pro isn’t available yet.');
   if (!resumed) track('upgrade_clicked', { plan, needs_sign_in: !acct.user });
   if (!acct.user) {   // Pro belongs to an account, so sign in first; checkout continues right after
-    try { sessionStorage.setItem('fo1:buy', plan); } catch {}
+    try { sessionStorage.setItem('bp:buy', plan); } catch {}
     D.acctOpen = true; acct.msg = ['info', 'Sign in first so Pro follows you to every device. Checkout opens right after.'];
     cloudReady().catch(() => {}); render(); revealPanel($('.acct')); deskFocus('#acctEmail'); return;
   }
@@ -1520,7 +1607,7 @@ async function fetchWeather(games) {
     const s = siteOf(g); if (!s || covered(s)) continue;
     let lat = s.lat, lon = s.lon;
     if (s.neutral) {   // a neutral site: look its city up once, then remember it
-      const key = 'fo1:geo:' + s.q; let hit = store.get(key);
+      const key = 'geo:' + s.q; let hit = store.get(key);
       if (!hit && s.q) { const r = (await fetchJSON(API.geo(s.q), 10000).catch(() => null))?.results?.[0]; if (r) { hit = [+r.latitude.toFixed(3), +r.longitude.toFixed(3)]; store.set(key, hit); } }
       if (!hit) continue; [lat, lon] = hit;
     }
@@ -1545,7 +1632,7 @@ async function fetchWeather(games) {
    Built once from that season's 18 weekly stat files and schedule (about 12 MB to download), then kept on this device
    and in snapshot.json as a few KB, so it loads in the background after the page is up. */
 async function loadSplits(season) {
-  const key = `fo1:split:${season}`, hit = store.get(key); if (hit) return hit;
+  const key = `split:${season}`, hit = store.get(key); if (hit) return hit;
   const host = {};
   for (const g of await fetchJSON(API.sched(season)) || []) { if (!g.week || !g.home || !g.away) continue; const h = fixAbbr(g.home), m = host[g.week] || (host[g.week] = {}); m[h] = h; m[fixAbbr(g.away)] = h; }
   const out = {};
@@ -1631,21 +1718,21 @@ async function gatherLive(err) {
   const pProj = T(fetchJSON(API.proj(season, week)).catch(e => { err('Sleeper projections', e); return []; }));
   const weekPs = [];
   for (let w = 1; w <= histMax; w++) {
-    const key = `fo1:wk2:${season}:${w}`, cached = w <= completedThrough ? store.get(key) : null;
+    const key = `wk2:${season}:${w}`, cached = w <= completedThrough ? store.get(key) : null;
     weekPs.push(cached ? Promise.resolve(cached) : T(fetchJSON(API.wk(season, w)).then(rows => { const c = compactWeek(rows); if (w <= completedThrough && c.D.length) store.set(key, c); return c; }).catch(e => { err('Sleeper stats week ' + w, e); return { P: [], D: [] }; })));
   }
   const pActual = week <= (past ? 18 : detWeek) ? T(fetchJSON(API.wk(season, week)).then(compactWeek).catch(() => ({ P: [], D: [] }))) : Promise.resolve({ P: [], D: [] });
-  const ppgKey = `fo1:ppg4:${season - 1}`, retKey = `fo1:ret:${season - 1}`; let prevPPG = store.get(ppgKey), prevRet = store.get(retKey);
+  const ppgKey = `ppg4:${season - 1}`, retKey = `ret:${season - 1}`; let prevPPG = store.get(ppgKey), prevRet = store.get(retKey);
   const keepPrevPlayers = rows => {
     if (!prevPPG) { prevPPG = playerPPG(rows); if (Object.keys(prevPPG).length > 100) store.set(ppgKey, prevPPG); }
     if (!prevRet) { prevRet = returnersPrev(rows); if (prevRet.length > 20) store.set(retKey, prevRet); }
   };
   // defensive players: last season is cached after the first load; this season is fetched every time (injuries, trades)
-  const idpKey = `fo1:idp:${season - 1}`; let idpPrev = store.get(idpKey);
+  const idpKey = `idp:${season - 1}`; let idpPrev = store.get(idpKey);
   const pIdpPrev = idpPrev ? Promise.resolve() : T(fetchJSON(API.idp(season - 1)).then(rows => { idpPrev = idpCompactPrev(rows); if (idpPrev.length > 300) store.set(idpKey, idpPrev); }).catch(e => err(`${season - 1} defensive players`, e)));
   const pIdpNow = T(fetchJSON(API.idp(season)).catch(e => { err('Defensive players', e); return []; }));
   const priorPs = [1, 2, 3].map(k => {
-    const s = season - k, key = `fo1:prior2:${s}`, cached = store.get(key);
+    const s = season - k, key = `prior2:${s}`, cached = store.get(key);
     if (cached) return Promise.resolve([s, cached]);
     const qb = k === 1 ? pool(Array.from({ length: 18 }, (_, i) => i + 1), 6, w => fetchJSON(API.wkQB(s, w))) : Promise.resolve(null);
     return T(Promise.all([fetchJSON(API.tot(s)), qb]).then(([rows, qbw]) => {
@@ -1654,8 +1741,8 @@ async function gatherLive(err) {
     }).catch(e => { err(s + ' season history', e); return [s, {}]; }));
   });
   // team history cached by an older version of this page: fetch last season's totals once for the per-player numbers
-  const pPPG = prevPPG && prevRet ? Promise.resolve() : (store.get(`fo1:prior2:${season - 1}`) ? T(fetchJSON(API.tot(season - 1)).then(keepPrevPlayers).catch(e => err(`${season - 1} player history`, e))) : Promise.resolve());
-  const schedKey = `fo1:sched:${season}`, schedCached = store.get(schedKey);
+  const pPPG = prevPPG && prevRet ? Promise.resolve() : (store.get(`prior2:${season - 1}`) ? T(fetchJSON(API.tot(season - 1)).then(keepPrevPlayers).catch(e => err(`${season - 1} player history`, e))) : Promise.resolve());
+  const schedKey = `sched:${season}`, schedCached = store.get(schedKey);
   const pSched = schedCached ? Promise.resolve(schedCached) : T(fetchJSON(API.sched(season)).then(rows => { const c = (rows || []).filter(g => g.week && g.home && g.away).map(g => [g.week, fixAbbr(g.home), fixAbbr(g.away)]); if (c.length > 200) store.set(schedKey, c); return c; }).catch(e => { err('Season schedule', e); return []; }));
   const pOwn = T(fetchJSON(API.own(season), 30000, { 'x-fantasy-filter': API.ownFilter }).then(j => (j.players || []).map(e => e.player).filter(p => p && ESPN_POS[p.defaultPositionId]).map(p => [p.fullName, p.defaultPositionId, p.proTeamId, p.ownership?.percentOwned ?? 0])).catch(e => { err('ESPN ownership', e); return []; }));
   // forecasts for this week's outdoor games, once the schedule says where and when they're played
@@ -1719,7 +1806,7 @@ function ingest(inp) {
   if (!D.sched[D.week] && D.games.length) { const m = D.sched[D.week] = {}; for (const T in D.tg) m[T] = { opp: D.tg[T].opp, home: D.tg[T].home }; }
   /* For the weather factor: each player's role (passing vs. rushing yards, receiving yards per target) and his scores this
      season in covered vs. open stadiums. Past games count at the home team's stadium. */
-  D.wx = inp.wx || {}; D.prof = {}; D.split = inp.split || store.get(`fo1:split:${inp.season - 1}`) || null;
+  D.wx = inp.wx || {}; D.prof = {}; D.split = inp.split || store.get(`split:${inp.season - 1}`) || null;
   const hostOf = (w, T) => { const m = D.sched[w]?.[T]; return m ? (m.home ? T : m.opp) : null; };
   const where = (w, T) => { const s = STADIUMS[hostOf(w, T)]; return s ? (s[3] === 'open' ? 'outP' : 'inP') : null; };
   const prof = id => D.prof[id] || (D.prof[id] = { py: 0, ry: 0, rcy: 0, tg: 0, inP: [], outP: [] });
@@ -2178,7 +2265,7 @@ function optimize() {
    Benny's lineup for each team is saved every week it's viewed (kept current until kickoff), so past weeks can be checked
    against what the players scored. A starter's spot freezes once his game starts, so a late change doesn't rewrite a pick
    that already played. Kept for this season and last, and synced to the account when signed in. */
-const HIST_KEY = 'fo1:hist';
+const HIST_KEY = 'hist';
 const histKey = (team, season, week) => `${team}|${season}|${week}`;
 const histAll = () => D.hist || (D.hist = store.get(HIST_KEY, {}) || {});
 function histPut(k, snap) {
@@ -2272,7 +2359,7 @@ function histPanel() {
 
 /* ---------- coaches (ESPN head-coach check, cached 24h) ---------- */
 async function checkCoaches(season) {
-  const key = 'fo1:coach:' + season, c = store.get(key);
+  const key = 'coach:' + season, c = store.get(key);
   if (c && Date.now() - c.ts < 864e5) { D.coaches = c.data; if (state.tab === 'teams') render(); return; }
   const idFrom = j => { const ref = j?.items?.[0]?.$ref || ''; const m = /coaches\/(\d+)/.exec(ref); return m ? { id: m[1], ref: ref.replace(/^http:/, 'https:') } : null; };
   const res = await pool(ABBR, 6, async T => {
@@ -2600,7 +2687,7 @@ function returnWeek(id) {
    doesn't move with the week you view. The saved copy carries the log the data refresh keeps (scripts/extract_snapshot.py);
    this browser keeps its own too, and the earlier sighting wins. A change of kind (Out to IR) starts a new entry. */
 function updateInjLog(inp) {
-  const S = D.detSeason, key = `fo1:injlog:${S}`, mine = store.get(key, {}) || {}, saved = inp.injLog || {}, log = {};
+  const S = D.detSeason, key = `injlog:${S}`, mine = store.get(key, {}) || {}, saved = inp.injLog || {}, log = {};
   const today = new Date().toISOString().slice(0, 10);
   for (const u of D.U.values()) {
     const k = injKind(u.inj); if (!k) continue;
@@ -3423,7 +3510,7 @@ function render() {
   const msgs = [];
   if (D.flash && !D.loading) msgs.push(`<div class="banner info flash"><span>${D.flash.html}</span><button type="button" class="btn sm" data-act="flashclose" aria-label="Dismiss">Dismiss</button></div>`);
   // skipped the account step on the walkthrough: one reminder on Lineup until they sign in or dismiss it
-  if (!D.loading && state.tab === 'lineup' && acct.on && !acct.user && store.get('fo1:nudge') === 'show') msgs.push(`<div class="banner info exban"><span><strong>Save your team across devices.</strong> ${esc(curTeam()?.name || 'Your team')} is saved in this browser now. Sign in to see it and Benny’s weekly lineups on your phone and computer too.</span><span class="toolbar"><button type="button" class="btn sm primary" data-act="account">Sign in</button><button type="button" class="btn sm" data-act="nudgeoff">Not now</button></span></div>`);
+  if (!D.loading && state.tab === 'lineup' && acct.on && !acct.user && store.get('nudge') === 'show') msgs.push(`<div class="banner info exban"><span><strong>Save your team across devices.</strong> ${esc(curTeam()?.name || 'Your team')} is saved in this browser now. Sign in to see it and Benny’s weekly lineups on your phone and computer too.</span><span class="toolbar"><button type="button" class="btn sm primary" data-act="account">Sign in</button><button type="button" class="btn sm" data-act="nudgeoff">Not now</button></span></div>`);
   // Only interrupt for problems that change the picks: missing projections or schedule, or data that's gone stale.
   const age = D.loadedAt ? Date.now() - D.loadedAt.getTime() : 0;
   if (!D.loading && !D.failed && D.snapshot && !D.refreshing && age > 36e5 * 36) msgs.push(`<div class="banner">These numbers are from ${esc(D.loadedAt.toLocaleDateString([], { weekday: 'long', month: 'short', day: 'numeric' }))}, so injury news since then isn’t included. Press Refresh to try for newer data.</div>`);
@@ -3467,7 +3554,7 @@ function espnNote(r, starting) {
    player-ids.json (built at most daily by scripts/player_ids.py) gives each Sleeper id its ESPN and NFL GSIS ids, kept
    on the player as u.espnId and u.gsisId. This browser keeps a copy for a day, so a visit doesn't refetch it.
    Headshots and team logos load straight from ESPN's image server, resized there. */
-const PIDS_KEY = 'fo1:pids';
+const PIDS_KEY = 'pids';
 const SILHOUETTE = '<svg viewBox="0 0 40 40" aria-hidden="true"><circle cx="20" cy="15" r="7.5" fill="currentColor"/><path d="M5 40c0-9 6.7-14.5 15-14.5S35 31 35 40z" fill="currentColor"/></svg>';
 function attachIds() { const m = D.pids; if (m) for (const u of D.U.values()) { const x = m[u.id]; u.espnId = x?.[0] || null; u.gsisId = x?.[1] || null; } }
 async function loadPlayerIds() {
@@ -3791,7 +3878,7 @@ function actWelcomeSignIn() { D.wSignin = !D.wSignin; acct.msg = null; if (D.wSi
 /* ---------- welcome walkthrough ----------
    Shown full screen, with no navigation, whenever no team has players yet: a first visit, after signing out, or after
    Reset. Three cards (Sleeper, ESPN, Find your players) open the same setup flow as + Add team; restoring a saved team is a link
-   below them. Once the team is saved they go straight to their lineup, where a banner offers an account (fo1:nudge).
+   below them. Once the team is saved they go straight to their lineup, where a banner offers an account (nudge).
    People who already have an account sign in at the top and get their teams straight back. */
 /* The welcome matches what the link promised: a link to Waivers or Start / Sit (D.intent) gets its own headline, and
    after setup lands on that page instead of Lineup (goIntended). */
@@ -3999,9 +4086,9 @@ function reviewHTML() {
     </div></div>
     <div class="toolbar"><button type="button" class="btn primary" data-act="flowsave" ${d.roster.length ? '' : 'disabled'}>Save team</button><button type="button" class="btn" data-act="flowback">Back</button></div>`;
 }
-// straight to the lineup; after the first team on the welcome walkthrough, the lineup offers an account (fo1:nudge)
+// straight to the lineup; after the first team on the welcome walkthrough, the lineup offers an account (nudge)
 function afterSave() {
-  if (D.welcome && acct.on && !acct.user) store.set('fo1:nudge', 'show');
+  if (D.welcome && acct.on && !acct.user) store.set('nudge', 'show');
   goIntended({ keepFlash: true });
 }
 function commitDraft() {
@@ -4208,7 +4295,7 @@ function lineupBody() {
   recordLineup(starters);
   // activation: Benny's lineup shown for a real team, counted once per NFL week in this browser (weekly retention uses it)
   const luKey = `${D.season}-${D.week}`;
-  if (an.on && store.get('fo1:anlu') !== luKey) { store.set('fo1:anlu', luKey); track('lineup_shown', { players: state.roster.length, starters: starters.filter(s => s.r).length, teams: state.teams.length, scoring: state.scoring }); }
+  if (an.on && store.get('anlu') !== luKey) { store.set('anlu', luKey); track('lineup_shown', { players: state.roster.length, starters: starters.filter(s => s.r).length, teams: state.teams.length, scoring: state.scoring }); }
   const st = starters.filter(s => s.r), mu = st.reduce((s, x) => s + x.r.mean, 0), sdT = lineupSD(st.map(x => x.r));
   // once games start: points banked by started players, shown apart from the pregame projection rather than mixed into it
   const live = state.roster.some(id => D.M[id]?.locked), played = st.filter(x => x.r.locked), sofar = played.reduce((s, x) => s + (ok(x.r.actual) ? x.r.actual : 0), 0);
@@ -4331,18 +4418,18 @@ function heat(v, avg, invert) {
   const a = Math.min(40, Math.abs(d) * 110); return `background:color-mix(in srgb, var(${d > 0 ? '--good' : '--bad'}) ${a.toFixed(0)}%, transparent)`;
 }
 /* Defenses table columns: [key, header, format, full name]. Which ones show and their left-to-right order are a
-   per-browser preference (fo1:defcols); K pts and total yards start hidden. */
+   per-browser preference (defcols); K pts and total yards start hidden. */
 const DEF_COLS = [['fpaQB', 'QB pts', f1, 'Fantasy points allowed to QBs'], ['fpaRB', 'RB pts', f1, 'Fantasy points allowed to RBs'], ['fpaWR', 'WR pts', f1, 'Fantasy points allowed to WRs'], ['fpaTE', 'TE pts', f1, 'Fantasy points allowed to TEs'], ['fpaK', 'K pts', f1, 'Fantasy points allowed to kickers'],
   ['passYdA', 'Pass yds', f0, 'Passing yards allowed'], ['ydsA', 'Total yds', f0, 'Total yards allowed'], ['ypcA', 'YPC', f1, 'Yards per carry allowed'], ['sacks', 'Sacks', f1, 'Sacks'], ['ptsA', 'Pts allowed', f1, 'Points allowed']];
 const DEF_COL = Object.fromEntries(DEF_COLS.map(c => [c[0], c]));
 const DEF_HIDE = ['fpaK', 'ydsA'];
 function defCols() {
-  const p = store.get('fo1:defcols') || {}, known = k => !!DEF_COL[k];
+  const p = store.get('defcols') || {}, known = k => !!DEF_COL[k];
   const order = (Array.isArray(p.order) ? p.order.filter(known) : []);
   for (const [k] of DEF_COLS) if (!order.includes(k)) order.push(k);
   return { order, hide: new Set(Array.isArray(p.hide) ? p.hide.filter(known) : DEF_HIDE) };
 }
-const saveDefCols = c => store.set('fo1:defcols', { order: c.order, hide: [...c.hide] });
+const saveDefCols = c => store.set('defcols', { order: c.order, hide: [...c.hide] });
 function defColsPanel(c) {
   return `<div class="card panel colcfg"><div class="row-head"><h3>Columns</h3><span class="toolbar"><button type="button" class="btn sm" data-act="defcolsreset">Reset</button><button type="button" class="btn sm" data-act="defcols">Done</button></span></div>
     <p class="small muted" style="margin:0">Tick the stats to show. Use the arrows to move a column left or right; the table follows this order.</p>
@@ -4501,11 +4588,11 @@ document.addEventListener('click', e => {
     const r = $(`[data-team="${T}"]`); if (r) scrollBy(0, r.getBoundingClientRect().top - y0); return;
   }
   const a = t.dataset.act;
-  if (a === 'reload') { for (let s = 0; s < 4; s++) store.del('fo1:coach:' + ((D.season || 0) - s)); load({ manual: true }); }
+  if (a === 'reload') { for (let s = 0; s < 4; s++) store.del('coach:' + ((D.season || 0) - s)); load({ manual: true }); }
   else if (a === 'sharemove') shareMove();
   else if (a === 'sharedx') { D.shared = null; render(); }
   else if (a === 'defcols') { D.colsOpen = !D.colsOpen; render(); }
-  else if (a === 'defcolsreset') { store.del('fo1:defcols'); render(); }
+  else if (a === 'defcolsreset') { store.del('defcols'); render(); }
   else if (a === 'loadleague') loadLeague();
   else if (a === 'useteam') useEspnTeam();
   else if (a === 'slfind') slFind();
@@ -4535,7 +4622,7 @@ document.addEventListener('click', e => {
   else if (a === 'wsignin') actWelcomeSignIn();
   else if (a === 'buy') goPro(t.dataset.plan);
   else if (a === 'billing') openBilling();
-  else if (a === 'nudgeoff') { store.set('fo1:nudge', 'done'); render(); }
+  else if (a === 'nudgeoff') { store.set('nudge', 'done'); render(); }
   else if (a === 'acctsend') sendCode();
   else if (a === 'acctverify') verifyCode();
   else if (a === 'acctback') { acct.step = 'email'; acct.code = ''; acct.msg = null; render(); deskFocus('#acctEmail'); }
@@ -4582,7 +4669,7 @@ document.addEventListener('click', e => {
   else if (a === 'resetstaff') { state.staffEdits = {}; save(); computeAll(); render(); }
   else if (a === 'reset') {
     if (!D.resetArm) { D.resetArm = true; render(); setTimeout(() => { D.resetArm = false; if (state.tab === 'settings') render(); }, 4000); return; }
-    try { Object.keys(localStorage).filter(k => k.startsWith('fo1:')).forEach(k => localStorage.removeItem(k)); } catch {}
+    store.clear();
     if (acct.user) { acct.sb.auth.signOut({ scope: 'local' }).catch(() => {}); acct.user = null; acct.ready = false; acct.choice = null; clearTimeout(acct.pushT); }
     acct.pro = acct.bootPro = null;
     state = ensureTeams(JSON.parse(JSON.stringify(DEFAULT_STATE))); D.hist = null; primeSigs(); D.resetArm = false; D.open.clear(); load({ fresh: true });
@@ -4672,6 +4759,44 @@ function matchPasted(text) {
   }
   return { ids, miss };
 }
+/* ---------- installed app ----------
+   sw.js keeps the app and the last data on the device, so the home-screen app opens offline. A new version (a new
+   sw.js waiting to take over, or a newer index.html the worker fetched in the background) shows a bar to reload into it;
+   a waiting worker takes over only on that tap. Registered after the page has loaded, and never in the self-test or
+   export modes, which run in throwaway browsers. Installed, the page asks once for storage that the browser won't clear
+   when space runs low (saved teams, lineups). */
+function installedApp() {
+  const root = document.documentElement, mq = matchMedia('(display-mode: standalone)');
+  const standalone = () => mq.matches || navigator.standalone === true;
+  mq.addEventListener?.('change', () => root.classList.toggle('standalone', standalone()));
+  const persistOnce = () => {
+    if (SELFTEST || !navigator.storage?.persist || store.get('persistAsked')) return;
+    store.set('persistAsked', 1);
+    navigator.storage.persisted().then(p => p || navigator.storage.persist()).catch(() => {});
+  };
+  if (standalone()) persistOnce();
+  addEventListener('appinstalled', persistOnce);
+  if (!('serviceWorker' in navigator) || SELFTEST || location.hash === '#export') return;
+  const sw = navigator.serviceWorker; let bar = null, tapped = false;
+  const offer = waiting => {
+    if (bar) { if (waiting) bar.waiting = waiting; return; }
+    bar = document.createElement('button'); bar.type = 'button'; bar.className = 'updbar'; bar.waiting = waiting || null;
+    bar.innerHTML = 'Update available · <b>tap to refresh</b>';
+    bar.addEventListener('click', () => { tapped = true; bar.disabled = true; if (bar.waiting) bar.waiting.postMessage({ type: 'skip-waiting' }); else location.reload(); });
+    document.body.appendChild(bar);
+  };
+  // the new worker took over after the tap: reload into it (not on the very first install, which takes over silently)
+  sw.addEventListener('controllerchange', () => { if (tapped) location.reload(); });
+  sw.addEventListener('message', e => { if (e.data?.type === 'shell-updated') offer(null); });
+  sw.startMessages?.();   // deliver anything the worker sent while the page was starting
+  const go = () => sw.register('sw.js').then(reg => {
+    if (reg.waiting && sw.controller) offer(reg.waiting);
+    reg.addEventListener('updatefound', () => { const w = reg.installing; w?.addEventListener('statechange', () => { if (w.state === 'installed' && sw.controller) offer(w); }); });
+    // an installed app can sit in the background for days: look for a new version each time it comes back
+    document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible') reg.update().catch(() => {}); });
+  }).catch(() => {});
+  if (document.readyState === 'complete') go(); else addEventListener('load', go, { once: true });
+}
 function applyCsv() {
   const lines = ($('#csv')?.value || '').split(/\r?\n/).map(l => l.trim()).filter(Boolean); let n = 0; const miss = [];
   for (const l of lines) {
@@ -4705,6 +4830,7 @@ render();
 if (!SELFTEST && location.hash !== '#export') loadPlayerIds();
 load();
 setTimeout(anStart, 1500);
+installedApp();
 if (anFlag === 'off' || anFlag === 'on') {
   toast(anFlag === 'off' ? 'Analytics is off in this browser.' : an.on ? 'Analytics is on again in this browser.' : 'Analytics stays off: this browser sends Do Not Track or Global Privacy Control.');
   try { const u = new URL(location.href); u.searchParams.delete('analytics'); history.replaceState(null, '', u.pathname + u.search + u.hash); } catch {}
