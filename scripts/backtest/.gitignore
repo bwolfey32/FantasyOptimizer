@@ -1,0 +1,4 @@
+# downloaded responses and generated fixtures/results: rebuilt by build_fixtures.py, replay.py and analyze.py
+cache/
+out/
+__pycache__/
