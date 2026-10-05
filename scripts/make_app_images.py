@@ -3,6 +3,9 @@ the iPhone launch screens (apple-touch-startup-image). Rerun after changing the 
 
 Usage: python3 scripts/make_app_images.py        (needs Pillow: pip install pillow)
 
+assets/apple-touch-icon.png    the iPhone home-screen icon: square and opaque, because iOS rounds the corners itself and
+                               shows any transparent corner as a white sliver. The gold frame runs to the edges and the
+                               green panel's corners follow iOS's curve, so once rounded the frame is an even border
 assets/icon-maskable-512.png   the icon's inner green panel on a full-bleed field of the same green, scaled so the BP
                                letters sit inside the central 80% circle every launcher keeps
 assets/splash/splash-WxH.png   brand green (#075b37, the manifest's background) with the icon centered, one per current
@@ -14,6 +17,8 @@ from PIL import Image, ImageDraw, ImageFilter
 ROOT = os.path.abspath(os.path.join(os.path.dirname(os.path.abspath(__file__)), ".."))
 ICON = os.path.join(ROOT, "assets", "icon-512.png")
 PANEL_GREEN = (2, 78, 48)          # the icon's own green, inside its gold frame
+FRAME_GOLD = (238, 194, 58)        # the icon's gold frame
+IOS_RADIUS = 0.2237                # iOS rounds a home-screen icon's corners at about 22.4% of its width
 BRAND_GREEN = (7, 91, 55)          # #075b37: theme_color and background_color in the manifest
 # [CSS width, CSS height, device pixel ratio, phones] in portrait
 SPLASH = [
@@ -48,6 +53,18 @@ def maskable(icon):
     return out
 
 
+def apple_touch(icon, size=180):
+    S = 1024                                   # drawn large, then scaled down once
+    border = round(0.045 * S)                  # the frame's width, as on icon-512.png
+    out = Image.new("RGB", (S, S), FRAME_GOLD)
+    panel = icon.crop((28, 28, 484, 484)).resize((S - 2 * border, S - 2 * border), Image.LANCZOS)
+    mask = Image.new("L", panel.size, 0)
+    # the panel's corners sit just inside iOS's own, so the gold band keeps its width around them
+    ImageDraw.Draw(mask).rounded_rectangle((0, 0, panel.size[0] - 1, panel.size[1] - 1), radius=round(IOS_RADIUS * S - border), fill=255)
+    out.paste(panel.convert("RGB"), (border, border), mask.filter(ImageFilter.GaussianBlur(1.5)))
+    return out.resize((size, size), Image.LANCZOS)
+
+
 def splash(icon, w, h):
     out = Image.new("RGB", (w, h), BRAND_GREEN)
     side = round(w * 0.38)
@@ -59,6 +76,7 @@ def splash(icon, w, h):
 def main():
     icon = Image.open(ICON).convert("RGBA")
     maskable(icon).save(os.path.join(ROOT, "assets", "icon-maskable-512.png"), optimize=True)
+    apple_touch(icon).save(os.path.join(ROOT, "assets", "apple-touch-icon.png"), optimize=True)
     os.makedirs(os.path.join(ROOT, "assets", "splash"), exist_ok=True)
     for cw, ch, dpr, _ in SPLASH:
         w, h = cw * dpr, ch * dpr

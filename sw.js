@@ -12,14 +12,14 @@
 
    VERSION names the caches: bump it whenever this file changes. The new worker installs, waits, and takes over when the
    person taps the update bar (the page posts "skip-waiting"); old caches are deleted when it activates. */
-const VERSION = 'v1';
+const VERSION = 'v2';
 const SHELL = `bp-shell-${VERSION}`, DATA = `bp-data-${VERSION}`;
 const DATA_WAIT = 5000;   // ms for a live data response to start before the cached copy answers
 const DATA_MAX = 150;     // cached data responses kept (oldest written dropped first)
 const SCOPE = self.registration.scope, APP = SCOPE, OFFLINE = new URL('offline.html', SCOPE).href;
 const WEATHER = ['clear-night', 'cloudy', 'fog', 'indoor', 'partly-cloudy-night', 'partly-cloudy', 'rain', 'sleet', 'snow', 'sunny', 'thunderstorm', 'wind'];
 const SHELL_URLS = [APP, OFFLINE, ...['privacy.html', 'terms.html', 'assets/site.webmanifest', 'assets/favicon.ico', 'assets/favicon-32.png',
-  'assets/apple-touch-icon.png', 'assets/icon-192.png', 'assets/icon-512.png', 'assets/icon-maskable-512.png',
+  'assets/apple-touch-icon.png?v=2', 'assets/icon-192.png', 'assets/icon-512.png', 'assets/icon-maskable-512.png',
   ...WEATHER.map(w => `assets/weather/${w}.png`)].map(u => new URL(u, SCOPE).href)];
 const FONT_CSS = 'https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600&family=Saira+Condensed:wght@500;600;700&display=swap';
 const FONT_HOSTS = new Set(['fonts.googleapis.com', 'fonts.gstatic.com']);
