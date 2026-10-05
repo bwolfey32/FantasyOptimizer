@@ -82,6 +82,37 @@ test('no waiver move adds a backup', () => {
   return !bad.length || 'adds ' + bad.map(m => name(m.f)).join(', ');
 });
 test('a starter keeps his usual blend (no role flag)', () => { setup(); const r = M(idOf('Jared Goff')); return !r.role || JSON.stringify(r.role); });
+/* Jauan Jennings, the reported miss: 11.6 a game for SF last season, 0 and 1.1 for MIN so far, still projected 10.9. The
+   fixture's last-season rows predate the team field, so the tests add it. */
+const withTeam = (id, T, fn) => { const D = ev('D'), keep = D.prevPPG[id].slice(); try { D.prevPPG[id][2] = T; return fn(); } finally { D.prevPPG[id] = keep; ev('computeAll')(); } };
+test('last season counts less as the season goes on, and less again after a team change', () => {
+  setup(); const D = ev('D'), pg = ev('priorGames'), id = idOf('Jauan Jennings'), keep = D.week, got = [];
+  try { for (const w of [1, 5, 8]) { D.week = w; got.push(pg(id)); } } finally { D.week = keep; }
+  const moved = withTeam(id, 'SF', () => pg(id)), stayed = withTeam(id, 'MIN', () => pg(id));
+  return JSON.stringify(got) === '[4,2,1]' && moved === 1.5 && stayed === 2.5 || `weeks 1/5/8 → ${got}, moved ${moved}, stayed ${stayed}`;
+});
+/* Justin Jefferson is listed Out in the fixture, which is why Sleeper projects Jennings that high; the slow-start tests
+   take him off the report so only Jennings' own games are in play. */
+const jjHealthy = fn => { const u = ev('D').U.get(idOf('Justin Jefferson')), keep = u.inj; try { u.inj = null; return fn(); } finally { u.inj = keep; } };
+test('a slow start on a new team: Jennings is not a bigger role, and the projection counts less', () => withTeam(idOf('Jauan Jennings'), 'SF', () => jjHealthy(() => {
+  setup(); const id = idOf('Jauan Jennings'), r = M(id), ros = ev('rosBase')(id);
+  return !r.role && r.doubt?.moved === 'MIN' && ros < 6 && r.mean < 7 || `role ${JSON.stringify(r.role)}, doubt ${JSON.stringify(r.doubt)}, rest of season ${ros.toFixed(1)}, this week ${r.mean.toFixed(1)}`;
+})));
+test('a slow-starting pickup is never the best waiver move, and the reason says why', () => withTeam(idOf('Jauan Jennings'), 'SF', () => jjHealthy(() => {
+  setup(); const id = idOf('Jauan Jennings'), W = ev('computeWaivers')();
+  if (W.best?.f === id) return 'Jennings is the best move';
+  const m = W.moves.find(x => x.f === id); return !m || /since joining MIN/.test(m.whyText) || 'reason: ' + m.whyText;
+})));
+test('a bigger role from a teammate\'s absence lasts until he is expected back', () => {
+  setup(); const D = ev('D'), id = idOf('Jauan Jennings'), r = M(id), b = ev('bumpOf')(id);
+  if (r.role?.kind !== 'expanded' || r.doubt) return `with Jefferson out: role ${JSON.stringify(r.role)}, doubt ${JSON.stringify(r.doubt)}`;
+  if (!b || b.mate.name !== 'Justin Jefferson') return 'no borrowed role: ' + JSON.stringify(b);
+  const weeks = [5, 6, 7, 8], v = ev('weekVals')(id, weeks), mm = ev('matchupMult'), T = D.U.get(id).team;
+  const bad = weeks.filter((w, i) => { const s = ev('schedOpp')(T, w); return w >= b.back && !s.bye && !near(v[i], b.own * mm('WR', s.opp, w, T), 1e-6); });
+  if (bad.length) return `weeks ${bad} still count the borrowed role (back week ${b.back}, own ${b.own.toFixed(1)}, values ${v.map(x => x.toFixed(1))})`;
+  const W = ev('computeWaivers')(); if (W.best?.f === id) return 'Jennings is the best move';
+  const m = W.moves.find(x => x.f === id); return !m || /Jefferson/.test(m.whyText) || 'reason: ' + m.whyText;
+});
 test('return weeks do not move with the week viewed', () => {
   setup(); const D = ev('D'), rw = ev('returnWeek'), ids = [idOf('Baker Mayfield'), idOf('Zach Charbonnet')];
   const at = w => { const keep = D.week; D.week = w; try { return ids.map(rw); } finally { D.week = keep; } };
@@ -192,7 +223,7 @@ test('matchup factors move only the scoring-average part, never Sleeper\'s proje
   return !bad.length || bad.slice(0, 5).map(r => `${r.u.name}: base ${r.base.toFixed(1)}, mean ${r.mean.toFixed(1)}`).join(', ');
 });
 test('a typical starter moves under 10% for the matchup', () => {
-  setup(); const big = modelled().filter(r => r.projPts > 8 && !r.role && Math.abs(r.eff) > 0.1);
+  setup(); const big = modelled().filter(r => r.projPts > 8 && !r.role && !r.doubt && Math.abs(r.eff) > 0.1);
   return !big.length || big.slice(0, 5).map(r => `${r.u.name} ${(r.eff * 100).toFixed(0)}%`).join(', ');
 });
 test('personal indoor/outdoor splits are context only', () => {
