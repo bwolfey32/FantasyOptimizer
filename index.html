@@ -521,6 +521,25 @@ tr.click:hover td { background: color-mix(in srgb, var(--accent) 5%, transparent
 .spark polyline { fill: none; stroke: var(--accent); stroke-width: 1.6; }
 .spark .area { fill: color-mix(in srgb, var(--accent) 14%, transparent); stroke: none; }
 .spark circle { fill: var(--accent); }
+/* Teams & schemes: the open team's row stands out and the rest step back */
+table.teams > tbody > tr.sel > td, table.teams > tbody > tr.seldet > td { background: color-mix(in srgb, var(--accent) 7%, var(--surface-2)); }
+table.teams > tbody > tr.sel > td { border-bottom-color: transparent; }
+table.teams > tbody > tr.sel > td:first-child, table.teams > tbody > tr.seldet > td:first-child { box-shadow: inset 3px 0 0 var(--accent); }
+table.teams > tbody > tr.sel > td:first-child strong { font-size: 15.5px; }
+table.teams > tbody > tr.sel .spark { display: none; }   /* the open table below draws the full trend */
+/* the open team's season table, with each stat's trend drawn behind its season cells */
+table.tdet { table-layout: fixed; min-width: 600px; }
+table.tdet th:first-child { width: 22%; }
+table.tdet td { padding-top: 12px; padding-bottom: 12px; border-bottom-color: color-mix(in srgb, var(--ink) 18%, var(--line)); }
+table.tdet th:not(:first-child), table.tdet td:not(:first-child) { text-align: center; }
+.tgc { position: relative; }
+.tgc > span { position: relative; text-shadow: 0 0 3px var(--surface), 0 0 6px var(--surface); }
+.tg { position: absolute; left: 0; top: 0; width: 100%; height: 100%; overflow: visible; pointer-events: none; }
+.tg polygon { fill: color-mix(in srgb, var(--accent) 9%, transparent); }
+.tg polyline { fill: none; stroke: color-mix(in srgb, var(--accent) 60%, transparent); stroke-width: 1.5; }
+.tgd { position: absolute; left: 50%; width: 7px; height: 7px; margin: -3.5px 0 0 -3.5px; border-radius: 50%; background: var(--accent); opacity: .8; }
+table.teams.has-sel > tbody > tr.click:not(.sel) .spark { opacity: .35; filter: grayscale(1); transition: opacity .15s, filter .15s; }
+table.teams.has-sel > tbody > tr.click:not(.sel):hover .spark { opacity: 1; filter: none; }
 .trend-up { color: var(--good); }
 .trend-down { color: var(--bad); }
 
@@ -4203,6 +4222,21 @@ function spark(vals, fmt) {
   const area = `${x(pts[0][0]).toFixed(1)},${H - P} ${line} ${x(last[0]).toFixed(1)},${H - P}`;
   return `<svg class="spark" width="${W}" height="${H}" viewBox="0 0 ${W} ${H}" role="img" aria-label="${esc(vals.map(fmt).join(', '))}"><polygon class="area" points="${area}"/><polyline points="${line}"/><circle cx="${x(last[0]).toFixed(1)}" cy="${y(last[1]).toFixed(1)}" r="2.6"/></svg>`;
 }
+/* The team table's trend behind the season cells: each cell draws its piece of one line, from the midpoint with the
+   season before, through its own value at the cell's center, to the midpoint with the season after. The season
+   columns share one width, so the pieces meet. The scale spans at least ±10% of the values, so a flat stat stays flat. */
+function trendCells(vals, f) {
+  const xs = vals.filter(ok); if (xs.length < 2) return vals.map(v => `<td>${f(v)}</td>`);
+  const lo = Math.min(...xs), hi = Math.max(...xs), mid = (lo + hi) / 2, r = Math.max(hi - lo, Math.abs(mid) * 0.2) || 1;
+  const Y = v => ok(v) ? 50 - (v - mid) / r * 64 : null, ys = vals.map(Y);
+  return vals.map((v, i) => {
+    const y = ys[i]; if (y == null) return `<td>${f(v)}</td>`;
+    const a = ys[i - 1] ?? null, b = ys[i + 1] ?? null, pts = [...(a != null ? [[0, (a + y) / 2]] : []), [50, y], ...(b != null ? [[100, (y + b) / 2]] : [])];
+    const ln = pts.map(([px, py]) => `${px},${py.toFixed(1)}`).join(' ');
+    const g = pts.length > 1 ? `<svg class="tg" viewBox="0 0 100 100" preserveAspectRatio="none" aria-hidden="true"><polygon points="${pts[0][0]},100 ${ln} ${pts[pts.length - 1][0]},100"/><polyline points="${ln}" vector-effect="non-scaling-stroke"/></svg>` : '';
+    return `<td class="tgc">${g}<i class="tgd" style="top:${y.toFixed(1)}%"></i><span>${f(v)}</span></td>`;
+  });
+}
 function viewTeams() {
   const seasons = [D.season - 3, D.season - 2, D.season - 1], P = D.prior, C = D.coaches;
   const series = (T, k) => [...seasons.map(s => P[s]?.[T]?.[k]), D.cur[T]?.[k]];
@@ -4212,19 +4246,19 @@ function viewTeams() {
     const d = ok(D.B[T].passRate) && ok(pr[2]) ? (D.B[T].passRate - pr[2]) * 100 : null;
     const hcNote = c?.name && norm(c.name) !== norm(s.hc) ? ` <span class="pill q" title="ESPN lists ${esc(c.name)}">ESPN: ${esc(c.name)}</span>` : '';
     const open = D.teamOpen === T;
-    return `<tr class="click" data-team="${T}"><td>${teamLogo(T)}<strong>${T}</strong> <span class="small muted">${esc(D.rec[T] || '')}</span></td><td class="l">${esc(s.hc)}${nb(s.hcNew || c?.isNew)}${hcNote}</td><td class="l">${esc(s.offCaller || s.oc)}${nb(s.offNew)}</td><td class="l">${esc(s.defCaller || s.dc)}${nb(s.defNew)}</td>
+    return `<tr class="click${open ? ' sel' : ''}" data-team="${T}" aria-expanded="${open}"><td>${teamLogo(T)}<strong>${T}</strong> <span class="small muted">${esc(D.rec[T] || '')}</span></td><td class="l">${esc(s.hc)}${nb(s.hcNew || c?.isNew)}${hcNote}</td><td class="l">${esc(s.offCaller || s.oc)}${nb(s.offNew)}</td><td class="l">${esc(s.defCaller || s.dc)}${nb(s.defNew)}</td>
       <td>${spark(pr, v => pct(v))} ${pct(D.B[T].passRate)}${ok(d) && Math.abs(d) >= 3 ? ` <span class="${d > 0 ? 'trend-up' : 'trend-down'}">${d > 0 ? '↑' : '↓'}${Math.abs(d).toFixed(0)}</span>` : ''}</td><td>${spark(pl, f1)} ${f1(D.B[T].plays)}</td><td>${spark(fw, f1)} ${f1(D.B[T].fpaWR)}</td></tr>
-      ${open ? `<tr><td colspan="7" style="text-align:left;white-space:normal;background:var(--surface-2)">${teamDetail(T, seasons)}</td></tr>` : ''}`;
+      ${open ? `<tr class="seldet"><td colspan="7" style="text-align:left;white-space:normal">${teamDetail(T, seasons)}</td></tr>` : ''}`;
   }).join('');
   return `<div class="section"><div class="row-head"><h2>Teams &amp; schemes</h2><span class="small muted">Sparklines run ${seasons[0]}–${D.season}. Tap a team for the season-by-season table.</span></div>
   <div class="banner info small">Coordinators and play-callers come from offseason hiring reports as of ${STAFF_AS_OF}. ${C ? 'Head coaches are checked against ESPN; a yellow tag means ESPN lists someone else.' : 'Checking head coaches against ESPN…'} Fix anything out of date in Settings.</div>
-  <div class="tscroll"><table><thead><tr><th class="l">Team</th><th class="l">Head coach</th><th class="l">Offense calls</th><th class="l">Defense calls</th><th>Pass rate</th><th>Plays/g</th><th>WR pts allowed</th></tr></thead><tbody>${rows}</tbody></table></div></div>`;
+  <div class="tscroll"><table class="teams${D.teamOpen ? ' has-sel' : ''}"><thead><tr><th class="l">Team</th><th class="l">Head coach</th><th class="l">Offense calls</th><th class="l">Defense calls</th><th>Pass rate</th><th>Plays/g</th><th>WR pts allowed</th></tr></thead><tbody>${rows}</tbody></table></div></div>`;
 }
 function teamDetail(T, seasons) {
   const s = staffOf(T), all = [...seasons.map(y => [y, D.prior[y]?.[T]]), [D.season + ' so far', D.cur[T]], [D.season + ' model', D.B[T]]];
   const ks = [['passRate', 'Pass rate', pct], ['plays', 'Plays/g', f1], ['ypc', 'Rush YPC', f1], ['sacksTaken', 'Sacks taken/g', f1], ['tsTE', 'TE target share', pct], ['tsRB', 'RB target share', pct], ['fpaQB', 'QB pts allowed', f1], ['fpaRB', 'RB pts allowed', f1], ['fpaWR', 'WR pts allowed', f1], ['fpaTE', 'TE pts allowed', f1], ['sacks', 'Sacks/g', f1], ['ptsA', 'Pts allowed/g', f1]];
   return `<div class="section" style="padding:6px 0"><div class="small"><strong>${TEAMS[T][1]}:</strong> HC ${esc(s.hc)} · OC ${esc(s.oc)} · DC ${esc(s.dc)}${s.note ? ' · ' + esc(s.note) : ''}. ${s.offNew ? `New offensive play-caller, so ${D.season - 1} offense counts as ${D.B[T].kO.toFixed(1)} games` : `Offense continuity: ${D.season - 1} counts as ${D.B[T].kO.toFixed(1)} games`}; ${s.defNew ? `new defensive play-caller (${D.B[T].kD.toFixed(1)} games)` : `defense continuity (${D.B[T].kD.toFixed(1)} games)`}.</div>
-  <div class="tscroll"><table><thead><tr><th class="l">Metric</th>${all.map(([y]) => `<th>${y}</th>`).join('')}</tr></thead><tbody>${ks.map(([k, l, f]) => `<tr><td>${l}</td>${all.map(([, p]) => `<td>${p ? f(p[k]) : '—'}</td>`).join('')}</tr>`).join('')}</tbody></table></div></div>`;
+  <div class="tscroll"><table class="tdet"><thead><tr><th class="l">Metric</th>${all.map(([y]) => `<th>${y}</th>`).join('')}</tr></thead><tbody>${ks.map(([k, l, f]) => `<tr><td>${l}</td>${trendCells(all.slice(0, -1).map(([, p]) => p?.[k]), f).join('')}${all.slice(-1).map(([, p]) => `<td>${p ? f(p[k]) : '—'}</td>`).join('')}</tr>`).join('')}</tbody></table></div></div>`;
 }
 function viewSettings() {
   const S = state.settings, sl = (id, label, val, min, max, step, fmt) => `<div class="slider"><label for="${id}">${label}</label><input type="range" id="${id}" data-set="${id}" min="${min}" max="${max}" step="${step}" value="${val}"><span class="num" id="${id}-v">${fmt(val)}</span></div>`;
@@ -4286,7 +4320,10 @@ document.addEventListener('click', e => {
   if (t.dataset.started) { toggleStarted(t.dataset.started); return; }
   if (t.dataset.strategy) { state.settings.strategy = t.dataset.strategy; track('strategy_changed', { strategy: t.dataset.strategy }); save(); render(); return; }
   if (t.dataset.sort) { const k = t.dataset.sort; D.defSort = D.defSort[0] === k ? [k, -D.defSort[1]] : [k, -1]; render(); return; }
-  if (t.dataset.team) { D.teamOpen = D.teamOpen === t.dataset.team ? null : t.dataset.team; render(); return; }
+  if (t.dataset.team) {   // opening a team closes the one before; keep the tapped row where it was on screen as that one folds away
+    const T = t.dataset.team, y0 = t.getBoundingClientRect().top; D.teamOpen = D.teamOpen === T ? null : T; render();
+    const r = $(`[data-team="${T}"]`); if (r) scrollBy(0, r.getBoundingClientRect().top - y0); return;
+  }
   const a = t.dataset.act;
   if (a === 'reload') { for (let s = 0; s < 4; s++) store.del('fo1:coach:' + ((D.season || 0) - s)); load({ manual: true }); }
   else if (a === 'sharemove') shareMove();
