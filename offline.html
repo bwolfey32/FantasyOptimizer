@@ -1,0 +1,33 @@
+<!doctype html>
+<html lang="en">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#075b37">
+<title>Benny’s Picks — Offline</title>
+<link rel="icon" href="assets/favicon-32.png" type="image/png" sizes="32x32">
+<!-- shown by sw.js when a page can't load: no network, and no copy saved on this device yet -->
+<style>
+  :root { color-scheme: light dark; }
+  html, body { height: 100%; margin: 0; overscroll-behavior: none; -webkit-tap-highlight-color: transparent; }
+  body { background: #075b37; color: #fff; font: 16px/1.5 "IBM Plex Sans", system-ui, -apple-system, "Segoe UI", sans-serif;
+    display: grid; place-items: center; text-align: center;
+    padding: calc(24px + env(safe-area-inset-top, 0px)) max(24px, env(safe-area-inset-right, 0px)) calc(24px + env(safe-area-inset-bottom, 0px)) max(24px, env(safe-area-inset-left, 0px)); box-sizing: border-box; }
+  main { max-width: 360px; display: flex; flex-direction: column; align-items: center; gap: 14px; }
+  img { width: 96px; height: 96px; }
+  h1 { margin: 6px 0 0; font: 700 28px/1.1 "Saira Condensed", "Arial Narrow", sans-serif; letter-spacing: .02em; text-transform: uppercase; }
+  p { margin: 0; color: rgba(255, 255, 255, .85); }
+  button { margin-top: 8px; padding: 12px 28px; border: 0; border-radius: 999px; background: #f2c23b; color: #13201a; font-family: inherit; font-size: 16px; font-weight: 600; line-height: 1;
+    cursor: pointer; -webkit-user-select: none; user-select: none; touch-action: manipulation; }
+  button:focus-visible { outline: 3px solid #fff; outline-offset: 3px; }
+</style>
+<main>
+  <img src="assets/icon-192.png" width="96" height="96" alt="Benny’s Picks">
+  <h1>You’re offline</h1>
+  <p>Benny’s Picks can’t reach the internet right now. Your teams are saved on this device and will be here when you’re back online.</p>
+  <button type="button" id="retry">Try again</button>
+</main>
+<script>
+  document.getElementById('retry').addEventListener('click', () => location.reload());
+  addEventListener('online', () => location.reload());
+</script>
+</html>

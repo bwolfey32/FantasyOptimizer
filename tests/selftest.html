@@ -441,6 +441,42 @@ test('dropping a widely rostered bench player says why he’s expendable', () =>
     return /Downs \(72% rostered\) isn’t in any of your next 4 lineups/.test(why) || why;
   } finally { if (was == null) ev('D').own.delete(d); else ev('D').own.set(d, was); }
 });
+/* ---------- this browser's storage (makeStore): prefix, migration, full and blocked storage ---------- */
+// a Storage stand-in: `quota` characters at most (QuotaExceededError past it), or `blocked` (every call throws, as in some private modes)
+function fakeStorage(seed = {}, { quota = Infinity, blocked = false } = {}) {
+  const m = new Map(Object.entries(seed)), used = () => [...m].reduce((s, [k, v]) => s + k.length + v.length, 0);
+  const no = () => { const e = new Error('blocked'); e.name = 'SecurityError'; throw e; };
+  return { get length() { return blocked ? no() : m.size; }, key: i => blocked ? no() : [...m.keys()][i] ?? null,
+    getItem: k => blocked ? no() : m.has(k) ? m.get(k) : null, removeItem: k => { if (blocked) no(); m.delete(k); },
+    setItem(k, v) { if (blocked) no(); v = String(v); const was = m.get(k); m.set(k, v);
+      if (used() > quota) { if (was == null) m.delete(k); else m.set(k, was); const e = new Error('full'); e.name = 'QuotaExceededError'; throw e; } }, _m: m };
+}
+test('storage: old fo1: keys move under bp:v1:, old data caches are dropped, the schema is recorded, other sites’ keys stay', () => {
+  const ls = fakeStorage({ 'fo1:state': '{"roster":["4046"]}', 'fo1:hist': '{"a":1}', 'fo1:wk2:2026:1': '[1,2,3]', 'sb-x-auth-token': 'tok', 'ph_x': '1' });
+  const s = ev('makeStore')(ls);
+  if (s.get('state')?.roster?.[0] !== '4046' || s.get('hist')?.a !== 1) return 'values not carried over: ' + JSON.stringify([...ls._m]);
+  if ([...ls._m.keys()].some(k => k.startsWith('fo1:')) || ls._m.has('bp:v1:wk2:2026:1')) return 'old keys left: ' + [...ls._m.keys()].join(', ');
+  if (ls.getItem('bp:schema') !== '1' || ls.getItem('sb-x-auth-token') !== 'tok' || ls.getItem('ph_x') !== '1') return 'schema or others: ' + JSON.stringify([...ls._m]);
+  ev('makeStore')(ls); return ls.getItem('bp:v1:state') === '{"roster":["4046"]}' || 'second run changed state';
+});
+test('storage: when it’s full, data caches go first; a write that still doesn’t fit is kept in memory for this visit', () => {
+  const ls = fakeStorage({ 'bp:schema': '1', 'bp:v1:wk2:2026:1': 'x'.repeat(400) }, { quota: 500 }), s = ev('makeStore')(ls);
+  if (s.set('state', { team: 'a'.repeat(100) }) !== true || ls._m.has('bp:v1:wk2:2026:1')) return 'cache not evicted to make room';
+  if (s.set('hist', 'h'.repeat(1000)) !== false) return 'an oversized write claimed it was saved';
+  if (s.get('hist') !== 'h'.repeat(1000)) return 'oversized write lost for this visit';
+  return s.get('state')?.team?.length === 100 || 'state lost';
+});
+test('storage: blocked or missing storage (private browsing) runs in memory, without errors', () => {
+  for (const ls of [fakeStorage({}, { blocked: true }), null]) {
+    const s = ev('makeStore')(ls); if (s.mode !== 'memory') return 'mode ' + s.mode;
+    s.set('state', { v: 1 }); if (s.get('state')?.v !== 1) return 'no in-memory copy'; s.del('state'); s.clear();
+    if (s.get('state', 'none') !== 'none') return 'delete failed';
+  }
+});
+test('storage: Reset clears this site’s keys, old and new, and leaves the sign-in session and others alone', () => {
+  const ls = fakeStorage({ 'bp:schema': '1', 'bp:v1:state': '{}', 'fo1:stray': '1', 'sb-x-auth-token': 'tok', 'ph_x': '1' }), s = ev('makeStore')(ls);
+  s.clear(); return [...ls._m.keys()].sort().join(',') === 'ph_x,sb-x-auth-token' || [...ls._m.keys()].join(',');
+});
 test('player pictures: headshot by ESPN id, team logo for a D/ST, silhouette when missing or broken', () => {
   setup(); const D = ev('D'), img = ev('getPlayerImage'), gibbs = D.U.get(idOf('Jahmyr Gibbs')), pit = D.U.get('PIT');
   const was = [D.pids, gibbs.espnId];
