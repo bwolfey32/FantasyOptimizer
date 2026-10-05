@@ -5,14 +5,15 @@ When someone shares from Benny's Picks, the link points here. Chat apps and soci
 | Shared from | Link | Card | Opens on the site |
 |---|---|---|---|
 | **Best move** (Waivers) | `/w?add=&drop=&wk=&g=&h=&o=&why=` | `/card` | `#waivers`, showing the shared move |
+| **Benny's Pick** (Start / Sit) | `/s?start=&sit=&wk=&e=&p=&f=&why=` | `/scard` | `#start-sit`, on the same two players |
 | **Power rankings** (a Sleeper team's grade card) | `/l?id=&wk=&r=` | `/lcard` | `#lineup`, ranking the league live; a visitor picks their own team from it to set up |
 
 A link can't put a made-up name on a card:
 
-- Players are looked up by id in the site's `share-players.json`, built daily by `scripts/player_ids.py`. Only the points, the ownership and the one-line reason come from a move's link.
+- Players are looked up by id in the site's `share-players.json`, built daily by `scripts/player_ids.py`. Only the numbers (points, ownership, the edge and the chance to outscore), the scoring and the one-line reason come from a move's or a pick's link.
 - A league's name and team names come from Sleeper's public API (by league id). Only each team's grade (roster id and score) comes from the link.
 
-`lib/card.mjs` holds what every card and link page share (fonts, the resvg engine, the panel and header, the link page itself). `lib/move.mjs` and `lib/league.mjs` read their links and draw their cards.
+`lib/card.mjs` holds what every card and link page share (fonts, the resvg engine, the panel and header, the link page itself). `lib/move.mjs`, `lib/call.mjs` and `lib/league.mjs` read their links and draw their cards.
 
 It runs on Netlify because GitHub Pages can't make a page per link, and Supabase's functions serve HTML only as plain text. Netlify's free plan allows commercial sites. Each card is drawn once, then served from Netlify's cache.
 

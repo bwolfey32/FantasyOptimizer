@@ -383,6 +383,7 @@ test('no team yet: Start/Sit opens on an example close call between two fantasy 
   st.tab = 'lineup'; setup();
   if (welcome.join() !== 'lineup,waivers,players') return 'welcome on: ' + welcome.join();
   if (!A || !B || A.pos !== B.pos || A.status !== 'ok' || B.status !== 'ok') return `example pair ${name(a)} / ${name(b)}`;
+  if (!/data-act="sharecall"/.test(html)) return 'Benny’s Pick has no Share button';
   return /example close call/.test(html) && /pick-name/.test(html) || 'no example call shown';
 });
 test('power rankings: every roster in a league graded, best first, and your own team’s grade is its Benny Grade', () => {

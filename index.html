@@ -626,6 +626,7 @@ table.teams.has-sel > tbody > tr.click:not(.sel):hover .spark { opacity: 1; filt
 .pick { padding: 18px 20px; display: flex; flex-direction: column; gap: 12px; border: 1.8px solid var(--accent); }
 .pick-head { display: flex; align-items: center; gap: 10px; }
 .pick-head .label { color: var(--gold); font-size: 13px; }
+.pick-head .pick-share { margin-left: auto; }
 .pick-main { display: flex; flex-wrap: wrap; align-items: flex-end; gap: 12px 32px; }
 .pick-who { flex: 1 1 260px; min-width: 0; }
 .pick-name { font-family: var(--font-display); font-weight: 700; font-size: 34px; line-height: 1.05; text-transform: uppercase; text-wrap: balance; }
@@ -3166,13 +3167,27 @@ function sharedMoveCard(R) {
    ownership and the one-line reason, for the card.
    Phones get the share sheet; elsewhere it's copied. The analytics event says only that a move was shared. */
 const SHARE_URL = 'https://share.bennyspicks.us/w';   // share/ on Netlify (share/README.md); '' shares plain bennyspicks.us links
-const SHARE_HOST = SHARE_URL ? new URL(SHARE_URL).origin : '';   // its other links: /l (power rankings)
+const SHARE_HOST = SHARE_URL ? new URL(SHARE_URL).origin : '';   // its other links: /s (Benny's Pick), /l (power rankings)
 // a line of text and a link: the share sheet on phones; elsewhere both are copied. done(how) records it.
 async function shareOut(text, url, done) {
   // desktop share sheets (Windows, macOS Chrome) mostly offer "Copy link", which drops the text: copy both there instead
   if (navigator.share && matchMedia('(pointer: coarse)').matches) { try { await navigator.share({ text, url }); done('share_sheet'); } catch {} return; }   // cancelled: nothing shared
   try { await navigator.clipboard.writeText(`${text} ${url}`); done('copy'); toast('Copied. Paste it anywhere.'); }
   catch { window.prompt('Copy this:', `${text} ${url}`); }
+}
+/* Share Benny's Pick on Start / Sit: who to start, the edge and the lean, and a link that opens Start / Sit on the same
+   two players (?start=&sit=), for anyone, team or not. Through share.bennyspicks.us the link also carries the edge, the
+   chance to outscore, the scoring and the first reason, for its card; the players are looked up by id there. */
+async function shareCall() {
+  const c = D.call, W = D.U.get(c?.w), L = D.U.get(c?.l); if (!W || !L) return;
+  const text = `Benny’s Pick: start ${W.name} over ${L.name} in week ${D.week} (${c.call.toLowerCase()}, ${c.edge >= 0.05 ? '+' : ''}${f1(c.edge)} projected pts, ${fmtName()}).`;
+  let url = `https://bennyspicks.us/?utm_source=share&utm_medium=start_sit&${new URLSearchParams({ start: c.w, sit: c.l })}#start-sit`;
+  if (SHARE_HOST) {
+    const q = new URLSearchParams({ start: c.w, sit: c.l, wk: D.week, e: f1(Math.max(0, c.edge)), p: Math.round(c.pw * 100), f: state.scoring });
+    if (c.why) q.set('why', c.why.slice(0, 160));
+    url = `${SHARE_HOST}/s?${q}`;
+  }
+  await shareOut(text, url, how => track('result_shared', { kind: 'start_sit', how, pos: W.pos, lean: c.call }));
 }
 async function shareMove() {
   const R = D.wCache, m = R?.best; if (!m) return;
@@ -4543,7 +4558,8 @@ function viewCompare() {
     // the lean and the point gap lead; the model's percentage is small print until it has been checked against results
     const call = pw < 0.55 ? 'Toss-up' : pw < 0.65 ? 'Slight lean' : pw < 0.8 ? 'Clear lean' : 'Strong lean';
     const why = pickReasons(w, l), gnote = gradeNote(w, l);
-    verdict = `<div class="card pick"><div class="pick-head"><span class="label">Benny’s Pick</span><span class="pill ${pw < 0.55 ? 'm' : 'n'}">${call}</span></div>
+    D.call = { w: w.id, l: l.id, edge, pw, call, why: why[0] || '' };   // what Share sends (shareCall)
+    verdict = `<div class="card pick"><div class="pick-head"><span class="label">Benny’s Pick</span><span class="pill ${pw < 0.55 ? 'm' : 'n'}">${call}</span><button type="button" class="btn sm pick-share" data-act="sharecall">Share</button></div>
       <div class="pick-main"><div class="pick-who">${playerIdentity(w.u, { size: 'lg', name: `Start ${esc(w.u.name)}`, nameCls: 'pick-name', subCls: 'small muted', line: `over ${esc(l.u.name)} · ${posLabel(w.pos)} · ${w.T || 'FA'} · matchup grades ${w.grade} vs ${l.grade}` })}</div>
         <div class="pick-stat"><span class="num">${edge >= 0.05 ? '+' : ''}${f1(edge)}</span><span class="small muted">projected pts edge</span></div></div>
       <div class="meter" aria-label="${esc(A.u.name)} ${pct(pA)}, ${esc(Bp.u.name)} ${pct(1 - pA)}"><span style="width:${pA * 100}%"></span></div>
@@ -4561,7 +4577,9 @@ function viewCompare() {
     ${why.length ? `<ul class="reasons">${why.map(x => `<li class="${x.up ? 'up' : 'down'}"><span class="rv">${spct(x.pct)}</span> ${esc(x.text)}</li>`).join('')}</ul>` : ''}
     ${isPro() ? `<details class="more"><summary>All factors</summary>${factorList(r)}${r.scheme ? `<div class="scheme"><strong>Scheme:</strong> ${esc(r.scheme)}</div>` : ''}</details>
     <details class="more"><summary>Coaching and scheme matchup</summary>${schemeBlock(r)}</details>` : lockLine('Every matchup factor and the coaching matchup')}</div>`; };
-  return `<div class="section">${decBar}<div class="cmp"><div class="field"><label class="label" for="cmp0">Player A</label>${pick(0, A)}</div><div class="field"><label class="label" for="cmp1">Player B</label>${pick(1, Bp)}</div></div>${verdict}<h2>Side by side</h2><div class="cmp">${col(A)}${col(Bp)}</div></div>`;
+  const sharedNote = D.sharedCall && A && Bp && state.compare[0] === a && state.compare[1] === b
+    ? `<div class="banner info small exban"><span><strong>A shared start/sit call.</strong> Benny’s numbers here are live and in ${esc(fmtName(true))} scoring, so they can differ from when it was shared.</span><button type="button" class="btn sm" data-act="sharedcallx">Dismiss</button></div>` : '';
+  return `<div class="section">${sharedNote}${decBar}<div class="cmp"><div class="field"><label class="label" for="cmp0">Player A</label>${pick(0, A)}</div><div class="field"><label class="label" for="cmp1">Player B</label>${pick(1, Bp)}</div></div>${verdict}<h2>Side by side</h2><div class="cmp">${col(A)}${col(Bp)}</div></div>`;
 }
 /* Two or three plain reasons for a pick: the projection gap, then the biggest matchup factors in the winner's favor
    or against the other player, an injury tag, or a safer floor. */
@@ -4782,6 +4800,8 @@ document.addEventListener('click', e => {
   const a = t.dataset.act;
   if (a === 'reload') { for (let s = 0; s < 4; s++) store.del('coach:' + ((D.season || 0) - s)); load({ manual: true }); }
   else if (a === 'sharemove') shareMove();
+  else if (a === 'sharecall') shareCall();
+  else if (a === 'sharedcallx') { D.sharedCall = false; render(); }
   else if (a === 'sharedx') { D.shared = null; render(); }
   else if (a === 'league') toggleLeague();
   else if (a === 'leagueretry') { const lid = state.sleeper?.leagueId; if (lid) { delete D.lg[lid]; render(); fetchLeague(lid, true).then(render); } }
@@ -5021,6 +5041,13 @@ acctBoot();
       track('shared_move_opened', { has_team: !needsTeam() });
     }
     for (const k of ['add', 'drop', 'wk', 'g', 'h']) q.delete(k);
+    try { history.replaceState(null, '', u.pathname + u.search + u.hash); } catch {}
+  } }
+// a shared start/sit call (shareCall's link): open Start / Sit on those two players, team or not
+{ const u = new URL(location.href), q = u.searchParams, idOk = s => /^[\w-]{1,12}$/.test(s || '');
+  if (q.has('start') || q.has('sit')) {
+    if (idOk(q.get('start')) && idOk(q.get('sit'))) { state.compare = [q.get('start'), q.get('sit')]; D.sharedCall = true; track('shared_call_opened', { has_team: !needsTeam() }); }
+    q.delete('start'); q.delete('sit');
     try { history.replaceState(null, '', u.pathname + u.search + u.hash); } catch {}
   } }
 // a shared league's power rankings (shareLeague's link): open the rankings for a team already linked to that league;
