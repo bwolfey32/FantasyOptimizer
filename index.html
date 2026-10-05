@@ -538,6 +538,10 @@ tr.click:hover td { background: color-mix(in srgb, var(--accent) 5%, transparent
 .wb-gain { display: flex; flex-direction: column; align-items: flex-end; text-align: right; margin-left: auto; }
 .wb-gain .num { font-size: 44px; line-height: 1; color: var(--good); }
 .wb-none { font-size: 15px; }
+/* a move someone shared with you: the Best move card's layout, quieter, so it doesn't compete with your own */
+.wshared { padding: 16px 20px; display: flex; flex-direction: column; gap: 10px; border: 1.5px dashed var(--line); }
+.wshared .label { color: var(--muted); font-size: 13px; }
+.wshared .wb-name { font-size: 24px; } .wshared .wb-gain .num { font-size: 34px; }
 @media (max-width: 780px) { .wb-gain { align-items: flex-start; text-align: left; margin-left: 0; } .wordmark h1 { font-size: 26px; } .pick-name { font-size: 28px; } }
 /* Benny's Pick */
 .pick { padding: 18px 20px; display: flex; flex-direction: column; gap: 12px; border: 1.8px solid var(--accent); }
@@ -2811,13 +2815,39 @@ function bestMoveCard(m, weeks, H, ownTxt, near) {
       <div class="wb-gain"><span class="num">+${f1(m.hz)}</span><span class="small muted">expected lineup pts over the next ${m.H} week${m.H > 1 ? 's' : ''}</span></div></div>
     ${m.whyText ? `<div class="small">${esc(m.whyText)}.</div>` : ''}</div>`;
 }
-/* Share the best move as a short line of text plus a link that opens Waivers (for a new visitor, the waivers welcome).
+/* Someone opened a shared move (?add=&drop=&wk=&g=&h=, read at startup): show it as a card where the link lands, the
+   welcome for a new visitor or Waivers for someone with a team, where R (their own waiver results) says what the same
+   pickup is worth to them. Nothing until the player data has loaded and knows the added player. */
+function sharedMoveCard(R) {
+  const S = D.shared; if (!S || !D.U.has(S.add)) return '';
+  const side = (kind, id) => { const u = D.U.get(id); return `<div class="wb-side"><span class="wb-kind ${kind}">${kind === 'add' ? 'Add' : 'Drop'}</span><span class="wb-name">${esc(u.name)}</span><span class="small muted">${u.pos === 'DEF' ? 'D/ST' : u.pos} · ${u.team || 'FA'}</span></div>`; };
+  const drop = S.drop && D.U.has(S.drop) ? side('drop', S.drop) : `<div class="wb-side"><span class="wb-kind keep">No drop</span><span class="small muted">They had an open roster spot</span></div>`;
+  const gain = S.g > 0 && S.h > 0 ? `<div class="wb-gain"><span class="num">+${f1(S.g)}</span><span class="small muted">expected lineup pts over the next ${S.h} week${S.h > 1 ? 's' : ''}, for their roster</span></div>` : '';
+  let mine = '';
+  if (R) {
+    const name = esc(D.U.get(S.add).name), m = R.moves.find(x => x.f === S.add);
+    mine = state.roster.includes(S.add) ? `You already have ${name}.`
+      : m && !m.marginal ? `For your team: +${f1(m.hz)} over the next ${m.H} week${m.H > 1 ? 's' : ''}${m.d ? `, dropping ${esc(D.U.get(m.d).name)}` : ''}.`
+      : m ? `For your team: +${f1(m.hz)} over the next ${m.H} week${m.H > 1 ? 's' : ''}, not enough to be worth a move.`
+      : !R.pool.includes(S.add) ? `${name} isn’t among your free agents.`
+      : `${name} wouldn’t add points to your lineup. Your best move is below.`;
+  }
+  const old = S.wk && D.week && S.wk !== D.week ? `Shared in week ${S.wk}; the numbers have changed since.` : '';
+  return `<div class="card wshared"><div class="row-head"><span class="label">Shared pick${S.wk ? ` · Week ${S.wk}` : ''}</span><button type="button" class="btn sm" data-act="sharedx">Dismiss</button></div>
+    <div class="wb-row">${side('add', S.add)}${drop}${gain}</div>
+    ${mine || old ? `<div class="small">${[mine, old].filter(Boolean).join(' ')}</div>` : ''}</div>`;
+}
+/* Share the best move as a short line of text plus a link that carries the move (add, drop, week, gain) and opens
+   Waivers, where sharedMoveCard shows it (for a new visitor, on the waivers welcome).
    Phones get the share sheet; elsewhere it's copied. The analytics event says only that a move was shared. */
 async function shareMove() {
   const R = D.wCache, m = R?.best; if (!m) return;
   const nm = id => D.U.get(id)?.name || id, H = m.H;
   const text = `Benny’s Picks: add ${nm(m.f)}${m.d ? `, drop ${nm(m.d)}` : ''}, +${f1(m.hz)} expected lineup points over the next ${H} week${H === 1 ? '' : 's'} (week ${D.week}).`;
-  const url = 'https://bennyspicks.us/?utm_source=share&utm_medium=waiver_move#waivers';
+  const q = new URLSearchParams({ utm_source: 'share', utm_medium: 'waiver_move', add: m.f });
+  if (m.d) q.set('drop', m.d);
+  q.set('wk', D.week); q.set('g', f1(m.hz)); q.set('h', H);
+  const url = `https://bennyspicks.us/?${q}#waivers`;
   const done = how => track('result_shared', { kind: 'waiver_move', how, gain: Math.round(m.hz), pos: D.U.get(m.f)?.pos });
   // desktop share sheets (Windows, macOS Chrome) mostly offer "Copy link", which drops the text: copy both there instead
   if (navigator.share && matchMedia('(pointer: coarse)').matches) { try { await navigator.share({ text, url }); done('share_sheet'); } catch {} return; }   // cancelled: nothing shared
@@ -2940,6 +2970,7 @@ function waiversBody() {
     ${nTaken ? `<button type="button" class="btn sm" data-act="untake">Show ${nTaken} hidden</button>` : ''}</div>
   <div class="toolbar"><span class="small muted">Rank by</span><div class="seg" role="group" aria-label="Rank moves by"><button type="button" data-wrank="window" aria-pressed="${!longTerm}">${hLab[0].toUpperCase() + hLab.slice(1)} only</button><button type="button" data-wrank="blend" aria-pressed="${longTerm}">+ long-term value</button></div></div>
   ${warn.map(w => `<div class="banner small">${esc(w)}</div>`).join('')}
+  ${sharedMoveCard(R)}
   ${bestMoveCard(R.best, weeks, H, ownTxt, moves.find(m => m.marginal))}
   ${weakSpotCard(pl, weeks, H)}
   <h3>Your team, ${hLab}</h3>
@@ -3507,7 +3538,8 @@ function actWelcomeSignIn() { D.wSignin = !D.wSignin; acct.msg = null; if (D.wSi
 const WELCOME_HERO = {
   lineup: ['Your best lineup, every week', 'Add your team to see recommended starters and waiver pickups.'],
   waivers: ['Your best waiver pickup, for your roster', 'Bring in your team and Benny ranks free agents by how many points they’d add to your lineup, for your scoring and your roster’s needs. With a Sleeper league, it uses your league’s real free agents.'],
-  compare: ['Start or sit? Benny’s Pick for your players', 'Bring in your team and Benny makes your close start/sit calls: the chance each player outscores the other, and why.'],
+  shared: ['That pick was for their roster. Find yours.', 'Bring in your team and Benny ranks free agents by how many points they’d add to your lineup, for your scoring and your roster’s needs. With a Sleeper league, it uses your league’s real free agents.'],
+  compare: ['Start or sit? Benny’s Pick for your players','Bring in your team and Benny makes your close start/sit calls: the chance each player outscores the other, and why.'],
 };
 const INTENT_TABS = new Set(['waivers', 'compare', 'players', 'defenses', 'teams', 'weather', 'settings']);
 function goIntended(opts) { const t = D.intent && HASH[D.intent] ? D.intent : 'lineup'; D.intent = null; go(t, opts); }
@@ -3538,10 +3570,12 @@ function viewWelcome() {
   else body = `<h2 class="wl-q">How would you like to add your team?</h2>
     <div class="wl-methods">${WELCOME_METHODS.map(([k, t, d]) => `<button type="button" class="wl-method wl-${k}" data-act="flow" data-method="${k}" data-dest="replace"><span class="wl-ico">${WL_LOGOS[k] ? `<img src="${WL_LOGOS[k]}" alt="" width="32" height="32">` : WL_ICONS[k]}</span><span class="wl-mt"><strong>${t}</strong><span class="small muted">${d}</span></span><span class="wl-mark">${WL_ICONS[k]}</span><span class="wl-go">${WL_GO}</span></button>`).join('')}</div>
     <div class="wl-alt"><button type="button" class="linkbtn small" data-act="flow" data-method="restore" data-dest="replace">Restore a saved team</button></div>`;
+  // arrived from a shared move: show it, and the headline turns to their own roster
+  const shared = D.flow ? '' : sharedMoveCard(), hero = (shared ? WELCOME_HERO.shared : WELCOME_HERO[D.intent]) || WELCOME_HERO.lineup;
   return `<div class="wl">
-    <div class="wl-top">${top}</div>${signIn}
-    <div class="wl-hero"><h2>${(WELCOME_HERO[D.intent] || WELCOME_HERO.lineup)[0]}</h2>
-      <p>${(WELCOME_HERO[D.intent] || WELCOME_HERO.lineup)[1]}</p></div>
+    <div class="wl-top">${top}</div>${signIn}${shared}
+    <div class="wl-hero"><h2>${hero[0]}</h2>
+      <p>${hero[1]}</p></div>
     ${body}
     <div class="small muted wl-legal">By using Benny’s Picks you agree to the <a href="terms.html">Terms</a>. <a href="privacy.html">Privacy</a>.${Object.keys(WL_LOGOS).length ? ' Not affiliated with Sleeper or ESPN.' : ''}</div>
   </div>`;
@@ -4181,6 +4215,7 @@ document.addEventListener('click', e => {
   const a = t.dataset.act;
   if (a === 'reload') { for (let s = 0; s < 4; s++) store.del('fo1:coach:' + ((D.season || 0) - s)); load({ manual: true }); }
   else if (a === 'sharemove') shareMove();
+  else if (a === 'sharedx') { D.shared = null; render(); }
   else if (a === 'defcols') { D.colsOpen = !D.colsOpen; render(); }
   else if (a === 'defcolsreset') { store.del('fo1:defcols'); render(); }
   else if (a === 'loadleague') loadLeague();
@@ -4365,6 +4400,18 @@ function applyCsv() {
 }
 
 acctBoot();
+// a shared move (shareMove's link): keep it for sharedMoveCard and take it out of the address, so a reload or bookmark
+// doesn't bring it back. The utm_ params stay for the analytics pageview.
+{ const u = new URL(location.href), q = u.searchParams, add = q.get('add'), idOk = s => /^[\w-]{1,12}$/.test(s || '');
+  if (q.has('add')) {
+    if (idOk(add)) {
+      const num = k => { const n = parseFloat(q.get(k)); return Number.isFinite(n) ? n : null; };
+      D.shared = { add, drop: idOk(q.get('drop')) ? q.get('drop') : null, wk: num('wk'), g: num('g'), h: num('h') };
+      track('shared_move_opened', { has_team: !needsTeam() });
+    }
+    for (const k of ['add', 'drop', 'wk', 'g', 'h']) q.delete(k);
+    try { history.replaceState(null, '', u.pathname + u.search + u.hash); } catch {}
+  } }
 { const tab = TAB_OF[location.hash.slice(1)]; if (tab && needsTeam() && INTENT_TABS.has(tab)) D.intent = tab; if (tab) state.tab = tab; else if (location.hash !== '#export' && !SELFTEST && HASH[state.tab]) { try { history.replaceState(null, '', '#' + HASH[state.tab]); } catch {} } }
 render();
 load();
