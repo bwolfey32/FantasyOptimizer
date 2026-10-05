@@ -1,0 +1,9 @@
+# Benny's Picks: everything public may be crawled, except the test, tool and data-script pages
+User-agent: *
+Disallow: /tests/
+Disallow: /scripts/
+Disallow: /supabase/
+Disallow: /share/
+Disallow: /forecasts/
+
+Sitemap: https://bennyspicks.us/sitemap.xml

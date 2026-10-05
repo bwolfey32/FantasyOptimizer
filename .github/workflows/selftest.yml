@@ -39,8 +39,12 @@ jobs:
       - name: Audit the advice on the current snapshot
         run: python3 scripts/audit.py --fixture snapshot.json --leagues 3 --summary "$GITHUB_STEP_SUMMARY" --report-only
 
+      # the weekly pages build from the frozen week (written to a scratch folder: the real ones come from the data refresh)
+      - name: Build the weekly pages from the frozen week
+        run: python3 scripts/weekly_pages.py --fixture tests/fixture-2026w4.json --out "$RUNNER_TEMP/pages"
+
       - name: Check the data scripts
         run: |
-          python3 -m py_compile scripts/extract_snapshot.py scripts/calibrate.py scripts/player_ids.py scripts/audit.py
+          python3 -m py_compile scripts/extract_snapshot.py scripts/calibrate.py scripts/player_ids.py scripts/audit.py scripts/weekly_pages.py
           node --check sw.js
           python3 scripts/calibrate.py --selfcheck

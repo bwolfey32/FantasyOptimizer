@@ -1,0 +1,108 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="robots" content="noindex">
+<title>Benny's Picks weekly pages: data</title>
+</head>
+<body>
+<p>Loads the site on a data bundle (<code>?fixture=</code>, default <code>snapshot.json</code>) and collects the numbers
+for the weekly pages (waiver wire, rankings, defenses, weather) from the site's own model, as JSON in the block below.
+<code>scripts/weekly_pages.py</code> runs it in headless Chrome and writes the pages.</p>
+<pre id="pages-out">running…</pre>
+<iframe id="app" title="App" style="width:1000px;height:600px"></iframe>
+<script>
+const q = new URLSearchParams(location.search), fixture = q.get('fixture') || 'snapshot.json';
+const frame = document.getElementById('app'), out = document.getElementById('pages-out');
+frame.src = `../index.html?fixture=${encodeURIComponent(fixture)}#selftest`;
+let W;
+const ev = s => W.eval(s);                       // the app's top-level let/const aren't on window, so reach them by eval
+const r1 = x => x == null || !isFinite(x) ? null : Math.round(x * 10) / 10;
+
+// How many players each page lists, by position
+const RANK_N = { QB: 32, RB: 48, WR: 60, TE: 28, K: 24, DEF: 24 };
+const WAIVER_N = { QB: 5, RB: 8, WR: 8, TE: 5, K: 4, DEF: 5 };
+
+function collect() {
+  const D = ev('D'), st = ev('state'), DEF = ev('DEFAULT_STATE');
+  /* A team-less view: no roster and the default league (12 teams, PPR, ESPN's standard lineup), so free agents are
+     players under 50% rostered across ESPN leagues, over the next 4 weeks. */
+  Object.assign(st, { roster: [], slots: Object.assign({}, DEF.slots), scoring: 'ppr', tePrem: 0, sleeper: null, overrides: {}, returnWeek: {} });
+  st.waivers = JSON.parse(JSON.stringify(DEF.waivers));
+  D.wCache = null; ev('syncScoring')(); ev('computeAll')();
+  const M = D.M, TEAMS = ev('TEAMS'), name = id => D.U.get(id)?.name || id;
+  const roleText = ev('roleText'), doubtText = ev('doubtText'), bumpOf = ev('bumpOf'), fillInFor = ev('fillInFor'), schedOpp = ev('schedOpp'), matchupMult = ev('matchupMult');
+  const rosBase = ev('rosBase'), siteOf = ev('siteOf'), wxText = ev('wxText'), wxRough = ev('wxRough'), covered = ev('covered');
+  const opp = r => r.T && D.tg[r.T] ? { opp: D.tg[r.T].opp, home: !!D.tg[r.T].home } : { opp: null, home: null };
+  const player = r => ({ id: r.id, name: r.pos === 'DEF' ? `${TEAMS[r.T]?.[1] || r.T} D/ST` : r.u.name, pos: r.pos, team: r.T || 'FA', ...opp(r),
+    proj: r1(r.mean), lo: r1(r.floor), hi: r1(r.ceil), grade: r.grade, inj: r.inj || '', played: !!r.locked,
+    note: r.role ? roleText(r.role, true) : r.doubt ? doubtText(r.doubt, true) : '' });
+
+  // rankings: this week's projections by position, players who'll play
+  const rankings = {};
+  for (const P of Object.keys(RANK_N)) rankings[P] = Object.values(M).filter(r => r.pos === P && r.status === 'ok' && r.role?.kind !== 'backup' && r.mean > 0)
+    .sort((a, b) => b.mean - a.mean).slice(0, RANK_N[P]).map(player);
+
+  // waiver wire: the best free agents at each position over the window
+  const R = ev('computeWaivers')(), { weeks, H } = R;
+  const own = id => D.own.has(id) ? r1(D.own.get(id)) : 0;
+  const notes = id => {
+    const r = M[id], u = D.U.get(id), out = [], bp = bumpOf(id), fi = !bp && fillInFor(id);
+    if (/^(out|doubtful|questionable)/i.test(u.inj || '')) out.push(`${u.inj.toLowerCase()} now: check the news first`);
+    if (bp) out.push(`bigger role while ${bp.mate.name} is out (${bp.mate.inj}), expected back week ${bp.back}`);
+    else if (fi) out.push(`filling in for ${fi.name} (${fi.inj})`);
+    else if (r.role) out.push(roleText(r.role, true).toLowerCase());
+    if (r.doubt) out.push(`slow start: ${r1(r.doubt.scored)} points a game so far`);
+    const ms = weeks.slice(0, H).map(w => { const s = schedOpp(u.team, w); return s.opp ? matchupMult(u.pos, s.opp, w, u.team) : null; }).filter(x => x != null);
+    const sm = ms.length ? ms.reduce((a, b) => a + b, 0) / ms.length : null;
+    if (sm && sm >= 1.04) out.push('soft schedule ahead'); else if (sm && sm <= 0.96) out.push('tough schedule ahead');
+    const byes = weeks.slice(0, H).filter(w => schedOpp(u.team, w).bye); if (byes.length) out.push(`bye in week ${byes.join(', ')}`);
+    return out;
+  };
+  const waivers = {};
+  for (const P of Object.keys(WAIVER_N)) waivers[P] = R.byH.filter(id => D.U.get(id).pos === P).slice(0, WAIVER_N[P]).map(id => {
+    const u = D.U.get(id);
+    return { id, name: P === 'DEF' ? `${TEAMS[u.team]?.[1] || u.team} D/ST` : u.name, pos: P, team: u.team || 'FA', own: own(id), ppg: r1(rosBase(id)), next: r1(R.sumH(id)),
+      sched: weeks.slice(0, H).map(w => { const s = schedOpp(u.team, w); return { w, opp: s.opp || null, home: s.home ?? null, bye: !!s.bye, m: s.opp ? r1((matchupMult(P, s.opp, w, u.team) - 1) * 100) : null }; }),
+      notes: notes(id) };
+  });
+
+  // defenses: D/STs to play this week, and what each defense allows by position (per game; rank 1 = allows the most)
+  const dst = Object.values(M).filter(r => r.pos === 'DEF' && r.status === 'ok').sort((a, b) => b.mean - a.mean).map(player);
+  const ABBR = ev('ABBR'), allowed = ABBR.map(T => {
+    const b = D.B[T] || {}, rk = k => D.ranks[k]?.[T] ?? null;
+    return { team: T, nick: TEAMS[T][1], rec: D.rec[T] || '', opp: D.tg[T]?.opp || null, home: D.tg[T] ? !!D.tg[T].home : null,
+      QB: r1(b.fpaQB), RB: r1(b.fpaRB), WR: r1(b.fpaWR), TE: r1(b.fpaTE), K: r1(b.fpaK), sacks: r1(b.sacks), ptsA: r1(b.ptsA),
+      rank: { QB: rk('fpaQB'), RB: rk('fpaRB'), WR: rk('fpaWR'), TE: rk('fpaTE'), K: rk('fpaK') } };
+  });
+
+  // weather: every game, its stadium and the forecast at open-air ones, with the fantasy players it moves most
+  const games = [...D.games].sort((a, b) => (a.date || '').localeCompare(b.date || '') || a.home.localeCompare(b.home)).map(g => {
+    const s = siteOf(g), w = D.wx?.[g.id], cov = covered(s);
+    const moved = Object.values(M).filter(r => (r.T === g.home || r.T === g.away) && r.status === 'ok' && r.mean >= 6)
+      .map(r => ({ r, f: r.factors.find(x => x.key === 'wx') })).filter(x => x.f && Math.abs(x.f.pct) >= 0.02)
+      .sort((a, b) => Math.abs(b.f.pct) - Math.abs(a.f.pct)).slice(0, 4).map(x => ({ name: x.r.pos === 'DEF' ? `${TEAMS[x.r.T]?.[1]} D/ST` : x.r.u.name, pos: x.r.pos, pct: Math.round(x.f.pct * 100) }));
+    return { away: g.away, home: g.home, date: g.date || null, state: g.state || 'pre', stadium: s?.name || null, city: s?.neutral ? s.city || null : null,
+      roof: !s ? null : s.roof, covered: cov, forecast: !cov && w ? wxText(w) : null, rough: !cov && w ? wxRough(w) : false, moved };
+  });
+
+  return { season: D.season, week: D.week, waiverWeeks: [weeks[0], weeks[H - 1]], createdAt: D.loadedAt?.toISOString() || null,
+    leagueSize: st.waivers.teams, ownMax: st.waivers.ownMax, rankings, waivers, dst, allowed, games };
+}
+
+frame.addEventListener('load', () => {
+  W = frame.contentWindow;
+  const started = Date.now();
+  (function wait() {
+    if (W.__ready) {
+      try { out.textContent = JSON.stringify(collect()); }
+      catch (e) { out.textContent = 'ERROR ' + (e && e.stack || e); }
+      return;
+    }
+    if (Date.now() - started > 90000) { out.textContent = 'ERROR the app never finished loading'; return; }
+    setTimeout(wait, 100);
+  })();
+});
+</script>
+</body>
+</html>
