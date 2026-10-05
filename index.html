@@ -2686,10 +2686,10 @@ function computeWaivers() {
     for (const d of drops) {
       if (d && sumAll(d) > 1.6 * sumAll(f) + 5) continue;
       const nr = roster.filter(x => x !== d).concat(f);
-      let hz = 0, near = 0, later = 0, depLost = 0; const starts = [], lost = [];
+      let hz = 0, near = 0, later = 0, depLost = 0; const starts = [];
       for (let wi = 0; wi < weeks.length; wi++) {
         const L2 = bestLineup(nr, wi, V, slotsAt(wi), RW[wi]), diff = (L2.total + L2.depth) - (base[wi].total + base[wi].depth);
-        if (wi < h) { hz += diff; if (wi < 2) near += diff; depLost += base[wi].depth - L2.depth; const st = L2.starters.find(s => s[1] === f); if (st) starts.push([weeks[wi], st[0].label || st[0].k]); if (d && base[wi].starters.some(s => s[1] === d)) lost.push(weeks[wi]); }
+        if (wi < h) { hz += diff; if (wi < 2) near += diff; depLost += base[wi].depth - L2.depth; const st = L2.starters.find(s => s[1] === f); if (st) starts.push([weeks[wi], st[0].label || st[0].k]); }
         else later += diff;
       }
       // how much the move raises your usual lineup, per week
@@ -2698,7 +2698,7 @@ function computeWaivers() {
       // so an upgrade at a weak spot beats a one-week patch. "window": later weeks just break ties; "blend" adds a third
       // of the value after the window, but only for a move that doesn't cost points in the window (never for a kicker
       // or D/ST: you'll stream another by then).
-      const score = hz + strength * h + (longTerm && !single && hz >= 0 ? 0.35 : 0.001) * later, mv = { f, d, hz, near, later, strength, score, starts, lost, depLost, H: h };
+      const score = hz + strength * h + (longTerm && !single && hz >= 0 ? 0.35 : 0.001) * later, mv = { f, d, hz, near, later, strength, score, starts, depLost, H: h };
       if (!best || score > best.score) best = mv;
       if (single && d && posOf(d) === fp && (!bestSame || score > bestSame.score)) bestSame = mv;
     }
@@ -2754,7 +2754,6 @@ function waiverWhy(m, needs, weeks, H) {
     const hs = [hist(m.f), hist(m.d)].filter(Boolean); if (hs.length) why.push(`scoring averages ${hs.join(', ')}; small samples are blended with last season`);
   } else if (m.starts.length) why.push(`${m.strength < 1 && m.starts.length < H ? 'short-term cover: ' : ''}starts in ${m.starts.length === H ? 'every week' : 'week' + (m.starts.length > 1 ? 's ' : ' ') + m.starts.map(s => s[0]).join(', ')} of the next ${H} (${[...new Set(m.starts.map(s => s[1]))].join('/')})${m.strength < 1 && m.starts.length < H ? ', for byes or injuries' : ''}`);
   else why.push('adds depth for later weeks');
-  if (m.d && !m.lost.length) why.push(`${D.U.get(m.d).name} wouldn’t have started in that stretch`);
   if (m.d && m.depLost > 0.5) why.push(`costs ${f1(m.depLost)} pts of injury cover as a backup ${D.U.get(m.d).pos === 'DEF' ? 'D/ST' : D.U.get(m.d).pos} (already counted in the gain)`);
   const fi = fillInFor(m.f); if (fi) why.push(`short-term: filling in for ${fi.name} (${fi.inj}), so later weeks count half`);
   const sm = mean(weeks.slice(1, H).map(w => { const s = schedOpp(fu.team, w); return s.opp ? matchupMult(fu.pos, s.opp, w, fu.team) : null; }).filter(ok));
