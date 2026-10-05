@@ -32,7 +32,7 @@ A team bar on every page shows the selected team, week, scoring and where the ro
 
 ## Getting started
 
-1. Open the site. The first visit asks how you'd like to add your team. Already have an account? Press **Sign in** at the top and your teams come straight back.
+1. Open the site. Lineup, Waivers and Roster ask how you'd like to add your team. You can look around first: **Start / Sit** works for any two players (it opens on an example close call), and **Research** and **Settings** need no team either. A bar at the top of those pages adds your team right there. Already have an account? Press **Sign in** at the top and your teams come straight back.
 2. Pick one of three ways:
    - **Sleeper:** enter your username or league ID and pick your team. It re-syncs every time you open the site, flags lineup differences from Sleeper, and the Waivers section uses your league's exact free agents.
    - **ESPN Fantasy:** load a public league by its ID, or, for any league, copy the roster table from **My Team** and paste it.

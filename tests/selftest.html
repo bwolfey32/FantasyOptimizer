@@ -376,6 +376,15 @@ test('Lineup, Start/Sit and Waivers render', () => {
   if (/Optimizing for/.test(lu)) return 'Lineup still shows "Optimizing for" during live games';
   return cmp.length > 500 && wv.length > 500 || 'a view came back nearly empty';
 });
+test('no team yet: Start/Sit opens on an example close call between two fantasy starters; Lineup, Waivers and Roster ask for a team', () => {
+  setup(st => { st.roster = []; st.compare = [null, null]; });
+  const st = ev('state'), html = ev('viewCompare')(), [a, b] = ev('D').cmpShown, A = M(a), B = M(b);
+  const welcome = ['lineup', 'waivers', 'players', 'compare', 'defenses', 'weather'].filter(t => { st.tab = t; return ev('showWelcome')(); });
+  st.tab = 'lineup'; setup();
+  if (welcome.join() !== 'lineup,waivers,players') return 'welcome on: ' + welcome.join();
+  if (!A || !B || A.pos !== B.pos || A.status !== 'ok' || B.status !== 'ok') return `example pair ${name(a)} / ${name(b)}`;
+  return /example close call/.test(html) && /pick-name/.test(html) || 'no example call shown';
+});
 test('Start/Sit makes no call for a player whose game started', () => {
   setup(); const L = lockedOnRoster(), free = ev('state').roster.find(id => M(id) && !M(id).locked && M(id).status === 'ok');
   ev('state').compare = [L[0], free]; const html = ev('viewCompare')(); ev('state').compare = [null, null];

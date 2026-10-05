@@ -247,9 +247,8 @@ a { color: var(--accent); }
 .foot { display: flex; flex-wrap: wrap; gap: 6px 16px; margin-top: auto; padding-top: 8px; border-top: 1px solid var(--line); }   /* kept at the bottom of the page on short pages */
 .foot a { color: var(--muted); }
 body.welcome .adslot { display: none !important; }
-/* Welcome walkthrough: full screen, no navigation */
-body.welcome .controls, body.welcome #tabs, body.welcome #teamctx, body.welcome #panels, body.welcome #brief, body.welcome #msgs, body.welcome #fresh { display: none !important; }
-body.welcome.wpro #panels { display: block !important; }   /* the sign-in panel when buying Pro before setting up a team */
+/* Welcome walkthrough: the main tabs stay, so a visitor can look around first; the team tools wait for a team */
+body.welcome .controls, body.welcome #teamctx, body.welcome #panels, body.welcome #brief, body.welcome #msgs, body.welcome #fresh { display: none !important; }
 /* on the welcome, Sign in sits top right in the header (only that button), in place of the link above the headline */
 body.welcome.wsign .top { align-items: center; }
 body.welcome.wsign .top > .controls { display: flex !important; }
@@ -272,6 +271,15 @@ body.welcome.wsign #acctBtn .acct-txt { position: static; width: auto; height: a
   body.welcome #main:has(.wl-methods) .wl { gap: 24px; } body.welcome #main:has(.wl-methods) .wl-hero p { margin-top: 14px; }
 }
 .wl-q { font-size: 22px; margin-top: 8px; }
+/* look around before adding a team: links to the pages that work without one */
+.wl-try { display: flex; flex-wrap: wrap; justify-content: center; gap: 6px 8px; font-size: 14.5px; }
+.wl-try a { display: inline-flex; padding: 5px 12px; border: 1px solid var(--line); border-radius: 999px; background: var(--surface); text-decoration: none; font-weight: 500; }
+.wl-try a:hover { border-color: var(--accent); }
+@media (max-width: 680px) { .wl-try { justify-content: flex-start; } }
+/* the team bar for a visitor with no team: what a team adds, and the way to add one */
+.tb-guest { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 14px; padding: 10px 14px; background: var(--surface); border: 1.8px solid var(--accent); border-radius: var(--radius); font-size: 14.5px; }
+.tb-guest > span { flex: 1 1 320px; }
+.tb-guest .btn { padding: 7px 14px; }
 .wl-methods { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; }
 /* each card in its platform's colors (Sleeper navy, ESPN red); Find your players in Benny's green */
 .wl-method { --wl-bg: #075b37; --wl-fg: #ffffff; --wl-ico: #ffffff; position: relative; overflow: hidden; isolation: isolate; display: flex; flex-direction: column; align-items: flex-start; gap: 10px; padding: 16px 44px 18px 16px; text-align: left; color: var(--wl-fg); border: 1px solid color-mix(in srgb, var(--wl-bg) 70%, #000); border-radius: var(--radius);
@@ -3416,6 +3424,7 @@ function renderBrief() {
   const el = $('#brief'); if (!el) return;
   if (D.loading || D.failed) { el.innerHTML = ''; return; }
   const team = esc(curTeam().name);
+  if (needsTeam()) { el.innerHTML = ''; return; }   // the guest bar above says what a team adds
   if (!state.roster.length) { el.innerHTML = `<span class="bteam">${team}:</span> import your roster to get Benny’s picks. <button type="button" class="blink" data-act="flow" data-method="sleeper" data-dest="replace">Import your team</button>`; return; }
   const { starters } = optimize(), proj = starters.reduce((s, x) => s + (x.r ? x.r.mean : 0), 0);
   const dec = reviewDecisions(), W = computeWaivers(), best = W.best;
@@ -3465,11 +3474,15 @@ function renderFresh() {
 setInterval(renderStatus, 60000);
 /* ---------- navigation ----------
    Six destinations, each with its own address (#lineup, #start-sit, #waivers, #roster, #research, #settings), so Back,
-   refresh and shared links land on the same screen. Research has three subpages. */
+   refresh and shared links land on the same screen. Research has three subpages.
+   A visitor with no team yet can use every page that doesn't need one (Start / Sit for any two players, Research,
+   Settings, Pro); Lineup, Waivers and Roster show the welcome, which asks for a team. */
 const NAV = [['lineup', 'Lineup'], ['compare', 'Start / Sit'], ['waivers', 'Waivers'], ['players', 'Roster'], ['defenses', 'Research'], ['settings', 'Settings']];
 const HASH = { lineup: 'lineup', compare: 'start-sit', waivers: 'waivers', players: 'roster', defenses: 'research', teams: 'research-teams', weather: 'research-weather', settings: 'settings', pro: 'pro' };
 const TAB_OF = Object.fromEntries(Object.entries(HASH).map(([k, v]) => [v, k]));
 const navOf = tab => tab === 'teams' || tab === 'weather' ? 'defenses' : tab;
+const TEAM_TABS = new Set(['lineup', 'waivers', 'players']);
+const showWelcome = () => needsTeam() && TEAM_TABS.has(state.tab);
 function go(tab, opts = {}) {
   if (!HASH[tab]) return;
   D.flash = opts.keepFlash ? D.flash : null;
@@ -3479,7 +3492,7 @@ function go(tab, opts = {}) {
 window.addEventListener('hashchange', () => {
   const tab = TAB_OF[location.hash.slice(1)]; if (!tab) return;
   track('screen_viewed', { screen: HASH[tab], has_team: !needsTeam() });
-  if (D.welcome && tab !== 'pro') D.intent = INTENT_TABS.has(tab) ? tab : null;   // on the welcome, a link changes where setup lands
+  if (needsTeam() && tab !== 'pro') D.intent = INTENT_TABS.has(tab) ? tab : null;   // before there's a team, setup lands on the last page visited
   state.tab = tab; save(); render(); if (D.navScroll !== false) window.scrollTo(0, 0); D.navScroll = true; runAfter();
 });
 // a one-shot step to run after the next page renders (scroll to a team, highlight the best move)
@@ -3488,24 +3501,21 @@ function weekOptions() {
   return D.snapshot ? `<option selected>${D.week}</option>` : Array.from({ length: 18 }, (_, i) => `<option value="${i + 1}" ${D.week === i + 1 ? 'selected' : ''}>${i + 1}${D.detWeek === i + 1 && D.season === D.detSeason ? ' (now)' : ''}</option>`).join('');
 }
 function render() {
-  // no team yet: the welcome takes the whole page, with no navigation
-  const welcome = D.welcome = needsTeam();
-  // the Pro page (from the footer link) also opens before there's a team, with a way back to the setup
-  const wpro = welcome && state.tab === 'pro';
-  if (!welcome && !D.flow) D.intent = null;   // set up some other way (a synced account, say): the link's destination no longer applies
-  document.body.classList.toggle('welcome', welcome); document.body.classList.toggle('wpro', wpro);
-  document.body.classList.toggle('wsign', welcome && !wpro && acct.on && !acct.user);   // the header's Sign in stands in for the welcome's own link
-  if (welcome) {
-    for (const s of ['#tabs', '#teamctx', '#panels', '#brief', '#msgs']) $(s).innerHTML = '';
-    if (wpro && D.acctOpen && acct.on) $('#panels').innerHTML = accountPanel();   // buying Pro signs in first
-    renderStatus(); renderAcct(); renderAd();
-    $('#main').innerHTML = wpro ? `<div class="wl-back"><a href="#lineup" data-tab="lineup">‹ Back to setting up your team</a></div>${viewPro()}` : viewWelcome(); return;
-  }
+  // no team yet, on a page that needs one: the welcome takes the page, under the main tabs
+  const welcome = D.welcome = showWelcome();
+  if (!needsTeam() && !D.flow) D.intent = null;   // set up some other way (a synced account, say): the link's destination no longer applies
+  document.body.classList.toggle('welcome', welcome);
+  document.body.classList.toggle('wsign', welcome && acct.on && !acct.user);   // the header's Sign in stands in for the welcome's own link
   const nav = navOf(state.tab);
   $('#tabs').innerHTML = NAV.map(([k, l]) => `<a href="#${HASH[k]}" class="navlink" data-tab="${k}" ${nav === k ? 'aria-current="page"' : ''}>${l}</a>`).join('');
+  if (welcome) {
+    for (const s of ['#teamctx', '#panels', '#brief', '#msgs']) $(s).innerHTML = '';
+    renderStatus(); renderAcct(); renderAd();
+    $('#main').innerHTML = viewWelcome(); return;
+  }
   const pb = $('#proBtn'); if (pb) { pb.hidden = !acct.on; pb.textContent = isPro() ? 'Pro ✓' : 'Go Pro'; pb.classList.toggle('is-pro', isPro()); pb.setAttribute('aria-pressed', String(state.tab === 'pro')); }
   renderStatus(); renderAcct(); renderAd();
-  $('#teamctx').innerHTML = D.loading || D.failed ? '' : teamBar();
+  $('#teamctx').innerHTML = D.loading || D.failed ? '' : needsTeam() ? guestBar() : teamBar();
   $('#panels').innerHTML = D.acctOpen && acct.on ? accountPanel() : D.loading || D.failed ? '' : D.flow ? flowPanel() : D.tsOpen ? teamSettingsPanel() : D.ioOpen ? sharePanel() : '';
   const msgs = [];
   if (D.flash && !D.loading) msgs.push(`<div class="banner info flash"><span>${D.flash.html}</span><button type="button" class="btn sm" data-act="flashclose" aria-label="Dismiss">Dismiss</button></div>`);
@@ -3793,6 +3803,11 @@ function teamBar() {
     </span>
   </div>`;
 }
+// in place of the team bar before there's a team: what adding one gets you, and the setup, opened right on this page
+function guestBar() {
+  return `<div class="tb-guest"><span><strong>Make it your team.</strong> Add your roster and Benny sets your lineup, makes your close start/sit calls and finds the waiver pickups that fit it. Free; Sleeper needs no login.</span>
+    <button type="button" class="btn primary" data-act="flow" data-method="sleeper" data-dest="replace">Add your team</button></div>`;
+}
 const tePremSelect = id => `<label class="small muted" for="${id}">TE premium</label><select class="sel" id="${id}" data-teprem>${[0, 0.25, 0.5, 0.75, 1].map(v => `<option value="${v}" ${tePrem() === v ? 'selected' : ''}>${v ? '+' + v + ' per catch' : 'None'}</option>`).join('')}</select>`;
 const leagueSizeOptions = n => [...new Set([6, 8, 10, 12, 14, 16, 18, 20, n])].sort((a, b) => a - b).map(v => `<option ${n === v ? 'selected' : ''}>${v}</option>`).join('');
 const slotsSummary = slots => SLOT_TYPES.filter(t => slots?.[t.k]).map(t => (slots[t.k] > 1 ? slots[t.k] + ' ' : '') + (t.label || t.k)).join(', ') || 'none';
@@ -3876,19 +3891,22 @@ const acctMsgHTML = () => acct.msg ? `<div class="banner ph-mask ${acct.msg[0] =
 function actWelcomeSignIn() { D.wSignin = !D.wSignin; acct.msg = null; if (D.wSignin) cloudReady().catch(() => {}); render(); if (D.wSignin) deskFocus(acct.step === 'code' ? '#acctCode' : '#acctEmail'); }
 
 /* ---------- welcome walkthrough ----------
-   Shown full screen, with no navigation, whenever no team has players yet: a first visit, after signing out, or after
-   Reset. Three cards (Sleeper, ESPN, Find your players) open the same setup flow as + Add team; restoring a saved team is a link
+   Shown on Lineup, Waivers and Roster whenever no team has players yet: a first visit, after signing out, or after
+   Reset. The main tabs stay above it, and links below the cards go to the pages that work without a team (WELCOME_TRY).
+   Three cards (Sleeper, ESPN, Find your players) open the same setup flow as + Add team; restoring a saved team is a link
    below them. Once the team is saved they go straight to their lineup, where a banner offers an account (nudge).
    People who already have an account sign in at the top and get their teams straight back. */
-/* The welcome matches what the link promised: a link to Waivers or Start / Sit (D.intent) gets its own headline, and
-   after setup lands on that page instead of Lineup (goIntended). */
+/* The welcome matches what the link promised: a link to Waivers (D.intent) gets its own headline, and after setup lands
+   on that page instead of Lineup (goIntended). Setup started from a page that works without a team lands back there. */
 const WELCOME_HERO = {
   lineup: ['Your best lineup, every week', 'Add your team to see recommended starters and waiver pickups.'],
   waivers: ['Your best waiver pickup, for your roster', 'Bring in your team and Benny ranks free agents by how many points they’d add to your lineup, for your scoring and your roster’s needs. With a Sleeper league, it uses your league’s real free agents.'],
   shared: ['That pick was for their roster. Find yours.', 'Bring in your team and Benny ranks free agents by how many points they’d add to your lineup, for your scoring and your roster’s needs. With a Sleeper league, it uses your league’s real free agents.'],
-  compare: ['Start or sit? Benny’s Pick for your players','Bring in your team and Benny makes your close start/sit calls: the chance each player outscores the other, and why.'],
+  players: ['Your roster, with every player’s matchup', 'Add your team to see each player’s projection and matchup grade, and to search and add players.'],
 };
-const INTENT_TABS = new Set(['waivers', 'compare', 'players', 'defenses', 'teams', 'weather', 'settings']);
+// pages that work without a team, offered under the setup cards
+const WELCOME_TRY = [['compare', 'Start / Sit any two players'], ['defenses', 'Defense rankings'], ['weather', 'Game-day weather'], ['teams', 'Teams & play-callers']];
+const INTENT_TABS = new Set(['waivers', 'compare', 'players']);
 function goIntended(opts) { const t = D.intent && HASH[D.intent] ? D.intent : 'lineup'; D.intent = null; go(t, opts); }
 const WELCOME_METHODS = [
   ['sleeper', 'Sleeper', 'Import and sync your league. No login needed.'],
@@ -3916,7 +3934,8 @@ function viewWelcome() {
   else if (D.flow) body = flowPanel();
   else body = `<h2 class="wl-q">How would you like to add your team?</h2>
     <div class="wl-methods">${WELCOME_METHODS.map(([k, t, d]) => `<button type="button" class="wl-method wl-${k}" data-act="flow" data-method="${k}" data-dest="replace"><span class="wl-ico">${WL_LOGOS[k] ? `<img src="${WL_LOGOS[k]}" alt="" width="32" height="32">` : WL_ICONS[k]}</span><span class="wl-mt"><strong>${t}</strong><span class="small muted">${d}</span></span><span class="wl-mark">${WL_ICONS[k]}</span><span class="wl-go">${WL_GO}</span></button>`).join('')}</div>
-    <div class="wl-alt"><button type="button" class="linkbtn small" data-act="flow" data-method="restore" data-dest="replace">Restore a saved team</button></div>`;
+    <div class="wl-alt"><button type="button" class="linkbtn small" data-act="flow" data-method="restore" data-dest="replace">Restore a saved team</button></div>
+    <div class="wl-try" role="group" aria-label="Look around first"><span class="small muted">Or look around first, no team needed:</span>${WELCOME_TRY.map(([k, l]) => `<a href="#${HASH[k]}" data-tab="${k}">${l}</a>`).join('')}</div>`;
   // arrived from a shared move: show it, and the headline turns to their own roster
   const shared = D.flow ? '' : sharedMoveCard(), hero = (shared ? WELCOME_HERO.shared : WELCOME_HERO[D.intent]) || WELCOME_HERO.lineup;
   return `<div class="wl">
@@ -3966,7 +3985,7 @@ function viewPro() {
 
 /* ---------- ads (free users only) ----------
    One slot above the page content on research-style pages (Waivers, Start / Sit, Research, Roster), none on Lineup, the
-   welcome, Settings or Pro. It changes only when the page changes, never on clicks within a page. Until Google approves
+   welcome, Settings or Pro, and no house ad before there's a team. It changes only when the page changes, never on clicks within a page. Until Google approves
    the site for AdSense it shows Benny's own promotions; fill in ADS to switch to AdSense. Pro members get no slot and the
    ad script never loads for them. */
 const ADS = { client: 'ca-pub-5224356068909594', slot: '' };   // AdSense publisher ID, and the display ad unit's slot ID once approved (house ads until then)
@@ -3978,7 +3997,8 @@ const HOUSE_ADS = [
 ];
 function renderAd() {
   const el = $('#adSlot'); if (!el) return;
-  const show = acct.on && !D.welcome && !D.loading && !D.failed && !isPro() && AD_TABS.has(state.tab) && location.hash !== '#export';
+  // Benny's own promotions sell Pro for your team, so a visitor with no team yet sees only Google's ads
+  const show = acct.on && !D.welcome && !D.loading && !D.failed && !isPro() && AD_TABS.has(state.tab) && location.hash !== '#export' && (!!(ADS.client && ADS.slot) || !needsTeam());
   if (!show) { if (!el.hidden) { el.hidden = true; el.innerHTML = ''; } D.adFor = null; return; }
   if (D.adFor === state.tab) return;
   D.adFor = state.tab; el.hidden = false;
@@ -4008,7 +4028,7 @@ function flowPanel() {
   const F = D.flow;
   // on the welcome, the panel is named for the card that opened it, and Back returns to the cards
   const pick = D.welcome && F.step !== 'review';
-  const title = F.step === 'review' ? 'Review and save' : pick ? FLOW_TITLES[F.method] : F.dest === 'new' ? 'Add a team' : `Import into ${esc(curTeam().name)}`;
+  const title = F.step === 'review' ? 'Review and save' : pick ? FLOW_TITLES[F.method] : needsTeam() ? 'Add your team' : F.dest === 'new' ? 'Add a team' : `Import into ${esc(curTeam().name)}`;
   const head = pick
     ? `<div class="row-head"><h2 class="flow-title m-${F.method}">${WL_ICONS[F.method] ? `<span class="wl-ico">${WL_ICONS[F.method]}</span>` : ''}${title}</h2><button type="button" class="linkbtn small flow-back" data-act="flowclose">← Back</button></div>`
     : `<div class="row-head"><h2>${title}</h2><button type="button" class="btn sm" data-act="flowclose">Cancel</button></div>`;
@@ -4086,9 +4106,9 @@ function reviewHTML() {
     </div></div>
     <div class="toolbar"><button type="button" class="btn primary" data-act="flowsave" ${d.roster.length ? '' : 'disabled'}>Save team</button><button type="button" class="btn" data-act="flowback">Back</button></div>`;
 }
-// straight to the lineup; after the first team on the welcome walkthrough, the lineup offers an account (nudge)
-function afterSave() {
-  if (D.welcome && acct.on && !acct.user) store.set('nudge', 'show');
+// straight to the lineup (or the page setup started from); after the first team, the lineup offers an account (nudge)
+function afterSave(first) {
+  if (first && acct.on && !acct.user) store.set('nudge', 'show');
   goIntended({ keepFlash: true });
 }
 function commitDraft() {
@@ -4098,10 +4118,10 @@ function commitDraft() {
     let msg; try { msg = importBundle(d.bundle, !!$('#ioReplace')?.checked); } catch (err) { flowFail('bad_code'); F.msg = ['err', err.message]; return render(); }
     track('team_saved', { method, teams: d.bundle.teams.length, first_team: first, intent: D.intent || 'lineup' });
     anPerson({ first_setup_method: method, first_week: D.week, first_season: D.season });
-    D.drafts.code = ''; D.flow = null; D.flash = { html: `<strong>${esc(msg)}</strong> <a href="#roster" data-tab="players">Edit roster</a>` }; slAutoSync(true); return afterSave();
+    D.drafts.code = ''; D.flow = null; D.flash = { html: `<strong>${esc(msg)}</strong> <a href="#roster" data-tab="players">Edit roster</a>` }; slAutoSync(true); return afterSave(first);
   }
   if (!d.roster.length) return;
-  const pick = D.welcome ? 'replace' : $('input[name=flowDest]:checked')?.value || F.dest, dest = pick === 'new' && !canAddTeam() ? 'replace' : pick, name = ($('#flowName')?.value || d.name || 'My team').trim().slice(0, 40) || 'My team';
+  const pick = first ? 'replace' : $('input[name=flowDest]:checked')?.value || F.dest, dest = pick === 'new' && !canAddTeam() ? 'replace' : pick, name = ($('#flowName')?.value || d.name || 'My team').trim().slice(0, 40) || 'My team';
   const data = { roster: d.roster.slice(), compare: [null, null], scoring: $('#flowScoring')?.value || d.scoring, tePrem: +($('#flowTep')?.value ?? d.tePrem) || 0,
     slots: Object.assign({}, DEFAULT_STATE.slots, d.slots), sleeper: d.sleeper || null, espn: Object.assign({}, DEFAULT_STATE.espn, d.espn || {}),
     waivers: Object.assign(JSON.parse(JSON.stringify(DEFAULT_STATE.waivers)), dest === 'replace' ? JSON.parse(JSON.stringify(state.waivers)) : {}, d.waivers || {}) };
@@ -4118,7 +4138,7 @@ function commitDraft() {
   anPerson({ first_setup_method: method, first_week: D.week, first_season: D.season });
   D.flow = null; D.open.clear(); D.wCache = null; D.sl = null; save();
   D.flash = { html: `<strong>Saved ${esc(curTeam().name)}:</strong> ${data.roster.length} players, ${esc(fmtName(true))} scoring${d.unresolved.length ? `; ${d.unresolved.length} name${d.unresolved.length === 1 ? '' : 's'} not found` : ''}. <a href="#roster" data-tab="players">Edit roster</a>` };
-  afterSave();
+  afterSave(first);
 }
 function flowPaste(src) {
   const text = $(src === 'paste' ? '#rosterPaste' : '#manualPaste')?.value || '';
@@ -4149,8 +4169,13 @@ function acMatches(q) {
 // each player search box: its suggestion list, and what picking a suggestion does
 const AC_BOX = { addq: ['acList', 'roster'], mq: ['mqList', 'manual'], cmp0: ['cmpList0', 'cmp0'], cmp1: ['cmpList1', 'cmp1'] };
 const isCmpBox = id => id === 'cmp0' || id === 'cmp1';
-// Start / Sit: an empty box lists your roster (best projection first, minus the other side's player)
-function cmpRoster(k) { const other = D.cmpShown?.[1 - k]; return state.roster.map(id => D.U.get(id)).filter(u => u && D.M[u.id] && u.id !== other).sort((a, b) => D.M[b.id].mean - D.M[a.id].mean); }
+// Start / Sit: an empty box lists your roster (best projection first, minus the other side's player); with no team yet,
+// this week's top projections at the other player's position (every position when that side is empty)
+function cmpRoster(k) {
+  const other = D.cmpShown?.[1 - k];
+  if (!state.roster.length) { const P = D.M[other]?.pos; return Object.values(D.M).filter(r => r.status === 'ok' && r.id !== other && (!P || r.pos === P)).sort((a, b) => b.mean - a.mean).slice(0, 12).map(r => r.u); }
+  return state.roster.map(id => D.U.get(id)).filter(u => u && D.M[u.id] && u.id !== other).sort((a, b) => D.M[b.id].mean - D.M[a.id].mean);
+}
 function renderAc(inputId) {
   const [listId, mode] = AC_BOX[inputId] || [], inp = $('#' + inputId), list = listId && $('#' + listId); if (!inp || !list) return;
   // Start / Sit boxes work like a dropdown: open on focus with your roster, and typing searches every player
@@ -4159,7 +4184,7 @@ function renderAc(inputId) {
   D.ac = { input: inputId, items, idx: Math.max(0, Math.min(D.ac?.input === inputId ? D.ac.idx : 0, items.length - 1)) };
   const open = cmp || q.length >= 2; list.hidden = !open; inp.setAttribute('aria-expanded', String(open));
   const tag = on => cmp ? (on ? '<span class="ac-tag on">On roster</span>' : '') : `<span class="ac-tag ${on ? 'on' : ''}">${on ? 'On roster' : 'Add'}</span>`;
-  list.innerHTML = (browse ? '<div class="ac-head small muted" role="presentation">Your players · type to search everyone</div>' : '')
+  list.innerHTML = (browse ? `<div class="ac-head small muted" role="presentation">${state.roster.length ? 'Your players' : 'Top projections this week'} · type to search everyone</div>` : '')
     + (items.length ? items.map((u, i) => { const r = D.M[u.id], on = have.has(u.id); return `<button type="button" role="option" class="ac-item" data-acadd="${esc(u.id)}" data-acmode="${mode}" aria-selected="${i === D.ac.idx}"><span class="ac-main">${playerIdentity(u, { size: 'sm', sub: `${r && r.status !== 'bye' ? ` · ${f1(r.mean)} proj` : r?.status === 'bye' ? ' · bye' : ''}${u.inj ? ' · ' + esc(u.inj) : ''}` })}</span>${tag(on)}</button>`; }).join('')
     : `<div class="ac-empty small muted">${q ? `No player matches “${esc(q)}”.` : 'Type a name to search.'}</div>`);
 }
@@ -4278,17 +4303,17 @@ function viewWeather() {
   const ros = state.roster.map(id => D.M[id]).filter(Boolean);
   const games = [...D.games].sort((a, b) => (a.date || '').localeCompare(b.date || '') || a.home.localeCompare(b.home));
   if (!games.length) return `<div class="card panel"><p style="margin:0">No games found for week ${D.week}.</p></div>`;
-  const anyWx = games.some(g => D.wx?.[g.id]);
+  const anyWx = games.some(g => D.wx?.[g.id]), mineCol = ros.length > 0;
   const rows = games.map(g => {
     const s = siteOf(g);
     const when = g.date ? new Date(g.date).toLocaleString([], { weekday: 'short', hour: 'numeric', minute: '2-digit' }) : '';
     const mine = ros.filter(r => r.T === g.home || r.T === g.away).map(r => { const f = r.factors.find(x => x.key === 'wx'); const v = f && Math.abs(f.pct) >= 0.005 ? f.pct : 0; return `<span class="chip ${v >= 0.01 ? 'up' : v <= -0.01 ? 'down' : ''}">${esc(shortName(r.id))}${v ? ' ' + spct(v) : ''}</span>`; }).join(' ');
     return `<tr><td class="l">${esc(when)}${g.state === 'post' ? ' <span class="pill m">Final</span>' : g.state === 'in' ? ' <span class="pill m">Live</span>' : ''}</td><td class="l"><strong>${g.away} @ ${g.home}</strong></td>
-      <td class="l">${s ? esc(s.name) + (s.neutral && s.city ? ` <span class="muted">(${esc(s.city)})</span>` : '') : ''}</td><td class="l wxc">${wxLine(g)}</td><td class="l">${mine}</td></tr>`;
+      <td class="l">${s ? esc(s.name) + (s.neutral && s.city ? ` <span class="muted">(${esc(s.city)})</span>` : '') : ''}</td><td class="l wxc">${wxLine(g)}</td>${mineCol ? `<td class="l">${mine}</td>` : ''}</tr>`;
   }).join('');
   return `<div class="row-head"><h2>Stadiums &amp; weather <span class="hsub">week ${D.week}</span></h2></div>
-    <p class="small muted" style="margin:0">Forecast for the three hours from kickoff at each open-air stadium${anyWx ? '' : ' (forecasts appear about two weeks before a game)'}, from Open-Meteo. Domes and retractable roofs play without weather. The numbers next to your players are how much the weather and stadium move their projection; open a player on Lineup for the details.</p>
-    <div class="tscroll"><table class="wxt"><thead><tr><th class="l">Kickoff</th><th class="l">Game</th><th class="l">Stadium</th><th class="l">Conditions</th><th class="l">Your players</th></tr></thead><tbody>${rows}</tbody></table></div>`;
+    <p class="small muted" style="margin:0">Forecast for the three hours from kickoff at each open-air stadium${anyWx ? '' : ' (forecasts appear about two weeks before a game)'}, from Open-Meteo. Domes and retractable roofs play without weather. ${mineCol ? 'The numbers next to your players are how much the weather and stadium move their projection; open a player on Lineup for the details.' : 'Add your team to see how the weather moves each of your players.'}</p>
+    <div class="tscroll"><table class="wxt"><thead><tr><th class="l">Kickoff</th><th class="l">Game</th><th class="l">Stadium</th><th class="l">Conditions</th>${mineCol ? '<th class="l">Your players</th>' : ''}</tr></thead><tbody>${rows}</tbody></table></div>`;
 }
 function lineupBody() {
   const { starters, bench } = optimize();
@@ -4323,11 +4348,33 @@ function lineupBody() {
   <div class="card list">${bench.length ? bench.map(r => playerRow(r, 'BN', false)).join('') : '<div class="item"><div class="prow"><span></span><span class="muted">Nobody on the bench.</span></div></div>'}</div>
   </div>`;
 }
+/* Start / Sit before there's a team: the closest call between two players most leagues start, past the stars (WRs or
+   RBs ranked 9th to 30th this week, then TEs or QBs ranked 5th to 16th), from players still to play; once every such
+   game has kicked off, from the week's players anyway. Given one player, the other is the closest projection at his
+   position. */
+const EXAMPLE_RANKS = [['WR', 8, 30], ['RB', 8, 30], ['TE', 4, 16], ['QB', 4, 16]];
+function exampleCall(withId) {
+  const ranked = P => Object.values(D.M).filter(r => r.pos === P && r.status === 'ok' && r.role?.kind !== 'backup' && r.mean > 0).sort((x, y) => y.mean - x.mean);
+  const w = D.M[withId];
+  if (w) {
+    const all = ranked(w.pos).filter(r => r.id !== w.id), live = all.filter(r => !r.locked), c = live.length ? live : all;
+    return [w.id, c.sort((x, y) => Math.abs(x.mean - w.mean) - Math.abs(y.mean - w.mean))[0]?.id || null];
+  }
+  for (const live of [true, false]) for (const [P, lo, hi] of EXAMPLE_RANKS) {
+    const c = ranked(P).slice(lo, hi).filter(r => !live || !r.locked); let best = null;
+    for (let i = 1; i < c.length; i++) { const d = c[i - 1].mean - c[i].mean; if (!best || d < best[0]) best = [d, c[i - 1].id, c[i].id]; }
+    if (best) return [best[1], best[2]];
+  }
+  return [null, null];
+}
 function viewCompare() {
   let [a, b] = state.compare;
   // open on the closest start/sit call when nothing is picked yet
   if (!a || !D.M[a] || !b || !D.M[b]) { const d = reviewDecisions()[0]; if (d) { a = d.start; b = d.alt; } }
   if (!a || !D.M[a] || !b || !D.M[b]) { const ros = state.roster.map(id => D.M[id]).filter(r => r && r.status === 'ok'); const { bench } = optimize(); const nb = bench.find(r => r.status === 'ok'); if (nb) { const { starters } = optimize(); const st = starters.find(s => s.r && s.slot.elig.includes(nb.pos)); a = a && D.M[a] ? a : st?.r.id; b = b && D.M[b] ? b : nb.id; } else if (ros.length > 1) { a = a || ros[0].id; b = b || ros[1].id; } }
+  // no team yet: an example close call until they pick their own two players
+  const example = !state.roster.length && (!a || !D.M[a] || !b || !D.M[b]);
+  if (example) { const x = exampleCall(D.M[a] ? a : D.M[b] ? b : null); if (D.M[a]) b = x[1]; else if (D.M[b]) a = x[1]; else [a, b] = x; }
   const A = D.M[a], Bp = D.M[b];
   D.cmpShown = [a || null, b || null];
   // a player search that opens like a dropdown (renderAc); the box empties while open and shows the pick again on leaving
@@ -4362,7 +4409,8 @@ function viewCompare() {
       ${modelNote()}</div>`;
   }
   const dec = reviewDecisions(), decShown = isPro() ? dec : dec.slice(0, 1), decMore = dec.length - decShown.length;
-  const decBar = dec.length ? `<div class="decisions"><span class="label">Decisions to review</span>${decShown.map(d => { const s = D.M[d.start], b = D.M[d.alt], on = a === d.start && Bp?.id === d.alt; return `<button type="button" class="chip dchip" data-decide="${esc(d.start)}|${esc(d.alt)}" aria-pressed="${on}">${esc(d.slot)}: ${esc(shortName(s.id))} or ${esc(shortName(b.id))}${d.tagged ? ` <span class="pill q">${esc(s.inj === 'Questionable' ? 'Q' : 'D')}</span>` : ''}</button>`; }).join('')}${decMore ? lockLine(`${decMore} more close call${decMore === 1 ? '' : 's'} this week`) : ''}</div>` : '';
+  const decBar = example && A && Bp ? `<div class="banner info small">An example close call: two ${esc(posLabel(A.pos))}s with nearly the same projection this week. Pick any two players above.</div>`
+    : dec.length ?`<div class="decisions"><span class="label">Decisions to review</span>${decShown.map(d => { const s = D.M[d.start], b = D.M[d.alt], on = a === d.start && Bp?.id === d.alt; return `<button type="button" class="chip dchip" data-decide="${esc(d.start)}|${esc(d.alt)}" aria-pressed="${on}">${esc(d.slot)}: ${esc(shortName(s.id))} or ${esc(shortName(b.id))}${d.tagged ? ` <span class="pill q">${esc(s.inj === 'Questionable' ? 'Q' : 'D')}</span>` : ''}</button>`; }).join('')}${decMore ? lockLine(`${decMore} more close call${decMore === 1 ? '' : 's'} this week`) : ''}</div>` : '';
   const col = r => { if (!r) return `<div class="card small muted">Pick a player.</div>`; const why = topReasons(r);
     return `<div class="card"><div>${playerIdentity(r.u, { size: 'lg', sub: ` ${injPill(r)} · <span title="${esc(gradeTip(r))}">matchup grade ${r.grade}</span>` })}${r.role || r.doubt ? `<div class="small"><strong>${esc(r.role ? roleText(r.role) : doubtText(r.doubt))}.</strong></div>` : ''}${oppText(r) ? `<div class="small muted">${esc(oppText(r))}</div>` : ''}</div>${matchCell(r, true)}${r.game && !r.locked && r.status !== 'bye' ? `<div class="small">${wxLine(r.game)}</div>` : ''}
     <div class="probs"><div><span class="label">Projection</span><span class="num">${r.status === 'bye' ? 'Bye' : f1(r.mean)}</span></div><div><span class="label">Likely range</span><span class="num">${f1(r.floor)}–${f1(r.ceil)}</span></div></div>
