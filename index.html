@@ -542,7 +542,10 @@ tr.click:hover td { background: color-mix(in srgb, var(--accent) 5%, transparent
 .fasetup { padding: 10px 14px; display: flex; flex-direction: column; gap: 8px; }
 .fa-line { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 8px 14px; font-size: 14.5px; }
 .wbest { padding: 16px 20px; display: flex; flex-direction: column; gap: 10px; border: 1.8px solid var(--accent); }
-.wbest .label { color: var(--gold); font-size: 13px; }
+.wbest .label { color: var(--gold); font-size: 14.3px; }
+/* the Best move card's text runs 10% larger than the rest of the page (the shared-move card keeps the base sizes) */
+.wbest .wb-kind { font-size: 16.5px; } .wbest .wb-name { font-size: 30.8px; } .wbest .wb-gain .num { font-size: 48.4px; }
+.wbest .wb-none { font-size: 16.5px; } .wbest .small { font-size: 14.85px; } .wbest .psub { font-size: 14.3px; }
 .wb-row { display: flex; flex-wrap: wrap; align-items: center; gap: 12px 28px; }
 .wb-side { display: flex; flex-direction: column; min-width: 0; flex: 1 1 180px; }
 .wb-kind { font-family: var(--font-display); font-weight: 700; font-size: 15px; letter-spacing: .08em; text-transform: uppercase; }
