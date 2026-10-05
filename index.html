@@ -2890,7 +2890,7 @@ function sharedMoveCard(R) {
    preview image of the Best move card and sends people on to the same Waivers link; it also carries the added player's
    ownership and the one-line reason, for the card.
    Phones get the share sheet; elsewhere it's copied. The analytics event says only that a move was shared. */
-const SHARE_URL = '';   // 'https://share.bennyspicks.us/w' once share/ is deployed (share/README.md)
+const SHARE_URL = 'https://share.bennyspicks.us/w';   // share/ on Netlify (share/README.md); '' shares plain bennyspicks.us links
 async function shareMove() {
   const R = D.wCache, m = R?.best; if (!m) return;
   const nm = id => D.U.get(id)?.name || id, H = m.H;
