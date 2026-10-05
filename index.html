@@ -446,6 +446,9 @@ body.welcome.wsign #acctBtn .acct-txt { position: static; width: auto; height: a
 .pimg svg { width: 84%; height: 84%; }
 .pimg.logo, .pimg.team { place-items: center; }
 .pimg.logo img { width: 76%; height: 76%; object-fit: contain; }
+.pimg picture { display: contents; }
+.tlogo { display: inline-block; width: 22px; height: 22px; margin-right: 8px; vertical-align: middle; }
+.tlogo img { display: block; width: 100%; height: 100%; object-fit: contain; }
 .pimg-t { font-family: var(--font-display); font-weight: 700; font-size: calc(var(--pimg) * .32); letter-spacing: .02em; color: var(--muted); }
 .pid.sm .pimg { --pimg: 34px; }
 .pid.lg { gap: 12px; }
@@ -627,8 +630,9 @@ td.dcrow { text-align: left; white-space: normal; background: var(--surface-2); 
 .move .mgain { grid-area: gain; display: flex; flex-direction: column; align-items: flex-end; text-align: right; }
 .move .mgain .num { font-size: 28px; line-height: 1; color: var(--good); }
 .move .mwhy { grid-area: why; color: var(--muted); }
-.prs { display: grid; grid-template-columns: 170px minmax(0, 1fr); gap: 6px 14px; padding: 10px 14px; align-items: start; }
+.prs { display: grid; grid-template-columns: 190px minmax(0, 1fr); gap: 6px 14px; padding: 10px 14px; align-items: start; }
 .prs .pteam { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 8px; }
+.prs .tlogo { margin-right: 0; }
 .prs .pbody { display: flex; flex-direction: column; gap: 3px; min-width: 0; }
 .prs .pchips { display: flex; flex-wrap: wrap; gap: 4px; }
 .prs .chip { white-space: normal; }
@@ -702,6 +706,11 @@ td .wks { flex-wrap: nowrap; }
 /* ---------- constants ---------- */
 const TEAMS = {ARI:[22,'Cardinals'],ATL:[1,'Falcons'],BAL:[33,'Ravens'],BUF:[2,'Bills'],CAR:[29,'Panthers'],CHI:[3,'Bears'],CIN:[4,'Bengals'],CLE:[5,'Browns'],DAL:[6,'Cowboys'],DEN:[7,'Broncos'],DET:[8,'Lions'],GB:[9,'Packers'],HOU:[34,'Texans'],IND:[11,'Colts'],JAX:[30,'Jaguars'],KC:[12,'Chiefs'],LV:[13,'Raiders'],LAC:[24,'Chargers'],LAR:[14,'Rams'],MIA:[15,'Dolphins'],MIN:[16,'Vikings'],NE:[17,'Patriots'],NO:[18,'Saints'],NYG:[19,'Giants'],NYJ:[20,'Jets'],PHI:[21,'Eagles'],PIT:[23,'Steelers'],SF:[25,'49ers'],SEA:[26,'Seahawks'],TB:[27,'Buccaneers'],TEN:[10,'Titans'],WAS:[28,'Commanders']};
 const ABBR = Object.keys(TEAMS);
+/* Team logos on ESPN's image server, keyed by our abbreviation (ESPN's file name is the same, lowercase). The dark
+   versions add an outline where a logo would disappear on a dark background (the Raiders). logoSrc sizes one. */
+const ESPN_IMG = 'https://a.espncdn.com/combiner/i?img=';
+const TEAM_LOGO = Object.fromEntries(ABBR.map(T => [T, { light: `/i/teamlogos/nfl/500/${T.toLowerCase()}.png`, dark: `/i/teamlogos/nfl/500-dark/${T.toLowerCase()}.png` }]));
+const logoSrc = (T, px, dark) => TEAM_LOGO[T] ? `${ESPN_IMG}${TEAM_LOGO[T][dark ? 'dark' : 'light']}&w=${px}&h=${px}` : null;
 const TEAM_CITY = {ARI:'Arizona',ATL:'Atlanta',BAL:'Baltimore',BUF:'Buffalo',CAR:'Carolina',CHI:'Chicago',CIN:'Cincinnati',CLE:'Cleveland',DAL:'Dallas',DEN:'Denver',DET:'Detroit',GB:'Green Bay',HOU:'Houston',IND:'Indianapolis',JAX:'Jacksonville',KC:'Kansas City',LV:'Las Vegas',LAC:'Los Angeles',LAR:'Los Angeles',MIA:'Miami',MIN:'Minnesota',NE:'New England',NO:'New Orleans',NYG:'New York',NYJ:'New York',PHI:'Philadelphia',PIT:'Pittsburgh',SF:'San Francisco',SEA:'Seattle',TB:'Tampa Bay',TEN:'Tennessee',WAS:'Washington'};
 /* A team named any common way, for D/ST lines and searches: "Steelers", "Pittsburgh Steelers", "Pittsburgh", "PIT", each
    optionally with "D/ST", "DST", "Defense" or "Def". A city two teams share (New York, Los Angeles) needs the nickname.
@@ -2888,7 +2897,7 @@ function persSection(weeks, H) {
     const stronger = Object.values(r.e).reduce((s, v) => s + v, 0) < 0;
     const chips = [...t.moves.slice(0, 4).map(mv => `<span class="chip">${mv.val > 0 ? '+' : '−'} ${esc(moveText(mv))} <span class="muted">${esc(mv.pos)}, ${mv.area}</span></span>`),
       ...t.stMoves.slice(0, 2).map(mv => `<span class="chip">${mv.val > 0 ? '+' : '−'} ${esc(moveText(mv))} <span class="muted">returner, ${f0(mv.yds)} yds/g${mv.td ? `, ${mv.td} TD` : ''}</span></span>`)].join(' ');
-    return `<div class="item prs"><div class="pteam"><strong>${r.T}</strong> <span class="small muted">${esc(D.rec[r.T] || '')}</span>
+    return `<div class="item prs"><div class="pteam">${teamLogo(r.T)}<strong>${r.T}</strong> <span class="small muted">${esc(D.rec[r.T] || '')}</span>
       ${r.size >= 0.015 ? `<span class="pill ${stronger ? 'n' : 'q'}">${stronger ? 'Stronger' : 'Weaker'}</span>` : ''}</div>
       <div class="pbody small">${allow ? `<div>Points allowed: ${allow}</div>` : ''}${Math.abs(r.own[0] - 1) >= 0.01 || Math.abs(r.own[1]) >= 0.05 ? `<div>${r.T} D/ST: ${spct(r.own[0] - 1)}${Math.abs(r.own[1]) >= 0.05 ? `, returns ${r.own[1] > 0 ? '+' : '−'}${f1(Math.abs(r.own[1]))} pts/g` : ''}</div>` : ''}
       ${r.faced ? `<div class="muted">You face them: ${esc(r.faced.slice(0, 4).map(([w, n]) => `wk ${w} ${n}`).join(', '))}${r.faced.length > 4 ? '…' : ''}</div>` : ''}
@@ -3273,7 +3282,7 @@ function espnNote(r, starting) {
    player-ids.json (built at most daily by scripts/player_ids.py) gives each Sleeper id its ESPN and NFL GSIS ids, kept
    on the player as u.espnId and u.gsisId. This browser keeps a copy for a day, so a visit doesn't refetch it.
    Headshots and team logos load straight from ESPN's image server, resized there. */
-const PIDS_KEY = 'fo1:pids', ESPN_IMG = 'https://a.espncdn.com/combiner/i?img=';
+const PIDS_KEY = 'fo1:pids';
 const SILHOUETTE = '<svg viewBox="0 0 40 40" aria-hidden="true"><circle cx="20" cy="15" r="7.5" fill="currentColor"/><path d="M5 40c0-9 6.7-14.5 15-14.5S35 31 35 40z" fill="currentColor"/></svg>';
 function attachIds() { const m = D.pids; if (m) for (const u of D.U.values()) { const x = m[u.id]; u.espnId = x?.[0] || null; u.gsisId = x?.[1] || null; } }
 async function loadPlayerIds() {
@@ -3286,21 +3295,29 @@ async function loadPlayerIds() {
 /* Which picture a player gets: his ESPN headshot, the team logo for a D/ST, or (no ESPN id, or the image failed to
    load: D.imgBad) a silhouette, or the team's abbreviation for a D/ST. */
 function getPlayerImage(u) {
-  if (u?.pos === 'DEF') { const src = TEAMS[u.team] ? `${ESPN_IMG}/i/teamlogos/nfl/500/${u.team.toLowerCase()}.png&w=96&h=96` : null;
-    return src && !D.imgBad.has(src) ? { kind: 'logo', src } : { kind: 'team', text: u?.team || '' }; }
+  if (u?.pos === 'DEF') { const src = logoSrc(u.team, 96);
+    return src && !D.imgBad.has(src) ? { kind: 'logo', src, dark: logoSrc(u.team, 96, true) } : { kind: 'team', text: u?.team || '' }; }
   const src = u?.espnId ? `${ESPN_IMG}/i/headshots/nfl/players/full/${u.espnId}.png&w=132&h=96&scale=crop` : null;
   return src && !D.imgBad.has(src) ? { kind: 'head', src } : { kind: 'none' };
 }
 const imgFallback = (kind, text) => kind === 'team' ? `<span class="pimg-t">${esc(text)}</span>` : SILHOUETTE;
+const lazyImg = (src, px) => `<img src="${esc(src)}" alt="" width="${px}" height="${px}" loading="lazy" decoding="async">`;
+// a logo that switches to its dark version with the system theme
+const logoPic = (src, dark, px, cls = '') => `<picture${cls ? ` class="${cls}" aria-hidden="true"` : ''}><source media="(prefers-color-scheme: dark)" srcset="${esc(dark)}">${lazyImg(src, px)}</picture>`;
 function playerImg(u) {
   const im = getPlayerImage(u);
-  return `<span class="pimg ${im.kind}" aria-hidden="true"${im.kind === 'logo' ? ` data-t="${esc(u.team)}"` : ''}>${im.src ? `<img src="${esc(im.src)}" alt="" width="44" height="44" loading="lazy" decoding="async">` : imgFallback(im.kind, im.text)}</span>`;
+  return `<span class="pimg ${im.kind}" aria-hidden="true"${im.kind === 'logo' ? ` data-t="${esc(u.team)}"` : ''}>${im.kind === 'logo' ? logoPic(im.src, im.dark, 44) : im.src ? lazyImg(im.src, 44) : imgFallback(im.kind, im.text)}</span>`;
 }
+/* A team's logo before its name in the Research tables. Unknown team, or the logo failed: an empty box of the same
+   size, so the names stay lined up. */
+const TLOGO_EMPTY = '<span class="tlogo" aria-hidden="true"></span>';
+function teamLogo(T) { const src = logoSrc(T, 64); return src && !D.imgBad.has(src) ? logoPic(src, logoSrc(T, 64, true), 22, 'tlogo') : TLOGO_EMPTY; }
 // error events don't bubble, so catch them on the way down: remember the bad image and show the fallback in its place
 document.addEventListener('error', e => {
-  const t = e.target, w = t.parentNode; if (t.tagName !== 'IMG' || !w?.classList?.contains('pimg')) return;
-  D.imgBad.add(t.getAttribute('src')); const k = w.dataset.t ? 'team' : 'none';
-  w.className = 'pimg ' + k; w.innerHTML = imgFallback(k, w.dataset.t);
+  const t = e.target, w = t.tagName === 'IMG' && t.closest('.pimg, .tlogo'); if (!w) return;
+  D.imgBad.add(t.getAttribute('src'));
+  if (w.classList.contains('tlogo')) { w.outerHTML = TLOGO_EMPTY; return; }
+  const k = w.dataset.t ? 'team' : 'none'; w.className = 'pimg ' + k; w.innerHTML = imgFallback(k, w.dataset.t);
 }, true);
 /* PlayerIdentity: picture, name, and a "POS · TEAM" line, wherever Benny asks you to decide on a player. `sub` follows
    the team on that line (pills, notes), `after` adds lines below it, `size` is 'sm' or 'lg'; `name`, `line`, `nameCls`
@@ -4143,9 +4160,9 @@ function viewDefenses() {
   return `<div class="section"><div class="row-head"><h2>Defenses, week ${D.week}</h2><span class="toolbar"><span class="small muted">Per game. Green = good for opposing offenses. Blends ${D.season} games with ${D.season - 1} by staff continuity. Tap a coordinator’s name for a profile.</span><button type="button" class="btn sm" data-act="defcols" aria-expanded="${!!D.colsOpen}">Columns</button></span></div>
   ${D.colsOpen ? defColsPanel(cfg) : ''}
   <div class="tscroll"><table><thead><tr><th class="l" data-sort="team">Team</th><th class="l">Record</th><th class="l">Wk ${D.week} opp</th>${cols.map(([k, l, , full]) => `<th data-sort="${k}" title="${esc(full)}">${l}${sk === k ? (dir < 0 ? ' ↓' : ' ↑') : ''}</th>`).join('')}<th class="l">DC</th></tr></thead><tbody>
-  ${rows.map(T => { const b = D.B[T], s = staffOf(T), tg = D.tg[T], open = D.dcOpen === T; return `<tr><td><strong>${T}</strong> <span class="muted small">${TEAMS[T][1]}</span></td><td class="l">${esc(D.rec[T] || '—')}</td><td class="l">${tg ? (tg.home ? 'vs ' : '@ ') + tg.opp : 'Bye'}</td>${cols.map(([k, , f]) => `<td style="${heat(b[k], L[k], k === 'sacks')}">${f(b[k])}</td>`).join('')}<td class="l"><button type="button" class="linkbtn" data-dc="${T}" aria-expanded="${open}">${esc(s.dc || s.defCaller || 'Unknown')}</button>${s.defNew ? ' <span class="pill n">New</span>' : ''}</td></tr>
+  ${rows.map(T => { const b = D.B[T], s = staffOf(T), tg = D.tg[T], open = D.dcOpen === T; return `<tr><td>${teamLogo(T)}<strong>${T}</strong> <span class="muted small">${TEAMS[T][1]}</span></td><td class="l">${esc(D.rec[T] || '—')}</td><td class="l">${tg ? (tg.home ? 'vs ' : '@ ') + tg.opp : 'Bye'}</td>${cols.map(([k, , f]) => `<td style="${heat(b[k], L[k], k === 'sacks')}">${f(b[k])}</td>`).join('')}<td class="l"><button type="button" class="linkbtn" data-dc="${T}" aria-expanded="${open}">${esc(s.dc || s.defCaller || 'Unknown')}</button>${s.defNew ? ' <span class="pill n">New</span>' : ''}</td></tr>
     ${open ? `<tr><td colspan="${span}" class="dcrow">${dcProfile(T)}</td></tr>` : ''}`; }).join('')}
-  <tr><td><strong>League avg</strong></td><td></td><td></td>${cols.map(([k, , f]) => `<td><strong>${f(L[k])}</strong></td>`).join('')}<td></td></tr></tbody></table></div></div>`;
+  <tr><td>${TLOGO_EMPTY}<strong>League avg</strong></td><td></td><td></td>${cols.map(([k, , f]) => `<td><strong>${f(L[k])}</strong></td>`).join('')}<td></td></tr></tbody></table></div></div>`;
 }
 /* A defensive play-caller's profile, opened from the DC column: scheme, background and style, what the scheme tends to
    do to each position, the team's record, and his defense's numbers this season next to last season (his previous
@@ -4195,7 +4212,7 @@ function viewTeams() {
     const d = ok(D.B[T].passRate) && ok(pr[2]) ? (D.B[T].passRate - pr[2]) * 100 : null;
     const hcNote = c?.name && norm(c.name) !== norm(s.hc) ? ` <span class="pill q" title="ESPN lists ${esc(c.name)}">ESPN: ${esc(c.name)}</span>` : '';
     const open = D.teamOpen === T;
-    return `<tr class="click" data-team="${T}"><td><strong>${T}</strong> <span class="small muted">${esc(D.rec[T] || '')}</span></td><td class="l">${esc(s.hc)}${nb(s.hcNew || c?.isNew)}${hcNote}</td><td class="l">${esc(s.offCaller || s.oc)}${nb(s.offNew)}</td><td class="l">${esc(s.defCaller || s.dc)}${nb(s.defNew)}</td>
+    return `<tr class="click" data-team="${T}"><td>${teamLogo(T)}<strong>${T}</strong> <span class="small muted">${esc(D.rec[T] || '')}</span></td><td class="l">${esc(s.hc)}${nb(s.hcNew || c?.isNew)}${hcNote}</td><td class="l">${esc(s.offCaller || s.oc)}${nb(s.offNew)}</td><td class="l">${esc(s.defCaller || s.dc)}${nb(s.defNew)}</td>
       <td>${spark(pr, v => pct(v))} ${pct(D.B[T].passRate)}${ok(d) && Math.abs(d) >= 3 ? ` <span class="${d > 0 ? 'trend-up' : 'trend-down'}">${d > 0 ? '↑' : '↓'}${Math.abs(d).toFixed(0)}</span>` : ''}</td><td>${spark(pl, f1)} ${f1(D.B[T].plays)}</td><td>${spark(fw, f1)} ${f1(D.B[T].fpaWR)}</td></tr>
       ${open ? `<tr><td colspan="7" style="text-align:left;white-space:normal;background:var(--surface-2)">${teamDetail(T, seasons)}</td></tr>` : ''}`;
   }).join('');

@@ -337,7 +337,13 @@ test('player pictures: headshot by ESPN id, team logo for a D/ST, silhouette whe
     D.imgBad.add(h.src); D.imgBad.add(l.src);
     if (img(gibbs).kind !== 'none') return 'a failed headshot should fall back to the silhouette';
     if (img(pit).kind !== 'team' || img(pit).text !== 'PIT') return 'a failed logo should fall back to the team abbreviation';
-    const row = ev('viewLineup')(); return /class="pid"/.test(row) && /class="pimg/.test(row) || 'lineup rows have no player picture';
+    const row = ev('viewLineup')(); if (!/class="pid"/.test(row) || !/class="pimg/.test(row)) return 'lineup rows have no player picture';
+    const tl = ev('teamLogo')('WAS'); if (!tl.includes('/500/was.png') || !tl.includes('/500-dark/was.png')) return 'no WAS logo: ' + tl;
+    D.imgBad.add(ev('logoSrc')('WAS', 64)); if (ev('teamLogo')('WAS') !== ev('TLOGO_EMPTY')) return 'a failed team logo should leave an empty box';
+    if (ev('teamLogo')('XYZ') !== ev('TLOGO_EMPTY')) return 'an unknown team should get an empty box';
+    D.imgBad.clear(); const wv = ev('viewWaivers')();
+    if (/special-teams changes/.test(wv) && !/class="pteam"><picture class="tlogo"/.test(wv)) return 'Waivers defense changes have no team logos';
+    return ['viewDefenses', 'viewTeams'].every(v => /class="tlogo"/.test(ev(v)())) || 'Research tables have no team logos';
   } finally { D.imgBad.clear(); D.pids = was[0]; gibbs.espnId = was[1]; }
 });
 
