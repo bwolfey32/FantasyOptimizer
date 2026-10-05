@@ -324,6 +324,22 @@ test('Start/Sit makes no call for a player whose game started', () => {
   ev('state').compare = [L[0], free]; const html = ev('viewCompare')(); ev('state').compare = [null, null];
   return /Game started/.test(html) && !/chance to outscore/.test(html) || 'verdict shown for a started player';
 });
+test('player pictures: headshot by ESPN id, team logo for a D/ST, silhouette when missing or broken', () => {
+  setup(); const D = ev('D'), img = ev('getPlayerImage'), gibbs = D.U.get(idOf('Jahmyr Gibbs')), pit = D.U.get('PIT');
+  const was = [D.pids, gibbs.espnId];
+  try {
+    D.pids = { [gibbs.id]: [4429795, '00-0039127'] }; ev('attachIds')();
+    const h = img(gibbs);
+    if (h.kind !== 'head' || !h.src.includes('/headshots/nfl/players/full/4429795.png')) return 'no headshot: ' + JSON.stringify(h);
+    if (gibbs.gsisId !== '00-0039127') return 'GSIS id not attached';
+    const l = img(pit); if (l.kind !== 'logo' || !l.src.includes('/teamlogos/nfl/500/pit.png')) return 'no D/ST logo: ' + JSON.stringify(l);
+    if (img(D.U.get(idOf('Jared Goff'))).kind !== 'none') return 'a player without an ESPN id should get the silhouette';
+    D.imgBad.add(h.src); D.imgBad.add(l.src);
+    if (img(gibbs).kind !== 'none') return 'a failed headshot should fall back to the silhouette';
+    if (img(pit).kind !== 'team' || img(pit).text !== 'PIT') return 'a failed logo should fall back to the team abbreviation';
+    const row = ev('viewLineup')(); return /class="pid"/.test(row) && /class="pimg/.test(row) || 'lineup rows have no player picture';
+  } finally { D.imgBad.clear(); D.pids = was[0]; gibbs.espnId = was[1]; }
+});
 
 window.addEventListener('load', () => {
   const t0 = Date.now();

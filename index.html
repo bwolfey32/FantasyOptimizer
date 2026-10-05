@@ -438,6 +438,19 @@ body.welcome.wsign #acctBtn .acct-txt { position: static; width: auto; height: a
 .slot.bench { color: var(--muted); }
 .pname { display: block; font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .psub { font-size: 13px; color: var(--muted); display: flex; flex-wrap: wrap; gap: 4px 8px; align-items: center; }
+/* PlayerIdentity: the player's picture to the left of his name and position. Fixed sizes, so nothing shifts as images load. */
+.pid { display: flex; align-items: center; gap: 10px; min-width: 0; }
+.pid-txt { display: flex; flex-direction: column; min-width: 0; }
+.pimg { --pimg: 44px; flex: none; width: var(--pimg); height: var(--pimg); border-radius: 50%; overflow: hidden; background: var(--surface-2); color: color-mix(in srgb, var(--muted) 45%, var(--surface-2)); display: grid; place-items: end center; }
+.pimg img { width: 100%; height: 100%; object-fit: cover; }
+.pimg svg { width: 84%; height: 84%; }
+.pimg.logo, .pimg.team { place-items: center; }
+.pimg.logo img { width: 76%; height: 76%; object-fit: contain; }
+.pimg-t { font-family: var(--font-display); font-weight: 700; font-size: calc(var(--pimg) * .32); letter-spacing: .02em; color: var(--muted); }
+.pid.sm .pimg { --pimg: 34px; }
+.pid.lg { gap: 12px; }
+.pid.lg .pimg { --pimg: 56px; }
+.pid.lg .pname { font-size: 18px; }
 .match { font-size: 13px; min-width: 0; }
 .match .opp { font-weight: 600; }
 .proj { font-size: 24px; text-align: right; line-height: 1; }
@@ -636,6 +649,8 @@ td .wks { flex-wrap: nowrap; }
   .prow { grid-template-columns: 44px minmax(0, 1fr) 38px 58px; grid-template-areas: "slot name grade proj" "slot match match range"; row-gap: 4px; }
   .prow > .slot { grid-area: slot; align-self: start; padding-top: 2px; }
   .prow > .pwho { grid-area: name; min-width: 0; }
+  .prow .pimg { --pimg: 36px; }
+  .pid { gap: 8px; }
   .prow > .match { grid-area: match; }
   .prow > .grade { grid-area: grade; }
   .prow > .proj { grid-area: proj; }
@@ -893,7 +908,7 @@ function loadState() {
 }
 let state = loadState();
 const save = () => { stashTeam(); stampChanges(); store.set('fo1:state', state); queuePush(); };
-const D = { loading: true, progress: 0, errors: [], open: new Set(), U: new Map(), proj: {}, H: {}, tg: {}, rec: {}, prior: {}, cur: {}, B: {}, L: {}, ranks: {}, M: {}, coaches: null, espnTeams: null, defSort: ['fpaWR', -1], teamOpen: null, resetArm: false };
+const D = { loading: true, progress: 0, errors: [], open: new Set(), U: new Map(), proj: {}, H: {}, tg: {}, rec: {}, prior: {}, cur: {}, B: {}, L: {}, ranks: {}, M: {}, imgBad: new Set(), coaches: null, espnTeams: null, defSort: ['fpaWR', -1], teamOpen: null, resetArm: false };
 
 /* ---------- accounts and sync ----------
    Signing in is optional. This browser's copy (fo1:state) stays the working copy; a signed-in account keeps a mirror of
@@ -1661,6 +1676,7 @@ function ingest(inp) {
   });
   for (const id in D.H) { const h = D.H[id], n = h.pts.length; h.n = n; h.avg = mean(h.pts); h.sd = n > 1 ? Math.sqrt(h.pts.reduce((s, x) => s + (x - h.avg) ** 2, 0) / (n - 1)) : null; }
   D.nameIdx = new Map(); for (const u of D.U.values()) { const k = norm(u.name); if (!D.nameIdx.has(k)) D.nameIdx.set(k, []); D.nameIdx.get(k).push(u.id); }
+  attachIds();   // ESPN and GSIS ids, for headshots (loadPlayerIds)
   D.loadedAt = new Date(inp.createdAt);
   // full-season schedule (byes, future opponents) and ESPN-wide ownership, used by the Waivers tab
   D.sched = {};
@@ -2809,7 +2825,7 @@ function schedStrip(id, weeks, H) {
 /* The headline of the Waiver Optimizer: ADD X / DROP Y / +n expected lineup points. */
 function bestMoveCard(m, weeks, H, ownTxt, near) {
   if (!m) return `<div class="card wbest"><span class="label">Best move</span><div class="wb-none">${near ? `<strong>Hold.</strong> No move clears Benny’s bar. The closest, add ${esc(D.U.get(near.f).name)}${near.d ? `, drop ${esc(D.U.get(near.d).name)}` : ''}, gains +${f1(near.hz)} over ${near.H} week${near.H > 1 ? 's' : ''}, less than projections typically miss by.` : 'Your roster is already the best Benny can build from these free agents. Check back after this week’s games.'}</div></div>`;
-  const side = (kind, id) => { const u = D.U.get(id); return `<div class="wb-side"><span class="wb-kind ${kind}">${kind === 'add' ? 'Add' : 'Drop'}</span><span class="wb-name">${esc(u.name)}</span><span class="small muted">${u.pos === 'DEF' ? 'D/ST' : u.pos} · ${u.team || 'FA'}${kind === 'add' ? ' · ' + ownTxt(id) : ''}</span></div>`; };
+  const side = (kind, id) => `<div class="wb-side"><span class="wb-kind ${kind}">${kind === 'add' ? 'Add' : 'Drop'}</span>${playerIdentity(D.U.get(id), { size: 'lg', nameCls: 'wb-name', subCls: 'small muted', sub: kind === 'add' ? ' · ' + ownTxt(id) : '' })}</div>`;
   return `<div class="card wbest"><div class="row-head"><span class="label">Best move</span><button type="button" class="btn sm" data-act="sharemove">Share</button></div>
     <div class="wb-row">${side('add', m.f)}${m.d ? side('drop', m.d) : `<div class="wb-side"><span class="wb-kind keep">No drop</span><span class="small muted">You have an open roster spot</span></div>`}
       <div class="wb-gain"><span class="num">+${f1(m.hz)}</span><span class="small muted">expected lineup pts over the next ${m.H} week${m.H > 1 ? 's' : ''}</span></div></div>
@@ -2820,7 +2836,7 @@ function bestMoveCard(m, weeks, H, ownTxt, near) {
    pickup is worth to them. Nothing until the player data has loaded and knows the added player. */
 function sharedMoveCard(R) {
   const S = D.shared; if (!S || !D.U.has(S.add)) return '';
-  const side = (kind, id) => { const u = D.U.get(id); return `<div class="wb-side"><span class="wb-kind ${kind}">${kind === 'add' ? 'Add' : 'Drop'}</span><span class="wb-name">${esc(u.name)}</span><span class="small muted">${u.pos === 'DEF' ? 'D/ST' : u.pos} · ${u.team || 'FA'}</span></div>`; };
+  const side = (kind, id) => `<div class="wb-side"><span class="wb-kind ${kind}">${kind === 'add' ? 'Add' : 'Drop'}</span>${playerIdentity(D.U.get(id), { size: 'lg', nameCls: 'wb-name', subCls: 'small muted' })}</div>`;
   const drop = S.drop && D.U.has(S.drop) ? side('drop', S.drop) : `<div class="wb-side"><span class="wb-kind keep">No drop</span><span class="small muted">They had an open roster spot</span></div>`;
   const gain = S.g > 0 && S.h > 0 ? `<div class="wb-gain"><span class="num">+${f1(S.g)}</span><span class="small muted">expected lineup pts over the next ${S.h} week${S.h > 1 ? 's' : ''}, for their roster</span></div>` : '';
   let mine = '';
@@ -2903,7 +2919,7 @@ function waiversBody() {
   trackOnce('wv:' + D.week, 'waivers_viewed', { has_move: moves.length > 0, waiver_count: moves.length, best_gain: R.best ? Math.round(R.best.hz) : 0, window: W.horizon, source: W.source });
   const hLab = H === 1 ? `week ${weeks[0]}` : `weeks ${weeks[0]}–${weeks[H - 1]}`;
   const ownTxt = id => D.own.has(id) ? `${D.own.get(id) < 1 ? '<1' : Math.round(D.own.get(id))}% owned` : 'unowned';
-  const pl = id => { const u = D.U.get(id), r = D.M[id]; return `<span class="pname">${esc(u.name)}</span><span class="psub">${u.pos} · ${u.team || 'FA'} ${injPill(r)}${r?.role ? ' · ' + esc(roleText(r.role, true)) : ''} · ${f1(rosBase(id))} pts/g</span>`; };
+  const pl = (id, after) => { const r = D.M[id]; return playerIdentity(D.U.get(id), { size: 'sm', sub: ` ${injPill(r)}${r?.role ? ' · ' + esc(roleText(r.role, true)) : ''} · ${f1(rosBase(id))} pts/g`, after }); };
   const src = W.source === 'list' && W.faList.length ? `your league’s free-agent list (${W.faList.length} players, pasted ${esc(new Date(W.faListAt).toLocaleDateString([], { month: 'short', day: 'numeric' }))})` : `players under ${W.ownMax}% owned across ESPN leagues`;
   const warn = [];
   if (W.source === 'own' && !D.own.size) warn.push('ESPN ownership didn’t load, so every player not on your roster counts as available. Paste your league’s free agents below for accurate suggestions.');
@@ -2926,7 +2942,7 @@ function waiversBody() {
   const shownMoves = isPro() ? moves : moves.slice(0, 2);
   const moveRows = moves.length ? shownMoves.map((m, i) => {
     return `<div class="item move"><div class="mrank num">${i + 1}</div>
-      <div class="mside"><span class="pill n">Add</span> <div>${pl(m.f)}<span class="psub">${ownTxt(m.f)}</span></div>${schedStrip(m.f, weeks, H)}</div>
+      <div class="mside"><span class="pill n">Add</span> <div>${pl(m.f, `<span class="psub">${ownTxt(m.f)}</span>`)}</div>${schedStrip(m.f, weeks, H)}</div>
       <div class="mside">${m.d ? `<span class="pill o">Drop</span> <div>${pl(m.d)}</div>${schedStrip(m.d, weeks, H)}` : `<span class="pill m">No drop</span> <div class="small muted">You have an open roster spot</div>`}</div>
       <div class="mgain"><span class="num">+${f1(m.hz)}</span><span class="small muted">expected lineup pts, next ${m.H} wk${m.H > 1 ? 's' : ''}</span>${m.H === H && H < weeks.length ? `<span class="small ${m.later >= 0 ? 'trend-up' : 'trend-down'}">${m.later >= 0 ? '+' : ''}${f1(m.later)} after that</span>` : ''}</div>
       <div class="mwhy small">${m.hold ? '<span class="pill o">Keep yours</span> ' : m.marginal ? '<span class="pill m">Marginal: holding is fine</span> ' : m.longBet ? '<span class="pill q">Long-term bet</span> ' : ''}${esc(m.whyText)}. <button type="button" class="btn sm" data-taken="${esc(m.f)}">Taken in my league</button></div></div>`;
@@ -2946,7 +2962,7 @@ function waiversBody() {
     const btn = `<div class="seg" role="group" aria-label="Drop suggestions for ${esc(u.name)}">
       <button type="button" data-keepmode="${esc(s.id)}" data-mode="${s.auto ? 'auto' : 'keep'}" aria-pressed="${s.keep}">Keep</button>
       <button type="button" data-keepmode="${esc(s.id)}" data-mode="${s.auto ? 'drop' : 'auto'}" aria-pressed="${!s.keep}">Can drop</button></div>`;
-    return `<div class="item stash"><div class="sinfo"><span class="pname">${esc(u.name)}</span><span class="psub">${u.pos} · ${u.team || 'FA'} ${injPill(D.M[s.id])}</span><span class="small muted">${s.prev ? `${f1(s.prev[0])} pts/g over ${s.prev[1]} games in ${D.season - 1}` : `No ${D.season - 1} stats`} · ${u.pos}${s.rank} when healthy (ranked on ${f1(s.rv)} pts/g)</span></div>
+    return `<div class="item stash"><div class="sinfo">${playerIdentity(u, { size: 'sm', sub: ' ' + injPill(D.M[s.id]), after: `<span class="small muted">${s.prev ? `${f1(s.prev[0])} pts/g over ${s.prev[1]} games in ${D.season - 1}` : `No ${D.season - 1} stats`} · ${u.pos}${s.rank} when healthy (ranked on ${f1(s.rv)} pts/g)</span>` })}</div>
       <div class="sctl"><label class="small muted" for="rw-${esc(s.id)}">Expected back</label><select class="sel" id="rw-${esc(s.id)}" data-rw="${esc(s.id)}">${opts}</select></div>
       <div class="sstat">${status}</div>
       ${btn}</div>`;
@@ -3250,12 +3266,51 @@ function espnNote(r, starting) {
   if (!starting && appStarting) return `<span class="pill q">Sit (starting on ${app})</span>`;
   return '';
 }
+/* ---------- player images ----------
+   player-ids.json (built at most daily by scripts/player_ids.py) gives each Sleeper id its ESPN and NFL GSIS ids, kept
+   on the player as u.espnId and u.gsisId. This browser keeps a copy for a day, so a visit doesn't refetch it.
+   Headshots and team logos load straight from ESPN's image server, resized there. */
+const PIDS_KEY = 'fo1:pids', ESPN_IMG = 'https://a.espncdn.com/combiner/i?img=';
+const SILHOUETTE = '<svg viewBox="0 0 40 40" aria-hidden="true"><circle cx="20" cy="15" r="7.5" fill="currentColor"/><path d="M5 40c0-9 6.7-14.5 15-14.5S35 31 35 40z" fill="currentColor"/></svg>';
+function attachIds() { const m = D.pids; if (m) for (const u of D.U.values()) { const x = m[u.id]; u.espnId = x?.[0] || null; u.gsisId = x?.[1] || null; } }
+async function loadPlayerIds() {
+  const c = store.get(PIDS_KEY);
+  if (c?.ids) { D.pids = c.ids; attachIds(); }
+  if (c?.ids && Date.now() - c.at < 864e5) return;
+  const j = await fetchJSON('player-ids.json', 15000).catch(() => null); if (!j?.ids) return;
+  D.pids = j.ids; store.set(PIDS_KEY, { at: Date.now(), ids: j.ids }); attachIds(); if (D.inp) render();
+}
+/* Which picture a player gets: his ESPN headshot, the team logo for a D/ST, or (no ESPN id, or the image failed to
+   load: D.imgBad) a silhouette, or the team's abbreviation for a D/ST. */
+function getPlayerImage(u) {
+  if (u?.pos === 'DEF') { const src = TEAMS[u.team] ? `${ESPN_IMG}/i/teamlogos/nfl/500/${u.team.toLowerCase()}.png&w=96&h=96` : null;
+    return src && !D.imgBad.has(src) ? { kind: 'logo', src } : { kind: 'team', text: u?.team || '' }; }
+  const src = u?.espnId ? `${ESPN_IMG}/i/headshots/nfl/players/full/${u.espnId}.png&w=132&h=96&scale=crop` : null;
+  return src && !D.imgBad.has(src) ? { kind: 'head', src } : { kind: 'none' };
+}
+const imgFallback = (kind, text) => kind === 'team' ? `<span class="pimg-t">${esc(text)}</span>` : SILHOUETTE;
+function playerImg(u) {
+  const im = getPlayerImage(u);
+  return `<span class="pimg ${im.kind}" aria-hidden="true"${im.kind === 'logo' ? ` data-t="${esc(u.team)}"` : ''}>${im.src ? `<img src="${esc(im.src)}" alt="" width="44" height="44" loading="lazy" decoding="async">` : imgFallback(im.kind, im.text)}</span>`;
+}
+// error events don't bubble, so catch them on the way down: remember the bad image and show the fallback in its place
+document.addEventListener('error', e => {
+  const t = e.target, w = t.parentNode; if (t.tagName !== 'IMG' || !w?.classList?.contains('pimg')) return;
+  D.imgBad.add(t.getAttribute('src')); const k = w.dataset.t ? 'team' : 'none';
+  w.className = 'pimg ' + k; w.innerHTML = imgFallback(k, w.dataset.t);
+}, true);
+/* PlayerIdentity: picture, name, and a "POS · TEAM" line, wherever Benny asks you to decide on a player. `sub` follows
+   the team on that line (pills, notes), `after` adds lines below it, `size` is 'sm' or 'lg'; `name`, `line`, `nameCls`
+   and `subCls` reword or restyle a card's headline. Spans only, so it fits inside the lineup's row buttons. */
+function playerIdentity(u, { sub = '', after = '', size = '', name, line, nameCls = 'pname', subCls = 'psub' } = {}) {
+  return `<span class="pid${size ? ' ' + size : ''}">${playerImg(u)}<span class="pid-txt"><span class="${nameCls}">${name ?? esc(u.name)}</span><span class="${subCls}">${line ?? `${posLabel(u.pos)} · ${u.team || 'FA'}${sub}`}</span>${after}</span></span>`;
+}
 function playerRow(r, slotLabel, starting) {
   const open = D.open.has(r.id);
   const reason = r.status === 'bye' ? '<span class="pill m">Bye</span>' : r.status === 'out' ? '<span class="pill o">Unavailable</span>' : '';
   return `<div class="item"><button type="button" class="prow" data-expand="${esc(r.id)}" aria-expanded="${open}">
     <span class="slot ${starting ? '' : 'bench'}">${esc(slotLabel)}</span>
-    <span class="pwho"><span class="pname">${esc(r.u.name)}</span><span class="psub">${r.pos} · ${r.T || 'FA'} ${injPill(r)} ${reason} ${r.override != null ? '<span class="pill n">Override</span>' : ''} ${espnNote(r, starting)}</span></span>
+    <span class="pwho">${playerIdentity(r.u, { sub: ` ${injPill(r)} ${reason} ${r.override != null ? '<span class="pill n">Override</span>' : ''} ${espnNote(r, starting)}` })}</span>
     ${matchCell(r)}
     <span class="grade g-${r.grade}" title="${esc(gradeTip(r))}">${r.grade}</span>
     <span class="proj num">${r.status === 'bye' ? '—' : f1(r.mean)}</span>
@@ -3813,7 +3868,7 @@ function renderAc(inputId) {
   const open = cmp || q.length >= 2; list.hidden = !open; inp.setAttribute('aria-expanded', String(open));
   const tag = on => cmp ? (on ? '<span class="ac-tag on">On roster</span>' : '') : `<span class="ac-tag ${on ? 'on' : ''}">${on ? 'On roster' : 'Add'}</span>`;
   list.innerHTML = (browse ? '<div class="ac-head small muted" role="presentation">Your players · type to search everyone</div>' : '')
-    + (items.length ? items.map((u, i) => { const r = D.M[u.id], on = have.has(u.id); return `<button type="button" role="option" class="ac-item" data-acadd="${esc(u.id)}" data-acmode="${mode}" aria-selected="${i === D.ac.idx}"><span class="ac-main"><span class="pname">${esc(u.name)}</span><span class="psub">${u.pos === 'DEF' ? 'D/ST' : u.pos} · ${u.team || 'FA'}${r && r.status !== 'bye' ? ` · ${f1(r.mean)} proj` : r?.status === 'bye' ? ' · bye' : ''}${u.inj ? ' · ' + esc(u.inj) : ''}</span></span>${tag(on)}</button>`; }).join('')
+    + (items.length ? items.map((u, i) => { const r = D.M[u.id], on = have.has(u.id); return `<button type="button" role="option" class="ac-item" data-acadd="${esc(u.id)}" data-acmode="${mode}" aria-selected="${i === D.ac.idx}"><span class="ac-main">${playerIdentity(u, { size: 'sm', sub: `${r && r.status !== 'bye' ? ` · ${f1(r.mean)} proj` : r?.status === 'bye' ? ' · bye' : ''}${u.inj ? ' · ' + esc(u.inj) : ''}` })}</span>${tag(on)}</button>`; }).join('')
     : `<div class="ac-empty small muted">${q ? `No player matches “${esc(q)}”.` : 'Type a name to search.'}</div>`);
 }
 /* A pasted name that didn't match counts as found once you pick the player it names, so its "Not found" note doesn't
@@ -3885,7 +3940,7 @@ function playerListHTML() {
   if (!shown.length) return `<div class="item empty-row small muted">${view === 'mine' ? (pp === 'All' ? 'No players yet. Find one above, or use Paste / import roster.' : `No ${pp === 'DEF' ? 'D/ST' : pp}s on your roster.`) : 'No players match.'}</div>`;
   return shown.map(u => {
     const r = D.M[u.id], on = ros.has(u.id);
-    return `<div class="item rrow"><div class="rr-who"><div class="pname">${esc(u.name)}</div><div class="psub">${u.pos === 'DEF' ? 'D/ST' : u.pos || '—'} · ${u.team || 'FA'} ${r ? injPill(r) : ''} ${!r ? '<span class="pill m">No data this week</span>' : r.status === 'bye' ? '<span class="pill m">Bye</span>' : r.O ? `${D.tg[u.team]?.home ? 'vs' : '@'} ${r.O}` : ''} ${r?.chip ? `<span class="chip ${r.chip.dir}">${esc(r.chip.text)}</span>` : ''}</div></div>
+    return `<div class="item rrow"><div class="rr-who">${playerIdentity(u, { sub: ` ${r ? injPill(r) : ''} ${!r ? '<span class="pill m">No data this week</span>' : r.status === 'bye' ? '<span class="pill m">Bye</span>' : r.O ? `${D.tg[u.team]?.home ? 'vs' : '@'} ${r.O}` : ''} ${r?.chip ? `<span class="chip ${r.chip.dir}">${esc(r.chip.text)}</span>` : ''}` })}</div>
       <div class="num rr-proj">${!r || r.status === 'bye' ? '—' : f1(r.mean)}</div>${r ? `<span class="grade g-${r.grade}" title="${esc(gradeTip(r))}">${r.grade}</span>` : '<span></span>'}
       ${D.showOvr && r ? `<input class="inp rr-ovr" type="number" step="0.1" data-ovr="${esc(u.id)}" value="${r.override ?? ''}" placeholder="Override" aria-label="Override projection for ${esc(u.name)}">` : ''}
       <button type="button" class="btn sm ${on ? '' : 'primary'}" data-${on ? 'remove' : 'add'}="${esc(u.id)}" ${locked ? 'aria-disabled="true"' : ''}>${on ? 'Remove' : 'Add'}</button></div>`;
@@ -3998,7 +4053,7 @@ function viewCompare() {
     const call = pw < 0.55 ? 'Toss-up' : pw < 0.65 ? 'Slight lean' : pw < 0.8 ? 'Clear lean' : 'Strong lean';
     const why = pickReasons(w, l), gnote = gradeNote(w, l);
     verdict = `<div class="card pick"><div class="pick-head"><span class="label">Benny’s Pick</span><span class="pill ${pw < 0.55 ? 'm' : 'n'}">${call}</span></div>
-      <div class="pick-main"><div class="pick-who"><div class="pick-name">Start ${esc(w.u.name)}</div><div class="small muted">over ${esc(l.u.name)} · ${w.pos} · ${w.T || 'FA'} · matchup grades ${w.grade} vs ${l.grade}</div></div>
+      <div class="pick-main"><div class="pick-who">${playerIdentity(w.u, { size: 'lg', name: `Start ${esc(w.u.name)}`, nameCls: 'pick-name', subCls: 'small muted', line: `over ${esc(l.u.name)} · ${posLabel(w.pos)} · ${w.T || 'FA'} · matchup grades ${w.grade} vs ${l.grade}` })}</div>
         <div class="pick-stat"><span class="num">${edge >= 0.05 ? '+' : ''}${f1(edge)}</span><span class="small muted">projected pts edge</span></div></div>
       <div class="meter" aria-label="${esc(A.u.name)} ${pct(pA)}, ${esc(Bp.u.name)} ${pct(1 - pA)}"><span style="width:${pA * 100}%"></span></div>
       <div class="small muted pick-odds">${pw < 0.55 ? 'Too close to call on projections alone; Benny leans this way. Check late injury news, or use Safe or Boom on the Lineup tab to break the tie. ' : ''}Model estimate of the chance to outscore: ${esc(shortName(A.id))} ${pct(pA)}, ${esc(shortName(Bp.id))} ${pct(1 - pA)}. ${calibNote()}</div>
@@ -4009,7 +4064,7 @@ function viewCompare() {
   const dec = reviewDecisions(), decShown = isPro() ? dec : dec.slice(0, 1), decMore = dec.length - decShown.length;
   const decBar = dec.length ? `<div class="decisions"><span class="label">Decisions to review</span>${decShown.map(d => { const s = D.M[d.start], b = D.M[d.alt], on = a === d.start && Bp?.id === d.alt; return `<button type="button" class="chip dchip" data-decide="${esc(d.start)}|${esc(d.alt)}" aria-pressed="${on}">${esc(d.slot)}: ${esc(shortName(s.id))} or ${esc(shortName(b.id))}${d.tagged ? ` <span class="pill q">${esc(s.inj === 'Questionable' ? 'Q' : 'D')}</span>` : ''}</button>`; }).join('')}${decMore ? lockLine(`${decMore} more close call${decMore === 1 ? '' : 's'} this week`) : ''}</div>` : '';
   const col = r => { if (!r) return `<div class="card small muted">Pick a player.</div>`; const why = topReasons(r);
-    return `<div class="card"><div><div class="pname" style="font-size:18px">${esc(r.u.name)}</div><div class="psub">${r.pos} · ${r.T} ${injPill(r)} · <span title="${esc(gradeTip(r))}">matchup grade ${r.grade}</span></div>${r.role ? `<div class="small"><strong>${esc(roleText(r.role))}.</strong></div>` : ''}${oppText(r) ? `<div class="small muted">${esc(oppText(r))}</div>` : ''}</div>${matchCell(r, true)}${r.game && !r.locked && r.status !== 'bye' ? `<div class="small">${wxLine(r.game)}</div>` : ''}
+    return `<div class="card"><div>${playerIdentity(r.u, { size: 'lg', sub: ` ${injPill(r)} · <span title="${esc(gradeTip(r))}">matchup grade ${r.grade}</span>` })}${r.role ? `<div class="small"><strong>${esc(roleText(r.role))}.</strong></div>` : ''}${oppText(r) ? `<div class="small muted">${esc(oppText(r))}</div>` : ''}</div>${matchCell(r, true)}${r.game && !r.locked && r.status !== 'bye' ? `<div class="small">${wxLine(r.game)}</div>` : ''}
     <div class="probs"><div><span class="label">Projection</span><span class="num">${r.status === 'bye' ? 'Bye' : f1(r.mean)}</span></div><div><span class="label">Likely range</span><span class="num">${f1(r.floor)}–${f1(r.ceil)}</span></div></div>
     ${why.length ? `<ul class="reasons">${why.map(x => `<li class="${x.up ? 'up' : 'down'}"><span class="rv">${spct(x.pct)}</span> ${esc(x.text)}</li>`).join('')}</ul>` : ''}
     ${isPro() ? `<details class="more"><summary>All factors</summary>${factorList(r)}${r.scheme ? `<div class="scheme"><strong>Scheme:</strong> ${esc(r.scheme)}</div>` : ''}</details>
@@ -4414,6 +4469,7 @@ acctBoot();
   } }
 { const tab = TAB_OF[location.hash.slice(1)]; if (tab && needsTeam() && INTENT_TABS.has(tab)) D.intent = tab; if (tab) state.tab = tab; else if (location.hash !== '#export' && !SELFTEST && HASH[state.tab]) { try { history.replaceState(null, '', '#' + HASH[state.tab]); } catch {} } }
 render();
+if (!SELFTEST && location.hash !== '#export') loadPlayerIds();
 load();
 setTimeout(anStart, 1500);
 if (anFlag === 'off' || anFlag === 'on') {
