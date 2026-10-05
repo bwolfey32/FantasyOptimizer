@@ -38,7 +38,7 @@ export async function leagueNames(id) {
 }
 // the link's teams that the league has, with their names: [{ rank, name, score, letter }]
 export function rankedTeams(L, names) {
-  return L.r.filter(([rid]) => names.teams[rid]).map(([rid, score], i) => ({ rank: i + 1, name: names.teams[rid], score, letter: letterOf(score) }));
+  return L.r.filter(([rid]) => Object.hasOwn(names.teams, rid)).map(([rid, score], i) => ({ rank: i + 1, name: names.teams[rid], score, letter: letterOf(score) }));
 }
 
 /* The power rankings card: the league's name, then every team in two columns, rank, name, letter grade and score. Rows

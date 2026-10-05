@@ -413,6 +413,13 @@ test('power rankings: every roster in a league graded, best first, and your own 
   if (rows.some((r, i) => i && r.g && rows[i - 1].g.score < r.g.score)) return 'not sorted: ' + rows.map(r => r.g?.score).join(',');
   return own.g.score === g.score || `league grade ${own.g.score}, Benny Grade ${g.score}`;
 });
+test('Start/Sit ignores an id that names no player (a crafted share link), without an error', () => {
+  setup(); const st = ev('state'), ok = st.roster.find(id => M(id)?.status === 'ok');
+  st.compare = ['constructor', ok]; let html = '';
+  try { html = ev('viewCompare')(); } finally { st.compare = [null, null]; }
+  const shown = ev('D').cmpShown;
+  return /Side by side/.test(html) && !/function Object/.test(html) && !shown.includes('constructor') || `shown ${shown}`;
+});
 test('Start/Sit makes no call for a player whose game started', () => {
   setup(); const L = lockedOnRoster(), free = ev('state').roster.find(id => M(id) && !M(id).locked && M(id).status === 'ok');
   ev('state').compare = [L[0], free]; const html = ev('viewCompare')(); ev('state').compare = [null, null];

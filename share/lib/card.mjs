@@ -24,8 +24,9 @@ async function players() {
 /* { name, pos, team, img } for a Sleeper id (a team abbreviation is its D/ST), or null if the site doesn't know him. */
 export async function who(id) {
   if (!id) return null;
-  if (TEAMS[id]) return { name: `${TEAMS[id]} D/ST`, pos: 'D/ST', team: id, img: `${ESPN_IMG}/i/teamlogos/nfl/500-dark/${id.toLowerCase()}.png&w=200&h=200`, logo: true };
-  const x = (await players())[id]; if (!x) return null;
+  // own keys only: an id like "constructor" is no team and no player
+  if (Object.hasOwn(TEAMS, id)) return { name: `${TEAMS[id]} D/ST`, pos: 'D/ST', team: id, img: `${ESPN_IMG}/i/teamlogos/nfl/500-dark/${id.toLowerCase()}.png&w=200&h=200`, logo: true };
+  const p = await players(), x = Object.hasOwn(p, id) ? p[id] : null; if (!Array.isArray(x)) return null;
   const [name, pos, team, espn] = x;
   return { name, pos, team: team || 'FA', img: espn ? `${ESPN_IMG}/i/headshots/nfl/players/full/${espn}.png&w=330&h=240&scale=crop` : null };
 }

@@ -51,7 +51,7 @@ function collect() {
     if (/^(out|doubtful|questionable)/i.test(u.inj || '')) out.push(`${u.inj.toLowerCase()} now: check the news first`);
     if (bp) out.push(`bigger role while ${bp.mate.name} is out (${bp.mate.inj}), expected back week ${bp.back}`);
     else if (fi) out.push(`filling in for ${fi.name} (${fi.inj})`);
-    else if (r.role) out.push(roleText(r.role, true).toLowerCase());
+    else if (r.role) { const t = roleText(r.role, true); out.push(t[0].toLowerCase() + t.slice(1)); }
     if (r.doubt) out.push(`slow start: ${r1(r.doubt.scored)} points a game so far`);
     const ms = weeks.slice(0, H).map(w => { const s = schedOpp(u.team, w); return s.opp ? matchupMult(u.pos, s.opp, w, u.team) : null; }).filter(x => x != null);
     const sm = ms.length ? ms.reduce((a, b) => a + b, 0) / ms.length : null;

@@ -3467,10 +3467,16 @@ function leagueTable(L, mine) {
   </tbody></table></div>
   <p class="small muted" style="margin:0">Each roster’s Benny Grade, out of 100: its starters ranked against every player at their position on rest-of-season value, in this league’s lineup and size. It rates roster strength now, not the record so far.</p>`;
 }
+// a league's data, fetched once while it's missing (the panel can open on a team whose league isn't loaded yet), then a render
+function needLeague(lid) {
+  if (!lid || D.lg[lid] || D.lgBusy?.has(lid)) return;
+  (D.lgBusy ||= new Set()).add(lid);
+  fetchLeague(lid).then(L => { D.lgBusy.delete(lid); if (L.lg) track('power_rankings_viewed', { teams: L.rosters.length, shared: false }); render(); });
+}
 // the rankings for the active Sleeper team's league, under its grade card on Lineup
 function leaguePanel() {
   const s = state.sleeper; if (!D.lgOpen || !s?.leagueId) return '';
-  const L = D.lg[s.leagueId];
+  const L = D.lg[s.leagueId]; needLeague(s.leagueId);
   const head = `<div class="row-head"><h2>Benny’s power rankings <span class="hsub">${esc(L?.lg?.name || s.leagueName || 'league')} · week ${D.week}</span></h2>
     <span class="toolbar">${L?.lg ? '<button type="button" class="btn sm primary" data-act="shareleague">Share with your league</button>' : ''}<button type="button" class="btn sm" data-act="league">Close</button></span></div>`;
   const body = !L ? '<p class="small muted" style="margin:0">Loading every team in your league…</p>'
@@ -3479,11 +3485,11 @@ function leaguePanel() {
   return `<div class="card panel lgp">${head}${body}</div>`;
 }
 function toggleLeague() {
-  D.lgOpen = !D.lgOpen; render();
-  if (!D.lgOpen) return;
-  revealPanel($('.lgp'));
-  const lid = state.sleeper?.leagueId; if (!lid) return;
-  fetchLeague(lid).then(L => { if (L.lg) track('power_rankings_viewed', { teams: L.rosters.length, shared: false }); render(); });
+  D.lgOpen = !D.lgOpen;
+  const lid = state.sleeper?.leagueId, L = D.lg[lid];
+  if (D.lgOpen && L && !(L.lg && Date.now() - L.at < 5 * 60000)) delete D.lg[lid];   // opening again later, or after an error: fresh rosters
+  render();   // leaguePanel fetches the league if it isn't here yet
+  if (D.lgOpen) revealPanel($('.lgp'));
 }
 /* Someone opened a shared rankings link (?league=): the league's rankings, with the way to set up your own team from it.
    For a visitor with no team this leads the welcome; for anyone else it shows on Lineup until dismissed (or, for the
@@ -3496,7 +3502,8 @@ function sharedLeagueCard() {
   const teams = slTeams(L.rosters, L.users).filter(t => t.n), wrongSeason = L.lg.season !== String(D.season);
   const pick = wrongSeason ? `<p class="small muted" style="margin:0">This league is from the ${esc(L.lg.season)} season; Benny is set to ${D.season}.</p>`
     : `<div class="toolbar"><label class="label" for="lgMine">Which team is yours?</label><select class="sel" id="lgMine" style="flex:1 1 200px">${teams.map(t => `<option value="${t.rosterId}">${esc(t.name)}${t.owner !== t.name ? ' · ' + esc(t.owner) : ''}</option>`).join('')}</select>
-      <button type="button" class="btn primary" data-act="sharedlguse">${needsTeam() ? 'Set up my team' : 'Add my team'}</button></div>`;
+      <button type="button" class="btn primary" data-act="sharedlguse">${needsTeam() ? 'Set up my team' : canAddTeam() ? 'Add my team' : 'Switch to my team here'}</button></div>
+      ${needsTeam() || canAddTeam() ? '' : `<p class="small muted" style="margin:0">Free keeps one team, so this takes the place of ${esc(curTeam().name)}; you’ll see it before it’s saved. <a href="#pro" data-tab="pro">Pro</a> keeps every league.</p>`}`;
   return `<div class="card panel lgp"><div class="row-head"><h2>Benny’s power rankings <span class="hsub">${esc(L.lg.name)} · week ${D.week}</span></h2>${close}</div>
     ${leagueTable(L)}${pick}</div>`;
 }
@@ -3649,7 +3656,7 @@ function go(tab, opts = {}) {
 window.addEventListener('hashchange', () => {
   const tab = TAB_OF[location.hash.slice(1)]; if (!tab) return;
   track('screen_viewed', { screen: HASH[tab], has_team: !needsTeam() });
-  if (needsTeam() && tab !== 'pro') D.intent = INTENT_TABS.has(tab) ? tab : null;   // before there's a team, setup lands on the last page visited
+  if (needsTeam() && tab !== 'pro') D.intent = INTENT_TABS.has(tab) ? tab : null;   // before there's a team: where setup lands (INTENT_TABS)
   state.tab = tab; save(); render(); if (D.navScroll !== false) window.scrollTo(0, 0); D.navScroll = true; runAfter();
 });
 // a one-shot step to run after the next page renders (scroll to a team, highlight the best move)
@@ -4054,7 +4061,8 @@ function actWelcomeSignIn() { D.wSignin = !D.wSignin; acct.msg = null; if (D.wSi
    below them. Once the team is saved they go straight to their lineup, where a banner offers an account (nudge).
    People who already have an account sign in at the top and get their teams straight back. */
 /* The welcome matches what the link promised: a link to Waivers (D.intent) gets its own headline, and after setup lands
-   on that page instead of Lineup (goIntended). Setup started from a page that works without a team lands back there. */
+   on that page instead of Lineup (goIntended). Setup started on Start / Sit lands back there, with your own close calls;
+   from Research or Settings it lands on Lineup, the first thing a new team is for. */
 const WELCOME_HERO = {
   lineup: ['Your best lineup, every week', 'Add your team to see recommended starters and waiver pickups.'],
   waivers: ['Your best waiver pickup, for your roster', 'Bring in your team and Benny ranks free agents by how many points they’d add to your lineup, for your scoring and your roster’s needs. With a Sleeper league, it uses your league’s real free agents.'],
@@ -4541,7 +4549,7 @@ function exampleCall(withId) {
   return [null, null];
 }
 function viewCompare() {
-  let [a, b] = state.compare;
+  let [a, b] = state.compare.map(id => id != null && Object.hasOwn(D.M, id) ? id : null);   // only players with this week's numbers
   // open on the closest start/sit call when nothing is picked yet
   if (!a || !D.M[a] || !b || !D.M[b]) { const d = reviewDecisions()[0]; if (d) { a = d.start; b = d.alt; } }
   if (!a || !D.M[a] || !b || !D.M[b]) { const ros = state.roster.map(id => D.M[id]).filter(r => r && r.status === 'ok'); const { bench } = optimize(); const nb = bench.find(r => r.status === 'ok'); if (nb) { const { starters } = optimize(); const st = starters.find(s => s.r && s.slot.elig.includes(nb.pos)); a = a && D.M[a] ? a : st?.r.id; b = b && D.M[b] ? b : nb.id; } else if (ros.length > 1) { a = a || ros[0].id; b = b || ros[1].id; } }
@@ -4818,7 +4826,7 @@ document.addEventListener('click', e => {
   else if (a === 'sharedcallx') { D.sharedCall = false; render(); }
   else if (a === 'sharedx') { D.shared = null; render(); }
   else if (a === 'league') toggleLeague();
-  else if (a === 'leagueretry') { const lid = state.sleeper?.leagueId; if (lid) { delete D.lg[lid]; render(); fetchLeague(lid, true).then(render); } }
+  else if (a === 'leagueretry') { delete D.lg[state.sleeper?.leagueId]; render(); }   // leaguePanel fetches it again
   else if (a === 'shareleague') shareLeague();
   else if (a === 'sharedlgx') { D.sharedLeague = null; render(); }
   else if (a === 'sharedlgretry') { delete D.lg[D.sharedLeague]; render(); fetchLeague(D.sharedLeague, true).then(render); }
@@ -5068,7 +5076,7 @@ acctBoot();
     try { history.replaceState(null, '', u.pathname + u.search + u.hash); } catch {}
   } }
 // a shared start/sit call (shareCall's link): open Start / Sit on those two players, team or not
-{ const u = new URL(location.href), q = u.searchParams, idOk = s => /^[\w-]{1,12}$/.test(s || '');
+{ const u = new URL(location.href), q = u.searchParams, idOk = s => /^[\w-]{1,12}$/.test(s || '') && !(s in {});   // not "constructor" and the like
   if (q.has('start') || q.has('sit')) {
     if (idOk(q.get('start')) && idOk(q.get('sit'))) { state.compare = [q.get('start'), q.get('sit')]; D.sharedCall = true; track('shared_call_opened', { has_team: !needsTeam() }); }
     q.delete('start'); q.delete('sit');
@@ -5082,7 +5090,7 @@ acctBoot();
     if (/^\d{6,24}$/.test(lid || '')) {
       const mine = state.teams.find(t => t.sleeper?.leagueId === lid);
       track('shared_league_opened', { has_team: !needsTeam(), own_league: !!mine });
-      if (mine) { stashTeam(); state.activeTeam = mine.id; applyTeam(mine); D.lgOpen = true; fetchLeague(lid).then(render); }
+      if (mine) { stashTeam(); state.activeTeam = mine.id; applyTeam(mine); D.lgOpen = true; }   // leaguePanel loads the league
       else {
         D.sharedLeague = lid;
         fetchLeague(lid).then(L => {

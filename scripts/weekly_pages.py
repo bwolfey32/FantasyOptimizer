@@ -40,15 +40,21 @@ except Exception:  # no time zone data: kickoffs in UTC
 
 esc = html.escape
 lab = lambda p: POS_LABEL.get(p, p)
+cap = lambda t: t[:1].upper() + t[1:]   # unlike str.capitalize, leaves names as they are
 
 
 def collect(fixture):
     srv = serve()
     url = f"http://127.0.0.1:{srv.server_address[1]}/scripts/weekly-pages.html?fixture={fixture}"
-    with tempfile.TemporaryDirectory() as prof:
-        dom = subprocess.run([find_chrome(), "--headless=new", "--no-sandbox", "--disable-gpu", f"--user-data-dir={prof}",
-                              "--virtual-time-budget=180000", "--dump-dom", url], capture_output=True, text=True, timeout=600).stdout
-    srv.shutdown()
+    # kept well inside the data refresh's 15 minutes, so a stuck browser can't hold up publishing the new snapshot
+    try:
+        with tempfile.TemporaryDirectory() as prof:
+            dom = subprocess.run([find_chrome(), "--headless=new", "--no-sandbox", "--disable-gpu", f"--user-data-dir={prof}",
+                                  "--virtual-time-budget=120000", "--dump-dom", url], capture_output=True, text=True, timeout=300).stdout
+    except subprocess.TimeoutExpired:
+        sys.exit("Chrome didn't finish the weekly pages in 5 minutes; keeping the old pages.")
+    finally:
+        srv.shutdown()
     m = re.search(r'<pre id="pages-out">(.*?)</pre>', dom, re.S)
     text = html.unescape(m.group(1)) if m else "ERROR no results in the page"
     if not text.startswith("{"):
@@ -202,7 +208,7 @@ def waiver_page(d):
                            if s["m"] is not None else f'<span class="wk">{s["w"]}</span>' for s in r["sched"])
         trs = "".join(
             f'<tr><td class="n">{i + 1}</td><td class="l"><strong>{esc(r["name"])}</strong> <span class="muted small">{esc(r["team"]) if p != "DEF" else ""}</span>'
-            f'{("<div class=small>" + esc("; ".join(r["notes"]).capitalize()) + "</div>") if r["notes"] else ""}</td>'
+            f'{("<div class=small>" + esc(cap("; ".join(r["notes"]))) + "</div>") if r["notes"] else ""}</td>'
             f'<td>{"&lt;1" if r["own"] < 1 else round(r["own"])}%</td><td>{r["ppg"]:.1f}</td><td><strong>{r["next"]:.1f}</strong></td><td class="l hide-s">{sched(r)}</td></tr>'
             for i, r in enumerate(rows))
         body.append(f'<h2 id="{p.lower()}">{POS_NAME[p]}</h2><div class="tscroll"><table><thead><tr><th>#</th><th class="l">Player</th><th title="Share of ESPN leagues that roster him">Rostered</th>'
