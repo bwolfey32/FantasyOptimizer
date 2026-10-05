@@ -37,6 +37,11 @@ jobs:
       - name: Check past forecasts against results
         run: python3 scripts/calibrate.py || echo "Calibration skipped this run"
 
+      # the fresh data through whole drafted leagues: advice that reads as wrong on sight lands in this run's summary;
+      # never blocks the snapshot
+      - name: Audit the advice on the new data
+        run: python3 scripts/audit.py --fixture snapshot.json --leagues 3 --summary "$GITHUB_STEP_SUMMARY" --report-only || echo "Audit skipped this run"
+
       # Sleeper and ESPN ids for player headshots, and share-players.json for share links' cards; rebuilt at most once a day, and a failure keeps the old map
       - name: Update player ids
         run: python3 scripts/player_ids.py player-ids.json || echo "Player ids kept from the last run"

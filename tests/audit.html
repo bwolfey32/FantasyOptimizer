@@ -1,0 +1,253 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Benny's Picks audit</title>
+<style>
+  body { font: 14px/1.5 system-ui, sans-serif; margin: 16px; background: #fff; color: #111; }
+  pre { white-space: pre-wrap; }
+  iframe { width: 1200px; height: 600px; border: 1px solid #ccc; }
+</style>
+</head>
+<body>
+<h1>Benny's Picks audit</h1>
+<p>Drafts whole leagues from a data bundle (ESPN roster percentages as the draft order), runs Lineup, Start/Sit, Waivers,
+Benny's Moves and Benny Grade for every team under several league setups, and flags advice a fantasy player would call
+wrong on sight. <code>?fixture=path</code> picks the bundle (default: <code>snapshot.json</code>, the live data),
+<code>?leagues=N</code> how many leagues. Lines starting with ERROR are rule breaks; WARN lines are worth a look. Run it
+with <code>scripts/audit.py</code>, or serve the repo folder and open this page.</p>
+<pre id="audit-out">running…</pre>
+<iframe id="app" title="App under test"></iframe>
+<script>
+const Q = new URLSearchParams(location.search), FIXTURE = Q.get('fixture') || 'snapshot.json', LEAGUES = +(Q.get('leagues') || 2);
+const frame = document.getElementById('app');
+frame.src = `../index.html?fixture=${encodeURIComponent(FIXTURE).replace(/%2F/g, '/')}#selftest`;   // relative to index.html
+let W;
+const ev = s => W.eval(s);
+const r1 = x => Math.round(x * 10) / 10;
+
+/* ---------- league setups ---------- */
+const BASE_SLOTS = { QB: 1, RB: 2, WR: 2, TE: 1, FLEX: 1, 'RB/WR': 0, 'WR/TE': 0, OP: 0, 'D/ST': 1, K: 1 };
+const CONFIGS = [
+  { name: 'PPR, 4 wks, under-50% pool', scoring: 'ppr', slots: BASE_SLOTS, waivers: { horizon: 4, source: 'own' } },
+  { name: 'PPR, 4 wks, league FAs', scoring: 'ppr', slots: BASE_SLOTS, waivers: { horizon: 4, source: 'list' } },
+  { name: 'half, superflex, 2 wks, league FAs', scoring: 'half', slots: Object.assign({}, BASE_SLOTS, { OP: 1 }), waivers: { horizon: 2, source: 'list' } },
+  { name: 'std, rest of season + long term, league FAs', scoring: 'std', slots: BASE_SLOTS, waivers: { horizon: 'ros', source: 'list', rank: 'blend' } },
+];
+
+/* ---------- draft: 12 teams, snake, 16 rounds, ESPN roster % as the board with a little noise ---------- */
+function rng(seed) { let s = seed >>> 0; return () => (s = (s * 1664525 + 1013904223) >>> 0) / 4294967296; }
+const CAP = { QB: 2, RB: 6, WR: 6, TE: 2, K: 1, DEF: 1 }, NEED = { QB: 1, RB: 2, WR: 2, TE: 1, K: 1, DEF: 1 };
+function draftLeague(seed, teams = 12, rounds = 16) {
+  const D = ev('D'), r = rng(seed);
+  const board = [...D.U.values()].filter(u => D.M[u.id] && (D.own.get(u.id) ?? 0) >= 1)
+    .map(u => ({ id: u.id, pos: u.pos, v: D.own.get(u.id) * (0.85 + 0.3 * r()) })).sort((a, b) => b.v - a.v);
+  const rosters = Array.from({ length: teams }, () => []), taken = new Set();
+  const cnt = (t, p) => rosters[t].filter(x => x.pos === p).length;
+  for (let rd = 0; rd < rounds; rd++) for (let k = 0; k < teams; k++) {
+    const t = rd % 2 ? teams - 1 - k : k, left = rounds - rd;
+    const missing = Object.keys(NEED).filter(p => cnt(t, p) < NEED[p]);
+    // kickers and defenses go in the last rounds, and every starting spot gets filled before the draft ends
+    const okPos = p => cnt(t, p) < CAP[p] && ((p !== 'K' && p !== 'DEF') || rd >= rounds - 3) && (left > missing.length || missing.includes(p));
+    const pick = board.find(x => !taken.has(x.id) && okPos(x.pos));
+    if (pick) { taken.add(pick.id); rosters[t].push(pick); }
+  }
+  return { rosters: rosters.map(rs => rs.map(x => x.id)), drafted: taken };
+}
+
+/* ---------- running one team ---------- */
+function setTeam(roster, cfg, fa) {
+  const st = ev('state'), DEF = ev('DEFAULT_STATE');
+  st.roster = roster.slice(); st.slots = Object.assign({}, cfg.slots); st.scoring = cfg.scoring; st.tePrem = 0; st.sleeper = null;
+  st.overrides = {}; st.returnWeek = {}; st.liveFix = {}; st.espn = Object.assign({}, DEF.espn);
+  st.waivers = Object.assign(JSON.parse(JSON.stringify(DEF.waivers)), cfg.waivers);
+  if (cfg.waivers.source === 'list') st.waivers.faList = fa;
+  st.settings = Object.assign({}, DEF.settings, { w: Object.assign({}, DEF.settings.w) });
+  ev('D').wCache = null; ev('syncScoring')();
+}
+
+/* ---------- detectors ---------- */
+const flags = [], counts = {};
+let CTX = null;   // the team being checked, kept with each flag so a case can be replayed
+function flag(level, kind, where, msg, data = CTX) {
+  counts[kind] = counts[kind] || { level, n: 0 }; counts[kind].n++;
+  flags.push({ level, kind, where, msg, data });
+}
+const nm = id => { const u = ev('D').U.get(id); return u ? `${u.name} (${u.pos} ${u.team || 'FA'})` : id; };
+const own = id => ev('D').own.get(id) ?? 0;
+
+// every number the page shows should be a number
+function checkNumbers(where) {
+  const D = ev('D');
+  for (const [id, r] of Object.entries(D.M)) {
+    if (!Number.isFinite(r.mean) || !Number.isFinite(r.sd) || r.sd < 0) flag('ERROR', 'projection-not-a-number', where, `${nm(id)}: mean ${r.mean}, sd ${r.sd}`);
+    else if (r.status === 'ok' && r.mean > 0 && r.floor > r.mean + 1e-9) flag('ERROR', 'range-above-projection', where, `${nm(id)}: floor ${r1(r.floor)} > ${r1(r.mean)}`);
+  }
+}
+/* Projections far from Sleeper's for players people roster. Not wrong by itself (the model means to differ sometimes),
+   but the biggest gaps are where a reviewer looks first. */
+function checkProjections(where) {
+  const D = ev('D');
+  const rows = Object.values(D.M).filter(r => r.status === 'ok' && !r.locked && r.projPts >= 5 && own(r.id) >= 20 && D.tg[r.T])
+    .map(r => ({ r, k: r.mean / r.projPts })).filter(x => x.k >= 1.4 || x.k <= 0.65);
+  for (const { r, k } of rows.sort((a, b) => Math.abs(Math.log(b.k)) - Math.abs(Math.log(a.k))))
+    flag('WARN', 'projection-far-from-sleeper', where, `${nm(r.id)}: Benny ${r1(r.mean)} vs Sleeper ${r1(r.projPts)} (${Math.round(k * 100)}%), form ${r1(ev('formOf')(r.id) ?? NaN)}, ${own(r.id)}% rostered${r.role ? ', ' + r.role.kind : ''}`);
+  // a widely rostered healthy player whose team plays but who has no projection is valued at nothing as a "backup"
+  // (a questionable player who lost his projection is a late scratch, r.scratch, and is said so)
+  for (const r of Object.values(D.M)) if (r.status === 'ok' && D.tg[r.T] && own(r.id) >= 50 && !(r.projPts > 0) && r.pos !== 'DEF')
+    flag('WARN', 'rostered-player-without-projection', where, `${nm(r.id)}: ${own(r.id)}% rostered, no Sleeper projection, Benny ${r1(r.mean)}${r.role ? ' (' + r.role.kind + ')' : ''}`);
+  for (const r of Object.values(D.M)) if (r.scratch && r.role) flag('ERROR', 'scratch-called-backup', where, nm(r.id));
+}
+function checkLineup(where) {
+  const { starters, bench } = ev('optimize')();
+  for (const s of starters) {
+    const r = s.r; if (!r || r.locked) continue;
+    if (r.status !== 'ok') flag('ERROR', 'lineup-starts-unavailable', where, `${nm(r.id)} starts at ${s.slot.k} but is ${r.status}`);
+    const better = bench.filter(b => b.status === 'ok' && !b.locked && s.slot.elig.includes(b.pos) && b.mean > r.mean + 0.05);
+    if (better.length && ev('strategy')() === 'mean') flag('ERROR', 'lineup-benches-better-player', where, `${nm(better[0].id)} ${r1(better[0].mean)} on the bench, ${nm(r.id)} ${r1(r.mean)} starts at ${s.slot.k}`);
+    if (r.role?.kind === 'backup' || (D_tg(r.T) && !(r.projPts > 0) && r.pos !== 'DEF')) flag('WARN', 'lineup-starts-backup', where, `${nm(r.id)} starts at ${s.slot.k} with no Sleeper projection (${r1(r.mean)})`);
+  }
+  if (!starters.some(s => s.r)) flag('ERROR', 'lineup-empty', where, 'no starters');
+}
+const D_tg = T => !!ev('D').tg[T];
+function checkWaivers(where, roster) {
+  const D = ev('D'), Wv = ev('computeWaivers')(), sched = ev('schedOpp'), weeks = Wv.weeks;
+  const rec = Wv.moves.filter(m => !m.marginal);
+  if (Wv.best && Wv.best.marginal) flag('ERROR', 'best-move-is-marginal', where, nm(Wv.best.f));
+  for (const m of Wv.moves) {
+    for (const k of ['hz', 'score', 'strength']) if (!Number.isFinite(m[k])) flag('ERROR', 'waiver-not-a-number', where, `${nm(m.f)} ${k}=${m[k]}`);
+    if (!roster.includes(m.d) && m.d) flag('ERROR', 'waiver-drops-player-not-on-roster', where, nm(m.d));
+    if (roster.includes(m.f)) flag('ERROR', 'waiver-adds-own-player', where, nm(m.f));
+  }
+  for (const m of rec) {
+    const f = D.U.get(m.f), d = m.d ? D.U.get(m.d) : null, txt = `add ${nm(m.f)}${d ? ', drop ' + nm(m.d) : ''} +${r1(m.hz)} over ${m.H}: ${m.whyText}`;
+    const fh = D.H[m.f], dh = d && D.H[m.d], fp = D.prevPPG[m.f]?.[0], dp = d && D.prevPPG[m.d]?.[0];
+    if (m.hz < 1 && !m.longBet) flag('ERROR', 'recommended-with-tiny-gain', where, txt);
+    // most of the gain from a single week (a bye or an injury) on a move sold as an upgrade
+    if (m.H >= 3 && m.wd && m.hz > 1) { const top = Math.max(...m.wd); if (top >= 0.65 * m.hz && m.strength >= 1 && !/of the gain is|bye|short-term|cover|matchup/i.test(m.whyText)) flag('WARN', 'gain-is-one-week', where, `${txt} [weeks ${m.wd.map(r1).join(', ')}]`); }
+    // a player most leagues roster: never dropped for a patch, and the reason says why he's expendable for an upgrade
+    const held = d && !['K', 'DEF'].includes(f.pos) && (W.marketHeld ? W.marketHeld(m.d, m.f) : own(m.d) >= 50 && own(m.d) - own(m.f) >= 30);
+    if (held && m.strength < 0.25) flag('ERROR', 'market-held-dropped-for-patch', where, `${txt} [rostered ${own(m.f)}% vs ${own(m.d)}%]`);
+    else if (held && !/lineup|bigger role/.test(m.whyText.split(';').slice(1).join(';'))) flag('WARN', 'market-held-drop-unexplained', where, `${txt} [rostered ${own(m.f)}% vs ${own(m.d)}%]`);
+    else if (d && !['K', 'DEF'].includes(d.pos) && own(m.d) - own(m.f) >= 40 && !/lineup|bigger role/.test(m.whyText)) flag('WARN', 'market-disagrees', where, `${txt} [rostered ${own(m.f)}% vs ${own(m.d)}%]`);
+    // the drop has outscored the add this season and last
+    if (d && d.pos === f.pos && dh?.n && fh?.n && dh.avg > fh.avg + 1 && ok(dp) && ok(fp) && dp > fp + 1)
+      flag('WARN', 'drop-outscores-add', where, `${txt} [this season ${r1(fh.avg)} vs ${r1(dh.avg)}, last ${fp} vs ${dp}]`);
+    // the add isn't his team's starter by Sleeper's projections (kickers, QBs, defenses: only one plays)
+    const T = f.team, dep = ev('D').depth?.[T + '|' + f.pos] || [];
+    if (D.tg[T] && !(D.proj[m.f]?.pts > 0) && !f.inj) flag('WARN', 'add-has-no-projection', where, `${txt} [no Sleeper projection this week]`);
+    else if (['QB', 'K'].includes(f.pos) && dep.length && dep[0] !== m.f && !f.inj) flag('WARN', 'add-not-the-starter', where, `${txt} [${nm(dep[0])} projects ${r1(D.proj[dep[0]].pts)} vs ${r1(D.proj[m.f]?.pts ?? 0)}]`);
+    if (!fh?.n && (ev('D').cur?.[T]?.g || 0) >= 2) flag('WARN', 'add-has-not-played', where, `${txt} [no games this season]`);
+    if (/^(questionable|doubtful|out)/i.test(f.inj || '') && !/check the news/.test(m.whyText)) flag('ERROR', 'injured-add-not-said', where, `${txt} [${f.inj}]`);
+    if (d && own(m.d) >= 85 && !['K', 'DEF'].includes(d.pos)) flag('WARN', 'drops-a-staple', where, `${txt} [${own(m.d)}% rostered]`);
+    if (d && m.strength < -0.25 && !(['K', 'DEF'].includes(f.pos))) flag('WARN', 'lowers-usual-lineup', where, `${txt} [usual lineup ${r1(m.strength)}/wk]`);
+    if (d && sched(d.team, weeks[0]).bye === false && /^(ir|out)/i.test(d.inj || '') && ev('stashInfo')(m.d)?.keep) flag('ERROR', 'drops-protected-injured', where, txt);
+  }
+  return { Wv, rec };
+}
+function checkMoves(where, Wv) {
+  const items = ev('bennysMoves')();
+  const startNow = new Set(ev('optimize')().starters.filter(s => s.r && s.r.status === 'ok' && !s.r.locked).map(s => s.r.id)), live = Wv.weeks[0] === ev('D').week;
+  const seenTitle = new Set();
+  for (const it of items) {
+    if (seenTitle.has(it.title)) flag('ERROR', 'moves-duplicate', where, it.title); seenTitle.add(it.title);
+    if (!Number.isFinite(it.gain)) flag('ERROR', 'moves-gain-not-a-number', where, it.title);
+  }
+  // a waiver move this week shouldn't drop someone the lineup starts this week for a pickup who doesn't start
+  // the weakest-spot suggestion names an injured or backup player without saying so
+  const ws = ev('weakSpot')(), pk = ws?.picks?.[0];
+  if (pk) { const u = ev('D').U.get(pk.id), it = items.find(i => i.taken === pk.id);
+    if (it && /^(out|doubtful|questionable)/i.test(u.inj || '') && !/out|doubtful|questionable/i.test(it.detail)) flag('ERROR', 'weak-spot-pick-injury-not-said', where, `${it.title.replace(/<[^>]+>/g, '')}: ${u.inj}`); }
+  if (live) for (const mv of Wv.moves.filter(x => !x.marginal && x.d && startNow.has(x.d)))
+    if (!mv.starts.some(s => s[0] === Wv.weeks[0])) flag('WARN', 'drops-this-weeks-starter', where, `add ${nm(mv.f)}, drop ${nm(mv.d)}: ${nm(mv.d)} starts this week, ${nm(mv.f)} doesn't`);
+}
+/* Benny's Pick for every starter against each bench player who could take his slot: the pick is the higher projection,
+   never a player ruled out, and a pick with an injury tag says so. */
+function checkPicks(where) {
+  const st = ev('state'), D = ev('D'), { starters, bench } = ev('optimize')(), was = st.compare;
+  try {
+    for (const s of starters) for (const b of bench) {
+      const a = s.r; if (!a || a.locked || b.locked || !s.slot.elig.includes(b.pos)) continue;
+      st.compare = [a.id, b.id]; const html = ev('viewCompare')(), m = /pick-name">Start ([^<]+)</.exec(html);
+      if (!m) { flag('ERROR', 'pick-missing', where, `${nm(a.id)} vs ${nm(b.id)}`); continue; }
+      const name = m[1].replace(/&#39;|&apos;/g, "'").replace(/&amp;/g, '&'), w = [a, b].find(r => r.u.name === name) || null, l = w === a ? b : a;
+      if (!w) { flag('ERROR', 'pick-unknown-player', where, `${name} for ${nm(a.id)} vs ${nm(b.id)}`); continue; }
+      if (l.status === 'ok' && l.mean > w.mean + 0.05) flag('ERROR', 'pick-lower-projection', where, `Start ${nm(w.id)} ${r1(w.mean)} over ${nm(l.id)} ${r1(l.mean)}`);
+      if (w.status !== 'ok' && l.status === 'ok') flag('ERROR', 'pick-unavailable-player', where, `Start ${nm(w.id)} (${w.status}) over ${nm(l.id)}`);
+      if (/^(questionable|doubtful)/i.test(w.inj || '') && !/check the news/.test(html.split('pick-why')[1] || '')) flag('ERROR', 'pick-injury-not-said', where, `Start ${nm(w.id)} (${w.inj}) over ${nm(l.id)}`);
+    }
+  } finally { st.compare = was; }
+}
+function checkStartSit(where) {
+  for (const d of ev('reviewDecisions')()) {
+    const s = ev('D').M[d.start], a = ev('D').M[d.alt];
+    if (a.mean > s.mean + 0.05 && ev('strategy')() === 'mean') flag('ERROR', 'startsit-leans-lower-projection', where, `${nm(s.id)} ${r1(s.mean)} over ${nm(a.id)} ${r1(a.mean)}`);
+  }
+}
+const ok = x => x != null && Number.isFinite(+x);
+
+/* ---------- Benny Grade vs the lineup it grades ---------- */
+function rankCorr(xs, ys) {
+  const rk = a => { const o = a.map((v, i) => [v, i]).sort((p, q) => p[0] - q[0]), r = []; o.forEach(([, i], k) => { r[i] = k; }); return r; };
+  const a = rk(xs), b = rk(ys), n = xs.length, ma = (n - 1) / 2;
+  let s = 0, sa = 0, sb = 0; for (let i = 0; i < n; i++) { s += (a[i] - ma) * (b[i] - ma); sa += (a[i] - ma) ** 2; sb += (b[i] - ma) ** 2; }
+  return s / Math.sqrt(sa * sb);
+}
+
+function run() {
+  const t0 = Date.now(), D = ev('D'), lines = [];
+  lines.push(`fixture ${FIXTURE}: season ${D.season} week ${D.week}, data from ${D.loadedAt?.toISOString()}, waivers from week ${ev('waiverStart')()}`);
+  const leagues = Array.from({ length: LEAGUES }, (_, i) => draftLeague(i + 1));
+  const summary = { moves: 0, rec: 0, rosters: 0, best: 0 };
+  for (const cfg of CONFIGS) {
+    for (const [li, L] of leagues.entries()) {
+      const fa = [...D.U.keys()].filter(id => D.M[id] && !L.drafted.has(id));
+      const grades = [], usual = [], adds = {};
+      L.rosters.forEach((roster, ti) => {
+        const where = `${cfg.name} | league ${li + 1} team ${ti + 1}`;
+        setTeam(roster, cfg, fa); CTX = { roster, cfg: cfg.name, league: li + 1 };
+        if (ti === 0 && li === 0) { checkNumbers(cfg.name); checkProjections(cfg.name); }
+        checkLineup(where); checkStartSit(where); if (cfg === CONFIGS[0]) checkPicks(where);
+        const { Wv, rec } = checkWaivers(where, roster);
+        for (const m of rec) adds[m.f] = (adds[m.f] || 0) + 1;
+        checkMoves(where, Wv);
+        summary.rosters++; summary.moves += Wv.moves.length; summary.rec += rec.length; summary.best += Wv.best ? 1 : 0;
+        // the grade is season-long, so it's checked against the usual lineup (no byes or one-week matchups)
+        const g = ev('teamGrade')(), sl = ev('bestLineup')(roster.filter(id => D.M[id]), 0, Wv.VS, ev('expandSlots')(), null).total;
+        grades.push(g ? g.score : 0); usual.push(sl);
+      });
+      // kicker edges are mostly noise, so one kicker sold to much of a league is suspect (a D/ST streamer for many is normal)
+      for (const [id, n] of Object.entries(adds)) if (D.U.get(id).pos === 'K' && n > L.rosters.length / 3)
+        flag('WARN', 'same-kicker-for-everyone', `${cfg.name} | league ${li + 1}`, `${nm(id)} recommended to ${n} of ${L.rosters.length} teams`);
+      const c = rankCorr(grades, usual);
+      if (c < 0.3) flag('WARN', 'grade-disagrees-with-lineup', `${cfg.name} | league ${li + 1}`, `rank correlation ${c.toFixed(2)} between Benny Grade and the usual lineup's points`);
+    }
+  }
+  const kinds = Object.entries(counts).sort((a, b) => (a[1].level === 'ERROR' ? 0 : 1) - (b[1].level === 'ERROR' ? 0 : 1) || b[1].n - a[1].n);
+  lines.push(`${summary.rosters} team-setups, ${summary.moves} waiver moves listed, ${summary.rec} recommended, a Best move for ${summary.best}`);
+  lines.push('', 'SUMMARY');
+  for (const [k, v] of kinds) lines.push(`  ${v.level} ${k}: ${v.n}`);
+  lines.push('', 'DETAILS (up to 12 of each kind, distinct messages)');
+  for (const [k] of kinds) {
+    const seen = new Set(), rows = flags.filter(f => f.kind === k && !seen.has(f.msg) && seen.add(f.msg));
+    for (const f of rows.slice(0, 12)) lines.push(`${f.level} ${f.kind} | ${f.where} | ${f.msg}`);
+    if (rows.length > 12) lines.push(`  … ${rows.length - 12} more distinct`);
+  }
+  const nErr = flags.filter(f => f.level === 'ERROR').length;
+  lines.push('', `DONE ${nErr} errors, ${flags.length - nErr} warnings in ${((Date.now() - t0) / 1000).toFixed(0)} s`);
+  window.AUDIT = { flags, counts, summary };
+  document.getElementById('audit-out').textContent = lines.join('\n');
+}
+
+window.addEventListener('load', () => {
+  const t0 = Date.now();
+  (function wait() {
+    W = frame.contentWindow;
+    if (!W || !W.__ready) { if (Date.now() - t0 > 60000) { document.getElementById('audit-out').textContent = 'ERROR app never became ready'; return; } return setTimeout(wait, 100); }
+    try { run(); } catch (e) { document.getElementById('audit-out').textContent = 'ERROR audit threw ' + (e && e.stack || e); }
+  })();
+});
+</script>
+</body>
+</html>

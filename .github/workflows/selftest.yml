@@ -31,7 +31,15 @@ jobs:
           sys.exit(1 if re.search(r"(?m)^FAIL", text) or not re.search(r"(?m)^DONE", text) else 0)
           EOF
 
+      # whole drafted leagues through every engine, flagging advice that reads as wrong on sight (tests/audit.html):
+      # the frozen week fails the run on any ERROR; the current snapshot is reported only, since its data changes
+      - name: Audit the advice on the frozen week
+        run: python3 scripts/audit.py --fixture tests/fixture-2026w4.json --leagues 3 --summary "$GITHUB_STEP_SUMMARY"
+
+      - name: Audit the advice on the current snapshot
+        run: python3 scripts/audit.py --fixture snapshot.json --leagues 3 --summary "$GITHUB_STEP_SUMMARY" --report-only
+
       - name: Check the data scripts
         run: |
-          python3 -m py_compile scripts/extract_snapshot.py scripts/calibrate.py scripts/player_ids.py
+          python3 -m py_compile scripts/extract_snapshot.py scripts/calibrate.py scripts/player_ids.py scripts/audit.py
           python3 scripts/calibrate.py --selfcheck

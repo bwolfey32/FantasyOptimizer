@@ -317,6 +317,20 @@ test('a top-half D/ST is never dropped for a lower-ranked one; the reason says t
   const why = ev('waiverWhy')({ f: 'LV', d: 'SEA', H: 3, h2h: [-1, 4.2, 0.3], hold: { rf: 12, rd: 3 } }, { list: [] }, [4, 5, 6], 3);
   return /streaming option for week 5 \(\+4\.2\), but don’t drop Seahawks D\/ST/.test(why) && /#3 rest of season, Raiders D\/ST #12/.test(why) || why;
 });
+/* reviewer: "add Spencer Shrader, drop Evan McPherson, +3.4 ... projects more in 3 of 3 weeks, +4.0 a week". Most of that was
+   McPherson's week 6 bye counted as a zero; head to head the edge was under a point a week. */
+test('a kicker swap is compared head to head only in weeks both play, and a bye alone does not make it a Best move', () => {
+  setup(st => { st.roster[st.roster.indexOf(idOf('Brandon Aubrey'))] = idOf('Evan McPherson'); });
+  const W = ev('computeWaivers')(), mc = idOf('Evan McPherson'), mean = a => a.reduce((s, x) => s + x, 0) / a.length;
+  for (const m of W.moves.filter(m => m.d === mc && m.h2h)) {
+    const hh = m.h2h.filter(x => x != null);
+    if (!m.marginal && !(hh.length && mean(hh) >= 1)) return `${name(m.f)} for McPherson recommended on ${m.h2h.join(', ')}`;
+    if (hh.length < m.h2h.length && !(m.hold ? /McPherson’s bye/ : /McPherson’s week \d+ bye/).test(m.whyText)) return `bye not named: ${m.whyText}`;
+  }
+  // the wording, on a made-up swap: the bye week is left out of the head to head and named with its gain over a streamer
+  const why = ev('waiverWhy')({ f: idOf('Spencer Shrader'), d: mc, H: 3, h2h: [1.1, null, 0.4], wd: [1.1, 2.1, 0.4], starts: [], strength: 0.9 }, { list: [] }, [5, 6, 7], 3);
+  return /in 2 of 2 weeks both play, \+0\.8 pts a week/.test(why) && /covers McPherson’s week 6 bye \(\+2\.1 over a streamer\)/.test(why) || why;
+});
 
 /* ---------- replacement level (reviewer: "add Deshaun Watson, drop Tre' Harris, +16.9 over 15 weeks", 1-QB league) ---------- */
 // one QB (Goff), Tre' Harris on the bench: Watson only covers Goff's bye and injuries, which a streamer would do too
@@ -366,6 +380,66 @@ test('Start/Sit makes no call for a player whose game started', () => {
   setup(); const L = lockedOnRoster(), free = ev('state').roster.find(id => M(id) && !M(id).locked && M(id).status === 'ok');
   ev('state').compare = [L[0], free]; const html = ev('viewCompare')(); ev('state').compare = [null, null];
   return /Game started/.test(html) && !/chance to outscore/.test(html) || 'verdict shown for a started player';
+});
+/* ---------- advice that reads as wrong on sight (found by tests/audit.html across whole drafted leagues) ---------- */
+test('kicker values stay near the league average: a few hot games don’t make one an upgrade over every other', () => {
+  setup(); const D = ev('D'), sa = ev('seasonAvg'), lg = D.posAvg.K;
+  const off = [...D.U.values()].filter(u => u.pos === 'K' && D.M[u.id] && D.H[u.id]?.n >= 2).filter(u => Math.abs(sa(u.id) - lg) > 1.5);
+  return !off.length || off.map(u => `${u.name} ${sa(u.id).toFixed(1)} vs league ${lg.toFixed(1)}`).join(', ');
+});
+test('a player most leagues roster is never dropped for a short-term patch, any window', () => {
+  const D = ev('D'), held = ev('marketHeld');
+  const hi = [...D.own.entries()].find(([id, o]) => o >= 70 && D.U.get(id)?.pos === 'WR')?.[0], lo = [...D.own.entries()].find(([id, o]) => o < 10 && D.U.get(id)?.pos === 'WR')?.[0];
+  if (!held(hi, lo) || held(lo, hi)) return 'marketHeld misreads ownership';
+  for (const hz of [2, 4, 'ros']) for (const rank of ['window', 'blend']) {
+    setup(st => { st.waivers.horizon = hz; st.waivers.rank = rank; }); const W = ev('computeWaivers')();
+    const bad = W.moves.filter(m => !m.marginal && m.d && m.strength < 0.25 && !['K', 'DEF'].includes(D.U.get(m.f).pos) && held(m.d, m.f));
+    if (bad.length) return `window ${hz} ${rank}: ` + bad.map(m => `${name(m.f)} for ${name(m.d)}`).join(', ');
+  }
+});
+test('every recommended move adds at least a point in its own window', () => {
+  for (const hz of [1, 2, 4, 'ros']) {
+    setup(st => { st.waivers.horizon = hz; }); const bad = ev('computeWaivers')().moves.filter(m => !m.marginal && !m.longBet && m.hz < 1);
+    if (bad.length) return `window ${hz}: ` + bad.map(m => `${name(m.f)} +${m.hz.toFixed(1)}`).join(', ');
+  }
+});
+test('a pickup who is injured now says so first, with the week he is counted from', () => {
+  setup(); const D = ev('D'), out = [...D.U.values()].find(u => /^out/i.test(u.inj || '') && D.M[u.id] && D.tg[u.team] && u.pos === 'RB');
+  const why = ev('waiverWhy')({ f: out.id, d: null, H: 4, hz: 5, strength: 1.2, starts: [[5, 'RB'], [6, 'RB'], [7, 'RB']] }, { list: [] }, [4, 5, 6, 7], 4);
+  return /^Out now, counted from week \d+, his earliest expected return: check the news first/.test(why) || why;
+});
+test('Benny’s Pick never starts a player who won’t play, and says why the other one sits', () => {
+  setup(); const D = ev('D'), st = ev('state'), out = [...D.U.values()].find(u => /^out/i.test(u.inj || '') && D.M[u.id]?.mean > 3 && !D.M[u.id].locked && D.tg[u.team] && u.pos !== 'DEF');
+  if (!out) return 'no pregame player ruled out in the fixture';
+  const ok = Object.values(D.M).find(r => r.pos === out.pos && r.status === 'ok' && !r.locked && r.mean < D.M[out.id].mean);
+  st.compare = [out.id, ok.id]; const html = ev('viewCompare')(); st.compare = [null, null];
+  return html.includes(`Start ${ok.u.name.replace(/'/g, '&#39;')}`) && /won’t play this week: he’s out/.test(html) || html.match(/pick-name">[^<]+/)?.[0] || 'no pick';
+});
+test('a pick with an injury tag says to check the news', () => {
+  setup(); const D = ev('D'), q = Object.values(D.M).find(r => r.status === 'ok' && /^questionable/i.test(r.inj || '') && r.mean > 3), l = Object.values(D.M).find(r => r.status === 'ok' && !r.inj && r.pos === q.pos && r.mean < q.mean);
+  const why = ev('pickReasons')(q, l); return why.some(x => /questionable: this assumes he plays, so check the news/.test(x)) || why.join(' | ');
+});
+test('a questionable player whose projection disappeared is a late scratch, not a backup (Jalen Coker)', () => {
+  setup(); const r = M(idOf('Jalen Coker'));
+  if (!(r.status === 'out' && r.scratch && !r.role)) return `status ${r.status}, scratch ${r.scratch}, role ${r.role?.kind}`;
+  return /likely inactive/.test(ev('outText')(r)) || ev('outText')(r);
+});
+test('a gain mostly from one week names that week and why', () => {
+  setup(); const D = ev('D'), te = idOf('Hunter Henry'), ki = idOf('Dalton Kincaid');
+  const why = ev('waiverWhy')({ f: te, d: null, H: 4, hz: 12.7, strength: 1, starts: [[4, 'TE'], [5, 'TE'], [6, 'TE'], [7, 'TE']], peak: { w: 6, g: 8.9, who: ki, empty: false } }, { list: [] }, [4, 5, 6, 7], 4);
+  return new RegExp(`8\\.9 of the gain is week 6 \\(${ev('shortName')(ki)} is `).test(why) || why;
+});
+test('a short-term pickup is a "matchup play" unless a bye or injury opens his spot', () => {
+  setup(); const f = idOf('Jacoby Brissett'), base = { f, d: null, H: 4, hz: 3.9, strength: 0, starts: [[5, 'QB']] };
+  const play = ev('waiverWhy')(Object.assign({ patch: false }, base), { list: [] }, [4, 5, 6, 7], 4), cover = ev('waiverWhy')(Object.assign({ patch: true }, base), { list: [] }, [4, 5, 6, 7], 4);
+  return /^Matchup play: starts 1 of the next 4 weeks over your QBs on matchups/.test(play) && /short-term cover: .*for byes or injuries/i.test(cover) || `${play} || ${cover}`;
+});
+test('dropping a widely rostered bench player says why he’s expendable', () => {
+  setup(); const d = idOf('Josh Downs'), was = ev('D').own.get(d); ev('D').own.set(d, 72);
+  try {
+    const why = ev('waiverWhy')({ f: idOf('Hunter Henry'), d, H: 4, hz: 4, strength: 1.5, dStarts: 0, starts: [[4, 'TE'], [5, 'TE']] }, { list: [] }, [4, 5, 6, 7], 4);
+    return /Downs \(72% rostered\) isn’t in any of your next 4 lineups/.test(why) || why;
+  } finally { if (was == null) ev('D').own.delete(d); else ev('D').own.set(d, was); }
 });
 test('player pictures: headshot by ESPN id, team logo for a D/ST, silhouette when missing or broken', () => {
   setup(); const D = ev('D'), img = ev('getPlayerImage'), gibbs = D.U.get(idOf('Jahmyr Gibbs')), pit = D.U.get('PIT');

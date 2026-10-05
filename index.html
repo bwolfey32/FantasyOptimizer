@@ -1905,6 +1905,9 @@ function evalPlayer(id) {
   const later = D.season === D.detSeason && D.week > D.detWeek;
   if (/^(out|ir|pup|sus|na|cov)/i.test(u.inj || '') && !(later && injKind(u.inj) && D.week >= returnWeek(id))) r.status = 'out';
   if (!tg) { r.status = 'bye'; r.mean = 0; r.sd = 0; r.grade = '–'; r.mult = 1; r.base = 0; r.projPart = 0; r.share = 0; r.eff = 0; return finish(r); }
+  // Questionable with no projection while Sleeper projects his teammates: Sleeper pulls a projection when a player is ruled
+  // inactive, so he's a late scratch, not a backup (roleOf would call him one)
+  if (r.status === 'ok' && /^questionable/i.test(u.inj || '') && !(pr?.pts > 0) && pos !== 'DEF' && D.depth?.[T + '|' + pos]?.length) { r.status = 'out'; r.scratch = true; }
   const O = r.O = tg.opp, g = r.game = tg.g, tb = D.B[T] || {}, ob = D.B[O] || {}, L = D.L;
   if (g.state !== 'pre') { r.locked = true; r.actual = D.actual[id]; }
   // his scoring form, with last season blended in so a few early games don't carry it alone (formOf)
@@ -1913,7 +1916,7 @@ function evalPlayer(id) {
   // when his games don't back the projection up it counts less (projDoubt). A projection under his form leads too
   // (PROJ_DOWN).
   // The base is two parts: Sleeper's projection (projPart), which already reflects this matchup, and his scoring average.
-  const role = r.role = roleOf(id, avg), pj = r.projPts, doubt = r.doubt = role || avg == null ? null : projDoubt(id, pj);
+  const role = r.role = r.scratch ? null : roleOf(id, avg), pj = r.projPts, doubt = r.doubt = role || avg == null ? null : projDoubt(id, pj);
   const bl = projWeight(S.blend * (doubt ? DOUBT_K : 1), pj, avg);
   r.projPart = role?.kind === 'backup' ? 0 : role ? ROLE_LEAD * pj : pj != null ? (avg != null ? bl * pj : pj) : 0;
   r.base = role?.kind === 'backup' ? 0 : r.projPart + (role ? (1 - ROLE_LEAD) * avg : pj != null ? (avg != null ? (1 - bl) * avg : 0) : (avg ?? 0));
@@ -2612,8 +2615,15 @@ function healthyBase(id) { return formOf(id) ?? 0; }
 /* Points a D/ST scores for points allowed (Sleeper's default tiers). With sacks, the part of its score that holds up. */
 const defPaPts = pa => pa <= 0 ? 10 : pa <= 6 ? 7 : pa <= 13 ? 4 : pa <= 20 ? 1 : pa <= 27 ? 0 : pa <= 34 ? -1 : -4;
 const DEF_VOL_GAMES = 12;   // league-average games blended into a D/ST's turnover and TD points
+/* League-average games blended into a kicker's average. A kicker's weekly score swings by about 4.5 points (SD) while real
+   differences between kickers are about 1.1 (2025 regulars), so a kicker's own games say little: shrinking by
+   noise variance over talent variance is (4.5 / 1.1)² ≈ 17 games. Last season's average predicted this season's not at
+   all (r = −0.03 over 23 kickers, 2026 weeks 1-4). With the D/ST weight of 3, one hot kicker read as an upgrade over
+   nearly every other, and kicker swaps shown as Best moves lost points in the backtest (docs/backtest-report.md). */
+const K_LG_GAMES = 16;
 /* Season average for rest-of-season value. D/ST and kicker scores swing a lot from week to week, so for them this
-   season's games are blended with last season (worth 4 games) and this season's league average at the position (3 games).
+   season's games are blended with last season (worth 4 games; for a kicker, half his games last season up to 4) and
+   this season's league average at the position (3 games for a D/ST, K_LG_GAMES for a kicker).
    A D/ST's sacks and points allowed count as played, but its turnovers and touchdowns (everything else it scored) barely
    carry from week to week, so that part is pulled most of the way to the league average first: a defense on a takeaway
    streak isn't valued as if the streak goes on. */
@@ -2624,10 +2634,10 @@ function seasonAvg(id) {
     const stab = h.stab.reduce((a, x) => a + x, 0), vol = h.pts.reduce((a, x) => a + x, 0) - stab;
     avg = stab / h.n + (vol + D.defVol * DEF_VOL_GAMES) / (h.n + DEF_VOL_GAMES);
   }
-  const prev = D.prevPPG?.[id]?.[0], lg = D.posAvg?.[r.pos]; let s = 0, n = 0;
+  const K = r.pos === 'K', pp = D.prevPPG?.[id], prev = pp?.[0], lg = D.posAvg?.[r.pos]; let s = 0, n = 0;
   if (avg != null) { s += avg * h.n; n += h.n; }
-  if (ok(prev)) { s += prev * 4; n += 4; }
-  if (ok(lg) && n) { s += lg * 3; n += 3; }
+  if (ok(prev)) { const w = K ? Math.min(4, (pp[1] || 0) / 2) : 4; s += prev * w; n += w; }
+  if (ok(lg) && n) { const w = K ? K_LG_GAMES : 3; s += lg * w; n += w; }
   return n ? s / n : null;
 }
 /* Rest-of-season value per game, the same for every opponent (matchupMult adds each week's own). It leans on scoring
@@ -2647,6 +2657,11 @@ function rosBase(id) {
   return pj != null && avg != null ? b * pj + (1 - b) * avg : (pj ?? avg ?? 0);
 }
 const STREAM_H = 3;   // weeks a kicker or D/ST move counts (computeWaivers)
+/* A QB, RB, WR or TE most leagues roster (MARKET_OWN% and MARKET_GAP points more than the pickup, ESPN-wide) carries value
+   the model can't see: talent, a role about to grow, what he'd fetch in a trade. Waivers never drops him for a pickup who
+   doesn't raise your usual lineup (a bye or matchup patch), and says why he's expendable when it drops him for an upgrade. */
+const MARKET_OWN = 50, MARKET_GAP = 30;
+function marketHeld(d, f) { const o = D.own.get(d) ?? 0; return D.own.size > 0 && o >= MARKET_OWN && o - (D.own.get(f) ?? 0) >= MARKET_GAP; }
 const SLOT_SHARE = { QB: { OP: .7 }, RB: { FLEX: .45, 'RB/WR': .5, OP: .1 }, WR: { FLEX: .45, 'RB/WR': .5, 'WR/TE': .75, OP: .1 }, TE: { FLEX: .1, 'WR/TE': .25, OP: .1 }, K: {}, DEF: {} };
 /* How many lineup spots a position fills per team, counting its share of flex slots. */
 function posSlots(P) { const own = { QB: 'QB', RB: 'RB', WR: 'WR', TE: 'TE', K: 'K', DEF: 'D/ST' }[P]; return (state.slots[own] || 0) + Object.entries(SLOT_SHARE[P]).reduce((s, [k, f]) => s + (state.slots[k] || 0) * f, 0); }
@@ -2818,30 +2833,46 @@ function computeWaivers() {
     for (const d of drops) {
       if (d && sumAll(d) > 1.6 * sumAll(f) + 5) continue;
       const nr = roster.filter(x => x !== d).concat(f);
-      let hz = 0, near = 0, later = 0, depLost = 0; const starts = [];
+      let hz = 0, near = 0, later = 0, depLost = 0; const starts = [], wd = [];
       for (let wi = 0; wi < weeks.length; wi++) {
         const L2 = bestLineup(nr, wi, V, slotsAt(wi), RW[wi]), diff = (L2.total + L2.depth) - (base[wi].total + base[wi].depth);
-        if (wi < h) { hz += diff; if (wi < 2) near += diff; depLost += base[wi].depth - L2.depth; const st = L2.starters.find(s => s[1] === f); if (st) starts.push([weeks[wi], st[0].label || st[0].k]); }
+        if (wi < h) { hz += diff; wd.push(diff); if (wi < 2) near += diff; depLost += base[wi].depth - L2.depth; const st = L2.starters.find(s => s[1] === f); if (st) starts.push([weeks[wi], st[0].label || st[0].k]); }
         else later += diff;
       }
       // how much the move raises your usual lineup, per week
       const LS = bestLineup(nr, 0, VS, slots, RS), strength = (LS.total + LS.depth) - (baseS.total + baseS.depth);
+      // a player most leagues roster is never the price of a short-term patch (marketHeld)
+      if (d && !single && strength < 0.25 && marketHeld(d, f)) continue;
       // Ranked by the window's lineup points (byes and injuries included) plus the usual-lineup gain over the same weeks,
       // so an upgrade at a weak spot beats a one-week patch. "window": later weeks just break ties; "blend" adds a third
       // of the value after the window, but only for a move that doesn't cost points in the window (never for a kicker
       // or D/ST: you'll stream another by then).
-      const score = hz + strength * h + (longTerm && !single && hz >= 0 ? 0.35 : 0.001) * later, mv = { f, d, hz, near, later, strength, score, starts, depLost, H: h };
+      const score = hz + strength * h + (longTerm && !single && hz >= 0 ? 0.35 : 0.001) * later, mv = { f, d, hz, wd, near, later, strength, score, starts, depLost, H: h };
+      // for the reason: how often the dropped player would start in the window, and whether the pickup's starts fill in
+      // for a bye or an injury at his position (a teammate worth nothing that week) or are matchup plays
+      if (d) mv.dStarts = base.slice(0, h).filter(b => b.starters.some(s => s[1] === d)).length;
+      mv.patch = starts.some(([w]) => { const wi = weeks.indexOf(w); return roster.some(id => id !== d && posOf(id) === fp && V[id][wi] === 0); });
+      // one week carrying most of the gain: which week, and the regular at his position who can't play then (or none)
+      const pk = wd.indexOf(Math.max(...wd));
+      if (h >= 2 && hz > 1 && wd[pk] >= 0.6 * hz) {
+        const mates = roster.filter(id => id !== d && posOf(id) === fp).sort((a, b) => VS[b][0] - VS[a][0]), top = mates[0];
+        mv.peak = { w: weeks[pk], g: wd[pk], who: top && V[top][pk] === 0 && !(weeks[pk] === D.week && D.M[top]?.locked && D.M[top].status === 'ok') ? top : null, empty: !mates.some(id => V[id][pk] > 0) };
+      }
       if (!best || score > best.score) best = mv;
       if (single && d && posOf(d) === fp && (!bestSame || score > bestSame.score)) bestSame = mv;
     }
     // streaming a kicker or defense: swap for the one you have when that's nearly as good
     if (best && bestSame && bestSame !== best && bestSame.score >= 0.7 * best.score) best = bestSame;
-    // a kicker or D/ST for another: keep the week-by-week difference, so the reason can compare them head to head
-    if (best && single && best.d && posOf(best.d) === fp) best.h2h = weeks.slice(0, h).map((_, wi) => V[f][wi] - V[best.d][wi]);
+    /* a kicker or D/ST for another: keep the week-by-week difference, so the reason can compare them head to head. Only
+       weeks both play count (null otherwise): with one on bye, the lineup gain that week is over a streamer (wd), not
+       over a zero, and counting the zero made "+4 a week" out of a one-week bye patch. */
+    if (best && single && best.d && posOf(best.d) === fp) best.h2h = weeks.slice(0, h).map((_, wi) => V[f][wi] > 0 && V[best.d][wi] > 0 ? V[f][wi] - V[best.d][wi] : null);
     if (!best || best.score <= 1 || !(best.hz > 0.5 || best.strength * h > 1 || (longTerm && !single && best.hz >= 0 && best.later > 0))) continue;
     /* Worth the roster churn? Projections miss by several points a week, so a small expected gain is no reason to give
        up a player: a move must add HOLD_BAR window points (or raise the usual lineup by as much), and a kicker or D/ST
-       swap must average 1 pt a week. With long-term value on, a move that clears the bar only on later weeks is a
+       swap must average 1 pt a week, both over the window and head to head in the weeks both play. Covering the dropped
+       one's bye alone doesn't clear it: that week you'd stream one anyway, and kicker swaps shown as Best moves
+       delivered nothing in the backtest (docs/backtest-report.md). With long-term value on, a move that clears the bar only on later weeks is a
        "long-term bet". Anything else is marginal: listed, never the best move, and holding is fine.
        A pickup that doesn't raise the usual lineup is only cover for byes and injuries, and cover for a week further
        out can wait: you'd stream one that week. So it has to clear the bar on this week and next, and is never a
@@ -2849,7 +2880,10 @@ function computeWaivers() {
        Never drop a top-half kicker or D/ST (rest of season, league size) for one that ranks below it: that one is a
        streamer for a good week, not a replacement (hold). */
     const swap = single && best.d && posOf(best.d) === fp, bar = Math.max(1.5, 0.75 * h);
-    const cover = best.strength < 0.25, clears = swap ? best.hz / h >= 1 : Math.max(cover ? best.near : best.hz, best.strength * h) >= bar;
+    const hh = swap ? best.h2h.filter(x => x != null) : [], h2hAvg = hh.length ? mean(hh) : 0;
+    // and a move sold on your usual lineup still has to add a point in the window: "+0.2 pts over 4 weeks" for an add
+    // and drop reads as a mistake, and the gain it counts on comes later (a long-term bet when that's on)
+    const cover = best.strength < 0.25, clears = swap ? best.hz / h >= 1 && h2hAvg >= 1 : Math.max(cover ? best.near : best.hz, best.strength * h) >= bar && best.hz >= 1;
     best.longBet = !single && !cover && !clears && longTerm && best.hz >= 0 && 0.35 * best.later >= bar;
     best.hold = swap && posRank[best.d] <= Math.ceil(W.teams / 2) && posRank[f] > posRank[best.d] ? { rf: posRank[f], rd: posRank[best.d] } : null;
     best.marginal = (!clears && !best.longBet) || !!best.hold;
@@ -2868,9 +2902,11 @@ function waiverWhy(m, needs, weeks, H) {
   const fu = D.U.get(m.f), why = [], P = fu.pos === 'DEF' ? 'D/ST' : fu.pos;
   if (m.hold) {
     // a lower-ranked kicker or D/ST for a top one: name the week he's worth streaming, and say to keep yours
-    const nm = id => D.U.get(id).name, i = m.h2h.indexOf(Math.max(...m.h2h)), up = m.h2h[i];
+    // the lineup gain each week (wd), so the dropped one's bye counts over a streamer rather than over a zero
+    const xs = (m.wd || m.h2h).map(x => x ?? -Infinity), nm = id => D.U.get(id).name, i = xs.indexOf(Math.max(...xs)), up = xs[i];
     const rank = `${nm(m.d)} ranks ${P} #${m.hold.rd} rest of season, ${nm(m.f)} #${m.hold.rf}`;
-    return up > 0.5 ? `${nm(m.f)} is a streaming option for week ${weeks[i]} (+${f1(up)}), but don’t drop ${nm(m.d)} for ${fu.pos === 'DEF' ? 'them' : 'him'}: ${rank}`
+    const bye = schedOpp(D.U.get(m.d).team, weeks[i]).bye ? `, ${nm(m.d)}’s bye` : '';
+    return up > 0.5 ? `${nm(m.f)} is a streaming option for week ${weeks[i]}${bye} (+${f1(up)}), but don’t drop ${nm(m.d)} for ${fu.pos === 'DEF' ? 'them' : 'him'}: ${rank}`
       : `Don’t drop ${nm(m.d)} for ${nm(m.f)}: ${rank}`;
   }
   const nd = needs.list.find(n => n.P === fu.pos), weak = nd && nd.level === 'Weak';
@@ -2878,18 +2914,39 @@ function waiverWhy(m, needs, weeks, H) {
   else if (weak) why.push(`fills your weak ${P} spot`);
   if (m.h2h) {
     // one kicker or D/ST for another: which scores more, week by week, and how settled each one's average is
-    const nm = id => { const u = D.U.get(id); return u.pos === 'DEF' ? u.team : shortName(id); }, F = nm(m.f), X = nm(m.d), n = m.h2h.length;
-    const wins = m.h2h.filter(x => x > 0.05).length, avg = m.h2h.reduce((s, x) => s + x, 0) / n, now = m.h2h[0], s = schedOpp(fu.team, weeks[0]);
-    why.push(`${F} projects more than ${X} in ${wins} of ${n} week${n === 1 ? '' : 's'}, ${avg >= 0 ? '+' : '−'}${f1(Math.abs(avg))} pts a week on average`);
-    if (n > 1 && Math.abs(now) >= 0.3) why.push(`${now < 0 ? 'worse' : 'better'} ${weeks[0] === D.week ? 'this week' : `in week ${weeks[0]}`} (${now < 0 ? '−' : '+'}${f1(Math.abs(now))}${s.opp ? `, ${s.home ? 'vs' : 'at'} ${s.opp}` : ''})`);
+    const nm = id => { const u = D.U.get(id); return u.pos === 'DEF' ? u.team : shortName(id); }, F = nm(m.f), X = nm(m.d);
+    // head to head only in the weeks both play; a bye is named on its own, with the lineup gain that week (over a streamer)
+    const hh = m.h2h.filter(x => x != null), n = hh.length, now = m.h2h[0], s = schedOpp(fu.team, weeks[0]);
+    const wins = hh.filter(x => x > 0.05).length, avg = n ? hh.reduce((s, x) => s + x, 0) / n : 0, both = n < m.h2h.length ? ' both play' : '';
+    if (n) why.push(`${F} projects more than ${X} in ${wins} of ${n} week${n === 1 ? '' : 's'}${both}, ${avg >= 0 ? '+' : '−'}${f1(Math.abs(avg))} pts a week on average`);
+    m.h2h.forEach((x, wi) => {
+      if (x != null || !m.wd) return; const g = m.wd[wi], sg = `${g < 0 ? '−' : '+'}${f1(Math.abs(g))}`;
+      if (schedOpp(D.U.get(m.d).team, weeks[wi]).bye) why.push(`covers ${X}’s week ${weeks[wi]} bye (${sg} over a streamer)`);
+      else if (schedOpp(fu.team, weeks[wi]).bye) why.push(`${F}’s bye is week ${weeks[wi]} (${sg} that week)`);
+    });
+    if (n > 1 && now != null && Math.abs(now) >= 0.3) why.push(`${now < 0 ? 'worse' : 'better'} ${weeks[0] === D.week ? 'this week' : `in week ${weeks[0]}`} (${now < 0 ? '−' : '+'}${f1(Math.abs(now))}${s.opp ? `, ${s.home ? 'vs' : 'at'} ${s.opp}` : ''})`);
     const hist = id => { const h = D.H[id], p = D.prevPPG?.[id]?.[0]; return h?.n ? `${nm(id)} ${f1(h.avg)} in ${h.n} game${h.n === 1 ? '' : 's'}${ok(p) ? ` (${f1(p)} last season)` : ''}` : null; };
-    const hs = [hist(m.f), hist(m.d)].filter(Boolean); if (hs.length) why.push(`scoring averages ${hs.join(', ')}; small samples are blended with last season`);
+    const hs = [hist(m.f), hist(m.d)].filter(Boolean);
+    if (hs.length) why.push(`scoring averages ${hs.join(', ')}; ${fu.pos === 'K' ? 'a kicker’s average is mostly weekly noise, so it counts for little against the league average' : 'small samples are blended with last season'}`);
   } else if (m.starts.length) {
     // the slots he’d fill, named only when that says more than his position (a FLEX, or both WR and FLEX)
     const sl = [...new Set(m.starts.map(s => s[1]))].sort((a, b) => (b === P) - (a === P)), n = m.starts.length, tag = sl.length === 1 && sl[0] === P ? '' : ` (${sl.join('/')})`;
-    why.push(`${m.strength < 1 && n < H ? 'short-term cover: ' : ''}${H === 1 ? `starts in week ${m.starts[0][0]}` : n === H ? `starts all ${H} of the next ${H} weeks` : `starts ${n} of the next ${H} weeks`}${tag}${m.strength < 1 && n < H ? ', for byes or injuries' : ''}`);
+    // short-term cover only when his starts fill in for a bye or an injury (patch); otherwise they're matchup plays
+    const short = m.strength < 1 && n < H, play = m.patch === false;
+    why.push(`${short ? (play ? 'matchup play: ' : 'short-term cover: ') : ''}${H === 1 ? `starts in week ${m.starts[0][0]}` : n === H ? `starts all ${H} of the next ${H} weeks` : `starts ${n} of the next ${H} weeks`}${tag}${short ? (play ? ` over your ${P}s on matchups` : ', for byes or injuries') : ''}`);
   }
   else why.push('adds depth for later weeks');
+  // most of the gain in one week: say which and why, so "+12.7 over 4 weeks" isn't read as an every-week edge
+  const pk = m.peak; if (pk && !m.h2h) {
+    const wk = pk.w === D.week ? 'this week' : `week ${pk.w}`, u = pk.who && D.U.get(pk.who);
+    const why1 = u ? `${shortName(pk.who)} ${schedOpp(u.team, pk.w).bye ? 'is on bye' : `is ${injWords(u.inj)}`} ${wk}` : pk.empty ? `no ${P} of yours plays ${wk}` : null;
+    why.push(`${f1(pk.g)} of the gain is ${wk}${why1 ? ` (${why1})` : ''}`);
+  }
+  // the dropped player: why he's expendable when he isn't a regular in your lineup (a name most leagues roster, especially)
+  if (m.d && !m.h2h && m.dStarts != null && m.dStarts < H / 2) {
+    const o = D.own.get(m.d) ?? 0, db = bumpOf(m.d), dn = shortName(m.d);
+    why.push(`${dn}${o >= 40 ? ` (${Math.round(o)}% rostered)` : ''} ${m.dStarts ? `starts only ${m.dStarts} of your next ${H} lineups` : H === 1 ? 'isn’t in your lineup' : `isn’t in any of your next ${H} lineups`}${db && db.back > weeks[0] ? `, and his bigger role ends when ${db.mate.name} is back (week ${db.back})` : ''}`);
+  }
   // a slow start is the first thing to know about a pickup the projection likes more than his games do (projDoubt)
   const dq = D.M[m.f]?.doubt; if (dq) why.push(`but he has scored ${f1(dq.scored)} a game ${dq.moved ? `since joining ${dq.moved}` : 'this season'}, so this counts his games over Sleeper’s ${f1(dq.pts)} projection`);
   if (m.d && m.depLost > 0.5) why.push(`costs ${f1(m.depLost)} pts of injury cover as a backup ${D.U.get(m.d).pos === 'DEF' ? 'D/ST' : D.U.get(m.d).pos} (already counted in the gain)`);
@@ -2903,6 +2960,9 @@ function waiverWhy(m, needs, weeks, H) {
     const mvs = [...t.moves.filter(same).slice(0, 2), ...t.stMoves.filter(same)].slice(0, 2);
     if (Math.abs(net) >= 0.02) why.push(`${fu.team} defense ${net > 0 ? 'improved' : 'weakened'} (${spct(om - 1)}${mvs.length ? ': ' + mvs.map(moveText).join(', ') : ''})`);
   }
+  // an injury designation on the pickup comes first: the gain assumes he plays from his expected return
+  if (/^(out|doubtful)/i.test(fu.inj || '')) { const rw = returnWeek(m.f); why.unshift(`${fu.inj.toLowerCase()} now${rw > weeks[0] ? `, counted from week ${rw}, his earliest expected return` : ''}: check the news first`); }
+  else if (/^questionable/i.test(fu.inj || '')) why.unshift('questionable this week: check the news first');
   return why.join('; ').replace(/^./, c => c.toUpperCase());
 }
 function teamNeeds(roster, V, weeks, H, slotsAt, base) {
@@ -3226,10 +3286,10 @@ function bennysMoves() {
     for (const r of ins.sort((a, b) => b.mean - a.mean)) {
       let i = outs.findIndex(o => o.pos === r.pos); if (i < 0) i = outs.findIndex(o => flex(o.pos) && flex(r.pos)); if (i < 0) continue;
       const o = outs.splice(i, 1)[0], gone = o.status !== 'ok', gain = r.mean - (gone ? 0 : o.mean);
-      out.push({ gain, tab: 'lineup', title: gone ? `Bench ${nm(o.id)} (${esc(o.status === 'bye' ? 'bye week' : o.inj || 'out')}), start ${nm(r.id)}` : `Start ${nm(r.id)} over ${nm(o.id)}`,
+      out.push({ gain, tab: 'lineup', title: gone ? `Bench ${nm(o.id)} (${esc(o.status === 'bye' ? 'bye week' : o.scratch ? 'likely inactive' : o.inj || 'out')}), start ${nm(r.id)}` : `Start ${nm(r.id)} over ${nm(o.id)}`,
         detail: gone ? `${nm(o.id)} won’t play this week but is in your ${appName} lineup.` : `Your ${appName} lineup starts ${nm(o.id)}; Benny projects ${nm(r.id)} for ${f1(r.mean)} vs ${f1(o.mean)}.`, gainTxt: `+${f1(gain)} pts` });
     }
-    for (const o of outs) if (o.status !== 'ok') out.push({ gain: o.status === 'bye' ? 3 : 5, tab: 'lineup', title: `Bench ${nm(o.id)}`, detail: `${o.status === 'bye' ? 'On bye' : esc(o.inj || 'Ruled out')} but in your ${appName} lineup.`, gainTxt: '' });
+    for (const o of outs) if (o.status !== 'ok') out.push({ gain: o.status === 'bye' ? 3 : 5, tab: 'lineup', title: `Bench ${nm(o.id)}`, detail: `${esc(outText(o).replace(/^./, c => c.toUpperCase()))} but in your ${appName} lineup.`, gainTxt: '' });
   } else {
     for (const d of reviewDecisions().slice(0, 3)) {
       const s = D.M[d.start], b = D.M[d.alt];
@@ -3247,9 +3307,10 @@ function bennysMoves() {
   const ws = weakSpot(), added = new Set(picks.map(m => m.f)), pk = ws?.picks.find(p => !added.has(p.id));
   if (ws) {
     const P = posLabel(ws.P), vs = ws.mine ? ` vs ${nm(ws.mine)}’s ${f1(ws.mineVal)}` : '', av = pk ? availTxt(pk.id) : '';
+    const pi = pk ? D.U.get(pk.id).inj || '' : '', inj = /^(out|doubtful|questionable)/i.test(pi) ? ` He’s ${esc(pi.toLowerCase())} now, so check the news first.` : '';
     out.splice(Math.min(1, out.length), 0, pk
       ? { gain: 0, tab: 'waivers', taken: pk.id, title: `Upgrade ${P}, your weakest spot: add ${nm(pk.id)}`,
-          detail: `Your ${P}s score ${ws.score}/100 on Benny Grade. ${nm(pk.id)} projects ${f1(pk.val)} pts a usual week${vs}${pk.gain > 0.5 ? '' : ', the best free agent there but not an upgrade yet'}${av ? `; ${av}` : ''}.`,
+          detail: `Your ${P}s score ${ws.score}/100 on Benny Grade. ${nm(pk.id)} projects ${f1(pk.val)} pts a usual week${vs}${pk.gain > 0.5 ? '' : ', the best free agent there but not an upgrade yet'}${av ? `; ${av}` : ''}.${inj}`,
           gainTxt: pk.gain > 0.5 ? `+${f1(pk.gain)} pts/wk` : '' }
       : { gain: 0, tab: 'waivers', title: `Upgrade ${P}: your weakest spot`, detail: `Your ${P}s score ${ws.score}/100 on Benny Grade and no free agent there is left. Target one by trade.`, gainTxt: '' });
   }
@@ -3373,6 +3434,12 @@ function render() {
   if (D.loading) { renderBrief(); main.innerHTML = `<div class="card loading"><h3>Loading week ${D.week || ''}</h3><div class="small">Projections, stats and schedules. Past seasons are saved after your first visit.</div><div class="bar"><span id="lbar" style="width:${Math.round(D.progress * 100)}%"></span></div></div>`; return; }
   renderBrief();
   main.innerHTML = ({ lineup: viewLineup, compare: viewCompare, waivers: viewWaivers, defenses: viewResearch, teams: viewResearch, players: viewPlayers, settings: viewSettings, weather: viewResearch, pro: viewPro })[state.tab]();
+}
+// an injury designation after "is": "on IR", "suspended", "out"
+const injWords = inj => /^ir/i.test(inj || '') ? 'on IR' : /^pup/i.test(inj || '') ? 'on the PUP list' : /^sus/i.test(inj || '') ? 'suspended' : /^na/i.test(inj || '') ? 'not with the team' : (inj || 'out').toLowerCase();
+// why a player won't play this week, in a few words
+function outText(r) {
+  return r.status === 'bye' ? `${r.T} is on bye` : r.scratch ? `he’s questionable and Sleeper no longer projects him, so he’s likely inactive` : `he’s ${injWords(r.inj)}`;
 }
 function injPill(r) {
   const i = r.inj || ''; if (!i) return '';
@@ -4183,6 +4250,14 @@ function viewCompare() {
   // a player whose game started can't move in or out of a lineup, so there's no call to make
   if (A && Bp && (A.locked || Bp.locked)) verdict = `<div class="card pick"><div class="pick-head"><span class="label">Benny’s Pick</span><span class="pill m">Game started</span></div>
       <div class="small">${esc([A, Bp].filter(r => r.locked).map(r => r.u.name).join(' and '))}${A.locked && Bp.locked ? ' have' : ' has'} already kicked off, so there’s no start/sit call to make. The side-by-side below is the pregame view.</div></div>`;
+  else if (A && Bp && (A.status === 'ok') !== (Bp.status === 'ok')) {
+    // one of them won't play (ruled out, IR, or on bye): his projection is what he'd score healthy, so it's no contest
+    const w = A.status === 'ok' ? A : Bp, l = w === A ? Bp : A, why = outText(l);
+    verdict = `<div class="card pick"><div class="pick-head"><span class="label">Benny’s Pick</span><span class="pill n">Only one plays</span></div>
+      <div class="pick-main"><div class="pick-who">${playerIdentity(w.u, { size: 'lg', name: `Start ${esc(w.u.name)}`, nameCls: 'pick-name', subCls: 'small muted', line: `over ${esc(l.u.name)} · ${posLabel(w.pos)} · ${w.T || 'FA'}` })}</div>
+        <div class="pick-stat"><span class="num">${f1(w.mean)}</span><span class="small muted">projected pts</span></div></div>
+      <ul class="pick-why"><li>${esc(`${l.u.name} won’t play this week: ${why}`)}</li>${/^(questionable|doubtful)/i.test(w.inj || '') ? `<li>${esc(`${w.u.name} is ${w.inj.toLowerCase()} too, so check the news before kickoff`)}</li>` : ''}</ul></div>`;
+  }
   else if (A && Bp) {
     // counted once per pair; "picked" is a pair the user chose, as opposed to the one Start / Sit opens on
     trackOnce('ss:' + [a, b].sort().join('|'), 'start_sit_used', { picked: state.compare[0] === a && state.compare[1] === b, pos: A.pos });
@@ -4247,7 +4322,9 @@ function pickReasons(w, l) {
   if (/^(questionable|doubtful)/i.test(l.inj || '')) out.push({ s: 0.2, t: `${l.u.name} is ${l.inj.toLowerCase()} for this week` });
   if (w.floor > l.floor + 2) out.push({ s: 0.035, t: `Higher low end: ${f1(w.floor)} points in a below-average week, vs ${f1(l.floor)}` });
   const first = out.find(x => x.s === 1), rest = out.filter(x => x !== first).sort((a, b) => b.s - a.s);
-  return [...(first ? [first] : []), ...rest].slice(0, 3).map(x => x.t);
+  // the pick's own injury tag always shows: the projection assumes he plays
+  const tag = /^(questionable|doubtful)/i.test(w.inj || '') ? [`But ${w.u.name} is ${w.inj.toLowerCase()}: this assumes he plays, so check the news before kickoff`] : [];
+  return [...(first ? [first] : []), ...rest].slice(0, 3 - tag.length).map(x => x.t).concat(tag);
 }
 function heat(v, avg, invert) {
   if (!ok(v) || !ok(avg) || !avg) return ''; let d = v / avg - 1; if (invert) d = -d;
