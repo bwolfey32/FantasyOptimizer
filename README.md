@@ -11,7 +11,7 @@ A free weekly lineup optimizer for ESPN fantasy football. It sets your best line
 The site has five sections, plus Settings in the header:
 
 - **Lineup:** who should I start this week? At the top:
-  - **Benny Grade** scores your roster out of 100, with its strongest and weakest positions.
+  - **Benny Grade** scores your roster out of 100, with its strongest and weakest positions. For a Sleeper team, **See your league’s power rankings** grades every roster in the league the same way, best first, with each team’s record. **Share with your league** sends the rankings to the league chat as a link: everyone in the league sees the rankings computed live, picks their own team from the list and is one tap from setting it up.
   - **Benny's Moves** lists the most useful things to do: lineup changes against the lineup set in Sleeper or ESPN, pickups and drops, and your weakest spot, ranked by points gained.
 
   Below that, Benny picks the starters that score the most for your lineup slots and benches anyone on bye, ruled out, or on IR. Each player gets a matchup grade (A–F), a projected score with a likely range, and the chance of beating his season average. Tap a player for the three biggest reasons, with the full breakdown and coaching profiles one tap further. **Past weeks** shows Benny's lineup from each earlier week, what it projected and what it scored.

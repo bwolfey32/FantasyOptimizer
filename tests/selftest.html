@@ -385,6 +385,21 @@ test('no team yet: Start/Sit opens on an example close call between two fantasy 
   if (!A || !B || A.pos !== B.pos || A.status !== 'ok' || B.status !== 'ok') return `example pair ${name(a)} / ${name(b)}`;
   return /example close call/.test(html) && /pick-name/.test(html) || 'no example call shown';
 });
+test('power rankings: every roster in a league graded, best first, and your own team’s grade is its Benny Grade', () => {
+  setup(); const D = ev('D'), st = ev('state'), mine = st.roster.slice(), taken = new Set(mine);
+  // three more teams drafted from the best players left, in a 4-team league with this team's lineup
+  const left = Object.values(D.M).filter(r => !taken.has(r.id) && r.status !== 'out').sort((a, b) => b.mean - a.mean), others = [[], [], []];
+  for (const P of ['QB', 'RB', 'RB', 'WR', 'WR', 'TE', 'K', 'DEF', 'RB', 'WR']) for (const t of others) { const i = left.findIndex(r => r.pos === P); if (i >= 0) t.push(left.splice(i, 1)[0].id); }
+  st.waivers.teams = 4;
+  const L = { at: 1, lg: { league_id: 'T1', name: 'Test', season: String(D.season), total_rosters: 4, scoring_settings: { rec: 1 }, roster_positions: ['QB', 'RB', 'RB', 'WR', 'WR', 'TE', 'FLEX', 'DEF', 'K', 'BN'] },
+    rosters: [mine, ...others, []].map((players, i) => ({ roster_id: i + 1, owner_id: 'u' + i, players, settings: { wins: i, losses: 3 - i } })), users: [] };
+  L.lg.total_rosters = 4;
+  const rows = ev('leagueRanks')(L), own = rows.find(r => r.rid === 1), g = ev('teamGrade')();
+  setup();
+  if (rows.length !== 5 || rows[4].g) return `rows ${rows.length}, empty roster graded ${JSON.stringify(rows[4].g)}`;
+  if (rows.some((r, i) => i && r.g && rows[i - 1].g.score < r.g.score)) return 'not sorted: ' + rows.map(r => r.g?.score).join(',');
+  return own.g.score === g.score || `league grade ${own.g.score}, Benny Grade ${g.score}`;
+});
 test('Start/Sit makes no call for a player whose game started', () => {
   setup(); const L = lockedOnRoster(), free = ev('state').roster.find(id => M(id) && !M(id).locked && M(id).status === 'ok');
   ev('state').compare = [L[0], free]; const html = ev('viewCompare')(); ev('state').compare = [null, null];

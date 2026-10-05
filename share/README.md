@@ -1,9 +1,18 @@
 # Share link previews
 
-When someone shares their **Best move** from Waivers, the link points here (`share.bennyspicks.us/w?…`). Chat apps and social sites (iMessage, Discord, Slack, X, Facebook…) read this page's preview tags and show a picture of the Best move card:
+When someone shares from Benny's Picks, the link points here. Chat apps and social sites (iMessage, Discord, Slack, X, Facebook…) read the link page's preview tags and show a picture of what was shared. Each kind of link has a page and a card (1200×630 PNG, drawn with [satori](https://github.com/vercel/satori) and resvg):
 
-- **`/w`** is the link itself. Its preview tags point at the card. People who open it go straight on to `bennyspicks.us/#waivers`, which shows the shared move as before.
-- **`/card`** draws the card (1200×630 PNG) with [satori](https://github.com/vercel/satori) and resvg. Players are looked up by id in the site's `share-players.json`, built daily by `scripts/player_ids.py`, so a link can't put a made-up name on the card. Only the points, the ownership and the one-line reason come from the link.
+| Shared from | Link | Card | Opens on the site |
+|---|---|---|---|
+| **Best move** (Waivers) | `/w?add=&drop=&wk=&g=&h=&o=&why=` | `/card` | `#waivers`, showing the shared move |
+| **Power rankings** (a Sleeper team's grade card) | `/l?id=&wk=&r=` | `/lcard` | `#lineup`, ranking the league live; a visitor picks their own team from it to set up |
+
+A link can't put a made-up name on a card:
+
+- Players are looked up by id in the site's `share-players.json`, built daily by `scripts/player_ids.py`. Only the points, the ownership and the one-line reason come from a move's link.
+- A league's name and team names come from Sleeper's public API (by league id). Only each team's grade (roster id and score) comes from the link.
+
+`lib/card.mjs` holds what every card and link page share (fonts, the resvg engine, the panel and header, the link page itself). `lib/move.mjs` and `lib/league.mjs` read their links and draw their cards.
 
 It runs on Netlify because GitHub Pages can't make a page per link, and Supabase's functions serve HTML only as plain text. Netlify's free plan allows commercial sites. Each card is drawn once, then served from Netlify's cache.
 
@@ -33,6 +42,7 @@ It runs on Netlify because GitHub Pages can't make a page per link, and Supabase
 
 ## Notes
 
-- `satori` and `@resvg/resvg-wasm` are pinned in `package.json`. The resvg engine loads from jsDelivr at the same version (`RESVG_WASM` in `lib/move.mjs`), so change both together.
+- `satori` and `@resvg/resvg-wasm` are pinned in `package.json`. The resvg engine loads from jsDelivr at the same version (`RESVG_WASM` in `lib/card.mjs`), so change both together.
 - Fonts (Saira Condensed, IBM Plex Sans) come from Google Fonts. Player headshots and team logos come from ESPN's image server, as on the site.
 - Apps cache a link's preview, often for days. A change to the card shows up only on links shared after it.
+- To try a card on your computer: `npm install` here, then import a function from `netlify/functions/` in Node and call it with a `Request` for its address. It returns the PNG or the page. (`node_modules/` and `package-lock.json` stay out of the repo.)

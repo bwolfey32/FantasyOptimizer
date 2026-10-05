@@ -560,6 +560,15 @@ table.teams > tbody > tr.sel > td:first-child, table.teams > tbody > tr.seldet >
 table.teams > tbody > tr.sel > td:first-child strong { font-size: 15.5px; }
 table.teams > tbody > tr.sel .spark { display: none; }   /* the open table below draws the full trend */
 /* the open team's season table, with each stat's trend drawn behind its season cells */
+/* league power rankings: the grade badge inline with its score; your team marked like an open team row */
+.lgp { display: flex; flex-direction: column; gap: 10px; }
+table.lgt td { vertical-align: middle; font-size: 14px; }
+table.lgt td:first-child { width: 36px; font-size: 17px; color: var(--accent); }
+table.lgt .grade { display: inline-grid; width: 30px; height: 26px; font-size: 16px; vertical-align: middle; margin-right: 4px; }
+table.lgt tr.me > td { background: color-mix(in srgb, var(--accent) 7%, var(--surface-2)); }
+table.lgt tr.me > td:first-child { box-shadow: inset 3px 0 0 var(--accent); }
+table.lgt tr:last-child > td { border-bottom: 0; }
+.gc-league { grid-column: 1 / -1; justify-self: start; margin-top: 4px; }
 table.tdet { table-layout: fixed; min-width: 600px; }
 table.tdet th:first-child { width: 22%; }
 table.tdet td { padding-top: 12px; padding-bottom: 12px; border-bottom-color: color-mix(in srgb, var(--ink) 18%, var(--line)); }
@@ -1036,7 +1045,7 @@ function loadState() {
 }
 let state = loadState();
 const save = () => { stashTeam(); stampChanges(); store.set('state', state); queuePush(); };
-const D = { loading: true, progress: 0, errors: [], open: new Set(), U: new Map(), proj: {}, H: {}, tg: {}, rec: {}, prior: {}, cur: {}, B: {}, L: {}, ranks: {}, M: {}, imgBad: new Set(), coaches: null, espnTeams: null, defSort: ['fpaWR', -1], teamOpen: null, resetArm: false };
+const D = { loading: true, progress: 0, errors: [], open: new Set(), lg: {}, U: new Map(), proj: {}, H: {}, tg: {}, rec: {}, prior: {}, cur: {}, B: {}, L: {}, ranks: {}, M: {}, imgBad: new Set(), coaches: null, espnTeams: null, defSort: ['fpaWR', -1], teamOpen: null, resetArm: false };
 
 /* ---------- accounts and sync ----------
    Signing in is optional. This browser's copy (state) stays the working copy; a signed-in account keeps a mirror of
@@ -2415,15 +2424,24 @@ function slNotes(lg) {
   if ((lg.roster_positions || []).some(p => /^(DL|LB|DB|IDP)/.test(p))) n.push('individual defensive players');
   return n;
 }
+// a league's lineup slots, scoring and size
+function slSettings(lg, rosters) {
+  const slots = Object.fromEntries(SLOT_TYPES.map(t => [t.k, 0])); for (const p of lg.roster_positions || []) if (SL_SLOT[p]) slots[SL_SLOT[p]]++;
+  const sc = slScoring(lg.scoring_settings);
+  return { slots, scoring: sc.scoring, tePrem: sc.tePrem, size: lg.total_rosters || rosters.length };
+}
+// each roster's team: its name in the league (or the owner's), and the owner
+function slTeams(rosters, users) {
+  const byUser = Object.fromEntries((users || []).map(u => [u.user_id, u]));
+  return rosters.map(r => { const u = byUser[r.owner_id]; return { rosterId: r.roster_id, ownerId: r.owner_id, name: u?.metadata?.team_name || u?.display_name || `Team ${r.roster_id}`, owner: u?.display_name || 'no owner', n: (r.players || []).length }; });
+}
 function slApply(lg, rosters, rosterId) {
   const r = rosters.find(x => String(x.roster_id) === String(rosterId)); if (!r) return null;
   const taxi = new Set(r.taxi || []);
-  const slots = Object.fromEntries(SLOT_TYPES.map(t => [t.k, 0])); for (const p of lg.roster_positions || []) if (SL_SLOT[p]) slots[SL_SLOT[p]]++;
-  const sc = slScoring(lg.scoring_settings);
-  return { roster: (r.players || []).filter(id => !taxi.has(id)), slots, scoring: sc.scoring, tePrem: sc.tePrem, size: lg.total_rosters || rosters.length,
+  return Object.assign(slSettings(lg, rosters), { roster: (r.players || []).filter(id => !taxi.has(id)),
     rostered: rosters.flatMap(x => x.players || []), starters: (r.starters || []).filter(id => id && id !== '0'),
     // exact roster size: every lineup and bench spot (IR and taxi spots are extra)
-    rosterMax: (lg.roster_positions || []).filter(p => p !== 'IR').length, reserve: (r.reserve || []).filter(id => !taxi.has(id)) };
+    rosterMax: (lg.roster_positions || []).filter(p => p !== 'IR').length, reserve: (r.reserve || []).filter(id => !taxi.has(id)) });
 }
 async function slFind() {
   const q = ($('#slQuery')?.value || '').trim(); D.sl = { q, msg: null };
@@ -2445,9 +2463,9 @@ async function slLoadLeague(id) {
   try {
     const [lg, ros, users] = await Promise.all([fetchJSON(`${SL}/league/${id}`), fetchJSON(`${SL}/league/${id}/rosters`), fetchJSON(`${SL}/league/${id}/users`)]);
     if (!lg?.league_id) { flowFail('league_not_found'); D.sl.msg = ['err', 'No Sleeper league with that ID.']; return render(); }
-    const byUser = Object.fromEntries((users || []).map(u => [u.user_id, u]));
     D.sl.league = lg; D.sl.rosters = ros || [];
-    D.sl.teams = D.sl.rosters.map(r => { const u = byUser[r.owner_id]; return { rosterId: r.roster_id, ownerId: r.owner_id, name: u?.metadata?.team_name || u?.display_name || `Team ${r.roster_id}`, owner: u?.display_name || 'no owner', n: (r.players || []).length }; });
+    D.sl.teams = slTeams(D.sl.rosters, users);
+    D.lg[lg.league_id] = { lg, rosters: D.sl.rosters, users: users || [], at: Date.now() };   // the same data the power rankings use
     D.sl.pick = (D.sl.teams.find(t => t.ownerId === D.sl.userId) || D.sl.teams[0])?.rosterId;
     D.sl.msg = lg.season !== String(D.season) ? ['err', `That league is from the ${lg.season} season; Benny is set to ${D.season}.`] : ['info', `${lg.name}: pick your team and press Sync this team.`];
     if (lg.season !== String(D.season)) flowFail('wrong_season');
@@ -2871,12 +2889,17 @@ function waiverStart() {
   const G = D.games || [], left = G.filter(g => g.state === 'pre').length;
   return D.season === D.detSeason && D.week === D.detWeek && D.week < 18 && G.length && left <= G.length / 5 ? D.week + 1 : D.week;
 }
+// the weeks Waivers looks at (from waiverStart to week 18), how many of them the chosen window covers, and its middle week
+function waiverWindow() {
+  const weeks = []; for (let w = waiverStart(); w <= 18; w++) weeks.push(w);
+  const hz = state.waivers.horizon, H = hz === 'ros' ? weeks.length : Math.min(hz, weeks.length);
+  return { weeks, H, mid: weeks[Math.floor((H - 1) / 2)] };
+}
 function computeWaivers() {
   const W = state.waivers, start = waiverStart(), live = start === D.week;   // live: the window starts with this week
   const key = JSON.stringify([state.roster, state.overrides, state.settings, state.slots, W, state.returnWeek, state.staffEdits, D.loadedAt?.getTime(), D.week, start]);
   if (D.wCache && D.wCache.key === key) return D.wCache;
-  const weeks = []; for (let w = start; w <= 18; w++) weeks.push(w);
-  const H = W.horizon === 'ros' ? weeks.length : Math.min(W.horizon, weeks.length);
+  const { weeks, H } = waiverWindow();
   const slots = expandSlots(), roster = state.roster.filter(id => D.M[id]);
   const pool = availablePool(), V = {};
   for (const id of [...roster, ...pool]) V[id] = weekVals(id, weeks);
@@ -3060,18 +3083,26 @@ function waiverWhy(m, needs, weeks, H) {
   else if (/^questionable/i.test(fu.inj || '')) why.unshift('questionable this week: check the news first');
   return why.join('; ').replace(/^./, c => c.toUpperCase());
 }
+// every player at a position with a projection or games, ranked on rest-of-season value (1 = best)
+function posRanks(P) {
+  const all = [...D.U.values()].filter(u => u.pos === P && D.M[u.id] && (D.proj[u.id]?.pts > 0 || D.H[u.id]?.n || D.prevPPG?.[u.id])), v = new Map(all.map(u => [u.id, rosBase(u.id)]));
+  return new Map(all.sort((a, b) => v.get(b.id) - v.get(a.id)).map((u, i) => [u.id, i + 1]));
+}
+/* A roster's players at one position, best first, as team needs and Benny Grade read them: the starters (lineup spots
+   for the position, flex shares counted) and up to three rows, each with his rank at the position (posRanks). Players
+   still out past the middle of the window (`mid`) don't count as starters for it. */
+function posRows(roster, P, rank, mid) {
+  const away = id => injKind(D.U.get(id).inj) && returnWeek(id) > mid;
+  const mine = roster.filter(id => D.U.get(id).pos === P).sort((a, b) => (away(a) - away(b)) || rosBase(b) - rosBase(a));
+  const need = Math.max(1, Math.round(posSlots(P)));
+  return { need, mine, rows: mine.slice(0, Math.max(need, 3)).map((id, i) => ({ id, rank: away(id) ? null : rank.get(id), starter: i < need && !away(id), away: away(id) })) };
+}
 function teamNeeds(roster, V, weeks, H, slotsAt, base) {
   const W = state.waivers, out = [], mid = weeks[Math.floor((H - 1) / 2)];
   for (const P of POS) {
     const nSlots = posSlots(P);
     if (nSlots <= 0) continue;
-    const all = [...D.U.values()].filter(u => u.pos === P && D.M[u.id] && (D.proj[u.id]?.pts > 0 || D.H[u.id]?.n || D.prevPPG?.[u.id])).sort((a, b) => rosBase(b.id) - rosBase(a.id));
-    const rank = new Map(all.map((u, i) => [u.id, i + 1]));
-    // players still out past the middle of the window don't count as starters for it
-    const away = id => injKind(D.U.get(id).inj) && returnWeek(id) > mid;
-    const mine = roster.filter(id => D.U.get(id).pos === P).sort((a, b) => (away(a) - away(b)) || rosBase(b) - rosBase(a));
-    const need = Math.max(1, Math.round(nSlots)); let worst = 0;
-    const rows = mine.slice(0, Math.max(need, 3)).map((id, i) => ({ id, rank: away(id) ? null : rank.get(id), starter: i < need && !away(id), away: away(id) }));
+    const { need, mine, rows } = posRows(roster, P, posRanks(P), mid); let worst = 0;
     for (let i = 0; i < need; i++) { const r = rows[i]; const thr = W.teams * (i + 1) * (nSlots / need); worst = Math.max(worst, r && r.rank ? r.rank / thr : 3); }
     const level = worst <= 0.7 ? 'Strong' : worst <= 1.15 ? 'OK' : 'Weak';
     const st = mine.slice(0, need); let ms = [];
@@ -3135,6 +3166,14 @@ function sharedMoveCard(R) {
    ownership and the one-line reason, for the card.
    Phones get the share sheet; elsewhere it's copied. The analytics event says only that a move was shared. */
 const SHARE_URL = 'https://share.bennyspicks.us/w';   // share/ on Netlify (share/README.md); '' shares plain bennyspicks.us links
+const SHARE_HOST = SHARE_URL ? new URL(SHARE_URL).origin : '';   // its other links: /l (power rankings)
+// a line of text and a link: the share sheet on phones; elsewhere both are copied. done(how) records it.
+async function shareOut(text, url, done) {
+  // desktop share sheets (Windows, macOS Chrome) mostly offer "Copy link", which drops the text: copy both there instead
+  if (navigator.share && matchMedia('(pointer: coarse)').matches) { try { await navigator.share({ text, url }); done('share_sheet'); } catch {} return; }   // cancelled: nothing shared
+  try { await navigator.clipboard.writeText(`${text} ${url}`); done('copy'); toast('Copied. Paste it anywhere.'); }
+  catch { window.prompt('Copy this:', `${text} ${url}`); }
+}
 async function shareMove() {
   const R = D.wCache, m = R?.best; if (!m) return;
   const nm = id => D.U.get(id)?.name || id, H = m.H, wk = R.weeks[0];
@@ -3149,11 +3188,7 @@ async function shareMove() {
     if (why) q.set('why', why.slice(0, 180));
   }
   const url = SHARE_URL ? `${SHARE_URL}?${q}` : `https://bennyspicks.us/?${q}#waivers`;
-  const done = how => track('result_shared', { kind: 'waiver_move', how, gain: Math.round(m.hz), pos: D.U.get(m.f)?.pos });
-  // desktop share sheets (Windows, macOS Chrome) mostly offer "Copy link", which drops the text: copy both there instead
-  if (navigator.share && matchMedia('(pointer: coarse)').matches) { try { await navigator.share({ text, url }); done('share_sheet'); } catch {} return; }   // cancelled: nothing shared
-  try { await navigator.clipboard.writeText(`${text} ${url}`); done('copy'); toast('Copied. Paste it anywhere.'); }
-  catch { window.prompt('Copy this:', `${text} ${url}`); }
+  await shareOut(text, url, how => track('result_shared', { kind: 'waiver_move', how, gain: Math.round(m.hz), pos: D.U.get(m.f)?.pos }));
 }
 /* Waivers section: every defense whose personnel changed enough to matter, teams you face first. */
 function persSection(weeks, H) {
@@ -3315,9 +3350,13 @@ const GRADE_CUTS = [[93, 'A+'], [87, 'A'], [83, 'A−'], [79, 'B+'], [75, 'B'], 
 const POS_WEIGHT = { QB: 1, RB: 1, WR: 1, TE: 0.8, K: 0.3, DEF: 0.4 };
 function teamGrade() {
   if (!state.roster.length || !D.M) return null;
-  const { needs } = computeWaivers(), L = state.waivers.teams || 12, per = {};
+  return gradeOf(computeWaivers().needs.list);
+}
+// the grade from each position's rows (posRows), in the current lineup slots and league size
+function gradeOf(list) {
+  const L = state.waivers.teams || 12, per = {};
   let sum = 0, wsum = 0, depth = 0;
-  for (const n of needs.list) {
+  for (const n of list) {
     const need = Math.max(1, Math.round(posSlots(n.P))), share = posSlots(n.P) / need, w = POS_WEIGHT[n.P] ?? 1, scores = [];
     for (let i = 0; i < need; i++) {
       const r = n.rows[i], avgRank = L * (i + 0.5) * share, ratio = r && r.rank && !r.away ? r.rank / avgRank : 4;
@@ -3339,7 +3378,8 @@ function gradeCard() {
   return `<div class="card grade-card"><span class="gc-letter g-${gradeClass(g.letter)}" aria-hidden="true">${g.letter}</span>
     <div class="gc-main"><span class="label">Benny Grade</span><div><span class="num gc-score">${g.score}</span><span class="muted">/100</span> <span class="vh">${g.letter}</span></div>
       <div class="small muted">${g.best ? `Strongest: <strong>${posLabel(g.best)}</strong>` : ''}${g.worst && g.worst !== g.best ? ` · Weakest: <strong>${posLabel(g.worst)}</strong>` : ''}</div></div>
-    <div class="gc-pos">${Object.entries(g.per).map(([P, s]) => `<span class="chip ${s >= 80 ? 'up' : s < 55 ? 'down' : ''}" title="${posLabel(P)} starters score ${s}/100">${posLabel(P)} ${s}</span>`).join('')}</div></div>`;
+    <div class="gc-pos">${Object.entries(g.per).map(([P, s]) => `<span class="chip ${s >= 80 ? 'up' : s < 55 ? 'down' : ''}" title="${posLabel(P)} starters score ${s}/100">${posLabel(P)} ${s}</span>`).join('')}</div>
+    ${state.sleeper?.leagueId ? `<button type="button" class="btn sm gc-league" data-act="league" aria-expanded="${!!D.lgOpen}">${D.lgOpen ? 'Hide' : 'See'} your league’s power rankings</button>` : ''}</div>`;
 }
 /* Your weakest spot: the QB, RB, WR or TE group with the lowest Benny Grade score, and the free agents there most worth
    adding. Candidates come from the Waivers pool (players available in most leagues, or your league's own free agents),
@@ -3361,6 +3401,104 @@ function availTxt(id) {
   if (W.source === 'list' && W.faList.length) return 'on your league’s free-agent list';
   if (!D.own.size) return '';
   const o = D.own.get(id) ?? 0; return `available in ${o < 1 ? '99%+' : Math.round(100 - o) + '%'} of leagues`;
+}
+
+/* ---------- league power rankings ----------
+   Every roster in a Sleeper league graded with Benny Grade (gradeOf) in that league's lineup slots and size, best first,
+   with each team's record. Sleeper's league data is public, so this needs no login. A Sleeper-linked team opens it from
+   its grade card; a shared rankings link (?league=, shareLeague) opens it for anyone, and a visitor with no team picks
+   their own team from the list to set it up. */
+async function fetchLeague(lid, force) {
+  const c = D.lg[lid]; if (!force && c?.lg && Date.now() - c.at < 5 * 60000) return c;
+  try {
+    const [lg, rosters, users] = await Promise.all([fetchJSON(`${SL}/league/${lid}`), fetchJSON(`${SL}/league/${lid}/rosters`), fetchJSON(`${SL}/league/${lid}/users`)]);
+    if (!lg?.league_id || !Array.isArray(rosters) || !rosters.length) return (D.lg[lid] = { err: 'missing' });
+    return (D.lg[lid] = { lg, rosters, users: users || [], at: Date.now() });
+  } catch { return (D.lg[lid] = { err: 'network' }); }
+}
+/* The league's teams, best grade first: { rid, name, owner, w, l, t, g } (g: gradeOf, null with no players this week).
+   The user's own team grades exactly as on Lineup, since it's the same rows over the same window. Kept until the data,
+   settings or league change. */
+function leagueRanks(L) {
+  const key = JSON.stringify([L.lg.league_id, L.at, D.loadedAt?.getTime(), D.week, fmtKey(), state.settings, state.overrides, state.returnWeek, state.staffEdits, state.waivers.horizon]);
+  if (L.ranks?.key === key) return L.ranks.rows;
+  const s = slSettings(L.lg, L.rosters), keep = [state.slots, state.waivers.teams];
+  state.slots = s.slots; state.waivers.teams = s.size;   // gradeOf and posSlots read the league's setup from state
+  try {
+    const { mid } = waiverWindow(), Ps = POS.filter(P => posSlots(P) > 0), ranks = Object.fromEntries(Ps.map(P => [P, posRanks(P)]));
+    const teams = slTeams(L.rosters, L.users);
+    const rows = L.rosters.map((r, i) => {
+      const taxi = new Set(r.taxi || []), ids = (r.players || []).filter(id => !taxi.has(id) && D.M[id]), st = r.settings || {};
+      return { rid: r.roster_id, name: teams[i].name, owner: teams[i].owner, w: +st.wins || 0, l: +st.losses || 0, t: +st.ties || 0,
+        g: ids.length ? gradeOf(Ps.map(P => ({ P, rows: posRows(ids, P, ranks[P], mid).rows }))) : null };
+    }).sort((a, b) => (b.g?.score ?? -1) - (a.g?.score ?? -1) || (b.w - b.l) - (a.w - a.l));
+    L.ranks = { key, rows };
+    return rows;
+  } finally { [state.slots, state.waivers.teams] = keep; }
+}
+const recordTxt = r => r.w || r.l || r.t ? `${r.w}-${r.l}${r.t ? '-' + r.t : ''}` : '—';
+function leagueTable(L, mine) {
+  const rows = leagueRanks(L);
+  return `<div class="tscroll"><table class="lgt"><thead><tr><th>#</th><th class="l">Team</th><th>Grade</th><th>Record</th><th class="l">Strongest · Weakest</th></tr></thead><tbody>
+    ${rows.map((r, i) => `<tr${String(r.rid) === String(mine) ? ' class="me"' : ''}><td class="num">${r.g ? i + 1 : '—'}</td>
+      <td class="l"><strong>${esc(r.name)}</strong>${r.owner && r.owner !== r.name && r.owner !== 'no owner' ? ` <span class="small muted">${esc(r.owner)}</span>` : ''}${String(r.rid) === String(mine) ? ' <span class="pill n">You</span>' : ''}</td>
+      <td>${r.g ? `<span class="grade g-${gradeClass(r.g.letter)}">${r.g.letter}</span> <span class="num">${r.g.score}</span>` : '<span class="muted">—</span>'}</td>
+      <td class="num">${recordTxt(r)}</td>
+      <td class="l small">${r.g ? `${r.g.best ? posLabel(r.g.best) : ''}${r.g.worst && r.g.worst !== r.g.best ? ` · <span class="muted">${posLabel(r.g.worst)}</span>` : ''}` : '<span class="muted">No players this week</span>'}</td></tr>`).join('')}
+  </tbody></table></div>
+  <p class="small muted" style="margin:0">Each roster’s Benny Grade, out of 100: its starters ranked against every player at their position on rest-of-season value, in this league’s lineup and size. It rates roster strength now, not the record so far.</p>`;
+}
+// the rankings for the active Sleeper team's league, under its grade card on Lineup
+function leaguePanel() {
+  const s = state.sleeper; if (!D.lgOpen || !s?.leagueId) return '';
+  const L = D.lg[s.leagueId];
+  const head = `<div class="row-head"><h2>Benny’s power rankings <span class="hsub">${esc(L?.lg?.name || s.leagueName || 'league')} · week ${D.week}</span></h2>
+    <span class="toolbar">${L?.lg ? '<button type="button" class="btn sm primary" data-act="shareleague">Share with your league</button>' : ''}<button type="button" class="btn sm" data-act="league">Close</button></span></div>`;
+  const body = !L ? '<p class="small muted" style="margin:0">Loading every team in your league…</p>'
+    : L.err ? `<p class="small" style="margin:0">${L.err === 'missing' ? 'Sleeper no longer has this league.' : 'Couldn’t reach Sleeper.'} <button type="button" class="linkbtn" data-act="leagueretry">Try again</button></p>`
+    : leagueTable(L, s.rosterId);
+  return `<div class="card panel lgp">${head}${body}</div>`;
+}
+function toggleLeague() {
+  D.lgOpen = !D.lgOpen; render();
+  if (!D.lgOpen) return;
+  revealPanel($('.lgp'));
+  const lid = state.sleeper?.leagueId; if (!lid) return;
+  fetchLeague(lid).then(L => { if (L.lg) track('power_rankings_viewed', { teams: L.rosters.length, shared: false }); render(); });
+}
+/* Someone opened a shared rankings link (?league=): the league's rankings, with the way to set up your own team from it.
+   For a visitor with no team this leads the welcome; for anyone else it shows on Lineup until dismissed (or, for the
+   league their team is linked to, opens the rankings there). */
+function sharedLeagueCard() {
+  const lid = D.sharedLeague; if (!lid || D.loading || D.failed) return '';
+  const L = D.lg[lid], close = needsTeam() ? '' : '<button type="button" class="btn sm" data-act="sharedlgx">Dismiss</button>';
+  if (!L) return `<div class="card panel lgp"><span class="small muted">Loading the shared league…</span></div>`;
+  if (L.err) return `<div class="card panel lgp"><div class="row-head"><span class="label">Shared league</span>${close}</div><p class="small" style="margin:0">${L.err === 'missing' ? 'Sleeper has no league at that link.' : 'Couldn’t reach Sleeper to load the shared league.'}${L.err === 'missing' ? '' : ' <button type="button" class="linkbtn" data-act="sharedlgretry">Try again</button>'}</p></div>`;
+  const teams = slTeams(L.rosters, L.users).filter(t => t.n), wrongSeason = L.lg.season !== String(D.season);
+  const pick = wrongSeason ? `<p class="small muted" style="margin:0">This league is from the ${esc(L.lg.season)} season; Benny is set to ${D.season}.</p>`
+    : `<div class="toolbar"><label class="label" for="lgMine">Which team is yours?</label><select class="sel" id="lgMine" style="flex:1 1 200px">${teams.map(t => `<option value="${t.rosterId}">${esc(t.name)}${t.owner !== t.name ? ' · ' + esc(t.owner) : ''}</option>`).join('')}</select>
+      <button type="button" class="btn primary" data-act="sharedlguse">${needsTeam() ? 'Set up my team' : 'Add my team'}</button></div>`;
+  return `<div class="card panel lgp"><div class="row-head"><h2>Benny’s power rankings <span class="hsub">${esc(L.lg.name)} · week ${D.week}</span></h2>${close}</div>
+    ${leagueTable(L)}${pick}</div>`;
+}
+// set up a team from the shared league: straight to the review step, with the league already loaded
+function useSharedLeague() {
+  const L = D.lg[D.sharedLeague], rid = $('#lgMine')?.value; if (!L?.lg || rid == null) return;
+  D.sl = { q: L.lg.league_id, league: L.lg, rosters: L.rosters, teams: slTeams(L.rosters, L.users), pick: rid, msg: null };
+  openFlow('sleeper', needsTeam() ? 'replace' : 'new');
+  flowTry(); slUseTeam();
+}
+/* Share the league's rankings: the top three in a line of text, and a link that opens these rankings for anyone in the
+   league (?league=). Through share.bennyspicks.us the link also carries each team's grade (roster id and score), and
+   chat apps show the rankings as a card; names come from Sleeper there, never from the link. */
+async function shareLeague() {
+  const lid = state.sleeper?.leagueId, L = D.lg[lid]; if (!L?.lg) return;
+  const rows = leagueRanks(L).filter(r => r.g), top = rows.slice(0, 3).map((r, i) => `${i + 1}. ${r.name} (${r.g.letter})`).join(', ');
+  const text = `Benny’s power rankings for ${L.lg.name}, week ${D.week}: ${top}. Where does your team rank?`;
+  const q = new URLSearchParams({ league: lid });
+  let url = `https://bennyspicks.us/?utm_source=share&utm_medium=power_rankings&${q}#lineup`;
+  if (SHARE_HOST) { const s = new URLSearchParams({ id: lid, wk: D.week, r: rows.slice(0, 20).map(r => `${r.rid}_${r.g.score}`).join('-') }); url = `${SHARE_HOST}/l?${s}`; }
+  await shareOut(text, url, how => track('result_shared', { kind: 'power_rankings', how, teams: rows.length }));
 }
 
 /* ---------- Benny's Moves ----------
@@ -3903,6 +4041,7 @@ const WELCOME_HERO = {
   waivers: ['Your best waiver pickup, for your roster', 'Bring in your team and Benny ranks free agents by how many points they’d add to your lineup, for your scoring and your roster’s needs. With a Sleeper league, it uses your league’s real free agents.'],
   shared: ['That pick was for their roster. Find yours.', 'Bring in your team and Benny ranks free agents by how many points they’d add to your lineup, for your scoring and your roster’s needs. With a Sleeper league, it uses your league’s real free agents.'],
   players: ['Your roster, with every player’s matchup', 'Add your team to see each player’s projection and matchup grade, and to search and add players.'],
+  league: ['Where does your team rank?', 'Benny graded every roster in this league. Pick yours below and Benny sets your lineup, makes your close start/sit calls and finds the waiver pickups that fit it.'],
 };
 // pages that work without a team, offered under the setup cards
 const WELCOME_TRY = [['compare', 'Start / Sit any two players'], ['defenses', 'Defense rankings'], ['weather', 'Game-day weather'], ['teams', 'Teams & play-callers']];
@@ -3936,13 +4075,14 @@ function viewWelcome() {
     <div class="wl-methods">${WELCOME_METHODS.map(([k, t, d]) => `<button type="button" class="wl-method wl-${k}" data-act="flow" data-method="${k}" data-dest="replace"><span class="wl-ico">${WL_LOGOS[k] ? `<img src="${WL_LOGOS[k]}" alt="" width="32" height="32">` : WL_ICONS[k]}</span><span class="wl-mt"><strong>${t}</strong><span class="small muted">${d}</span></span><span class="wl-mark">${WL_ICONS[k]}</span><span class="wl-go">${WL_GO}</span></button>`).join('')}</div>
     <div class="wl-alt"><button type="button" class="linkbtn small" data-act="flow" data-method="restore" data-dest="replace">Restore a saved team</button></div>
     <div class="wl-try" role="group" aria-label="Look around first"><span class="small muted">Or look around first, no team needed:</span>${WELCOME_TRY.map(([k, l]) => `<a href="#${HASH[k]}" data-tab="${k}">${l}</a>`).join('')}</div>`;
-  // arrived from a shared move: show it, and the headline turns to their own roster
-  const shared = D.flow ? '' : sharedMoveCard(), hero = (shared ? WELCOME_HERO.shared : WELCOME_HERO[D.intent]) || WELCOME_HERO.lineup;
+  // arrived from a shared move or league: show it, and the headline turns to their own roster
+  const league = D.flow ? '' : sharedLeagueCard(), shared = D.flow || league ? '' : sharedMoveCard();
+  const hero = (league ? WELCOME_HERO.league : shared ? WELCOME_HERO.shared : WELCOME_HERO[D.intent]) || WELCOME_HERO.lineup;
   return `<div class="wl">
     <div class="wl-top">${top}</div>${signIn}${shared}
     <div class="wl-hero"><h2>${hero[0]}</h2>
       <p>${hero[1]}</p></div>
-    ${body}
+    ${league}${body}
     <div class="small muted wl-legal">By using Benny’s Picks you agree to the <a href="terms.html">Terms</a>. <a href="privacy.html">Privacy</a>.${Object.keys(WL_LOGOS).length ? ' Not affiliated with Sleeper or ESPN.' : ''}</div>
   </div>`;
 }
@@ -4136,6 +4276,8 @@ function commitDraft() {
   if (d.src) D.drafts[d.src] = '';
   track('team_saved', { method, scoring: data.scoring, te_premium: data.tePrem > 0, players: data.roster.length, unmatched: d.unresolved.length, new_team: dest === 'new', first_team: first, intent: D.intent || 'lineup' });
   anPerson({ first_setup_method: method, first_week: D.week, first_season: D.season });
+  // set up from a shared league's rankings: show them again, with this team marked
+  if (D.sharedLeague && data.sleeper?.leagueId === D.sharedLeague) { D.sharedLeague = null; D.lgOpen = true; }
   D.flow = null; D.open.clear(); D.wCache = null; D.sl = null; save();
   D.flash = { html: `<strong>Saved ${esc(curTeam().name)}:</strong> ${data.roster.length} players, ${esc(fmtName(true))} scoring${d.unresolved.length ? `; ${d.unresolved.length} name${d.unresolved.length === 1 ? '' : 's'} not found` : ''}. <a href="#roster" data-tab="players">Edit roster</a>` };
   afterSave(first);
@@ -4332,7 +4474,9 @@ function lineupBody() {
   const strat = strategy(), sLab = { mean: 'Projected', floor: 'Safe (low end)', ceil: 'Boom (high end)' };
   const head = `<div class="prow lhead" aria-hidden="true"><span class="label">Slot</span><span class="label">Player</span><span class="label">Opponent</span><span class="label" title="Matchup grade: how favorable this week’s matchup is for each player. It doesn’t rank players.">Matchup</span><span class="label" style="text-align:right">Proj</span><span class="label" style="text-align:right" title="Middle half of outcomes (25th–75th percentile). Scores can land outside it.">Likely range</span><span class="label" style="text-align:right" title="Model estimate of the chance he beats his season average">Beat avg</span></div>`;
   return `<div class="section">
+  ${sharedLeagueCard()}
   <div class="gm-row">${gradeCard()}${movesCard()}</div>
+  ${leaguePanel()}
   <div class="summary">
     <div><span class="label">Starters project</span><span class="big num">${f1(mu)}</span><span class="small muted">${fmtName()} points, week ${D.week}${live ? ', before kickoff' : ''}</span></div>
     <div><span class="label">Likely range</span><span class="big num">${f0(mu - 0.674 * sdT)}–${f0(mu + 0.674 * sdT)}</span><span class="small muted">middle 50% of outcomes</span></div>
@@ -4639,6 +4783,12 @@ document.addEventListener('click', e => {
   if (a === 'reload') { for (let s = 0; s < 4; s++) store.del('coach:' + ((D.season || 0) - s)); load({ manual: true }); }
   else if (a === 'sharemove') shareMove();
   else if (a === 'sharedx') { D.shared = null; render(); }
+  else if (a === 'league') toggleLeague();
+  else if (a === 'leagueretry') { const lid = state.sleeper?.leagueId; if (lid) { delete D.lg[lid]; render(); fetchLeague(lid, true).then(render); } }
+  else if (a === 'shareleague') shareLeague();
+  else if (a === 'sharedlgx') { D.sharedLeague = null; render(); }
+  else if (a === 'sharedlgretry') { delete D.lg[D.sharedLeague]; render(); fetchLeague(D.sharedLeague, true).then(render); }
+  else if (a === 'sharedlguse') useSharedLeague();
   else if (a === 'defcols') { D.colsOpen = !D.colsOpen; render(); }
   else if (a === 'defcolsreset') { store.del('defcols'); render(); }
   else if (a === 'loadleague') loadLeague();
@@ -4871,6 +5021,26 @@ acctBoot();
       track('shared_move_opened', { has_team: !needsTeam() });
     }
     for (const k of ['add', 'drop', 'wk', 'g', 'h']) q.delete(k);
+    try { history.replaceState(null, '', u.pathname + u.search + u.hash); } catch {}
+  } }
+// a shared league's power rankings (shareLeague's link): open the rankings for a team already linked to that league;
+// otherwise show them (sharedLeagueCard) with the way to set up a team from it. A visitor with no team takes on the
+// league's scoring and lineup slots, so the numbers they see match their league.
+{ const u = new URL(location.href), q = u.searchParams, lid = q.get('league');
+  if (q.has('league')) {
+    if (/^\d{6,24}$/.test(lid || '')) {
+      const mine = state.teams.find(t => t.sleeper?.leagueId === lid);
+      track('shared_league_opened', { has_team: !needsTeam(), own_league: !!mine });
+      if (mine) { stashTeam(); state.activeTeam = mine.id; applyTeam(mine); D.lgOpen = true; fetchLeague(lid).then(render); }
+      else {
+        D.sharedLeague = lid;
+        fetchLeague(lid).then(L => {
+          if (L.lg && needsTeam()) { const s = slSettings(L.lg, L.rosters); Object.assign(state, { slots: s.slots, scoring: s.scoring, tePrem: s.tePrem }); state.waivers.teams = s.size; save(); syncScoring(); }
+          render();
+        });
+      }
+    }
+    q.delete('league');
     try { history.replaceState(null, '', u.pathname + u.search + u.hash); } catch {}
   } }
 { const tab = TAB_OF[location.hash.slice(1)]; if (tab && needsTeam() && INTENT_TABS.has(tab)) D.intent = tab; if (tab) state.tab = tab; else if (location.hash !== '#export' && !SELFTEST && HASH[state.tab]) { try { history.replaceState(null, '', '#' + HASH[state.tab]); } catch {} } }
