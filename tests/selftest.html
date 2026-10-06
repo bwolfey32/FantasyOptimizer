@@ -843,6 +843,52 @@ test('trained: with Waivers on the trained model, its values 2-4 weeks ahead cou
   } finally { T.waivers = false; }
 }));
 
+/* ---------- the three models side by side (modelTriple, modelCompare, classicCallNote in index.html) ----------
+   With the made-up file above, every QB/RB/WR/TE's trained number is 20.0; the classic number is what he was before it
+   and Sleeper's is his own projection. */
+const triple = id => ev('modelTriple')(id);
+test('compare: trained, classic and Sleeper numbers, in the team’s scoring', () => {
+  setup(); const id = trainedPick(r => !r.u.inj), c0 = M(id).mean, s0 = M(id).projPts;
+  if (!id) return 'no healthy pregame starter';
+  return withTrained(() => {
+    setup(); const t = triple(id), r = M(id);
+    if (!t) return `${name(id)}: no comparison`;
+    if (!near(t.t.m, 20) || !near(t.c.m, c0) || !near(t.s, s0) || !near(t.t.lo, r.floor) || !near(t.t.hi, r.ceil) || !(t.t.lo <= t.t.m && t.t.m <= t.t.hi)) return `${name(id)}: ${JSON.stringify(t)}, classic ${c0}, Sleeper ${s0}`;
+    setup(st => { st.scoring = 'half'; }); const h = triple(id), c1 = ev('D').MC[id].model;
+    return h && near(h.t.m, 17) && near(h.c.m, c1) && near(h.s, M(id).projPts) || `half-PPR: ${JSON.stringify(h)}`;
+  });
+});
+test('compare: nothing for kickers, D/STs, byes, started games, the Classic setting or a file for another week', () => {
+  setup(); const D = ev('D'), pos = id => ['QB', 'RB', 'WR', 'TE'].includes(D.M[id].pos);
+  const ids = { K: Object.keys(D.M).find(id => D.M[id].pos === 'K' && D.M[id].status === 'ok'), DEF: Object.keys(D.M).find(id => D.M[id].pos === 'DEF' && D.M[id].status === 'ok'),
+    bye: Object.keys(D.M).find(id => pos(id) && D.M[id].status === 'bye'), locked: Object.keys(D.M).find(id => pos(id) && D.M[id].status === 'ok' && D.M[id].locked), ok: trainedPick(r => !r.u.inj) };
+  return withTrained(D2 => {
+    setup(); const bad = [];
+    for (const [k, id] of Object.entries(ids)) if (k !== 'ok' && id && triple(id)) bad.push(k);
+    if (!triple(ids.ok)) bad.push('a healthy starter has none');
+    setup(st => { st.settings.model = 'classic'; }); if (triple(ids.ok)) bad.push('Classic setting');
+    D2.ml.week = D2.week + 1; setup(); if (triple(ids.ok)) bad.push('other week');
+    return !bad.length || `${bad.join(', ')} (${Object.entries(ids).filter(([, v]) => !v).map(([k]) => k).join(', ') || 'all found'} missing)`;
+  });
+});
+test('compare: an override doesn’t change the models’ own numbers', () => withTrained(() => {
+  setup(); const id = trainedPick(r => !r.u.inj), a = triple(id); setup(st => { st.overrides[id] = 3.5; }); const b = triple(id);
+  return a && b && near(a.t.m, b.t.m) && near(a.c.m, b.c.m) && near(b.t.hi - b.t.lo, a.t.hi - a.t.lo, 1e-6) && b.ov || `${JSON.stringify(a)} -> ${JSON.stringify(b)}`;
+}));
+test('compare: it shows in an expanded player, Start/Sit and the best move, and not on the Classic setting', () => withTrained(() => {
+  setup(); const D = ev('D'), id = trainedPick(r => !r.u.inj), id2 = trainedPick(r => !r.u.inj && r.id !== id && r.pos === M(id).pos);
+  if (!id || !id2) return 'no two healthy pregame starters';
+  const bar = html => /class="mcmp"/.test(html) && /Trained/.test(html) && /Classic/.test(html) && /Sleeper/.test(html) && !/NaN|undefined/.test(html.match(/<div class="mcmp"[\s\S]*?<\/svg>[\s\S]*?<\/div>/)?.[0] || '');
+  const detail = ev('detailBlock')(M(id));
+  setup(st => { st.compare = [id, id2]; }); const ss = ev('viewCompare')();
+  const move = ev('bestMoveCard')({ f: id, d: id2, hz: 3, H: 1 }, [], 1, () => '', null);
+  const call = ev('classicCallNote')(M(id), M(id2), M(id));
+  const bad = [!bar(detail) && 'detail', (ss.match(/class="mcmp"/g) || []).length < 2 && 'Start/Sit', !bar(move) && 'best move', !/Waivers values use the Classic model/.test(move) && 'waivers note', !/^Classic /.test(call) && `classic call "${call}"`].filter(Boolean);
+  setup(st => { st.settings.model = 'classic'; }); const off = /class="mcmp"/.test(ev('detailBlock')(M(id))) || /class="mcmp"/.test(ev('viewCompare')());
+  if (off) bad.push('shown on Classic');
+  return !bad.length || bad.join(', ');
+}));
+
 window.addEventListener('load', () => {
   const t0 = Date.now();
   (function wait() {

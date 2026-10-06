@@ -541,6 +541,19 @@ html { scroll-padding-top: calc(var(--stick-h, 0px) + 8px); }
 .probs { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
 .probs > div { border: 1px solid var(--line); border-radius: 8px; padding: 8px 10px; display: flex; flex-direction: column; gap: 2px; }
 .probs .num { font-size: 22px; line-height: 1; }
+/* The three models side by side (modelCompare): Trained's likely range as a band, a tick for Trained, a diamond for Classic and a dot for Sleeper */
+.mcmp { display: flex; flex-direction: column; gap: 4px; min-width: 0; }
+.mcmp svg { display: block; width: 100%; max-width: 340px; height: 40px; overflow: visible; }
+.mcmp .ax { stroke: var(--line); stroke-width: 1; }
+.mcmp .band { fill: color-mix(in srgb, var(--accent) 22%, transparent); }
+.mcmp .mt { stroke: var(--accent); stroke-width: 3.5; stroke-linecap: round; }
+.mcmp .mc { fill: var(--warn); stroke: var(--surface); stroke-width: 1.5; }
+.mcmp .ms { fill: var(--muted); stroke: var(--surface); stroke-width: 1.5; }
+.mcmp-k { display: flex; flex-wrap: wrap; gap: 2px 14px; font-size: 13.5px; font-variant-numeric: tabular-nums; }
+.mcmp-k b { font-weight: 600; }
+.mcmp-k svg { display: inline-block; width: 11px; height: 11px; max-width: none; margin-right: 5px; vertical-align: -1px; }
+.mcmp-row { display: flex; flex-wrap: wrap; gap: 12px 28px; }
+.mcmp-row > .mcmp { flex: 1 1 200px; }
 .math { font-size: 13px; color: var(--muted); font-variant-numeric: tabular-nums; }
 .dh { font-size: 16px; }
 .reasons { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 6px; font-size: 14.5px; }
@@ -3604,6 +3617,8 @@ function bestMoveCard(m, weeks, H, ownTxt, near) {
   return `<div class="card wbest"><div class="row-head"><span class="label">Best move</span><button type="button" class="btn sm" data-act="sharemove">Share</button></div>
     <div class="wb-row">${side('add', m.f)}${m.d ? side('drop', m.d) : `<div class="wb-side"><span class="wb-kind keep">No drop</span><span class="small muted">You have an open roster spot</span></div>`}
       <div class="wb-gain"><span class="num">+${f1(m.hz)}</span><span class="small muted">expected lineup pts over the next ${m.H} week${m.H > 1 ? 's' : ''}</span></div></div>
+    ${(() => { const bars = [[m.f, 'Add'], [m.d, 'Drop']].filter(x => x[0]).map(([id, k]) => modelCompare(id, { head: `${k} · ${shortName(id)}, this week`, compact: true })).filter(Boolean);
+      return bars.length ? `<div class="mcmp-row">${bars.join('')}</div>${TRAINED.waivers ? '' : '<div class="small muted">Waivers values use the Classic model, so a move’s gain is Classic’s; the other two are shown for comparison.</div>'}` : ''; })()}
     ${m.whyText ? `<div class="small">${esc(m.whyText)}.</div>` : ''}${moveRange(m)}</div>`;
 }
 /* Someone opened a shared move (?add=&drop=&wk=&g=&h=, read at startup): show it as a card where the link lands, the
@@ -4293,6 +4308,48 @@ function probTiles(r) {
     <div class="small muted" style="grid-column:1/-1">Model estimates. ${calibNote()}</div>
   </div>`;
 }
+/* The three models' numbers for one player this week, in this team's scoring: the trained model's (D.M), the classic
+   model's (D.MC, the same players evaluated classic by computeAll) and Sleeper's own projection. Each is the model's own
+   number before any override. Null when there is nothing to compare: the Classic setting or no file for this week (no
+   D.MC), a player the trained model doesn't cover (kickers, D/STs, backups), a bye, or a game that has started. */
+function modelTriple(id) {
+  const t = D.M[id], c = D.MC?.[id];
+  if (!t?.trained || !c || t.status !== 'ok' || t.locked || c.status !== 'ok') return null;
+  // an override moves floor and ceil with it, so the range is rebuilt around the model's own number
+  const side = r => ({ m: r.model, lo: r.override != null ? Math.max(0, r.model - 0.674 * r.sd) : r.floor, hi: r.override != null ? r.model + 0.674 * r.sd : r.ceil });
+  return { t: side(t), c: side(c), s: t.projPts > 0 ? t.projPts : null, ov: t.override != null };
+}
+const MC_KEY = { t: '<svg viewBox="0 0 11 11" aria-hidden="true"><line class="mt" x1="5.5" y1="1.5" x2="5.5" y2="9.5"/></svg>',
+  c: '<svg viewBox="0 0 11 11" aria-hidden="true"><polygon class="mc" points="5.5,0.8 10.2,5.5 5.5,10.2 0.8,5.5"/></svg>',
+  s: '<svg viewBox="0 0 11 11" aria-hidden="true"><circle class="ms" cx="5.5" cy="5.5" r="4.3"/></svg>' };
+/* Trained, Classic and Sleeper for one player: a bar with Trained's likely range, the three numbers, and in words how far
+   apart they are (compact: just the bar and the numbers). Free for everyone, and nothing at all when there's no
+   comparison to make (modelTriple). */
+function modelCompare(id, o = {}) {
+  const tri = modelTriple(id); if (!tri) return '';
+  const { t, c, s } = tri, xs = [t.lo, t.hi, t.m, c.m, s].filter(ok);
+  let lo = Math.min(...xs), hi = Math.max(...xs); const pad = Math.max(0.5, (hi - lo) * 0.06); lo -= pad; hi += pad;
+  if (hi - lo < 4) { const mid = (lo + hi) / 2; lo = mid - 2; hi = mid + 2; }
+  const X = v => (8 + (v - lo) / (hi - lo) * 284).toFixed(1);
+  const rel = (a, b, name) => Math.abs(a - b) < 0.05 ? `matches ${name}` : `${f1(Math.abs(a - b))} ${a > b ? 'above' : 'below'} ${name}`;
+  const spread = Math.max(...[t.m, c.m, s].filter(ok)) - Math.min(...[t.m, c.m, s].filter(ok));
+  const note = spread < 1 ? 'The models agree within a point.' : `Trained is ${rel(t.m, c.m, 'Classic')}${s != null ? ` and ${rel(t.m, s, 'Sleeper')}` : ''}.`;
+  const label = `Trained ${f1(t.m)}, likely range ${f1(t.lo)} to ${f1(t.hi)}; Classic ${f1(c.m)}${s != null ? `; Sleeper ${f1(s)}` : ''}`;
+  const svg = `<svg viewBox="0 0 300 40" role="img" aria-label="${esc(label)}"><line class="ax" x1="4" x2="296" y1="20" y2="20"/><rect class="band" x="${X(t.lo)}" y="15" width="${Math.max(1, X(t.hi) - X(t.lo)).toFixed(1)}" height="10" rx="4"/>
+    <line class="mt" x1="${X(t.m)}" x2="${X(t.m)}" y1="11" y2="29"/><polygon class="mc" points="${X(c.m)},1 ${+X(c.m) + 6},7 ${X(c.m)},13 ${X(c.m) - 6},7"/>${s != null ? `<circle class="ms" cx="${X(s)}" cy="34" r="5"/>` : ''}</svg>`;
+  return `<div class="mcmp">${o.head ? `<span class="${o.headCls || 'label'}">${esc(o.head)}</span>` : ''}${svg}
+    <div class="mcmp-k"><span>${MC_KEY.t}Trained <b>${f1(t.m)}</b> <span class="muted">(${f1(t.lo)}–${f1(t.hi)})</span></span><span>${MC_KEY.c}Classic <b>${f1(c.m)}</b></span>${s != null ? `<span>${MC_KEY.s}Sleeper <b>${f1(s)}</b></span>` : ''}</div>
+    ${o.compact ? '' : `<div class="small muted">${note}${tri.ov ? ' These are the models’ own numbers, before your override.' : ''}</div>`}</div>`;
+}
+/* Start/Sit: would the classic model make the same call? Said only when one of the two is on the trained model, and not
+   when either has an override (the models' own numbers would no longer be what he sees). */
+function classicCallNote(A, Bp, w) {
+  const cA = D.MC?.[A.id], cB = D.MC?.[Bp.id];
+  if (!cA || !cB || !(A.trained || Bp.trained) || A.status !== 'ok' || Bp.status !== 'ok' || A.override != null || Bp.override != null) return '';
+  const cw = cA.model >= cB.model ? A : Bp, cl = cw === A ? Bp : A, hi = D.MC[cw.id].model, lo = D.MC[cl.id].model;
+  return cw === w ? `Classic makes the same call (${shortName(cw.id)} ${f1(hi)}, ${shortName(cl.id)} ${f1(lo)}).`
+    : `Classic would start ${shortName(cw.id)} (${f1(hi)} to ${f1(lo)}), so the two models split: treat this as closer than the percentage says.`;
+}
 /* Jump from a player explanation to the research behind it. */
 function researchLinks(r) {
   if (!r.O || !r.T) return '';
@@ -4340,7 +4397,7 @@ function detailBlock(r) {
     ${r.status === 'bye' ? '<div class="small muted">Bye week.</div>' : `<div class="small muted">Baseline ${f1(r.base)}${r.projPart > 0 && r.share > 0 ? `: ${f1(r.projPart)} from Sleeper’s projection, which already counts this matchup, and ${f1(r.base - r.projPart)} from his scoring average` : r.projPart > 0 ? ', Sleeper’s projection, which already counts this matchup' : ', his scoring average'}. Matchup strength ${spct(r.mult - 1)}${r.share > 0 ? `, applied to the scoring-average part: ${spct(r.eff)} overall` : ', already in the projection'}${r.override != null ? `; your override sets it to ${f1(r.override)}` : ''}.</div>
     ${why.length ? `<ul class="reasons">${why.map(x => `<li class="${x.up ? 'up' : 'down'}"><span class="rv">${spct(x.pct)}</span> ${esc(x.text)}</li>`).join('')}</ul>` : '<div class="small muted">No matchup factor moves him much this week.</div>'}`}
   </div>
-  <div class="section">${probTiles(r)}${modelNote()}</div>
+  <div class="section">${modelCompare(r.id, { head: 'Three models, this week' })}${probTiles(r)}${modelNote()}</div>
   ${researchLinks(r)}
   ${!isPro() ? `<div style="grid-column:1/-1">${lockLine('Every matchup factor, the math and the coaching matchup')}</div>` : `<details class="more"><summary>All matchup factors and the math</summary><div class="section">${factorList(r)}${r.scheme ? `<div class="scheme"><strong>Scheme:</strong> ${esc(r.scheme)}</div>` : ''}
   <div class="math">Sleeper projection ${f1(r.projPts)} · season avg ${f1(h?.avg)} → ${f1(r.projPart)} from the projection + ${f1(r.base - r.projPart)} from the average × matchup ${r.mult.toFixed(2)} = <strong>${f1(r.model)}</strong>${r.override != null ? ` · your override ${f1(r.override)}` : ''}${h?.n ? ` · weekly scores: ${h.pts.map(x => x.toFixed(1)).join(', ')}` : ''}</div>
@@ -5103,6 +5160,7 @@ function viewCompare() {
       <div class="meter" aria-label="${esc(A.u.name)} ${pct(pA)}, ${esc(Bp.u.name)} ${pct(1 - pA)}"><span style="width:${pA * 100}%"></span></div>
       <div class="small muted pick-odds">${pw < 0.55 ? 'Too close to call on projections alone; Benny leans this way. Check late injury news, or use Safe or Boom on the Lineup tab to break the tie. ' : ''}Model estimate of the chance to outscore: ${esc(shortName(A.id))} ${pct(pA)}, ${esc(shortName(Bp.id))} ${pct(1 - pA)}. ${calibNote()}</div>
       ${why.length ? `<ul class="pick-why">${why.map(x => `<li>${esc(x)}</li>`).join('')}</ul>` : ''}
+      ${classicCallNote(A, Bp, w) ? `<div class="small muted">${esc(classicCallNote(A, Bp, w))}</div>` : ''}
       ${gnote ? `<div class="pick-note">${esc(gnote)}</div>` : ''}
       ${modelNote()}</div>`;
   }
@@ -5112,6 +5170,7 @@ function viewCompare() {
   const col = r => { if (!r) return `<div class="card small muted">Pick a player.</div>`; const why = topReasons(r);
     return `<div class="card"><div>${playerIdentity(r.u, { size: 'lg', sub: ` ${injPill(r)} · <span title="${esc(gradeTip(r))}">matchup grade ${r.grade}</span>` })}${r.role || r.doubt ? `<div class="small"><strong>${esc(r.role ? roleText(r.role) : doubtText(r.doubt))}.</strong></div>` : ''}${oppText(r) ? `<div class="small muted">${esc(oppText(r))}</div>` : ''}</div>${matchCell(r, true)}${r.game && !r.locked && r.status !== 'bye' ? `<div class="small">${wxLine(r.game)}</div>` : ''}
     <div class="probs"><div><span class="label">Projection</span><span class="num">${r.status === 'bye' ? 'Bye' : f1(r.mean)}</span></div><div><span class="label">Likely range</span><span class="num">${f1(r.floor)}–${f1(r.ceil)}</span></div></div>
+    ${modelCompare(r.id, { head: 'Three models', compact: true })}
     ${why.length ? `<ul class="reasons">${why.map(x => `<li class="${x.up ? 'up' : 'down'}"><span class="rv">${spct(x.pct)}</span> ${esc(x.text)}</li>`).join('')}</ul>` : ''}
     ${isPro() ? `<details class="more"><summary>All factors</summary>${factorList(r)}${r.scheme ? `<div class="scheme"><strong>Scheme:</strong> ${esc(r.scheme)}</div>` : ''}</details>
     <details class="more"><summary>Coaching and scheme matchup</summary>${schemeBlock(r)}</details>` : lockLine('Every matchup factor and the coaching matchup')}</div>`; };
@@ -5280,7 +5339,7 @@ function viewSettings() {
   </div>
   <div class="card panel"><h3>Projections</h3>
     <div class="seg" role="group" aria-label="Projection model">${[['trained', 'Trained'], ['classic', 'Classic']].map(([k, l]) => `<button type="button" data-model="${k}" aria-pressed="${(S.model === 'classic' ? 'classic' : 'trained') === k}">${l}</button>`).join('')}</div>
-    <p class="small muted" style="margin:6px 0 0">${S.model === 'classic' ? 'Classic: Sleeper’s projection blended with each player’s form, moved by the matchup factors and weights below.' : `Trained: models learned from every NFL game since 2013 set each QB, RB, WR and TE’s weekly number and range. Waivers, kickers and D/STs use the classic model and the weights below. ${D.ml ? (useTrained() ? `Updated ${new Date(D.ml.made).toLocaleString()}.` : `Not available for this week yet, so the classic model is in use.`) : 'Loading…'}`}</p></div>
+    <p class="small muted" style="margin:6px 0 0">${S.model === 'classic' ? 'Classic: Sleeper’s projection blended with each player’s form, moved by the matchup factors and weights below.' : `Trained: models learned from every NFL game since 2013 set each QB, RB, WR and TE’s weekly number and range. Waivers, kickers and D/STs use the classic model and the weights below. Expanded players, Start/Sit and Waivers’ best move also show the trained number beside the classic one and Sleeper’s own. ${D.ml ? (useTrained() ? `Updated ${new Date(D.ml.made).toLocaleString()}.` : `Not available for this week yet, so the classic model is in use.`) : 'Loading…'}`}</p></div>
   <div class="card panel"><h3>Model weights</h3>
     ${sl('blend', 'Weekly projection vs. season average', S.blend, 0, 1, 0.05, v => Math.round(v * 100) + '%')}
     ${sl('intensity', 'Matchup strength', S.intensity, 0, 1.5, 0.05, v => Math.round(v * 100) + '%')}
@@ -5292,7 +5351,7 @@ function viewSettings() {
     ${ABBR.map(T => { const s = staffOf(T); const ti = (f, cls = '') => `<input class="inp ${cls}" type="text" id="st-${T}-${f}" data-staff="${T}.${f}" value="${esc(s[f])}" aria-label="${T} ${f}">`; const cb = f => `<input type="checkbox" id="st-${T}-${f}" data-staff="${T}.${f}" ${s[f] ? 'checked' : ''} aria-label="${T} ${f}">`; return `<tr><td><strong>${T}</strong></td><td class="l">${ti('hc')}</td><td class="l">${ti('offCaller')}</td><td class="l">${cb('offNew')}</td><td class="l">${ti('offPrev', 'ab')}</td><td class="l">${ti('defCaller')}</td><td class="l">${cb('defNew')}</td><td class="l">${ti('defPrev', 'ab')}</td></tr>`; }).join('')}
     </tbody></table></div><div class="toolbar"><button type="button" class="btn" data-act="resetstaff">Restore researched staffs</button></div></div>
   <div class="card panel"><details class="how"><summary>How the projection works</summary>
-    <ol><li><strong>Trained model</strong> (the default): for quarterbacks, running backs, receivers and tight ends, models trained on every NFL game since 2013 start from Sleeper’s projection, take out how far Sleeper has run high or low at the position lately, and correct it from usage (targets, carries, snaps), role and depth chart, the betting line, the opponent, the weather and injuries. They’re retrained during the season, and their ranges come from how far scores landed from their projections in past seasons. The steps below are the classic model, which Waivers, kickers and D/STs always use, and everyone when Classic is chosen above.</li>
+    <ol><li><strong>Trained model</strong> (the default): for quarterbacks, running backs, receivers and tight ends, models trained on every NFL game since 2013 start from Sleeper’s projection, take out how far Sleeper has run high or low at the position lately, and correct it from usage (targets, carries, snaps), role and depth chart, the betting line, the opponent, the weather and injuries. They’re retrained during the season, and their ranges come from how far scores landed from their projections in past seasons. The steps below are the classic model, which Waivers, kickers and D/STs always use, and everyone when Classic is chosen above. Expanded players, Start/Sit and Waivers’ best move show the trained number beside the classic one and Sleeper’s own projection, so you can see where they differ (Sleeper’s comes with no range).</li>
     <li><strong>Base:</strong> Sleeper’s weekly projection, converted to each team’s scoring (PPR, half-PPR or standard), blended with the player’s season average (slider above). A healthy player Sleeper doesn’t project while it projects a teammate at his position is a backup, with a base of 0 however he scored filling in. When the projection is under half or over 1.6× his average, his role changed and the projection leads (90%).</li>
     <li><strong>Matchup factors</strong>, each capped at ±25%: fantasy points the opponent allows to the position; secondary (pass yards allowed) or run defense (yards per carry allowed, plus the player’s own line); sacks allowed by the offense vs. sacks by the opposing defense; the team’s Vegas implied total and spread, with the opponent’s record; the offense’s pass rate and pace; and the opponent’s defensive roster changes (signings, trades, injuries) that its stats don’t show yet. Together they’re capped at ±20%, and they move only the season-average part of the base, since Sleeper’s projection already counts the matchup.</li>
     <li><strong>Weather &amp; stadium:</strong> domes and closed retractable roofs give passers and kickers a small lift. Outdoors, the forecast for the three hours from kickoff (Open-Meteo) moves points between passing, running and kicking: wind over 10 mph hurts deep passing and kickers most, rain and snow add carries, and freezing cold costs kickers and passers a little. The betting total already lowers everyone in bad weather, so this factor doesn’t cut them all again. Each player’s role sets how much he feels it (a deep threat more than a slot receiver, a running quarterback less than a pocket passer), and his own scores indoors vs. outdoors are shown for context but don’t move the projection. Like every matchup factor, it moves only the part of the projection that comes from his scoring average, since Sleeper’s projection already counts the weather.</li>
