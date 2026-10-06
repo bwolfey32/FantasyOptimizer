@@ -175,7 +175,7 @@ footer a {{ color: var(--muted); }}
 {body}
 <div class="cta"><span>{cta[0]}</span><a class="app" href="/{cta[1]}">{esc(cta[2])}</a></div>
 </main>
-<footer class="small"><span>© {datetime.now(timezone.utc).year} Benny’s Picks</span><a href="/">Lineup optimizer</a><a href="/weekly/">This week</a><a href="/privacy.html">Privacy</a><a href="/terms.html">Terms</a></footer>
+<footer class="small"><span>© {datetime.now(timezone.utc).year} Benny’s Picks</span><a href="/">Lineup optimizer</a><a href="/weekly/">This week</a><a href="/privacy.html">Privacy</a><a href="/terms.html">Terms</a><a href="/about.html">About</a><a href="/contact.html">Contact</a></footer>
 </div>
 </html>
 """
@@ -318,7 +318,7 @@ def hub_page(d):
 
 def sitemap(d):
     day = (d["createdAt"] or datetime.now(timezone.utc).isoformat())[:10]
-    urls = [("/", None, "daily"), ("/weekly/", day, "daily")] + [(f"/weekly/{s}/", day, "daily") for s, _ in PAGES] + [("/privacy.html", None, "yearly"), ("/terms.html", None, "yearly")]
+    urls = [("/", None, "daily"), ("/weekly/", day, "daily")] + [(f"/weekly/{s}/", day, "daily") for s, _ in PAGES] + [("/privacy.html", None, "yearly"), ("/terms.html", None, "yearly"), ("/about.html", None, "yearly"), ("/contact.html", None, "yearly")]
     rows = "".join(f"  <url><loc>{SITE}{u}</loc>{f'<lastmod>{m}</lastmod>' if m else ''}<changefreq>{c}</changefreq></url>\n" for u, m, c in urls)
     return f'<?xml version="1.0" encoding="UTF-8"?>\n<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n{rows}</urlset>\n'
 

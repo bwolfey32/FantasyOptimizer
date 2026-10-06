@@ -1,0 +1,59 @@
+<!doctype html>
+<html lang="en">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>About · Benny’s Picks</title>
+<meta name="description" content="What Benny’s Picks is, how its fantasy football projections are made, where the data comes from, and who runs it.">
+<link rel="icon" href="assets/favicon.ico" sizes="any">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;600&family=Saira+Condensed:wght@700&display=swap">
+<style>
+:root { --bg: #eef2ee; --surface: #fff; --ink: #13201a; --muted: #4a5850; --line: #cfd8d1; --accent: #075b37; }
+@media (prefers-color-scheme: dark) { :root { --bg: #0e1512; --surface: #151e1a; --ink: #e4ebe6; --muted: #a9b7af; --line: #29352f; --accent: #4fc38e; color-scheme: dark; } }
+* { box-sizing: border-box; }
+body { margin: 0; background: var(--bg); color: var(--ink); font: 16px/1.6 "IBM Plex Sans", system-ui, sans-serif; }
+.wrap { max-width: 760px; margin: 0 auto; padding: 24px 16px 64px; }
+h1, h2 { font-family: "Saira Condensed", "Arial Narrow", sans-serif; text-transform: uppercase; line-height: 1.1; }
+h1 { font-size: 34px; margin: 18px 0 4px; }
+h2 { font-size: 22px; margin: 28px 0 6px; }
+a { color: var(--accent); }
+.muted { color: var(--muted); }
+.home { display: inline-flex; align-items: center; gap: 10px; text-decoration: none; color: var(--ink); font-weight: 600; }
+.home img { width: 36px; height: 36px; }
+ul { padding-left: 20px; }
+</style>
+<div class="wrap">
+  <a class="home" href="./"><img src="assets/icon-192.png" alt="">Benny’s Picks</a>
+  <h1>About Benny’s Picks</h1>
+  <p class="muted">A free weekly lineup tool for fantasy football.</p>
+
+  <p>Benny’s Picks sets your best fantasy football lineup each week. Add your team from Sleeper, ESPN or Yahoo, and Benny picks your starters, makes the close start/sit calls, and finds the waiver pickups that would add the most points to your lineup. It runs on live data: injuries, betting lines, matchups and the weather at kickoff.</p>
+  <p>It’s built and run by Ben Wolfe. The aim is to make each week’s decisions from the numbers, and to show the reasons behind every call so you can judge it yourself.</p>
+
+  <h2>What it does</h2>
+  <ul>
+    <li><strong>Lineup:</strong> the starters that score the most for your league’s lineup slots and scoring, with a projected score, a likely range and a matchup grade for each player. Players on bye, ruled out or on IR go to the bench, and a questionable player counts at his chance to play.</li>
+    <li><strong>Start / Sit:</strong> pick any two players and Benny names the start, the chance he outscores the other, and why.</li>
+    <li><strong>Waivers:</strong> add/drop moves for your roster, ranked by the lineup points they add over the next few weeks, not by one bye-week fill-in.</li>
+    <li><strong>Benny Grade and power rankings:</strong> your roster scored out of 100, and, for a Sleeper league, every team in it graded the same way.</li>
+    <li><strong>Research:</strong> every defense, each team’s schemes and play-callers, and every game’s stadium and kickoff forecast.</li>
+  </ul>
+  <p>The <a href="weekly/">weekly pages</a> share the same numbers with everyone, no team needed: <a href="weekly/rankings/">rankings</a>, the <a href="weekly/waiver-wire/">waiver wire</a>, <a href="weekly/defense-rankings/">defense rankings</a> and the <a href="weekly/weather/">NFL weather report</a>, updated every few hours.</p>
+
+  <h2>How the projections work</h2>
+  <p>Each quarterback’s, running back’s, receiver’s and tight end’s weekly projection comes from models trained on every NFL game since 2013. They start from Sleeper’s projection, take out how far it has run high or low at that position lately, and adjust it for the player’s usage and role, his depth chart spot, the betting line, the opponent, the weather and injuries around him. Each model was tested only on seasons it never saw in training, and it’s retrained during the season as new games are played.</p>
+  <p>Weather counts too. Domes and closed roofs help passers and kickers a little; outdoors, strong wind hurts deep passing and kicking, rain and snow shift work toward running backs, and how much a player feels it depends on his role.</p>
+  <p>Projections are estimates, not guarantees. Every player shows a likely range alongside his number, because a fantasy week has a lot of luck in it.</p>
+
+  <h2>Where the data comes from</h2>
+  <p>Projections, stats, injuries, schedules and Sleeper leagues come from Sleeper. Scores, records, betting lines, roster percentages and player photos come from ESPN. Forecasts come from Open-Meteo, and the historical games the models learn from come from nflverse’s public NFL data. Stadium details and coaching profiles are compiled by hand.</p>
+  <p>Benny’s Picks isn’t affiliated with or endorsed by the NFL, Sleeper, ESPN or Yahoo.</p>
+
+  <h2>Free and Pro</h2>
+  <p>Benny’s Picks is free, supported by ads. Your lineup, Start / Sit for any two players, the Benny Grade and all the research are free. Pro, a paid plan, shows every suggested move and close call rather than the top few, adds win-chance lineups for Sleeper leagues, supports unlimited teams and removes ads. You can use the site without an account; your teams stay in your own browser unless you sign in to sync them across devices. Our <a href="privacy.html">Privacy Policy</a> has the details.</p>
+
+  <h2>Get in touch</h2>
+  <p>Questions, bugs or ideas are welcome. See <a href="contact.html">Contact Us</a>.</p>
+
+  <p><a href="./">Back to Benny’s Picks</a> · <a href="privacy.html">Privacy Policy</a> · <a href="terms.html">Terms of Service</a> · <a href="contact.html">Contact Us</a></p>
+</div>
+</html>
