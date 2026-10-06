@@ -23,38 +23,40 @@ const log = (...a) => { const s = a.join(' '); logEl.textContent += s + '\n'; fe
 const DEFAULTS = {
   RECENT_W: [1.5, 1.25, 1.1],                                         // formOf
   PRIOR_K0: 4, PRIOR_KEND: 2, PRIOR_END: 5, PRIOR_KLATE: 1, MOVED_CAP: 1.5,   // priorGames: 4 games at week 1 → 2 by week 5 → 1
-  DOUBT_ON: true, DOUBT_K: 0.4, DOUBT_RATIO: 2, DOUBT_GAP: 4, DOUBT_LAST: 0.8, DOUBT_NMIN: 3, DOUBT_NMIN_NEW: 2,   // projDoubt
+  DOUBT_ON: true, DOUBT_K: 0.4, DOUBT_RATIO: 2, DOUBT_GAP: 4, DOUBT_LAST: 0.8, DOUBT_NMIN: 2,   // projDoubt
+  DOUBT_MOVED_ONLY: true, DOUBT_POS: ['RB', 'WR', 'TE'],               // projDoubt: only after a team change, these positions
   ROLE_LO: 0.5, ROLE_HI: 1.6, ROLE_LEAD: 0.9,                         // roleOf
   ROS_PROJ: 0.75,                                                     // rosBase
   BUMP: true,                                                         // bumpOf
   SD_K: 1,                                                            // multiplier on evalPlayer's sd (calibration experiments)
+  USAGE_W: 0.75,                                                      // formOf: share of each game scored from usage (USAGE_PTS)
+  PROJ_DOWN: 0.9,                                                     // projWeight: the projection's weight when it's under his form
   // experiments, off at these values:
-  USAGE_W: 0, XFP: null,                // formOf: share of each game scored from usage (XFP[pos] = [a, per target, per carry, per pass attempt])
   BLEND_W1: null, BLEND_WN: 6,          // projection weight at week 1, easing linearly to the blend setting by week BLEND_WN
-  DOUBT_NEW: true, DOUBT_MOVED_ONLY: false, DOUBT_POS: null,   // projDoubt: newcomers too / only after a team change / positions
   QB_K: 1, QB_ROS_K: 1,                 // multiplier on QB forecasts: this week, rest of season
   MM_K: 1,                              // multiplier on the matchup strength used for Waivers' week-by-week values (matchupMult)
   BLEND_ROS: true,                      // whether the early-season schedule (BLEND_W1) applies to rest of season too
-  DOWN_BLEND: null, DOWN_ROS: null,     // projection weight when Sleeper projects him below his form: weekly, rest of season
 };
+/* Constants index.html keeps in plain objects (P_PLAY, REDIST, RC, HC, WIN, ...): a param whose name has a dot, like
+   "REDIST.k" or "HC.pMiss.RB", sets that property inside the page, no source edit needed. Each job starts from the
+   page's own values (OBJ0, copied at install). */
+const OBJ_NAMES = ['P_PLAY', 'PLAY_K', 'REDIST', 'RC', 'HC', 'WIN'];
 /* [function name, [[exact text, replacement, expected count]], text to insert at the top of the body] */
 const PATCHES = [
   ['priorGames', [['w <= 5 ? 4 - (w - 1) * 0.5 : 1', '__P.priorK(w)', 1], ['Math.min(k, 1.5)', 'Math.min(k, __P.MOVED_CAP)', 1]]],
-  ['formOf', [['RECENT_W[', '__P.RECENT_W[', 1], ['if (k) {', 'if (__P.USAGE_W && h?.n) { const x = __P.xfp(id, h); if (x != null) { s = s * (1 - __P.USAGE_W) + x.s * __P.USAGE_W; } } if (k) {', 1]]],
-  ['projDoubt', [['h.n < (moved || !p ? 2 : 3)', 'h.n < (moved || !p ? __P.DOUBT_NMIN_NEW : __P.DOUBT_NMIN)', 1],
+  ['formOf', [['RECENT_W[', '__P.RECENT_W[', 1], ['USAGE_W', '__P.USAGE_W', 2]]],
+  ['projDoubt', [['DOUBT_POS.has(u?.pos)', '__P.DOUBT_POS.includes(u?.pos)', 1], ['!moved || h.n < 2', '(__P.DOUBT_MOVED_ONLY && !moved) || h.n < __P.DOUBT_NMIN', 1],
     ['pts >= 2 * Math.max(cur, 2) && pts - cur >= 4', 'pts >= __P.DOUBT_RATIO * Math.max(cur, 2) && pts - cur >= __P.DOUBT_GAP', 1],
     ['h.pts[h.n - 1] >= 0.8 * pts', 'h.pts[h.n - 1] >= __P.DOUBT_LAST * pts', 1]],
-    'if (!__P.DOUBT_ON) return null; { const p_ = D.prevPPG?.[id], u_ = D.U.get(id); if (!__P.DOUBT_NEW && !p_) return null; ' +
-    'if (__P.DOUBT_MOVED_ONLY && !(p_?.[2] && u_?.team && p_[2] !== u_.team)) return null; if (__P.DOUBT_POS && !__P.DOUBT_POS.includes(u_?.pos)) return null; }'],
+    'if (!__P.DOUBT_ON) return null;'],
   ['roleOf', [['k < 0.5 ?', 'k < __P.ROLE_LO ?', 1], ['k > 1.6 &&', 'k > __P.ROLE_HI &&', 1]]],
-  ['evalPlayer', [['DOUBT_K', '__P.DOUBT_K', 1], ['ROLE_LEAD', '__P.ROLE_LEAD', 2], ['r.sd = Math.sqrt(', 'r.sd = __P.SD_K * Math.sqrt(', 1],
-    ['const bl = S.blend * (doubt ? __P.DOUBT_K : 1);', 'let bl = __P.blendOf(S.blend, D.week) * (doubt ? __P.DOUBT_K : 1); ' +
-      'if (__P.DOWN_BLEND != null && pj != null && avg != null && pj < avg) bl = Math.max(bl, __P.DOWN_BLEND);', 1],
+  ['evalPlayer', [['DOUBT_K', '__P.DOUBT_K', 1], ['ROLE_LEAD', '__P.ROLE_LEAD', 2], ['r.sd = SD_SCALE * Math.sqrt(', 'r.sd = __P.SD_K * SD_SCALE * Math.sqrt(', 1],
+    ['projWeight(S.blend', '__P.projWeight(__P.blendOf(S.blend, D.week)', 1],
     ['r.eff = r.base > 0 ? r.mean / r.base - 1 : 0;', "if (pos === 'QB') r.mean *= __P.QB_K; r.eff = r.base > 0 ? r.mean / r.base - 1 : 0;", 1]]],
   ['rosBase', [['ROS_PROJ', '__P.ROS_PROJ', 1], ['DOUBT_K', '__P.DOUBT_K', 1], ['ROLE_LEAD', '__P.ROLE_LEAD', 1],
-    ['state.settings.blend *', '__P.blendOf(state.settings.blend, D.week, true) *', 1],
-    ['return pj != null && avg != null ? b * pj + (1 - b) * avg : (pj ?? avg ?? 0);', 'const b2 = __P.DOWN_ROS != null && !r.role && pj != null && avg != null && pj < avg ? Math.max(b, __P.DOWN_ROS) : b; ' +
-      "return (pj != null && avg != null ? b2 * pj + (1 - b2) * avg : (pj ?? avg ?? 0)) * (P === 'QB' ? __P.QB_ROS_K : 1);", 1]]],
+    ['state.settings.blend *', '__P.blendOf(state.settings.blend, D.week, true) *', 1], ['projWeight(b0', '__P.projWeight(b0', 1],
+    ['return pj != null && avg != null ? b * pj + (1 - b) * avg : (pj ?? avg ?? 0);',
+      "return (pj != null && avg != null ? b * pj + (1 - b) * avg : (pj ?? avg ?? 0)) * (P === 'QB' ? __P.QB_ROS_K : 1);", 1]]],
   ['bumpOf', [], 'if (!__P.BUMP) return null;'],
   ['matchupMult', [['S.intensity * adj * fade', '__P.MM_K * S.intensity * adj * fade', 1]]],
 ];
@@ -63,16 +65,10 @@ function install(W) {
   const P = W.__P = Object.assign({}, DEFAULTS, { RECENT_W: DEFAULTS.RECENT_W.slice() });
   P.priorK = w => w <= P.PRIOR_END ? P.PRIOR_K0 - (w - 1) * (P.PRIOR_K0 - P.PRIOR_KEND) / Math.max(1, P.PRIOR_END - 1) : P.PRIOR_KLATE;
   P.blendOf = (b, w, ros) => P.BLEND_W1 == null || w >= P.BLEND_WN || (ros && !P.BLEND_ROS) ? b : P.BLEND_W1 + (b - P.BLEND_W1) * (w - 1) / Math.max(1, P.BLEND_WN - 1);
-  /* usage-based expected points (experiment): this season's games re-scored from targets, carries and pass attempts
-     with per-position rates (P.XFP), weighted like formOf. Returns { s } on formOf's weighted-sum scale. */
-  P.xfp = (id, h) => {
-    const u = W.eval('D').U.get(id), k = P.XFP?.[u?.pos]; if (!k) return null;
-    const g = W.__usage?.[id]; if (!g || g.length !== h.n) return null;
-    let s = 0; g.forEach((x, i) => { const w = P.RECENT_W[h.n - 1 - i] ?? 1; s += (k[0] + k[1] * x[0] + k[2] * x[1] + k[3] * x[2]) * w; });
-    return { s };
-  };
-  /* A function whose source no longer matches (index.html changed since these patches were written) is left as it is,
-     and reported: the parameters it carried have no effect on this version until PATCHES is updated. */
+  P.projWeight = (b, pj, avg) => pj != null && avg != null && pj < avg ? Math.max(b, P.PROJ_DOWN) : b;   // index.html's projWeight
+  W.__OBJ0 = {}; for (const k of OBJ_NAMES) { try { W.__OBJ0[k] = JSON.parse(JSON.stringify(W.eval(k))); } catch { /* not in this version */ } }
+  /* A function whose source no longer matches (index.html changed since these patches were written) stops the run, so
+     a parameter can't silently have no effect: update PATCHES. */
   const missed = [];
   for (const [name, edits, prefix] of PATCHES) {
     let src = W[name].toString(), bad = null;
@@ -85,14 +81,22 @@ function install(W) {
     if (prefix) { const i = src.indexOf('{'); src = src.slice(0, i + 1) + ' ' + prefix + src.slice(i + 1); }
     W.eval(`'use strict'; ${name} = ${src};`);
   }
-  // per-game usage for the experiment: [targets, carries, pass attempts] per game, in the same order as D.H[id].pts
-  const D = W.eval('D'); W.__usage = {};
-  D.weeks.forEach(wk => { for (const p of wk.P) (W.__usage[p[0]] ||= []).push([p[10], p[8], p[5]]); });
   return missed;
 }
+// copies src's values into the page's object dst, nested objects property by property (the page holds references to them)
+function restore(dst, src) { for (const [k, v] of Object.entries(src)) { if (v && typeof v === 'object' && !Array.isArray(v) && dst[k] && typeof dst[k] === 'object') restore(dst[k], v); else dst[k] = JSON.parse(JSON.stringify(v)); } }
 function setParams(W, params) {
   const P = W.__P; if (!P) return;   // before install(): the original model
-  Object.assign(P,DEFAULTS, { RECENT_W: DEFAULTS.RECENT_W.slice() }, JSON.parse(JSON.stringify(params || {})));
+  const all = JSON.parse(JSON.stringify(params || {})), flat = {};
+  for (const k in W.__OBJ0 || {}) restore(W.eval(k), W.__OBJ0[k]);
+  for (const [k, v] of Object.entries(all)) {
+    if (!k.includes('.')) { flat[k] = v; continue; }
+    const path = k.split('.'), last = path.pop(); let o = W.eval(path.shift());
+    for (const p of path) o = o[p];
+    if (o == null || !(last in o)) throw new Error(`unknown parameter ${k}`);
+    o[last] = v;
+  }
+  Object.assign(P, DEFAULTS, { RECENT_W: DEFAULTS.RECENT_W.slice(), DOUBT_POS: DEFAULTS.DOUBT_POS.slice() }, flat);
 }
 
 function loadFrame(path) {
@@ -165,12 +169,12 @@ function waiversOf(W, roster, owned) {
   const moves = Wv.moves.map(m => {
     const nr = ids.filter(x => x !== m.d).concat(m.f), per = [], perL = [];
     for (let wi = 0; wi < m.H; wi++) {
-      const R = wi || !live ? replAt(wi) : null, L2 = bestLineup(nr, wi, Wv.V, slots, R), B = Wv.base[wi];
+      const R = wi || !live ? replAt(wi) : null, L2 = bestLineup(nr, wi, Wv.V, slots, R, Wv.HCW), B = Wv.base[wi];
       per.push(r2((L2.total + L2.depth) - (B.total + B.depth))); perL.push(r2(L2.total - B.total));
     }
     const r = D.M[m.f], pp = D.prevPPG?.[m.f], bp = bumpOf(m.f), fi = fillInFor(m.f);
     return { f: m.f, d: m.d, name: D.U.get(m.f).name, pos: r.pos, team: r.T, dname: m.d ? D.U.get(m.d).name : null, hz: r2(m.hz), strength: r2(m.strength),
-      score: r2(m.score), H: m.H, marginal: !!m.marginal, hold: !!m.hold, why: m.whyText, per, perL, weeks: Wv.weeks.slice(0, m.H),
+      score: r2(m.score), H: m.H, marginal: !!m.marginal, hold: !!m.hold, handcuff: m.handcuff ? { s: m.handcuff.s.id, sv: r2(m.handcuff.sv), p: m.handcuff.p } : null, why: m.whyText, per, perL, weeks: Wv.weeks.slice(0, m.H),
       vf: Wv.V[m.f].slice(0, m.H).map(r2), vd: m.d ? Wv.V[m.d].slice(0, m.H).map(r2) : null,
       flags: { doubt: r.doubt ? { cur: r2(r.doubt.cur), n: r.doubt.n, moved: r.doubt.moved } : null, role: r.role?.kind || '', bump: bp ? { mate: bp.mate.name, back: bp.back } : null,
         fill: fi ? fi.name : null, proj: r2(r.projPts), cur: r2(D.H[m.f]?.avg), n: D.H[m.f]?.n || 0, prev: pp ? pp[0] : null, prevTeam: pp ? pp[2] : null,
@@ -191,7 +195,7 @@ async function run() {
       // parity: the patched model at the original constants must reproduce the original model exactly
       reset(W, fx, { settings: {} }); const before = rowsOf(W, false);
       const missed = install(W);
-      if (missed.length && fx === job.fixtures[0]) log('WARNING index.html has changed since these patches were written; these parameters have no effect: ' + missed.join(' | '));
+      if (missed.length) throw new Error('index.html has changed since these patches were written, update PATCHES: ' + missed.join(' | '));
       reset(W, fx, { settings: {} }); const after = rowsOf(W, false);
       let diff = 0, nb = Object.keys(before).length;
       if (nb !== Object.keys(after).length) diff = Infinity;

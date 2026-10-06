@@ -392,6 +392,51 @@ The results are worth reading with these in mind. The first three matter most.
    - Scoring is PPR only, and D/STs are left out of forecast scoring, as in `calibrate.py`.
    - Last season's indoor/outdoor splits and ESPN coach records aren't built: both are display only.
 
+## Injuries, teammates, role changes, handcuffs and win chance (October 2026)
+
+Five additions to the model, fitted from nflverse's public injury reports, snap counts and weekly stats for 2023-25
+(`scripts/backtest/fit_nflverse.py`, results in `out/results/nflverse.json`). **They have not been through the replay
+above**: the session that built them couldn't reach Sleeper's or ESPN's archives, so their effect on projection error,
+Waivers and lineups is unmeasured. They ship at the fitted values (or, where nothing could be fitted, the proposed ones);
+the replay is the next step, with the configs in [How to rerun](#how-to-rerun).
+
+| What | Fit (2023-25, regular season, QB/RB/WR/TE) | Shipped |
+|---|---|---|
+| Chance a player listed **questionable** plays (regulars: 2+ games, 5+ points a game) | 69% of 634 (95% interval 66-73%); QB 40% of 78, RB 73%, WR 72%, TE 80% | `P_PLAY.Questionable` QB 0.45, RB 0.73, WR 0.72, TE 0.78 (shrunk toward 69%) |
+| Chance a player listed **doubtful** plays | 1% of 83 | `P_PLAY.Doubtful` 0.02 |
+| Still questionable once inactives are out (90 minutes before kickoff) | not in the data | `P_PLAY.late` 0.97 |
+| What a questionable player scores when he plays, over his untagged games | 0.98 on average (median 0.83), 416 games | `PLAY_K.Questionable` 0.97 |
+| Of a missing regular's targets and carries, the share his RB/WR/TE teammates add that game | RB 0.95, TE 1.06, WR 1.55 (noisy); 89% of it at his own position | `REDIST.k` 0.9, `REDIST.same` 0.85 |
+| Chance a regular (his team's snap leader) has no offensive snap 1-4 weeks later | RB 8.3%, WR 8.6%, TE 8.3%, QB 13% (benchings count) | `HC.pMiss` |
+| Next man up's points in the game the regular misses, over the regular's average | RB 0.82 mean, 0.61 median (35 games); QB 0.80 / 0.72 | `HC.succ` RB 0.7, QB 0.75 |
+| Role-change flags (snap/carry/target share, last 2 games vs. earlier): change holds the next week | rises 62-72%, drops 55-68% (1,363 flags) | shown; flagged on Waivers |
+| How far toward the last 2 games the next week's form should move (usage-weighted points, no projection) | rises: 0 for RB and WR, 0.2 TE (moving toward a rise made it worse); drops: 0.6-0.9 | `RC.formMax` up 0, down 0.6 |
+
+What each one does:
+
+- **Chance to play.** A questionable or doubtful player's number is his chance to play × what he scores if he plays,
+  and his range is the mixture of the two (a zero when he sits). Doubtful now counts the same on Lineup and Waivers
+  (before, Lineup counted him in full and Waivers as a zero). The forecast record keeps the if-he-plays numbers, so
+  calibration still scores players who played.
+- **Teammates.** A questionable or doubtful regular's targets and carries are passed to his teammates at the chance he
+  sits. A player ruled out is left to Sleeper's projections, which already reflect it.
+- **Backups.** A backup running back or quarterback behind a regular who may sit is valued as the starter at the chance
+  he starts.
+- **Role changes.** Off until the data includes snap counts (rows saved from October 2026 on).
+- **Handcuffs.** On Waivers, the next running back behind a healthy regular (or quarterback, with a superflex spot) is
+  worth `HC.pMiss` × what he'd score starting over what the lineup would have instead. Never worth a player you'd start.
+- **Win chance.** Pro, Sleeper teams: the lineup with the best chance to beat this week's opponent, with the
+  correlations `pairCorr` assumes, never below the Projected lineup's chance, and charging 0.1 points of win chance per
+  projected point given up.
+
+What the replay should measure first:
+- Whether Sleeper already shades a questionable player's projection, which would make `PLAY_K` and the chance to play
+  count twice. Compare projection over form for tagged and untagged players.
+- `REDIST.k` from 0 up.
+- `RC.formMax.down` against the projection blend.
+- Handcuff moves' realized value.
+- The win rate of Win chance vs. Projected lineups, with the drafted teams paired into weekly matchups.
+
 ## How to rerun
 
 ```
@@ -408,6 +453,12 @@ python3 scripts/backtest/analyze.py compare:compare
 [What we tested and left alone](#what-we-tested-and-left-alone). To add weeks, pass for example `--weeks 2026:5-8` to
 `build_fixtures.py` (results for a week are fetched once it has been played).
 
-After the model-tweaks branch is merged, `replay.py baseline` replays the tuned model. Some of the harness's parameter
-rewrites in `driver.html` (`PATCHES`) no longer find their target text in the new code, so the driver skips them and
-warns. Update them before running new sweeps.
+`driver.html`'s `PATCHES` match the current code (parity is exact on the frozen week), and a patch that no longer
+finds its text now stops the run instead of being skipped. The constants added in October 2026 live in plain objects
+(`P_PLAY`, `PLAY_K`, `REDIST`, `RC`, `HC`, `WIN`), so a config sets them by dotted name with no source edit, for example
+`{"name": "no redistribution", "params": {"REDIST.k": 0}, "full": true}` or `{"params": {"RC.formMax.down": 0.3}}`.
+The earlier sweep modes still name some retired experiments (`XFP`, `DOWN_BLEND`); those parameters now do nothing.
+
+```
+python3 scripts/backtest/fit_nflverse.py            # the injury, handcuff and role-change fits below (nflverse only)
+```

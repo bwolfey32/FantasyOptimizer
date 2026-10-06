@@ -82,7 +82,15 @@ function checkNumbers(where) {
   const D = ev('D');
   for (const [id, r] of Object.entries(D.M)) {
     if (!Number.isFinite(r.mean) || !Number.isFinite(r.sd) || r.sd < 0) flag('ERROR', 'projection-not-a-number', where, `${nm(id)}: mean ${r.mean}, sd ${r.sd}`);
-    else if (r.status === 'ok' && r.mean > 0 && r.floor > r.mean + 1e-9) flag('ERROR', 'range-above-projection', where, `${nm(id)}: floor ${r1(r.floor)} > ${r1(r.mean)}`);
+    else if (r.status === 'ok' && r.mean > 0 && r.floor > r.mean + 1e-9 && !r.mix) flag('ERROR', 'range-above-projection', where, `${nm(id)}: floor ${r1(r.floor)} > ${r1(r.mean)}`);
+    // on the injury report: counted at a chance to play between 0 and 1, never above what he scores if he plays
+    if (r.mix && (r.mean > r.mIf + 1e-9 || !(r.pPlay >= 0 && r.pPlay <= 1) || r.floor > r.ceil)) flag('ERROR', 'pplay-out-of-range', where, `${nm(id)}: pPlay ${r.pPlay}, mean ${r1(r.mean)} of ${r1(r.mIf)}`);
+    // a teammate's work is passed on only from a regular who is questionable or doubtful (not one ruled out: Sleeper has it)
+    if (r.mateBump && !r.mateBump.from.every(f => ev('injTag')(f.x.inj) && f.pm > 0 && f.pm < 1)) flag('ERROR', 'teammate-bump-without-tagged-mate', where, `${nm(id)}: from ${r.mateBump.from.map(f => nm(f.x.id) + ' ' + (f.x.inj || 'healthy')).join(', ')}`);
+    // a role change that moves his form by more than 30% is worth a look (roleChgOf, formNow)
+    if (r.rc) { const f = ev('formOf')(id), fn = ev('formNow')(id); if (f > 2 && Math.abs(fn - f) > 0.3 * f) flag('WARN', 'role-change-big-swing', where, `${nm(id)}: form ${r1(f)} → ${r1(fn)} (${r.rc.dir})`); }
+    // a doubtful player this week: Waivers counts what Lineup does
+    if (/^doubtful/i.test(r.inj || '') && r.status === 'ok' && !r.locked && Math.abs(ev('weekVals')(id, [D.week])[0] - r.mean) > 1e-6) flag('ERROR', 'doubtful-inconsistent', where, `${nm(id)}: Lineup ${r1(r.mean)}, Waivers ${r1(ev('weekVals')(id, [D.week])[0])}`);
   }
 }
 /* Projections far from Sleeper's for players people roster. Not wrong by itself (the model means to differ sometimes),
@@ -90,7 +98,7 @@ function checkNumbers(where) {
 function checkProjections(where) {
   const D = ev('D');
   const rows = Object.values(D.M).filter(r => r.status === 'ok' && !r.locked && r.projPts >= 5 && own(r.id) >= 20 && D.tg[r.T])
-    .map(r => ({ r, k: r.mean / r.projPts })).filter(x => x.k >= 1.4 || x.k <= 0.65);
+    .map(r => ({ r, k: (r.mix ? r.mIf : r.mean) / r.projPts })).filter(x => x.k >= 1.4 || x.k <= 0.65);   // if he plays: the chance he sits isn't a gap
   for (const { r, k } of rows.sort((a, b) => Math.abs(Math.log(b.k)) - Math.abs(Math.log(a.k))))
     flag('WARN', 'projection-far-from-sleeper', where, `${nm(r.id)}: Benny ${r1(r.mean)} vs Sleeper ${r1(r.projPts)} (${Math.round(k * 100)}%), form ${r1(ev('formOf')(r.id) ?? NaN)}, ${own(r.id)}% rostered${r.role ? ', ' + r.role.kind : ''}`);
   // a widely rostered healthy player whose team plays but who has no projection is valued at nothing as a "backup"
@@ -111,6 +119,22 @@ function checkLineup(where) {
   if (!starters.some(s => s.r)) flag('ERROR', 'lineup-empty', where, 'no starters');
 }
 const D_tg = T => !!ev('D').tg[T];
+/* Win chance, as a Pro team in a Sleeper league playing `opp` (another drafted roster, its best lineup as the set one):
+   never below the Projected lineup's chance, a number, and only players who'll play. */
+function checkWin(where, roster, opp) {
+  const A = ev('acct'), D = ev('D'), st = ev('state'), was = [A.user, A.bootPro, st.sleeper, st.settings.strategy], k = 'LAUDIT|' + D.week;
+  try {
+    A.user = null; A.bootPro = { until: Date.now() + 1e10 }; st.sleeper = { leagueId: 'LAUDIT', rosterId: 1, starters: [] }; st.settings.strategy = 'win';
+    D.slMatch[k] = { rows: [{ roster_id: 1, matchup_id: 1, players: roster, starters: [] }, { roster_id: 2, matchup_id: 1, players: opp, starters: [] }], at: Date.now() }; D.winCache = null;
+    const R = ev('optimize')(), w = R.win;
+    if (!w) return flag('ERROR', 'win-lineup-missing', where, 'no win lineup with a matchup set');
+    if (!Number.isFinite(w.p) || w.p < 0 || w.p > 1) flag('ERROR', 'win-prob-not-a-number', where, `p=${w.p}`);
+    if (w.p < w.base.p - 1e-9) flag('ERROR', 'win-lineup-below-projected', where, `${r1(w.p * 100)}% vs Projected ${r1(w.base.p * 100)}%`);
+    for (const s of R.starters) if (s.r && s.r.status !== 'ok' && !s.r.locked) flag('ERROR', 'lineup-starts-unavailable', where, `win chance starts ${nm(s.r.id)} (${s.r.status})`);
+    const mu = x => x.filter(s => s.r).reduce((a, s) => a + s.r.mean, 0), give = mu(w.base.starters) - mu(R.starters);
+    if (give > 0.08 * mu(w.base.starters)) flag('WARN', 'win-lineup-gives-up-points', where, `${r1(give)} projected points for ${r1(w.base.p * 100)}% → ${r1(w.p * 100)}%`);
+  } finally { [A.user, A.bootPro, st.sleeper, st.settings.strategy] = was; delete D.slMatch[k]; D.winCache = null; }
+}
 function checkWaivers(where, roster) {
   const D = ev('D'), Wv = ev('computeWaivers')(), sched = ev('schedOpp'), weeks = Wv.weeks;
   const rec = Wv.moves.filter(m => !m.marginal);
@@ -119,6 +143,19 @@ function checkWaivers(where, roster) {
     for (const k of ['hz', 'score', 'strength']) if (!Number.isFinite(m[k])) flag('ERROR', 'waiver-not-a-number', where, `${nm(m.f)} ${k}=${m[k]}`);
     if (!roster.includes(m.d) && m.d) flag('ERROR', 'waiver-drops-player-not-on-roster', where, nm(m.d));
     if (roster.includes(m.f)) flag('ERROR', 'waiver-adds-own-player', where, nm(m.f));
+    // a backup is listed only as a handcuff (RB, or QB with a superflex spot), behind a healthy regular, and says so; his
+    // contingent value can't exceed the chance × what he'd score as the starter, every week of the window
+    const fu = D.U.get(m.f);
+    if (D.M[m.f]?.role?.kind === 'backup' || m.handcuff) {
+      const hc = m.handcuff, txt = `add ${nm(m.f)}: ${m.whyText}`;
+      if (!hc || !/handcuff/i.test(m.whyText)) flag('ERROR', 'handcuff-not-said', where, txt);
+      else {
+        if (!(fu.pos === 'RB' || (fu.pos === 'QB' && (ev('state').slots.OP || 0) > 0))) flag('ERROR', 'handcuff-wrong-position', where, txt);
+        if (/^(out|ir|pup|sus|doubtful)/i.test(hc.s.inj || '')) flag('ERROR', 'handcuff-behind-out-starter', where, `${txt} [${nm(hc.s.id)} ${hc.s.inj}]`);
+        const bound = (Wv.HCW?.[m.f] || []).slice(0, m.H).reduce((a, x) => a + (x ? x.p * x.sv : 0), 0) + Math.max(0, ...(Wv.V[m.f] || [0]).slice(0, m.H)) * m.H;
+        if (!m.d && m.hz > bound + 1e-6) flag('ERROR', 'handcuff-value-above-bound', where, `${txt} [+${r1(m.hz)} over a bound of ${r1(bound)}]`);
+      }
+    }
   }
   for (const m of rec) {
     const f = D.U.get(m.f), d = m.d ? D.U.get(m.d) : null, txt = `add ${nm(m.f)}${d ? ', drop ' + nm(m.d) : ''} +${r1(m.hz)} over ${m.H}: ${m.whyText}`;
@@ -136,7 +173,7 @@ function checkWaivers(where, roster) {
       flag('WARN', 'drop-outscores-add', where, `${txt} [this season ${r1(fh.avg)} vs ${r1(dh.avg)}, last ${fp} vs ${dp}]`);
     // the add isn't his team's starter by Sleeper's projections (kickers, QBs, defenses: only one plays)
     const T = f.team, dep = ev('D').depth?.[T + '|' + f.pos] || [];
-    if (D.tg[T] && !(D.proj[m.f]?.pts > 0) && !f.inj) flag('WARN', 'add-has-no-projection', where, `${txt} [no Sleeper projection this week]`);
+    if (D.tg[T] && !(D.proj[m.f]?.pts > 0) && !f.inj && !m.handcuff) flag('WARN', 'add-has-no-projection', where, `${txt} [no Sleeper projection this week]`);
     else if (['QB', 'K'].includes(f.pos) && dep.length && dep[0] !== m.f && !f.inj) flag('WARN', 'add-not-the-starter', where, `${txt} [${nm(dep[0])} projects ${r1(D.proj[dep[0]].pts)} vs ${r1(D.proj[m.f]?.pts ?? 0)}]`);
     if (!fh?.n && (ev('D').cur?.[T]?.g || 0) >= 2) flag('WARN', 'add-has-not-played', where, `${txt} [no games this season]`);
     if (/^(questionable|doubtful|out)/i.test(f.inj || '') && !/check the news/.test(m.whyText)) flag('ERROR', 'injured-add-not-said', where, `${txt} [${f.inj}]`);
@@ -212,6 +249,7 @@ function run() {
         const { Wv, rec } = checkWaivers(where, roster);
         for (const m of rec) adds[m.f] = (adds[m.f] || 0) + 1;
         checkMoves(where, Wv);
+        if (cfg === CONFIGS[0]) checkWin(where, roster, L.rosters[(ti + 1) % L.rosters.length]);
         summary.rosters++; summary.moves += Wv.moves.length; summary.rec += rec.length; summary.best += Wv.best ? 1 : 0;
         // the grade is season-long, so it's checked against the usual lineup (no byes or one-week matchups)
         const g = ev('teamGrade')(), sl = ev('bestLineup')(roster.filter(id => D.M[id]), 0, Wv.VS, ev('expandSlots')(), null).total;

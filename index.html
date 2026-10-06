@@ -930,6 +930,7 @@ const norm = s => String(s || '').toLowerCase().normalize('NFD').replace(/[̀-ͯ
 function erf(x) { const s = Math.sign(x); x = Math.abs(x); const t = 1 / (1 + 0.3275911 * x); const y = 1 - (((((1.061405429 * t - 1.453152027) * t) + 1.421413741) * t - 0.284496736) * t + 0.254829592) * t * Math.exp(-x * x); return s * y; }
 const Phi = z => 0.5 * (1 + erf(z / Math.SQRT2));
 const pAbove = (x, m, sd) => sd > 0 ? 1 - Phi((x - m) / sd) : (m >= x ? 1 : 0);
+const invPhi = p => { let lo = -8, hi = 8; for (let i = 0; i < 50; i++) { const mid = (lo + hi) / 2; if (Phi(mid) < p) lo = mid; else hi = mid; } return (lo + hi) / 2; };
 const mean = a => a.length ? a.reduce((s, x) => s + x, 0) / a.length : null;
 /* index.html#selftest (with ?fixture=path) loads only that saved data bundle, for tests/selftest.html: no live data, account,
    analytics or Sleeper sync, and nothing read from or written to this browser's storage. */
@@ -943,7 +944,7 @@ const SELFTEST = location.hash === '#selftest';
    blocked, is kept in memory so the page works for this visit. Nothing here crashes the page. The sign-in session is
    Supabase's own (sb-...-auth-token) and stays as Supabase writes it. */
 const STORE_PREFIX = 'bp:v1:', STORE_SCHEMA = 1, STORE_SCHEMA_KEY = 'bp:schema';
-const STORE_CACHES = /^(sched|wk2|prior2|split|idp|ppg4|ret|pids|coach|geo):/;
+const STORE_CACHES = /^(sched|wk2|wk3|prior2|split|idp|ppg4|ret|pids|coach|geo):/;
 const storeKeys = ls => Array.from({ length: ls.length }, (_, i) => ls.key(i)).filter(k => k != null);
 const isQuotaErr = e => !!e && (e.name === 'QuotaExceededError' || e.name === 'NS_ERROR_DOM_QUOTA_REACHED' || e.code === 22 || e.code === 1014);
 function migrateStore(ls) {
@@ -1501,7 +1502,8 @@ function compactWeek(rows) {
     if (!(s.gp > 0)) continue;
     if (pos === 'DEF') { const T = fixAbbr(r.team || r.player_id); if (!TEAMS[T]) continue; Dd.push([T, fixAbbr(r.opponent), s.fan_pts_allow_qb||0, s.fan_pts_allow_rb||0, s.fan_pts_allow_wr||0, s.fan_pts_allow_te||0, s.fan_pts_allow_k||0, s.fan_pts_allow_def||0, s.sack||0, s.pts_allow||0, s.yds_allow||0, +(s.pts_ppr||0).toFixed(2)]); continue; }
     if (!POS.includes(pos)) continue;
-    P.push([r.player_id, pos, fixAbbr(r.team), fixAbbr(r.opponent), +(s.pts_ppr||0).toFixed(2), s.pass_att||0, s.pass_yd||0, s.pass_sack||0, s.rush_att||0, s.rush_yd||0, s.rec_tgt||0, s.rec_yd||0, nameOf(r), s.rec||0]);
+    P.push([r.player_id, pos, fixAbbr(r.team), fixAbbr(r.opponent), +(s.pts_ppr||0).toFixed(2), s.pass_att||0, s.pass_yd||0, s.pass_sack||0, s.rush_att||0, s.rush_yd||0, s.rec_tgt||0, s.rec_yd||0, nameOf(r), s.rec||0,
+      s.off_snp ?? null, s.tm_off_snp ?? null]);   // snaps last: rows saved before they were kept just end earlier
   }
   return { P, D: Dd };
 }
@@ -1757,7 +1759,7 @@ async function gatherLive(err) {
   const pProj = T(fetchJSON(API.proj(season, week)).catch(e => { err('Sleeper projections', e); return []; }));
   const weekPs = [];
   for (let w = 1; w <= histMax; w++) {
-    const key = `wk2:${season}:${w}`, cached = w <= completedThrough ? store.get(key) : null;
+    const key = `wk3:${season}:${w}`, cached = w <= completedThrough ? store.get(key) : null;
     weekPs.push(cached ? Promise.resolve(cached) : T(fetchJSON(API.wk(season, w)).then(rows => { const c = compactWeek(rows); if (w <= completedThrough && c.D.length) store.set(key, c); return c; }).catch(e => { err('Sleeper stats week ' + w, e); return { P: [], D: [] }; })));
   }
   const pActual = week <= (past ? 18 : detWeek) ? T(fetchJSON(API.wk(season, week)).then(compactWeek).catch(() => ({ P: [], D: [] }))) : Promise.resolve({ P: [], D: [] });
@@ -1825,10 +1827,16 @@ function ingest(inp) {
     if (!D.U.has(id)) D.U.set(id, { id, name, pos, team, inj });
     if (pts != null && !(id in D.proj)) D.proj[id] = { pts: fmtPts(pts, rec, pos), opp };
   }
+  /* Per game too, for role changes (roleChgOf): his targets (tgs), carries (ras), pass attempts (pas), share of his
+     team's offensive snaps (snp, null when the row has no snap counts) and team (tms); and each team's targets and
+     carries a week (D.teamWk[T][week index]). */
+  D.teamWk = {};
+  inp.weeks.forEach((wk, wi) => { for (const [, , T, , , , , , ra, , tg] of wk.P) if (T) { const t = (D.teamWk[T] ||= [])[wi] ||= { tgt: 0, ra: 0 }; t.tgt += tg; t.ra += ra; } });
   inp.weeks.forEach((wk, wi) => {
-    for (const [id, pos, T, , ppr, pa, , , ra, , tg, , name, rec] of wk.P) {
+    for (const [id, pos, T, , ppr, pa, , , ra, , tg, , name, rec, snp, tsnp] of wk.P) {
       const pts = fmtPts(ppr, rec, pos), u = USAGE_PTS[pos];
-      const h = D.H[id] || (D.H[id] = { pts: [], use: [], tgt: 0, ra: 0, wks: [] }); h.pts.push(pts); h.tgt += tg; h.ra += ra; h.wks.push(wi + 1);
+      const h = D.H[id] || (D.H[id] = { pts: [], use: [], tgt: 0, ra: 0, wks: [], tgs: [], ras: [], pas: [], snp: [], tms: [] }); h.pts.push(pts); h.tgt += tg; h.ra += ra; h.wks.push(wi + 1);
+      h.tgs.push(tg); h.ras.push(ra); h.pas.push(pa); h.tms.push(T); h.snp.push(tsnp > 0 && snp != null ? snp / tsnp : null);
       h.use.push(u ? fmtPts(u[0] + u[1] * tg + u[2] * ra + u[3] * pa, rec, pos) : null);   // what the game's usage is worth (formOf)
       if (T) { const t = D.teamUse[T] || (D.teamUse[T] = { tgt: 0, ra: 0, wks: new Set() }); t.tgt += tg; t.ra += ra; t.wks.add(wi); }
       if (!D.U.has(id)) D.U.set(id, { id, name, pos, team: T, inj: null });
@@ -1876,7 +1884,7 @@ function ingest(inp) {
    hasn't started, so what gets checked is the pregame forecast. */
 function forecastRows() {
   const out = {}, r2 = x => x == null ? null : Math.round(x * 100) / 100;
-  for (const [id, r] of Object.entries(D.M)) if (r.status === 'ok' && r.game && r.pos !== 'DEF' && (r.projPts > 0 || r.base > 0)) out[id] = [r2(r.mean), r2(r.sd), r2(r.base), r2(r.projPts), r.game.state];
+  for (const [id, r] of Object.entries(D.M)) if (r.status === 'ok' && r.game && r.pos !== 'DEF' && (r.projPts > 0 || r.base > 0)) out[id] = [r2(r.mIf ?? r.mean), r2(r.sdIf ?? r.sd), r2(r.base), r2(r.projPts), r.game.state, r.pPlay ?? 1];   // mean and sd if he plays
   return out;
 }
 /* Loading order: the saved copy (snapshot.json, refreshed every few hours by a GitHub Action) paints the board
@@ -1960,6 +1968,22 @@ const ROLE_POS = new Set(['QB', 'RB', 'WR', 'TE']), ROLE_LEAD = 0.9;
    weight stands. Only a projection under half his average is called a smaller role (roleOf). */
 const PROJ_DOWN = 0.9;
 const projWeight = (b, pj, avg) => pj != null && avg != null && pj < avg ? Math.max(b, PROJ_DOWN) : b;
+/* The chance a player on the injury report plays: how often regulars (2+ games, 5+ points a game) with that designation
+   on the final report took an offensive snap, 2023-25 (scripts/backtest/fit_nflverse.py: questionable 69% overall, 634
+   cases; QB 40% of 78, RB 73%, WR 72%, TE 80%, each shrunk toward the overall rate; doubtful 1% of 83; out none). Once
+   inactives are announced (90 minutes before kickoff) a player still listed questionable is playing (late). PLAY_K is
+   what he scores when he plays through it, against his untagged games (questionable 0.98 on average). */
+const P_PLAY = { Questionable: { QB: 0.45, RB: 0.73, WR: 0.72, TE: 0.78, K: 0.75 }, Doubtful: 0.02, late: 0.97, lateMin: 75 };
+const PLAY_K = { Questionable: 0.97, Doubtful: 1 };
+const injTag = inj => /^questionable/i.test(inj || '') ? 'Questionable' : /^doubtful/i.test(inj || '') ? 'Doubtful' : null;
+/* This week only (the report is about now), and not once his game has started (then he's in or out). */
+function pPlayOf(r) {
+  const tag = injTag(r.u.inj); if (!tag || r.status !== 'ok' || r.locked || !r.game) return 1;
+  if (D.season === D.detSeason && D.week > D.detWeek) return 1;
+  const v = P_PLAY[tag], p = typeof v === 'number' ? v : v[r.pos] ?? 1;
+  const mins = r.game.date ? (new Date(r.game.date) - Date.now()) / 60000 : Infinity;
+  return tag === 'Questionable' && mins < P_PLAY.lateMin && mins > -30 ? Math.max(p, P_PLAY.late) : p;
+}
 function roleOf(id, avg) {
   const u = D.U.get(id); if (!u?.team || !ROLE_POS.has(u.pos) || !D.tg[u.team] || /^(out|ir|pup|sus|na|cov|doubtful)/i.test(u.inj || '')) return null;
   const pts = D.proj[id]?.pts, mates = (D.depth?.[u.team + '|' + u.pos] || []).filter(x => x !== id);
@@ -1989,6 +2013,48 @@ function formOf(id, withPrior = true) {
   if (k) { s += D.prevPPG[id][0] * k; n += k; }
   return n ? s / n : null;
 }
+/* Role changes, read from snap counts: a running back's, receiver's or tight end's share of his team's offensive snaps,
+   carries and targets (weights RC.w) over his last RC.recent games with his team against his earlier ones, from
+   RC.minGames games. A change of RC.min or more is a new role; a rise also needs RC.riseSnap of the snaps lately, and a
+   drop in the game he got hurt doesn't count (he's on the injury report, or his last game's snaps are under half the
+   one before). In 2023-25 (fit_nflverse.py, 1,363 flags) a drop held the next week about 60-68% of the time and the
+   next game was best predicted with form moved 60-90% of the way to the last two games; a rise held 62-72% of the
+   time but moving toward it made the forecast worse (a bigger role often fills in for a hurt teammate, then ends). So
+   a drop moves his form RC.formMax.down of the way to his recent games (formNow), and a rise is shown and flagged on
+   Waivers without moving the number. Off without snap counts (rows saved before they were kept). */
+const RC = { minGames: 4, recent: 2, min: 0.12, riseSnap: 0.4, w: { RB: [0.4, 0.35, 0.25], WR: [0.5, 0, 0.5], TE: [0.5, 0, 0.5] }, formMax: { up: 0, down: 0.6 } };
+function roleChgOf(id) {
+  const memo = D.rc ||= {}; if (id in memo) return memo[id];
+  return (memo[id] = (() => {
+    const u = D.U.get(id), h = D.H[id], w = RC.w[u?.pos]; if (!w || !h?.n || !u.team || !h.snp) return null;
+    const gi = h.pts.map((_, i) => i).filter(i => h.tms[i] === u.team && h.snp[i] != null);
+    if (gi.length < RC.minGames) return null;
+    const tw = i => D.teamWk?.[u.team]?.[h.wks[i] - 1] || { tgt: 0, ra: 0 }, avg = a => a.reduce((s, x) => s + x, 0) / a.length;
+    const o = gi.map(i => { const t = tw(i); return w[0] * h.snp[i] + w[1] * (t.ra ? h.ras[i] / t.ra : 0) + w[2] * (t.tgt ? h.tgs[i] / t.tgt : 0); });
+    const rec = gi.slice(-RC.recent), early = gi.slice(0, -RC.recent), score = avg(o.slice(-RC.recent)) - avg(o.slice(0, -RC.recent));
+    if (Math.abs(score) < RC.min) return null;
+    const snp = a => avg(a.map(i => h.snp[i])), share = (a, k, kt) => { let x = 0, t = 0; for (const i of a) { x += h[k][i]; t += tw(i)[kt]; } return t ? x / t : 0; };
+    if (score > 0 && snp(rec) < RC.riseSnap) return null;
+    if (score < 0 && (u.inj || h.snp[gi.at(-1)] < 0.5 * h.snp[gi.at(-2)])) return null;
+    return { score, dir: score > 0 ? 'up' : 'down', rec, snpNow: snp(rec), snpBefore: snp(early), tgtNow: share(rec, 'tgs', 'tgt'), tgtBefore: share(early, 'tgs', 'tgt'),
+      raNow: share(rec, 'ras', 'ra'), raBefore: share(early, 'ras', 'ra'), borrowed: score > 0 ? mateOut(id) : null };
+  })());
+}
+// his form, moved toward his last games when his role changed (roleChgOf, RC.formMax)
+function formNow(id) {
+  const f = formOf(id), c = roleChgOf(id), k = c ? RC.formMax[c.dir] : 0; if (f == null || !k) return f;
+  const h = D.H[id], recent = c.rec.reduce((s, i) => s + (h.use?.[i] != null ? (1 - USAGE_W) * h.pts[i] + USAGE_W * h.use[i] : h.pts[i]), 0) / c.rec.length;
+  return f + k * (recent - f);
+}
+function rcText(c, T, short) {
+  if (!c) return '';
+  if (short) return c.dir === 'up' ? 'Rising role' : 'Shrinking role';
+  const pc = x => Math.round(x * 100) + '%', ra = Math.abs(c.raNow - c.raBefore) > Math.abs(c.tgtNow - c.tgtBefore);
+  const what = ra ? ['carries', c.raNow, c.raBefore] : ['targets', c.tgtNow, c.tgtBefore];
+  return `${c.dir === 'up' ? 'Rising' : 'Shrinking'} role: ${pc(c.snpNow)} of the snaps and ${pc(what[1])} of ${T}’s ${what[0]} the last ${RC.recent} games, ${c.dir === 'up' ? 'up' : 'down'} from ${pc(c.snpBefore)} and ${pc(what[2])}`
+    + (c.borrowed ? ` while ${c.borrowed.name} is ${injWords(c.borrowed.inj)}` : '')
+    + (c.dir === 'down' ? `; his form counts his last ${RC.recent} games more` : RC.formMax.up ? '' : '; a bigger role often doesn’t last, so it isn’t in the number yet');
+}
 /* Sleeper's projection can lag what a player is doing after a move: a big name on a new team keeps a projection his games
    don't back up. When a running back, receiver or tight end who changed teams since last season has 2+ games of scoring
    form under half the projection and 4+ points short, his last game is under 80% of it, and no regular at his position
@@ -2012,9 +2078,103 @@ function mateOut(id) {
   for (const x of D.U.values()) if (x.id !== id && x.team === u.team && x.pos === u.pos && /^(out|ir|pup|sus|doubtful)/i.test(x.inj || '') && big(x)) return x;
   return null;
 }
+/* Teammates of a regular who may sit. When a QB, RB, WR or TE regular is questionable or doubtful (Sleeper still projects
+   him; one ruled out is already in his teammates' projections), the work he'd leave goes to his teammates, weighted by
+   the chance he sits: of a missing regular's targets and carries, his RB/WR/TE teammates added back about all of it,
+   89% at his own position (2023-25, fit_nflverse.py). REDIST.k is the share passed on, REDIST.same the part kept at his
+   position; within each group a teammate gets his share of the group's targets (carries go to running backs only).
+   Each target and carry is worth what USAGE_PTS says, catches at CATCH_RATE. */
+const REDIST = { k: 0.9, same: 0.85 }, CATCH_RATE = { RB: 0.78, WR: 0.64, TE: 0.7 };
+const isRegular = x => (D.H[x.id]?.n ? D.H[x.id].avg : 0) >= 8 || (D.prevPPG?.[x.id]?.[0] ?? 0) >= 8;
+// the chance a teammate sits this week, from his designation (pPlayOf), 0 for anyone untagged or ruled out
+function pMissOf(x, g) {
+  if (!injTag(x.inj) || !(D.proj[x.id]?.pts > 0) || !g || g.state !== 'pre') return 0;
+  return 1 - pPlayOf({ u: x, pos: x.pos, status: 'ok', locked: false, game: g });
+}
+function mateBumpOf(id, g) {
+  const u = D.U.get(id); if (!u?.team || !['RB', 'WR', 'TE'].includes(u.pos) || !REDIST.k) return null;
+  const per = (x, k) => { const h = D.H[x]; return h?.n ? h[k] / h.n : 0; };
+  const mates = [...D.U.values()].filter(x => x.team === u.team && ['RB', 'WR', 'TE'].includes(x.pos) && D.H[x.id]?.n && !/^(out|ir|pup|sus|na)/i.test(x.inj || ''));
+  let pts = 0, v = 0; const from = [];
+  for (const x of mates) {
+    if (x.id === id || !isRegular(x)) continue;
+    const pm = pMissOf(x, g); if (!(pm > 0)) continue;
+    const rest = mates.filter(y => y.id !== x.id), tX = per(x.id, 'tgt'), cX = per(x.id, 'ra');
+    const tot = (pos, k) => rest.filter(y => !pos || y.pos === pos).reduce((a, y) => a + per(y.id, k), 0);
+    const sameT = tot(x.pos, 'tgt'), otherT = tot(null, 'tgt') - sameT, rbC = tot('RB', 'ra');
+    // targets: REDIST.same of them to his position group, the rest to the others (all to one group when the other has none)
+    const mine = u.pos === x.pos, gs = sameT && otherT ? (mine ? REDIST.same : 1 - REDIST.same) : 1;
+    const myT = mine ? (sameT ? per(id, 'tgt') / sameT : 0) : (otherT ? per(id, 'tgt') / otherT : 0);
+    const dT = REDIST.k * tX * gs * myT, dC = u.pos === 'RB' && rbC ? REDIST.k * cX * per(id, 'ra') / rbC : 0;
+    const U = USAGE_PTS[u.pos], gain = fmtPts(U[1] * dT + U[2] * dC, CATCH_RATE[u.pos] * dT, u.pos);
+    if (gain <= 0) continue;
+    pts += pm * gain; v += pm * (1 - pm) * gain ** 2; from.push({ x, pm, gain });
+  }
+  return pts > 0.05 ? { pts, var: v, from } : null;
+}
+/* A backup's value as the starter: his usage-weighted points (formOf's per-game blend) in games he led his position
+   (HC.leadSnap of the snaps, or without snap counts the most carries or pass attempts on his team), with HC.prior games
+   of HC.succ × the starter's form: a next man up scored 0.82 of the regular's average on average, 0.61 at the median, a
+   few big games pulling it up (2023-25, fit_nflverse.py), so 0.7.
+   HC.pMiss: how often a regular has no offensive snap in a given week 1-4 weeks out (RB 8.3%, QB 13%, which counts
+   benchings), for handcuffs on Waivers. */
+const HC = { pMiss: { QB: 0.13, RB: 0.083, WR: 0.086, TE: 0.083 }, succ: { QB: 0.75, RB: 0.7, WR: 0.75, TE: 0.55 }, prior: 2, minSV: 8, leadSnap: 0.55 };
+function asStarterPts(id, starter) {
+  const h = D.H[id], u = D.U.get(id); if (!u) return 0; let s = 0, n = 0;
+  (h?.pts || []).forEach((x, i) => {
+    if (h.tms?.[i] !== u.team) return;
+    const sn = h.snp?.[i], wk = D.weeks?.[h.wks[i] - 1], lead = sn != null ? sn >= HC.leadSnap
+      : !!wk && (u.pos === 'QB' ? !wk.P.some(p => p[2] === u.team && p[1] === 'QB' && p[0] !== id && p[5] > h.pas[i]) : !wk.P.some(p => p[2] === u.team && p[1] === u.pos && p[0] !== id && p[8] > h.ras[i]));
+    if (!lead) return;
+    const uu = h.use?.[i]; s += uu != null ? (1 - USAGE_W) * x + USAGE_W * uu : x; n++;
+  });
+  const sf = starter ? formOf(starter) ?? 0 : 0;
+  s += HC.prior * (HC.succ[u.pos] ?? 0.8) * sf; n += HC.prior;
+  return s / n;
+}
+/* A backup behind a regular who may sit this week: what he'd score starting (sv) and the chance he does (p). Quarterbacks
+   and running backs only: a receiver's or tight end's work spreads across the group when he sits (mateBumpOf). */
+function contOf(id, behind, g) {
+  const x = D.U.get(behind); if (!x || !['QB', 'RB'].includes(x.pos) || !isRegular(x)) return null;
+  const p = pMissOf(x, g); if (!(p > 0)) return null;
+  return { p, sv: asStarterPts(id, behind), behind: x };
+}
+/* A handcuff: the next man up behind a healthy regular, a running back (or a quarterback when a superflex spot makes a
+   second one start), worth HC.minSV or more as the starter. His value on Waivers is contingent: in a week the regular
+   misses (HC.pMiss) he scores asStarterPts; contValue counts that over what the lineup would have instead. */
+function handcuffOf(id) {
+  const u = D.U.get(id); if (!u?.team || !(u.pos === 'RB' || (u.pos === 'QB' && (state.slots.OP || 0) > 0)) || injKind(u.inj)) return null;
+  const memo = D.hcMemo ||= {}, key = id + '|' + (state.slots.OP || 0); if (key in memo) return memo[key];
+  return (memo[key] = (() => {
+    const dep = D.depth?.[u.team + '|' + u.pos] || [], s = dep[0] && D.U.get(dep[0]);
+    if (!s || s.id === id || !isRegular(s) || injKind(s.inj)) return null;
+    // the next man up: Sleeper's second at the position, else the teammate with the most carries (pass attempts) lately
+    const recent = x => { const h = D.H[x.id]; if (!h?.n) return 0; const k = u.pos === 'QB' ? 'pas' : 'ras'; return (h[k] || []).slice(-2).reduce((a, v) => a + v, 0); };
+    const next = dep[1] ? D.U.get(dep[1]) : [...D.U.values()].filter(x => x.team === u.team && x.pos === u.pos && x.id !== s.id && !injKind(x.inj)).sort((a, b) => recent(b) - recent(a))[0];
+    if (next?.id !== id) return null;
+    const sv = asStarterPts(id, s.id);
+    return sv >= HC.minSV ? { s, sv, p: HC.pMiss[u.pos] } : null;
+  })());
+}
 function doubtText(d, short) {
   if (!d) return '';
   return short ? 'Slow start' : `Slow start: ${f1(d.scored)} pts a game ${d.moved ? `since joining ${d.moved}` : 'this season'} (${d.n} games), well under Sleeper’s ${f1(d.pts)}, so his games count more than the projection`;
+}
+// a player on the injury report this week: the chance he plays and what that does to his number (pPlayOf)
+function playText(r) {
+  if (!r?.mix) return '';
+  if (r.cont && !injTag(r.u.inj)) {
+    const b = r.cont.behind, bt = injTag(b.inj).toLowerCase();
+    return `Backup to ${b.name}, who is ${bt}: if ${shortName(b.id)} sits (about ${Math.round(r.cont.p * 100)}% of the time), he starts and scores about ${f1(r.mIf)}, so he counts as ${f1(r.mean)}`;
+  }
+  const tag = injTag(r.u.inj).toLowerCase(), pc = Math.round(r.pPlay * 100), late = r.pPlay >= P_PLAY.late;
+  return late ? `Still ${tag} with inactives out, so he’s playing: counted at ${pc}% of the ${f1(r.mIf)} he scores when he plays`
+    : `${tag[0].toUpperCase() + tag.slice(1)}: ${r.pos}s listed ${tag} played about ${pc}% of the time (2023-25), so he counts as ${f1(r.mean)}, ${pc}% of the ${f1(r.mIf)} he scores if he plays. Check inactives 90 minutes before kickoff`;
+}
+// the work a teammate who may sit would leave him (mateBumpOf), one line
+function mateText(r) {
+  const b = r?.mateBump; if (!b) return '';
+  return 'Teammate on the injury report: ' + b.from.map(f => `+${f1(f.pm * f.gain)} for the ${Math.round(f.pm * 100)}% chance ${f.x.name} (${injTag(f.x.inj).toLowerCase()}) sits, when he’d get about ${f1(f.gain)} more`).join('; ');
 }
 function roleText(role, short) {
   if (!role) return '';
@@ -2033,11 +2193,11 @@ function evalPlayer(id) {
   if (!tg) { r.status = 'bye'; r.mean = 0; r.sd = 0; r.grade = '–'; r.mult = 1; r.base = 0; r.projPart = 0; r.share = 0; r.eff = 0; return finish(r); }
   // Questionable with no projection while Sleeper projects his teammates: Sleeper pulls a projection when a player is ruled
   // inactive, so he's a late scratch, not a backup (roleOf would call him one)
-  if (r.status === 'ok' && /^questionable/i.test(u.inj || '') && !(pr?.pts > 0) && pos !== 'DEF' && D.depth?.[T + '|' + pos]?.length) { r.status = 'out'; r.scratch = true; }
+  if (r.status === 'ok' && injTag(u.inj) && !(pr?.pts > 0) && pos !== 'DEF' && D.depth?.[T + '|' + pos]?.length) { r.status = 'out'; r.scratch = true; }
   const O = r.O = tg.opp, g = r.game = tg.g, tb = D.B[T] || {}, ob = D.B[O] || {}, L = D.L;
   if (g.state !== 'pre') { r.locked = true; r.actual = D.actual[id]; }
   // his scoring form, with last season blended in so a few early games don't carry it alone (formOf)
-  const avg = formOf(id);
+  const avg = formNow(id); r.rc = roleChgOf(id);
   // a backup is worth nothing this week however he scored filling in; after a role change the projection leads, and
   // when his games don't back the projection up it counts less (projDoubt). A projection under his form leads too
   // (PROJ_DOWN).
@@ -2046,6 +2206,8 @@ function evalPlayer(id) {
   const bl = projWeight(S.blend * (doubt ? DOUBT_K : 1), pj, avg);
   r.projPart = role?.kind === 'backup' ? 0 : role ? ROLE_LEAD * pj : pj != null ? (avg != null ? bl * pj : pj) : 0;
   r.base = role?.kind === 'backup' ? 0 : r.projPart + (role ? (1 - ROLE_LEAD) * avg : pj != null ? (avg != null ? (1 - bl) * avg : 0) : (avg ?? 0));
+  // a backup behind a starter who may sit (questionable or doubtful): valued as the starter, at the chance he sits (contOf)
+  if (role?.kind === 'backup' && r.status === 'ok' && g.state === 'pre') { const c = contOf(id, role.behind, g); if (c) { r.cont = c; r.base = c.sv; } }
   const add = (key, label, raw, note, short) => { const v = clamp(raw * I * (S.w[key] ?? 1), -0.25, 0.25); r.factors.push({ key, label, pct: v, note, short }); };
   const itT = implied(g, T), itO = implied(g, O), lgI = D.lgImplied;
   const st = staffOf(T), so = staffOf(O);
@@ -2103,8 +2265,19 @@ function evalPlayer(id) {
   const avgPart = r.base - r.projPart; r.share = r.base > 0 ? avgPart / r.base : 0;
   r.mean = r.projPart + (avgPart > 0 ? avgPart * r.mult : avgPart); r.eff = r.base > 0 ? r.mean / r.base - 1 : 0;
   for (const f of r.factors) f.eff = f.pct * r.share;
+  // the work a teammate who may sit would leave (mateBumpOf), on top of his own projection
+  const mb = r.cont || role?.kind === 'backup' || r.locked ? null : mateBumpOf(id, g);
+  if (mb) { r.mateBump = mb; r.mean += mb.pts; }
   const n = h?.n || 0, dsd = CV[pos] * Math.max(r.mean, 3);
   r.sd = SD_SCALE * Math.sqrt(((n > 1 ? n * h.sd ** 2 : 0) + 3 * dsd ** 2) / ((n > 1 ? n : 0) + 3)) * (r.newStaff ? 1.1 : 1);
+  if (r.mateBump) r.sd = Math.sqrt(r.sd ** 2 + r.mateBump.var);
+  // on the injury report: what he scores if he plays (mIf, sdIf), counted at the chance he does (pPlayOf), with the
+  // spread of both outcomes (a zero when he sits); finish reads the range from the two
+  const pp = pPlayOf(r) * (r.cont ? r.cont.p : 1);   // a backup behind a starter who may sit "plays" when he starts
+  if (pp < 1) {
+    r.pPlay = pp; r.mIf = r.mean * (PLAY_K[injTag(u.inj)] ?? 1); r.sdIf = r.sd; r.mix = true;
+    r.mean = pp * r.mIf; r.sd = Math.sqrt(pp * r.sdIf ** 2 + pp * (1 - pp) * r.mIf ** 2);
+  }
   const adj = r.mult - 1; r.grade = adj >= 0.12 ? 'A' : adj >= 0.04 ? 'B' : adj > -0.04 ? 'C' : adj > -0.12 ? 'D' : 'F';
   return finish(r);
 }
@@ -2158,15 +2331,25 @@ function trendTxt(T, k, def) {
 function finish(r) {
   const ov = state.overrides[r.id];
   r.model = r.mean;   // the model's own number, before any override
-  if (ov != null && ok(+ov)) { r.override = +ov; r.mean = +ov; }
+  if (ov != null && ok(+ov)) { r.override = +ov; r.mean = +ov; r.mix = false; }
   const m = r.mean, sd = r.sd || 0;
-  r.floor = m - 0.674 * sd; r.ceil = m + 0.674 * sd; r.boom = m + 1.2816 * sd;
-  if (r.pos !== 'DEF') r.floor = Math.max(0, r.floor);
-  r.pAvg = r.h?.n && r.status !== 'bye' ? pAbove(r.h.avg, m, sd) : null;
-  r.p10 = pAbove(10, m, sd); r.p15 = pAbove(15, m, sd); r.p20 = pAbove(20, m, sd);
+  if (r.mix) {
+    // a zero with chance 1 − p, else his if-he-plays curve: the quantile t is 0 below 1 − p
+    const p = r.pPlay, q = t => t <= 1 - p ? 0 : Math.max(0, r.mIf + r.sdIf * invPhi((t - (1 - p)) / p)), above = x => p * pAbove(x, r.mIf, r.sdIf);
+    r.floor = q(0.25); r.ceil = q(0.75); r.boom = q(0.9);
+    r.pAvg = r.h?.n ? above(r.h.avg) : null; r.p10 = above(10); r.p15 = above(15); r.p20 = above(20);
+  } else {
+    r.floor = m - 0.674 * sd; r.ceil = m + 0.674 * sd; r.boom = m + 1.2816 * sd;
+    if (r.pos !== 'DEF') r.floor = Math.max(0, r.floor);
+    r.pAvg = r.h?.n && r.status !== 'bye' ? pAbove(r.h.avg, m, sd) : null;
+    r.p10 = pAbove(10, m, sd); r.p15 = pAbove(15, m, sd); r.p20 = pAbove(20, m, sd);
+  }
   const top = [...r.factors].filter(f => Math.abs(f.pct) >= 0.03).sort((a, b) => Math.abs(b.pct) - Math.abs(a.pct))[0];
   // a role change matters more than any matchup factor, so it takes the chip
-  r.chip = r.role ? { text: roleText(r.role, true), dir: r.role.kind === 'expanded' ? 'up' : 'down' } : r.doubt ? { text: doubtText(r.doubt, true), dir: 'down' } : top ? { text: top.short(top.pct), dir: top.pct > 0 ? 'up' : 'down' } : null;
+  const mbTop = r.mateBump?.from.slice().sort((a, b) => b.pm * b.gain - a.pm * a.gain)[0];
+  r.chip = r.cont ? { text: `${shortName(r.cont.behind.id)} ${injTag(r.cont.behind.inj) === 'Doubtful' ? 'doubtful' : 'questionable'}`, dir: 'up' }
+    : mbTop && r.mateBump.pts >= 0.5 && !r.role ? { text: `${shortName(mbTop.x.id)} may sit`, dir: 'up' }
+    : r.rc && !r.role && !r.doubt ? { text: rcText(r.rc, r.T, true), dir: r.rc.dir } : r.role ? { text: roleText(r.role, true), dir: r.role.kind === 'expanded' ? 'up' : 'down' } : r.doubt ? { text: doubtText(r.doubt, true), dir: 'down' } : top ? { text: top.short(top.pct), dir: top.pct > 0 ? 'up' : 'down' } : null;
   return r;
 }
 /* ---------- defensive & special-teams personnel ----------
@@ -2240,7 +2423,7 @@ function persOwn(T, share = 1 - state.settings.blend) {
   return [1 + share * (clamp(1 + 0.5 * (0.5 * t.pct[0] + 0.5 * t.pct[1]), 0.9, 1.1) - 1), share * clamp(t.st, -1, 1)];
 }
 function computeAll() {
-  computeTeams(); computePersonnel(); D.M = {};
+  computeTeams(); computePersonnel(); D.M = {}; D.rc = {}; D.hcMemo = {};
   // who Sleeper projects at each team and position this week, best first (roleOf)
   D.depth = {};
   for (const id in D.proj) { const u = D.U.get(id); if (u?.team && D.proj[id].pts > 0) (D.depth[u.team + '|' + u.pos] ||= []).push(id); }
@@ -2251,8 +2434,14 @@ function computeAll() {
   { let s = 0, n = 0; for (const [id, h] of Object.entries(D.H)) if (h.stab && D.U.get(id)?.pos === 'DEF') { s += h.pts.reduce((a, x) => a + x, 0) - h.stab.reduce((a, x) => a + x, 0); n += h.n; } D.defVol = n ? s / n : null; }
   for (const id of D.U.keys()) { const r = evalPlayer(id); if (r) D.M[id] = r; }
 }
-// Safe (floor) and Boom (ceiling) lineups are Pro; free lineups optimize the projection
-const strategy = () => isPro() ? state.settings.strategy : 'mean';
+/* Lineup strategies are Pro; free lineups optimize the projection. A team linked to a Sleeper league plays a known
+   opponent, so its Pro choice is Win chance (winLineup), which also stands in for a Safe or Boom choice saved earlier;
+   other teams keep Safe (floor) and Boom (ceiling). */
+const strategy = () => {
+  if (!isPro()) return 'mean';
+  const s = state.settings.strategy;
+  return state.sleeper?.leagueId ? (s === 'mean' ? 'mean' : 'win') : s === 'win' ? 'mean' : s;
+};
 // always the pregame value: points already scored aren't a forecast, and a player whose game started can't be moved anyway
 const metricOf = r => { const s = strategy(); return s === 'floor' ? r.floor : s === 'ceil' ? r.ceil : r.mean; };
 
@@ -2281,23 +2470,112 @@ function assignSlots(slots, cands, val = metricOf) {
   return slots.map((s, i) => { const j = asg[i]; return { slot: s, r: j >= 0 && j < cands.length && cost[i][j] < 1e5 ? cands[j] : null }; });
 }
 /* Before kickoff, simply the best lineup. Once games start, a player already playing can't be moved: the ones you started
-   (knownStarters) keep their slots, and only the open slots are picked, from players yet to play. */
+   (knownStarters) keep their slots, and only the open slots are picked, from players yet to play. With Win chance and a
+   known opponent, the lineup with the best chance to win (winLineup); without one, the projection. */
 function optimize() {
+  if (strategy() === 'win') { const w = winLineup(); if (w) return w; }
+  return optimizeBy();
+}
+function optimizeBy(val = metricOf) {
   const slots = expandSlots(), roster = state.roster.map(id => D.M[id]).filter(Boolean);
   if (!slots.length) return { starters: [], bench: roster };
   let starters;
-  if (!roster.some(r => r.locked)) starters = assignSlots(slots, roster.filter(r => r.status === 'ok'));
+  if (!roster.some(r => r.locked)) starters = assignSlots(slots, roster.filter(r => r.status === 'ok'), val);
   else {
     // started players go in first, each in the narrowest slot he fits, so the flex spots stay open for the rest
     const ks = knownStarters().ids, frozen = roster.filter(r => r.locked && ks.has(r.id));
     starters = assignSlots(slots, frozen, (r, s) => 100 - s.elig.length);
     const open = starters.map((a, i) => a.r ? -1 : i).filter(i => i >= 0);
-    const rest = assignSlots(open.map(i => slots[i]), roster.filter(r => r.status === 'ok' && !r.locked));
+    const rest = assignSlots(open.map(i => slots[i]), roster.filter(r => r.status === 'ok' && !r.locked), val);
     open.forEach((i, j) => { starters[i] = rest[j]; });
   }
   const used = new Set(starters.filter(s => s.r).map(s => s.r.id));
   const bench = roster.filter(r => !used.has(r.id)).sort((a, b) => (b.status === 'ok') - (a.status === 'ok') || metricOf(b) - metricOf(a));
   return { starters, bench };
+}
+
+/* ---------- win chance (Pro, a team in a Sleeper league) ----------
+   This week's opponent comes from the league's matchups (same matchup_id). His lineup is the one he set in Sleeper,
+   with anyone who won't play (or an empty spot) replaced by his best player left, and anyone already playing kept.
+   P(win) = Φ(μ / σ): μ the difference of the two projected totals, σ² both lineups' variances with the correlations
+   pairCorr assumes, less twice the covariance between them (your QB and his receiver in the same game rise together;
+   his D/ST and your offense move apart). A finished game counts at its actual points. Our lineup: the projection
+   plus λ × spread for each λ in WIN.lambdas (a favorite wants less spread, an underdog more), then single swaps while
+   they raise the win chance, and never below the Projected lineup's chance. Each projected point given up costs
+   WIN.ptCost of win chance: a lineup at 99.8% doesn't trade 7 points for 99.9%. */
+const WIN = { lambdas: [-1, -0.6, -0.3, -0.15, 0, 0.15, 0.3, 0.6, 1, 1.5], climb: 25, ptCost: 0.001 };
+D.slMatch = {};
+async function fetchMatchups(lid, week, force) {
+  const k = `${lid}|${week}`, c = D.slMatch[k]; if (!force && c?.rows && Date.now() - c.at < 5 * 60000) return c;
+  try {
+    const rows = await fetchJSON(`${SL}/league/${lid}/matchups/${week}`);
+    return (D.slMatch[k] = Array.isArray(rows) ? { rows, at: Date.now() } : { err: 'missing' });
+  } catch { return (D.slMatch[k] = { err: 'network' }); }
+}
+// this week's matchup for the active Sleeper team, fetched once while it's missing (Pro only), then a render
+function needMatchup() {
+  const s = state.sleeper; if (!s?.leagueId || !isPro() || state.settings.strategy === 'mean') return;
+  const k = `${s.leagueId}|${D.week}`; if (D.slMatch[k] || D.slBusy?.has(k)) return;
+  (D.slBusy ||= new Set()).add(k); needLeague(s.leagueId);
+  fetchMatchups(s.leagueId, D.week).then(() => { D.slBusy.delete(k); D.winCache = null; render(); });
+}
+// the opponent: { rid, name, ids, starters }, or { none: why } (loading, no matchup this week, Sleeper unreachable)
+function oppOf() {
+  const s = state.sleeper; if (!s?.leagueId) return { none: 'sleeper' };
+  const M = D.slMatch[`${s.leagueId}|${D.week}`]; if (!M) return { none: 'loading' }; if (M.err) return { none: M.err };
+  const me = M.rows.find(r => String(r.roster_id) === String(s.rosterId)), o = me?.matchup_id != null && M.rows.find(r => r.matchup_id === me.matchup_id && r.roster_id !== me.roster_id);
+  if (!o) return { none: 'nomatch' };
+  const L = D.lg[s.leagueId], t = L?.rosters ? slTeams(L.rosters, L.users).find(x => String(x.rosterId) === String(o.roster_id)) : null;
+  return { rid: o.roster_id, name: t?.name || 'your opponent', ids: (o.players || []).filter(id => D.M[id]), starters: (o.starters || []).filter(id => D.M[id]), at: M.at };
+}
+function oppLineup(o) {
+  const slots = expandSlots(), rs = o.ids.map(id => D.M[id]), set = new Set(o.starters);
+  const st = assignSlots(slots, rs.filter(r => set.has(r.id) && (r.locked || r.status === 'ok')), (r, s) => 100 - s.elig.length);
+  const open = st.map((a, i) => a.r ? -1 : i).filter(i => i >= 0), used = new Set(st.filter(a => a.r).map(a => a.r.id));
+  const rest = assignSlots(open.map(i => slots[i]), rs.filter(r => !used.has(r.id) && r.status === 'ok' && !r.locked), r => r.mean);
+  open.forEach((i, j) => { st[i] = rest[j]; });
+  return st.filter(a => a.r).map(a => a.r);
+}
+// a player's points for the win chance: actual once his game is over, else the forecast
+const winPts = r => r.locked && r.game?.state === 'post' && ok(r.actual) ? { m: r.actual, sd: 0 } : { m: r.mean, sd: r.sd || 0 };
+function winProb(A, B) {
+  let mu = 0, v = 0;
+  const side = (X, sg) => { for (let i = 0; i < X.length; i++) { const a = winPts(X[i]); mu += sg * a.m; v += a.sd ** 2; for (let j = i + 1; j < X.length; j++) v += 2 * pairCorr(X[i], X[j]) * a.sd * winPts(X[j]).sd; } };
+  side(A, 1); side(B, -1);
+  for (const a of A) for (const b of B) v -= 2 * pairCorr(a, b) * winPts(a).sd * winPts(b).sd;
+  const sd = Math.sqrt(Math.max(v, 1e-9));
+  return { p: Phi(mu / sd), mu, sd };
+}
+function winLineup() {
+  const o = oppOf(); if (o.none) return null;
+  const key = JSON.stringify([state.activeTeam, state.roster, state.overrides, state.settings, state.slots, state.liveFix, D.loadedAt?.getTime(), D.week, o.rid, o.at]);
+  if (D.winCache?.key === key) return D.winCache.v;
+  const slots = expandSlots(), roster = state.roster.map(id => D.M[id]).filter(Boolean), opp = oppLineup(o);
+  const base = optimizeBy(r => r.mean), locked = new Set(base.starters.filter(s => s.r?.locked).map(s => s.r.id));
+  const avail = roster.filter(r => r.status === 'ok' && !r.locked), lineupOf = st => st.filter(s => s.r).map(s => s.r);
+  const mu0 = lineupOf(base.starters).reduce((a, r) => a + r.mean, 0);
+  const evalSt = st => { const L = lineupOf(st), w = winProb(L, opp); return { st, w, obj: w.p - WIN.ptCost * Math.max(0, mu0 - L.reduce((a, r) => a + r.mean, 0)) }; };
+  // the open slots (no player already playing in them) filled by a value
+  const fixedIdx = base.starters.map((s, i) => s.r && locked.has(s.r.id) ? i : -1).filter(i => i >= 0), openIdx = slots.map((_, i) => i).filter(i => !fixedIdx.includes(i));
+  const fill = val => { const st = base.starters.map(s => s.r && locked.has(s.r.id) ? s : { slot: s.slot, r: null }); const rest = assignSlots(openIdx.map(i => slots[i]), avail, val); openIdx.forEach((i, j) => { st[i] = rest[j]; }); return st; };
+  let best = evalSt(base.starters);
+  const b0 = best;
+  for (const lam of WIN.lambdas) { const c = evalSt(fill(r => r.mean + lam * (r.sd || 0))); if (c.obj > best.obj + 1e-9) best = c; }
+  // single swaps: a bench player into an open slot he fits, while the chance rises
+  for (let round = 0; round < WIN.climb; round++) {
+    let better = null; const on = new Set(lineupOf(best.st).map(r => r.id));
+    for (const i of openIdx) for (const b of avail) {
+      if (on.has(b.id) || !best.st[i].slot.elig.includes(b.pos)) continue;
+      const st = best.st.slice(); st[i] = { slot: st[i].slot, r: b }; const c = evalSt(st);
+      if (c.obj > (better || best).obj + 1e-9) better = c;
+    }
+    if (!better) break; best = better;
+  }
+  const used = new Set(lineupOf(best.st).map(r => r.id));
+  const bench = roster.filter(r => !used.has(r.id)).sort((a, b) => (b.status === 'ok') - (a.status === 'ok') || b.mean - a.mean);
+  const v = { starters: best.st, bench, win: { p: best.w.p, mu: lineupOf(best.st).reduce((a, r) => a + winPts(r).m, 0), oppMu: opp.reduce((a, r) => a + winPts(r).m, 0), opp, name: o.name, base: { starters: b0.st, p: b0.w.p } } };
+  D.winCache = { key, v };
+  return v;
 }
 
 /* ---------- lineup history ----------
@@ -2347,7 +2625,8 @@ function recordLineup(starters) {
   const on = new Set(st.map(e => e[1]).filter(Boolean));
   const act = Object.assign({}, prev?.act);
   for (const id of state.roster) { const r = D.M[id]; if (r?.locked && ok(r.actual)) act[id] = Math.round(r.actual * 10) / 10; }
-  const snap = { team: curTeam()?.name || '', fmt: fmtName(), strategy: strategy(), starters: st,
+  const wp = strategy() === 'win' ? D.winCache?.v?.win?.p : null;
+  const snap = { team: curTeam()?.name || '', fmt: fmtName(), strategy: strategy(), ...(wp != null ? { pwin: Math.round(wp * 1000) / 1000 } : {}), starters: st,
     bench: state.roster.filter(id => !on.has(id) && D.M[id]).map(id => ent(D.M[id])), act };
   // first saved after kickoff: it holds Benny's assumption about who started, not a lineup shown before the games
   if (prev ? prev.guess : state.roster.some(id => D.M[id]?.locked)) snap.guess = true;
@@ -2746,7 +3025,7 @@ function updateInjLog(inp) {
   D.injLog = log;
 }
 /* Healthy per-game value: his scoring form, this season blended with last (formOf). */
-function healthyBase(id) { return formOf(id) ?? 0; }
+function healthyBase(id) { return formNow(id) ?? 0; }
 /* Points a D/ST scores for points allowed (Sleeper's default tiers). With sacks, the part of its score that holds up. */
 const defPaPts = pa => pa <= 0 ? 10 : pa <= 6 ? 7 : pa <= 13 ? 4 : pa <= 20 ? 1 : pa <= 27 ? 0 : pa <= 34 ? -1 : -4;
 const DEF_VOL_GAMES = 12;   // league-average games blended into a D/ST's turnover and TD points
@@ -2867,6 +3146,8 @@ function weekVals(id, weeks) {
   // on his own scoring, as before the injury
   const bump = bumpOf(id);
   return weeks.map((w, i) => {
+    // this week a doubtful player is still on the board, counted at his chance to play (pPlayOf) as on Lineup
+    if (w === D.week && back != null && r.status === 'ok' && !r.locked) return r.mean;
     if (back != null && w < back) return 0;
     if (w === D.week && back == null) return r.status !== 'ok' || r.locked ? 0 : r.mean;
     if (w === D.week && r.locked) return 0;
@@ -2880,12 +3161,29 @@ function weekVals(id, weeks) {
    cover for what he adds over it, so a second QB in a 1-QB league is worth little: you'd pick one up the week you
    need him. */
 const replSlot = (slot, R) => R ? Math.max(0, ...slot.elig.map(p => R[p] || 0)) : 0;
-function bestLineup(ids, wi, V, slots, R) {
+function bestLineup(ids, wi, V, slots, R, HW) {
   const c = ids.filter(id => V[id] && V[id][wi] > 0), n = slots.length; if (!n) return { total: 0, starters: [] };
   const cost = slots.map(s => { const row = c.map(id => s.elig.includes(D.U.get(id).pos) ? -V[id][wi] : 1e6); const r = -replSlot(s, R); for (let i = 0; i < n; i++) row.push(r); return row; });
   const asg = hungarian(cost); let total = 0; const starters = [];
   asg.forEach((j, i) => { if (j >= 0 && j < c.length && cost[i][j] < 1e5) { total += V[c[j]][wi]; starters.push([slots[i], c[j]]); } else total += replSlot(slots[i], R); });
-  return { total, starters, depth: depthValue(c, starters, wi, V, R) };
+  const cont = HW ? contValue(ids, starters, wi, V, R, HW) : 0;
+  return { total, starters, depth: depthValue(c, starters, wi, V, R) + cont, cont };
+}
+/* Handcuffs (HW[id][wi] = { s, p, sv }, from handcuffOf): in a week his regular misses (chance p), he scores sv. With
+   the regular in your lineup he takes the regular's place, over the best you'd start there otherwise; with the regular
+   elsewhere he takes your weakest spot he fits; already starting, he adds what sv beats his own week by. */
+function contValue(ids, starters, wi, V, R, HW) {
+  let v = 0; const on = new Map(starters.map(([sl, id]) => [id, sl]));
+  for (const id of ids) {
+    const hc = HW[id]?.[wi]; if (!hc) continue;
+    const pos = D.U.get(id).pos, fits = sl => sl.elig.includes(pos);
+    let alt;
+    if (on.has(id)) alt = V[id][wi];
+    else if (on.has(hc.s.id)) { const sl = on.get(hc.s.id); alt = replSlot(sl, R); for (const b of ids) if (b !== id && b !== hc.s.id && !on.has(b) && fits(sl) && sl.elig.includes(D.U.get(b).pos) && V[b]?.[wi] > alt) alt = V[b][wi]; }
+    else { alt = hc.sv; for (const [sl, x] of starters) if (fits(sl)) alt = Math.min(alt, V[x][wi]); }   // no spot he fits: nothing
+    v += hc.p * Math.max(0, hc.sv - alt);
+  }
+  return v;
 }
 /* Bench insurance: each week a starter has some chance of a late scratch or in-game injury. When that happens the
    best healthy bench player who fits his slot plays instead (or a free agent, when none beats one), so a backup is
@@ -2906,8 +3204,9 @@ function availablePool() {
   const list = W.source === 'list' && W.faList.length ? new Set(W.faList) : null;
   // a synced Sleeper league knows every rostered player, so its free agents are exact
   const sl = W.source === 'sleeper' && state.sleeper?.rostered ? new Set(state.sleeper.rostered) : null;
-  // backups (roleOf) aren't pickups: their value depends on a starter missing time, not on their fill-in scoring
-  return [...D.U.values()].filter(u => D.M[u.id] && !ros.has(u.id) && !W.taken[u.id] && (D.proj[u.id]?.pts > 0 || D.H[u.id]?.n) && !isLongInj(u.inj) && D.M[u.id].role?.kind !== 'backup'
+  // backups (roleOf) aren't pickups on their fill-in scoring; a handcuff is, for what he'd score when the starter misses
+  return [...D.U.values()].filter(u => D.M[u.id] && !ros.has(u.id) && !W.taken[u.id] && !isLongInj(u.inj)
+    && (D.M[u.id].role?.kind !== 'backup' ? D.proj[u.id]?.pts > 0 || D.H[u.id]?.n : handcuffOf(u.id))
     && (sl ? !sl.has(u.id) : list ? list.has(u.id) : (D.own.get(u.id) ?? 0) < W.ownMax)).map(u => u.id);
 }
 /* The first week a waiver pickup plays: this week, or next week once nearly all of this week’s games have kicked off (a
@@ -2930,6 +3229,15 @@ function computeWaivers() {
   const slots = expandSlots(), roster = state.roster.filter(id => D.M[id]);
   const pool = availablePool(), V = {};
   for (const id of [...roster, ...pool]) V[id] = weekVals(id, weeks);
+  /* Handcuffs (handcuffOf): each week, what he'd score if his regular misses (asStarterPts × that week's matchup) and the
+     chance of it (HC.pMiss), for contValue; HCS the same for the usual week. This week, when it's in the window, is
+     already in his projection (contOf). */
+  const HCW = {}, HCS = {};
+  for (const id of [...roster, ...pool]) {
+    const hc = handcuffOf(id); if (!hc) continue; const u = D.U.get(id);
+    HCW[id] = weeks.map((w, wi) => { if (live && wi === 0) return null; const so = schedOpp(u.team, w); return so.opp ? { s: hc.s, p: hc.p, sv: hc.sv * matchupMult(u.pos, so.opp, w, u.team) } : null; });
+    HCS[id] = [{ s: hc.s, p: hc.p, sv: hc.sv }];
+  }
   const sumH = id => V[id].slice(0, H).reduce((s, x) => s + x, 0), sumAll = id => V[id].reduce((s, x) => s + x, 0);
   // This week, a starter whose game has kicked off has banked his points and can't be swapped out, so his slot is left
   // out of this week's comparison (otherwise a free agent who hasn't played yet looks like he fills an empty spot).
@@ -2940,7 +3248,7 @@ function computeWaivers() {
      by. This week stays unfilled: the pickup you make now is the move itself. */
   const replAt = (VX, wi) => Object.fromEntries(POS.map(P => { const v = pool.filter(id => D.U.get(id).pos === P).map(id => VX[id][wi]).sort((a, b) => b - a); return [P, v[Math.min(2, v.length - 1)] || 0]; }));
   const RW = weeks.map((_, wi) => wi || !live ? replAt(V, wi) : null);
-  const base = weeks.map((_, wi) => bestLineup(roster, wi, V, slotsAt(wi), RW[wi]));
+  const base = weeks.map((_, wi) => bestLineup(roster, wi, V, slotsAt(wi), RW[wi], HCW));
   /* A player's usual week: his average over the weeks left after this one (all of them when the window starts next
      week), skipping his bye (weeks he's injured count
      as 0). The best lineup on these values is your team's everyday strength, so a move that fixes a weak position
@@ -2948,19 +3256,24 @@ function computeWaivers() {
   const later1 = live && weeks.length > 1 ? 1 : 0;
   const usual = id => { const T = D.U.get(id).team, vals = V[id].filter((x, wi) => wi >= later1 && T && !schedOpp(T, weeks[wi]).bye); return vals.length ? mean(vals) : 0; };
   const VS = {}; for (const id of [...roster, ...pool]) VS[id] = [usual(id)];
-  const RS = replAt(VS, 0), baseS = bestLineup(roster, 0, VS, slots, RS);
+  const RS = replAt(VS, 0), baseS = bestLineup(roster, 0, VS, slots, RS, HCS);
   // a bye counts for little (BYE_W): in the free agents' order, a week a player is on bye counts (1 − BYE_W) of his usual
   // week, so his own bye doesn't sink him (Top free agents still shows the true points over the window). VN: every
   // player at his usual week when on bye, for the lineup a move would have with no one on bye
   const onBye = (id, wi) => { const T = D.U.get(id)?.team; return wi > 0 && !!T && !!schedOpp(T, weeks[wi]).bye; };
   const VN = {}; for (const id of [...roster, ...pool]) VN[id] = V[id].map((x, wi) => onBye(id, wi) ? VS[id][0] : x);   // no one on bye
-  const baseN = [], baseNAt = wi => (baseN[wi] ||= bestLineup(roster, wi, VN, slotsAt(wi), RW[wi]));
+  const baseN = [], baseNAt = wi => (baseN[wi] ||= bestLineup(roster, wi, VN, slotsAt(wi), RW[wi], HCW));
   const rankH = new Map(pool.map(id => [id, V[id].slice(0, H).reduce((s, x, wi) => s + (onBye(id, wi) ? (1 - BYE_W) * VS[id][0] : x), 0)]));
   // candidates: best 24 overall over the horizon plus the best 5 at each position, and the same by usual week
   const byH = [...pool].sort((a, b) => rankH.get(b) - rankH.get(a)), byS = [...pool].sort((a, b) => VS[b][0] - VS[a][0]), cand = new Set(byH.slice(0, 24));
   for (const p of POS) byH.filter(id => D.U.get(id).pos === p).slice(0, 5).forEach(id => cand.add(id));
   byS.slice(0, 12).forEach(id => cand.add(id));
   for (const p of POS) byS.filter(id => D.U.get(id).pos === p).slice(0, 3).forEach(id => cand.add(id));
+  // the handcuffs worth most over the window
+  const hcVal = id => (HCW[id] || []).slice(0, H).reduce((a, x) => a + (x ? x.p * x.sv : 0), 0);
+  pool.filter(id => HCW[id]).sort((a, b) => hcVal(b) - hcVal(a)).slice(0, 4).forEach(id => cand.add(id));
+  // a rising role (roleChgOf) is the pickup to look at before his points show it
+  pool.filter(id => roleChgOf(id)?.dir === 'up').sort((a, b) => VS[b][0] - VS[a][0]).slice(0, 6).forEach(id => cand.add(id));
   // roster limit: exact for a synced Sleeper team (players on its IR don't count); otherwise lineup spots + 7 bench, with one IR spot
   const slr = state.sleeper?.rosterMax ? state.sleeper : null;
   const irHeld = slr ? roster.filter(id => (slr.reserve || []).includes(id)).length : Math.min(1, roster.filter(id => /^ir/i.test(D.U.get(id).inj || '')).length);
@@ -2988,17 +3301,17 @@ function computeWaivers() {
       if (d && sumAll(d) > 1.6 * sumAll(f) + 5) continue;
       const nr = roster.filter(x => x !== d).concat(f);
       // how much the move raises your usual lineup, per week
-      const LS = bestLineup(nr, 0, VS, slots, RS), strength = (LS.total + LS.depth) - (baseS.total + baseS.depth);
-      // a player most leagues roster is never the price of a short-term patch (marketHeld)
-      if (d && !single && strength < 0.25 && marketHeld(d, f)) continue;
+      const LS = bestLineup(nr, 0, VS, slots, RS, HCS), strength = (LS.total + LS.depth) - (baseS.total + baseS.depth);
+      // a player most leagues roster is never the price of a short-term patch (marketHeld), nor of a handcuff's chance
+      if (d && !single && strength - (LS.cont - baseS.cont) < 0.25 && marketHeld(d, f)) continue;
       // hz, near and later are the lineup points the move adds (shown); the *Adj sums rank it, with a week touched by a
       // bye counting BYE_W of its gain and the rest its gain with no one on bye: a bye is a short absence, not a player's value
       let hz = 0, near = 0, later = 0, hzAdj = 0, nearAdj = 0, laterAdj = 0, depLost = 0; const starts = [], wd = [];
       for (let wi = 0; wi < weeks.length; wi++) {
-        const L2 = bestLineup(nr, wi, V, slotsAt(wi), RW[wi]), diff = (L2.total + L2.depth) - (base[wi].total + base[wi].depth);
+        const L2 = bestLineup(nr, wi, V, slotsAt(wi), RW[wi], HCW), diff = (L2.total + L2.depth) - (base[wi].total + base[wi].depth);
         let adj = diff;
         if ((d && onBye(d, wi)) || byeIds.some(id => onBye(id, wi))) {
-          const LN = bestLineup(nr, wi, VN, slotsAt(wi), RW[wi]), bN = baseNAt(wi);
+          const LN = bestLineup(nr, wi, VN, slotsAt(wi), RW[wi], HCW), bN = baseNAt(wi);
           adj = BYE_W * diff + (1 - BYE_W) * ((LN.total + LN.depth) - (bN.total + bN.depth));
         }
         if (wi < h) { hz += diff; hzAdj += adj; wd.push(diff); if (wi < 2) { near += diff; nearAdj += adj; } depLost += base[wi].depth - L2.depth; const st = L2.starters.find(s => s[1] === f); if (st) starts.push([weeks[wi], st[0].label || st[0].k]); }
@@ -3008,7 +3321,7 @@ function computeWaivers() {
       // same weeks, so an upgrade at a weak spot beats a one-week patch. "window": later weeks just break ties; "blend"
       // adds a third of the value after the window, but only for a move that doesn't cost points in the window (never for
       // a kicker or D/ST: you'll stream another by then).
-      const score = hzAdj + strength * h + (longTerm && !single && hzAdj >= 0 ? 0.35 : 0.001) * laterAdj, mv = { f, d, hz, hzAdj, wd, near, nearAdj, later, laterAdj, strength, score, starts, depLost, H: h };
+      const score = hzAdj + strength * h + (longTerm && !single && hzAdj >= 0 ? 0.35 : 0.001) * laterAdj, mv = { f, d, hz, hzAdj, wd, near, nearAdj, later, laterAdj, strength, score, starts, depLost, H: h, handcuff: HCW[f] ? handcuffOf(f) : null };
       // for the reason: how often the dropped player would start in the window, and whether the pickup's starts fill in
       // for a bye or an injury at his position (a teammate worth nothing that week) or are matchup plays
       if (d) mv.dStarts = base.slice(0, h).filter(b => b.starters.some(s => s[1] === d)).length;
@@ -3054,7 +3367,9 @@ function computeWaivers() {
     // would have cleared with every bye week counted in full: the reason says it's mostly bye-week cover
     best.byeCover = !clears && !best.longBet && clearsOn(best.hz, best.near);
     best.hold = swap && posRank[best.d] <= Math.ceil(W.teams / 2) && posRank[f] > posRank[best.d] ? { rf: posRank[f], rd: posRank[best.d] } : null;
-    best.marginal = (!clears && !best.longBet) || !!best.hold;
+    // a handcuff is a chance, not points you can count on: never worth a player you'd start in the window
+    best.hcDrop = !!(best.handcuff && best.d && best.dStarts > 0);
+    best.marginal = (!clears && !best.longBet) || !!best.hold || best.hcDrop;
     moves.push(best);
   }
   moves.sort((a, b) => a.marginal - b.marginal || b.score - a.score);
@@ -3062,7 +3377,7 @@ function computeWaivers() {
   const seen = {}, shown = moves.filter(m => { const k = posOf(m.f) + '|' + m.d; seen[k] = (seen[k] || 0) + 1; return seen[k] <= 2; }).slice(0, 12);
   const needs = teamNeeds(roster, V, weeks, H, slotsAt, base);
   for (const m of shown) m.whyText = waiverWhy(m, needs, weeks, H);
-  return (D.wCache = { key, weeks, H, V, pool, moves: shown, best: shown.find(m => !m.marginal) || null, needs, byH, sumH, base, stashes, VS });
+  return (D.wCache = { key, weeks, H, V, HCW, pool, moves: shown, best: shown.find(m => !m.marginal) || null, needs, byH, sumH, base, stashes, VS });
 }
 // why a waiver move helps, in one line (shown on Waivers and in Benny's Moves)
 function waiverWhy(m, needs, weeks, H) {
@@ -3080,6 +3395,10 @@ function waiverWhy(m, needs, weeks, H) {
   const nd = needs.list.find(n => n.P === fu.pos), weak = nd && nd.level === 'Weak';
   if (m.strength >= 1) why.push(`raises your usual lineup by +${f1(m.strength)} pts a week at ${weak ? `${P}, your weak spot` : P}`);
   else if (weak) why.push(`fills your weak ${P} spot`);
+  // a handcuff: what he's worth when his regular misses, and how often that happens (handcuffOf, contValue)
+  if (m.handcuff) { const hc = m.handcuff, mine = state.roster.includes(hc.s.id); why.push(`handcuff: about ${f1(hc.sv)} a game if ${hc.s.name} misses time (about 1 week in ${Math.round(1 / hc.p)}), counted at that chance${mine ? `: insurance for your own ${shortName(hc.s.id)}` : ''}${m.hcDrop ? `; a chance like that isn’t worth ${shortName(m.d)}, who starts for you` : ''}`); }
+  const rc = roleChgOf(m.f);
+  if (rc?.dir === 'up') why.push(`rising role: ${Math.round(rc.snpNow * 100)}% of the snaps the last ${RC.recent} games, up from ${Math.round(rc.snpBefore * 100)}%${rc.borrowed ? ` (${rc.borrowed.name} is ${injWords(rc.borrowed.inj)})` : ''}`);
   if (m.h2h) {
     // one kicker or D/ST for another: which scores more, week by week, and how settled each one's average is
     const nm = id => { const u = D.U.get(id); return u.pos === 'DEF' ? u.team : shortName(id); }, F = nm(m.f), X = nm(m.d);
@@ -3131,8 +3450,9 @@ function waiverWhy(m, needs, weeks, H) {
     if (Math.abs(net) >= 0.02) why.push(`${fu.team} defense ${net > 0 ? 'improved' : 'weakened'} (${spct(om - 1)}${mvs.length ? ': ' + mvs.map(moveText).join(', ') : ''})`);
   }
   // an injury designation on the pickup comes first: the gain assumes he plays from his expected return
-  if (/^(out|doubtful)/i.test(fu.inj || '')) { const rw = returnWeek(m.f); why.unshift(`${fu.inj.toLowerCase()} now${rw > weeks[0] ? `, counted from week ${rw}, his earliest expected return` : ''}: check the news first`); }
-  else if (/^questionable/i.test(fu.inj || '')) why.unshift('questionable this week: check the news first');
+  const fr = D.M[m.f], pc = fr?.mix && weeks[0] === D.week ? ` (counted at his ${Math.round(fr.pPlay * 100)}% chance to play)` : '';
+  if (/^(out|doubtful)/i.test(fu.inj || '')) { const rw = returnWeek(m.f); why.unshift(`${fu.inj.toLowerCase()} now${pc}${rw > weeks[0] ? `, counted ${pc ? 'in full ' : ''}from week ${rw}, his earliest expected return` : ''}: check the news first`); }
+  else if (/^questionable/i.test(fu.inj || '')) why.unshift(`questionable this week${pc}: check the news first`);
   return why.join('; ').replace(/^./, c => c.toUpperCase());
 }
 // every player at a position with a projection or games, ranked on rest-of-season value (1 = best)
@@ -3581,7 +3901,8 @@ async function shareLeague() {
    the top two. */
 function bennysMoves() {
   if (!state.roster.length || !D.M) return [];
-  const out = [], { starters } = optimize(), on = new Set(starters.filter(s => s.r).map(s => s.r.id)), nm = id => esc(D.U.get(id)?.name || '');
+  const out = [], { starters, win: w } = optimize(), on = new Set(starters.filter(s => s.r).map(s => s.r.id)), nm = id => esc(D.U.get(id)?.name || '');
+  const pcW = x => Math.round(x * 100) + '%', pApp = w && state.sleeper?.starters ? winProb(state.sleeper.starters.map(id => D.M[id]).filter(r => r && (r.status === 'ok' || r.locked)), w.opp).p : 0;
   let app = null, appName = '';
   if (state.sleeper?.starters) { app = new Set(state.sleeper.starters); appName = 'Sleeper'; }
   else if (Object.keys(state.espn.slotOf || {}).length) { app = new Set(Object.entries(state.espn.slotOf).filter(([, s]) => !(s === 20 || s === 21)).map(([id]) => id)); appName = 'ESPN'; }
@@ -3592,8 +3913,11 @@ function bennysMoves() {
     for (const r of ins.sort((a, b) => b.mean - a.mean)) {
       let i = outs.findIndex(o => o.pos === r.pos); if (i < 0) i = outs.findIndex(o => flex(o.pos) && flex(r.pos)); if (i < 0) continue;
       const o = outs.splice(i, 1)[0], gone = o.status !== 'ok', gain = r.mean - (gone ? 0 : o.mean);
-      out.push({ gain, tab: 'lineup', title: gone ? `Bench ${nm(o.id)} (${esc(o.status === 'bye' ? 'bye week' : o.scratch ? 'likely inactive' : o.inj || 'out')}), start ${nm(r.id)}` : `Start ${nm(r.id)} over ${nm(o.id)}`,
-        detail: gone ? `${nm(o.id)} won’t play this week but is in your ${appName} lineup.` : `Your ${appName} lineup starts ${nm(o.id)}; Benny projects ${nm(r.id)} for ${f1(r.mean)} vs ${f1(o.mean)}.`, gainTxt: `+${f1(gain)} pts` });
+      // with Win chance a swap can give up a little projection for a better chance: say so, and keep it on the list
+      const wTxt = w ? ` With it Benny’s lineup wins ${pcW(w.p)} of the time against ${esc(w.name)}, yours ${pcW(pApp)}.` : '';
+      out.push({ gain: w ? Math.max(0.1, gain, (w.p - pApp) * 20) : gain, tab: 'lineup', title: gone ? `Bench ${nm(o.id)} (${esc(o.status === 'bye' ? 'bye week' : o.scratch ? 'likely inactive' : o.inj || 'out')}), start ${nm(r.id)}` : `Start ${nm(r.id)} over ${nm(o.id)}`,
+        detail: (gone ? `${nm(o.id)} won’t play this week but is in your ${appName} lineup.` : `Your ${appName} lineup starts ${nm(o.id)}; Benny projects ${nm(r.id)} for ${f1(r.mean)} vs ${f1(o.mean)}.`) + wTxt,
+        gainTxt: w && gain < 0.05 ? `+${Math.round((w.p - pApp) * 100)}% to win` : `+${f1(gain)} pts` });
     }
     for (const o of outs) if (o.status !== 'ok') out.push({ gain: o.status === 'bye' ? 3 : 5, tab: 'lineup', title: `Bench ${nm(o.id)}`, detail: `${esc(outText(o).replace(/^./, c => c.toUpperCase()))} but in your ${appName} lineup.`, gainTxt: '' });
   } else {
@@ -3912,6 +4236,9 @@ function detailBlock(r) {
   return `<div class="detail"><div class="section">
     <h3 class="dh">Why ${f1(r.mean)} points</h3>
     ${r.role || r.doubt ? `<div class="small"><strong>${esc(r.role ? roleText(r.role) : doubtText(r.doubt))}.</strong></div>` : ''}
+    ${r.mix ? `<div class="small"><strong>${esc(playText(r))}.</strong></div>` : ''}
+    ${r.mateBump ? `<div class="small"><strong>${esc(mateText(r))}.</strong></div>` : ''}
+    ${r.rc ? `<div class="small"><strong>${esc(rcText(r.rc, r.T))}.</strong></div>` : ''}
     ${oppText(r) ? `<div class="small"><strong>Opportunity:</strong> ${esc(oppText(r))}.</div>` : ''}
     ${r.status === 'bye' ? '<div class="small muted">Bye week.</div>' : `<div class="small muted">Baseline ${f1(r.base)}${r.projPart > 0 && r.share > 0 ? `: ${f1(r.projPart)} from Sleeper’s projection, which already counts this matchup, and ${f1(r.base - r.projPart)} from his scoring average` : r.projPart > 0 ? ', Sleeper’s projection, which already counts this matchup' : ', his scoring average'}. Matchup strength ${spct(r.mult - 1)}${r.share > 0 ? `, applied to the scoring-average part: ${spct(r.eff)} overall` : ', already in the projection'}${r.override != null ? `; your override sets it to ${f1(r.override)}` : ''}.</div>
     ${why.length ? `<ul class="reasons">${why.map(x => `<li class="${x.up ? 'up' : 'down'}"><span class="rv">${spct(x.pct)}</span> ${esc(x.text)}</li>`).join('')}</ul>` : '<div class="small muted">No matchup factor moves him much this week.</div>'}`}
@@ -3927,10 +4254,11 @@ function detailBlock(r) {
 }
 /* Projected starter total for any saved team, by running the optimizer against that team's roster and slots. */
 function teamProjection(t) {
-  if (t.id === state.activeTeam) { const { starters } = optimize(); return starters.reduce((s, x) => s + (x.r ? x.r.mean : 0), 0); }
+  const total = () => optimizeBy(r => r.mean).starters.reduce((s, x) => s + (x.r ? x.r.mean : 0), 0);   // the projection, whatever the strategy
+  if (t.id === state.activeTeam) return total();
   const keep = [state.roster, state.slots];
   state.roster = t.roster || []; state.slots = Object.assign({}, DEFAULT_STATE.slots, t.slots || {});
-  try { const { starters } = optimize(); return starters.reduce((s, x) => s + (x.r ? x.r.mean : 0), 0); }
+  try { return total(); }
   finally { [state.roster, state.slots] = keep; }
 }
 function scoringSelect(id) {
@@ -4187,7 +4515,7 @@ const lockLine = text => `<a href="#pro" class="lock" data-tab="pro"><span class
 const PRO_FEATURES = [
   ['All of Benny’s Moves', 'Every lineup change, pickup and drop for your team, ranked by points gained.'],
   ['Full waiver recommendations', 'Every add/drop move that improves your roster, not just the top two.'],
-  ['Full lineup analysis', 'Safe and Boom lineups for when you’re favored or the underdog, plus every matchup factor, the math and the coaching matchup.'],
+  ['Full lineup analysis', 'Win chance lineups that pick the best chance to beat this week’s opponent in your Sleeper league (Safe and Boom lineups for other teams), plus every matchup factor, the math and the coaching matchup.'],
   ['Every start/sit call', 'All of this week’s close decisions, not just the first one.'],
   ['Multiple teams', 'Every league you play in, in one place.'],
   ['No ads', 'Anywhere on Benny’s Picks.'],
@@ -4559,8 +4887,29 @@ function viewWeather() {
     <p class="small muted" style="margin:0">Forecast for the three hours from kickoff at each open-air stadium${anyWx ? '' : ' (forecasts appear about two weeks before a game)'}, from Open-Meteo. Domes and retractable roofs play without weather. ${mineCol ? 'The numbers next to your players are how much the weather and stadium move their projection; open a player on Lineup for the details.' : 'Add your team to see how the weather moves each of your players.'}</p>
     <div class="tscroll"><table class="wxt"><thead><tr><th class="l">Kickoff</th><th class="l">Game</th><th class="l">Stadium</th><th class="l">Conditions</th>${mineCol ? '<th class="l">Your players</th>' : ''}</tr></thead><tbody>${rows}</tbody></table></div>`;
 }
+/* Win chance on Lineup: the opponent's set lineup, and each slot where Benny's pick differs from the Projected lineup,
+   with why (a wider range when you're projected to lose, a steadier one when you're projected to win, a stack). */
+function winNote(win, starters) {
+  const ids = x => x.filter(s => s.r).map(s => s.r), mine = ids(starters), base = ids(win.base.starters);
+  const add = mine.filter(r => !base.includes(r)), drop = base.filter(r => !mine.includes(r)), behind = win.mu < win.oppMu, lines = [];
+  for (const a of add) {
+    let j = drop.findIndex(b => b.pos === a.pos); if (j < 0) j = drop.findIndex(b => ['RB', 'WR', 'TE'].includes(b.pos) && ['RB', 'WR', 'TE'].includes(a.pos)); if (j < 0) j = 0;
+    const b = drop.splice(j, 1)[0]; if (!b) continue;
+    const d = a.mean - b.mean, stack = mine.find(x => x !== a && pairCorr(a, x) >= 0.35);
+    const why = stack ? `he pairs with your ${stack.u.name}, so their games rise and fall together${behind ? ', which helps when you’re projected to lose' : ''}`
+      : a.sd > b.sd ? `his wider range helps when you’re projected to lose` : `his steadier range helps when you’re projected to win`;
+    lines.push(`Starts ${a.u.name} over ${b.u.name}: ${Math.abs(d) < 0.05 ? 'about the same projection' : `${f1(Math.abs(d))} ${d > 0 ? 'more' : 'fewer'} projected points`}, but ${why}`);
+  }
+  // whole percents, or tenths when the two would read the same
+  const close = Math.round(win.base.p * 100) === Math.round(win.p * 100), pc = x => (close ? (x * 100).toFixed(1) : Math.round(x * 100)) + '%';
+  const Name = win.name.replace(/^./, c => c.toUpperCase());
+  return `<details class="more"><summary>${lines.length ? `Why this lineup differs from Projected (win chance ${pc(win.base.p)} → ${pc(win.p)})` : 'Win chance: same lineup as Projected'}</summary><div class="section">
+    ${lines.length ? `<ul class="small" style="margin:0;padding-left:18px">${lines.map(t => `<li>${esc(t)}</li>`).join('')}</ul>` : `<p class="small muted" style="margin:0">The Projected lineup already gives you the best chance against ${esc(win.name)}.</p>`}
+    <p class="small muted" style="margin:0">${esc(Name)}’s lineup, as set in Sleeper (anyone who won’t play replaced by his best player left): ${win.opp.map(r => `${esc(r.u.name)} ${f1(winPts(r).m)}`).join(', ')}. Finished games count at their actual points.</p></div></details>`;
+}
 function lineupBody() {
-  const { starters, bench } = optimize();
+  needMatchup();
+  const { starters, bench, win } = optimize();
   recordLineup(starters);
   // activation: Benny's lineup shown for a real team, counted once per NFL week in this browser (weekly retention uses it)
   const luKey = `${D.season}-${D.week}`;
@@ -4573,7 +4922,10 @@ function lineupBody() {
   const tagged = r => r && r.inj && r.status !== 'bye', empty = starters.length - st.length;
   const startTags = st.filter(x => tagged(x.r)).map(x => x.r), benchTags = bench.filter(tagged);
   const tagTxt = list => list.slice(0, 3).map(r => `${shortName(r.id)} ${r.inj === 'Questionable' ? 'Q' : r.inj === 'Doubtful' ? 'D' : r.inj}`).join(', ') + (list.length > 3 ? '…' : '');
-  const strat = strategy(), sLab = { mean: 'Projected', floor: 'Safe (low end)', ceil: 'Boom (high end)' };
+  const strat = strategy(), sLab = { mean: 'Projected', floor: 'Safe (low end)', ceil: 'Boom (high end)', win: 'Projected' };
+  const opp = strat === 'win' && !win ? oppOf() : null, pcW = win ? Math.round(win.p * 100) + '%' : '';
+  const oppWhy = opp ? { loading: 'loading your Sleeper matchup…', nomatch: 'no matchup in your league this week', missing: 'Sleeper has no matchups for this league', network: 'couldn’t reach Sleeper for your matchup' }[opp.none] || '' : '';
+  const keys = state.sleeper?.leagueId ? ['mean', 'win'] : ['mean', 'floor', 'ceil'], kLab = { mean: 'Projected', floor: 'Safe', ceil: 'Boom', win: 'Win chance' };
   const head = `<div class="prow lhead" aria-hidden="true"><span class="label">Slot</span><span class="label">Player</span><span class="label">Opponent</span><span class="label" title="Matchup grade: how favorable this week’s matchup is for each player. It doesn’t rank players.">Matchup</span><span class="label" style="text-align:right">Proj</span><span class="label" style="text-align:right" title="Middle half of outcomes (25th–75th percentile). Scores can land outside it.">Likely range</span><span class="label" style="text-align:right" title="Model estimate of the chance he beats his season average">Beat avg</span></div>`;
   return `<div class="section">
   ${sharedLeagueCard()}
@@ -4582,14 +4934,16 @@ function lineupBody() {
   <div class="summary">
     <div><span class="label">Starters project</span><span class="big num">${f1(mu)}</span><span class="small muted">${fmtName()} points, week ${D.week}${live ? ', before kickoff' : ''}</span></div>
     <div><span class="label">Likely range</span><span class="big num">${f0(mu - 0.674 * sdT)}–${f0(mu + 0.674 * sdT)}</span><span class="small muted">middle 50% of outcomes</span></div>
-    ${live ? `<div><span class="label">Scored so far</span><span class="big num">${f1(sofar)}</span><span class="small muted">${played.length} of ${st.length} starters playing or done</span></div>`
-      : `<div><span class="label">Optimizing for</span><span class="big num" style="font-size:24px">${sLab[strat]}</span><span class="small muted">${strat === 'mean' ? 'best average outcome' : strat === 'floor' ? 'use when you’re favored' : 'use when you’re the underdog'}</span></div>`}
+    ${live ? `<div><span class="label">Scored so far</span><span class="big num">${f1(sofar)}</span><span class="small muted">${played.length} of ${st.length} starters playing or done${win ? ` · win chance ${pcW}` : ''}</span></div>`
+      : win ? `<div><span class="label">Win chance</span><span class="big num">${pcW}</span><span class="small muted">vs ${esc(win.name)}: you ${f1(win.mu)}, they ${f1(win.oppMu)}</span></div>`
+      : `<div><span class="label">Optimizing for</span><span class="big num" style="font-size:24px">${sLab[strat]}</span><span class="small muted">${strat === 'win' ? oppWhy : strat === 'mean' ? 'best average outcome' : strat === 'floor' ? 'use when you’re favored' : 'use when you’re the underdog'}</span></div>`}
     <div><span class="label">Injury alerts</span><span class="big num">${startTags.length}<span class="small muted" style="font-family:var(--font-body);font-size:14px;font-weight:400"> starter${startTags.length === 1 ? '' : 's'} · ${benchTags.length} bench</span></span><span class="small muted">${startTags.length ? 'Starting: ' + esc(tagTxt(startTags)) : 'No starters tagged'}${benchTags.length ? ' · Bench: ' + esc(tagTxt(benchTags)) : ''}${empty ? ` · ${empty} empty slot${empty === 1 ? '' : 's'}` : ''}</span></div>
   </div>
   ${D.histOpen ? histPanel() : ''}
   ${live ? `<div class="banner small">Games have started. Players already playing stay where ${ks.src === 'Sleeper' ? 'your Sleeper lineup has them' : ks.src === 'ESPN' ? 'your imported ESPN lineup has them' : ks.src === 'Benny' ? 'Benny’s lineup had them before kickoff' : 'Benny’s pregame lineup would have them (Benny doesn’t know who you started)'}; only the open slots are picked, from players yet to play.${ks.src !== 'Sleeper' ? ' Started someone else? Use “I started him” or “I didn’t start him” on that player.' : ''}</div>` : ''}
-  <div class="row-head"><h2>Start</h2><span class="toolbar"><button type="button" class="btn sm" data-act="hist" aria-expanded="${!!D.histOpen}">Past weeks</button><span class="seg" role="group" aria-label="Strategy">${['mean', 'floor', 'ceil'].map(k => k === 'mean' || isPro() ? `<button type="button" data-strategy="${k}" aria-pressed="${strat === k}">${{ mean: 'Projected', floor: 'Safe', ceil: 'Boom' }[k]}</button>` : `<button type="button" data-tab="pro" title="Safe and Boom lineups are part of Pro">${{ floor: 'Safe', ceil: 'Boom' }[k]} <span aria-hidden="true">🔒</span></button>`).join('')}</span></span></div>
+  <div class="row-head"><h2>Start</h2><span class="toolbar"><button type="button" class="btn sm" data-act="hist" aria-expanded="${!!D.histOpen}">Past weeks</button><span class="seg" role="group" aria-label="Strategy">${keys.map(k => k === 'mean' || isPro() ? `<button type="button" data-strategy="${k}" aria-pressed="${strat === k}">${kLab[k]}</button>` : `<button type="button" data-tab="pro" title="${k === 'win' ? 'Win chance lineups' : 'Safe and Boom lineups'} are part of Pro">${kLab[k]} <span aria-hidden="true">🔒</span></button>`).join('')}</span></span></div>
   <div class="card list">${head}${starters.map(s => s.r ? playerRow(s.r, s.slot.label || s.slot.k, true) : `<div class="item"><div class="prow"><span class="slot">${esc(s.slot.label || s.slot.k)}</span><span class="pwho muted">No eligible player. <a href="#roster" data-tab="players">Add one in Roster</a>.</span></div></div>`).join('')}</div>
+  ${win ? winNote(win, starters) : ''}
   <div class="row-head"><h2>Bench</h2><span class="small muted">Tap any player for the full matchup breakdown</span></div>
   <div class="card list">${bench.length ? bench.map(r => playerRow(r, 'BN', false)).join('') : '<div class="item"><div class="prow"><span></span><span class="muted">Nobody on the bench.</span></div></div>'}</div>
   </div>`;
@@ -4707,7 +5061,8 @@ function pickReasons(w, l) {
   if (w.floor > l.floor + 2) out.push({ s: 0.035, t: `Higher low end: ${f1(w.floor)} points in a below-average week, vs ${f1(l.floor)}` });
   const first = out.find(x => x.s === 1), rest = out.filter(x => x !== first).sort((a, b) => b.s - a.s);
   // the pick's own injury tag always shows: the projection assumes he plays
-  const tag = /^(questionable|doubtful)/i.test(w.inj || '') ? [`But ${w.u.name} is ${w.inj.toLowerCase()}: this assumes he plays, so check the news before kickoff`] : [];
+  const tag = w.mix ? [`But ${w.u.name} is ${w.inj.toLowerCase()}: counted at his ${Math.round(w.pPlay * 100)}% chance to play, so check inactives before kickoff`]
+    : /^(questionable|doubtful)/i.test(w.inj || '') ? [`But ${w.u.name} is ${w.inj.toLowerCase()}: check the news before kickoff`] : [];
   return [...(first ? [first] : []), ...rest].slice(0, 3 - tag.length).map(x => x.t).concat(tag);
 }
 function heat(v, avg, invert) {
@@ -4842,7 +5197,7 @@ function viewSettings() {
     <li><strong>Weather &amp; stadium:</strong> domes and closed retractable roofs give passers and kickers a small lift. Outdoors, the forecast for the three hours from kickoff (Open-Meteo) moves points between passing, running and kicking: wind over 10 mph hurts deep passing and kickers most, rain and snow add carries, and freezing cold costs kickers and passers a little. The betting total already lowers everyone in bad weather, so this factor doesn’t cut them all again. Each player’s role sets how much he feels it (a deep threat more than a slot receiver, a running quarterback less than a pocket passer), and his own scores indoors vs. outdoors are shown for context but don’t move the projection. Like every matchup factor, it moves only the part of the projection that comes from his scoring average, since Sleeper’s projection already counts the weather.</li>
     <li><strong>Scheme history:</strong> each team’s numbers blend ${D.season} games with last season. When the play-caller is unchanged, last season counts as ${S.priorWeeks} games. When the play-caller is new, it counts as at most 1.5 games, mixed with the new coach’s old team, and the player’s range widens by 10%.</li>
     <li><strong>Probabilities:</strong> scores are treated as a bell curve around the projection, with spread from the player’s weekly scores (shrunk toward a typical spread for the position). A lineup’s range allows for teammates and opponents scoring together (a QB and his receivers most). Every week’s forecasts are frozen before kickoff and later checked against what players scored.</li>
-    <li><strong>Lineup:</strong> an exact assignment fills every slot to maximize the chosen strategy. Bye weeks and players ruled Out or on IR sit automatically.</li></ol></details>
+    <li><strong>Lineup:</strong> an exact assignment fills every slot to maximize the chosen strategy. Bye weeks and players ruled Out or on IR sit automatically. A questionable or doubtful player counts at his chance to play. Win chance (Pro, Sleeper leagues) compares your lineup’s total with your opponent’s, both spreads and how teammates and opponents in the same game score together, and picks the lineup most likely to win.</li></ol></details>
     <div class="toolbar"><button type="button" class="btn danger" data-act="reset">${D.resetArm ? 'Press again to erase everything' : 'Reset all saved data'}</button><span class="small muted">Removes your roster, overrides, settings, saved lineups and cached stats from this browser${acct.user ? ', and signs you out (your account keeps its copy)' : ''}.</span></div></div>
   </div>`;
 }

@@ -75,11 +75,40 @@ test('backup QB (Drew Lock) is a backup worth 0 this week', () => {
   setup(); const r = M(idOf('Drew Lock'));
   return r.role?.kind === 'backup' && r.mean === 0 && name(r.role.behind) === 'Sam Darnold' || `role ${JSON.stringify(r.role)}, mean ${r.mean}`;
 });
-test('backups are not waiver pickups', () => { setup(); return !ev('availablePool')().includes(idOf('Drew Lock')); });
-test('no waiver move adds a backup', () => {
-  setup(); const W = ev('computeWaivers')();
-  const bad = W.moves.filter(m => M(m.f)?.role?.kind === 'backup');
-  return !bad.length || 'adds ' + bad.map(m => name(m.f)).join(', ');
+test('a backup QB is no waiver pickup in a 1-QB league', () => { setup(); return !ev('availablePool')().includes(idOf('Drew Lock')) && !ev('handcuffOf')(idOf('Drew Lock')); });
+/* ---------- handcuffs (handcuffOf, contValue) ---------- */
+test('a handcuff is the next running back (or superflex QB) behind a healthy regular, worth HC.minSV or more as the starter', () => {
+  setup(st => { st.slots.OP = 1; }); const D = ev('D'), hcOf = ev('handcuffOf'), reg = ev('isRegular'), HC = ev('HC');
+  const all = [...D.U.values()].filter(u => D.M[u.id]).map(u => [u, hcOf(u.id)]).filter(x => x[1]);
+  if (all.length < 10) return `${all.length} handcuffs`;
+  const bad = all.filter(([u, h]) => !['RB', 'QB'].includes(u.pos) || D.depth[u.team + '|' + u.pos][0] !== h.s.id || !reg(h.s) || h.s.inj && /^(out|ir|doubtful|pup|sus)/i.test(h.s.inj) || h.sv < HC.minSV || h.p !== HC.pMiss[u.pos]);
+  if (bad.length) return bad.map(([u, h]) => `${u.name} behind ${h.s.name}`).join(', ');
+  const lock = hcOf(idOf('Drew Lock')); return lock?.s.id === idOf('Sam Darnold') || 'Drew Lock is no handcuff in superflex';
+});
+test('a backup added on Waivers is a handcuff and says so; with an open spot one is listed', () => {
+  let listed = 0;
+  for (const hz of [2, 4, 'ros']) {
+    // an open roster spot, and free agents where the only running backs are handcuffs (so other backs don't crowd them out)
+    setup((st, D) => { st.waivers.horizon = hz; st.roster = st.roster.filter(id => id !== idOf('Rashid Shaheed'));
+      st.waivers.source = 'list'; st.waivers.faList = [...D.U.values()].filter(u => D.M[u.id] && !st.roster.includes(u.id) && (D.own.get(u.id) ?? 0) < 50 && (u.pos !== 'RB' || ev('handcuffOf')(u.id))).map(u => u.id); });
+    const W = ev('computeWaivers')();
+    const bad = W.moves.filter(m => M(m.f)?.role?.kind === 'backup' && !(m.handcuff && /handcuff: about [\d.]+ a game if .+ misses time \(about 1 week in \d+\)/i.test(m.whyText)));
+    if (bad.length) return `window ${hz}: ` + bad.map(m => `${name(m.f)}: ${m.whyText}`).join(' | ');
+    listed += W.moves.filter(m => m.handcuff).length;
+  }
+  return listed > 0 || 'no handcuff listed with an open roster spot';
+});
+test('a handcuff behind your own starter is worth the chance he misses × what he beats your next option there by', () => {
+  setup(); const D = ev('D'), W = ev('computeWaivers')(), gibbs = idOf('Jahmyr Gibbs'), hcOf = ev('handcuffOf');
+  const cuff = [...D.U.values()].find(u => hcOf(u.id)?.s.id === gibbs); if (!cuff) return 'no handcuff behind Gibbs';
+  const hc = hcOf(cuff.id), wi = W.weeks.findIndex((w, i) => i > 0 && !ev('schedOpp')(D.U.get(gibbs).team, w).bye);
+  const ids = ev('state').roster.concat(cuff.id), V = Object.assign({}, W.V, { [cuff.id]: W.weeks.map(() => 0) }), slots = ev('expandSlots')();
+  const HW = { [cuff.id]: W.weeks.map(() => null) }; HW[cuff.id][wi] = { s: hc.s, p: hc.p, sv: hc.sv };
+  const L = ev('bestLineup')(ids, wi, V, slots, null, HW), L0 = ev('bestLineup')(ids, wi, V, slots, null);
+  const sl = L.starters.find(x => x[1] === gibbs)?.[0]; if (!sl) return 'Gibbs not starting';
+  const alt = Math.max(0, ...ids.filter(b => b !== gibbs && b !== cuff.id && !L.starters.some(x => x[1] === b) && sl.elig.includes(D.U.get(b).pos)).map(b => V[b]?.[wi] ?? 0));
+  const want = hc.p * Math.max(0, hc.sv - alt);
+  return Math.abs(L.cont - want) < 1e-9 && Math.abs(L.depth - L0.depth - want) < 1e-9 && L.total === L0.total || `cont ${L.cont}, want ${want}`;
 });
 test('a starter keeps his usual blend (no role flag)', () => { setup(); const r = M(idOf('Jared Goff')); return !r.role || JSON.stringify(r.role); });
 /* Jauan Jennings, the reported miss: 11.6 a game for SF last season, 0 and 1.1 for MIN so far, still projected 10.9. The
@@ -221,7 +250,10 @@ test('matchup strength stays within ±20%', () => {
   return !bad.length || bad.slice(0, 5).map(r => `${r.u.name} ${r.mult.toFixed(2)}`).join(', ');
 });
 test('matchup factors move only the scoring-average part, never Sleeper\'s projection', () => {
-  setup(); const bad = modelled().filter(r => { const avgPart = r.base - r.projPart, want = r.projPart + (avgPart > 0 ? avgPart * r.mult : avgPart); return Math.abs(r.mean - want) > 1e-9 || Math.abs(r.mean - r.base) > Math.abs(avgPart) * 0.2 + 1e-9; });
+  // a player on the injury report: his number if he plays (before PLAY_K), which the chance to play then scales
+  // and less the work a teammate who may sit would leave him (mateBumpOf), which isn't a matchup factor
+  const pre = r => (r.mix ? r.mIf / (ev('PLAY_K')[ev('injTag')(r.inj)] ?? 1) : r.mean) - (r.mateBump?.pts ?? 0);
+  setup(); const bad = modelled().filter(r => !r.cont).filter(r => { const avgPart = r.base - r.projPart, want = r.projPart + (avgPart > 0 ? avgPart * r.mult : avgPart); return Math.abs(pre(r) - want) > 1e-9 || Math.abs(pre(r) - r.base) > Math.abs(avgPart) * 0.2 + 1e-9; });
   return !bad.length || bad.slice(0, 5).map(r => `${r.u.name}: base ${r.base.toFixed(1)}, mean ${r.mean.toFixed(1)}`).join(', ');
 });
 test('a typical starter moves under 10% for the matchup', () => {
@@ -262,7 +294,8 @@ test('lineup range allows for correlated players', () => {
 });
 test('forecast rows for the calibration record', () => {
   setup(); const fc = ev('forecastRows')(), rows = Object.values(fc);
-  return rows.length > 200 && rows.every(r => r.length === 5 && ['pre', 'in', 'post'].includes(r[4]) && r[1] > 0) || `${rows.length} rows, sample ${JSON.stringify(rows[0])}`;
+  // [mean if he plays, sd if he plays, base, projection, game state, chance he plays]
+  return rows.length > 200 && rows.every(r => r.length === 6 && ['pre', 'in', 'post'].includes(r[4]) && r[1] > 0 && r[5] > 0 && r[5] <= 1) && rows.some(r => r[5] < 1) || `${rows.length} rows, sample ${JSON.stringify(rows[0])}`;
 });
 test('the model note reports calibration once three weeks are checked', () => {
   setup(); const D = ev('D'), before = ev('modelNote')();
@@ -495,7 +528,148 @@ test('Benny’s Pick never starts a player who won’t play, and says why the ot
 });
 test('a pick with an injury tag says to check the news', () => {
   setup(); const D = ev('D'), q = Object.values(D.M).find(r => r.status === 'ok' && /^questionable/i.test(r.inj || '') && r.mean > 3), l = Object.values(D.M).find(r => r.status === 'ok' && !r.inj && r.pos === q.pos && r.mean < q.mean);
-  const why = ev('pickReasons')(q, l); return why.some(x => /questionable: this assumes he plays, so check the news/.test(x)) || why.join(' | ');
+  const why = ev('pickReasons')(q, l); return why.some(x => /questionable: counted at his \d+% chance to play, so check inactives before kickoff/.test(x)) || why.join(' | ');
+});
+/* ---------- the chance to play (P_PLAY, pPlayOf) ---------- */
+const preGame = () => Object.values(ev('D').M).filter(r => r.status === 'ok' && !r.locked && r.game?.state === 'pre');
+test('a questionable player counts at his chance to play, with the range of both outcomes', () => {
+  setup(); const r = preGame().find(r => /^questionable/i.test(r.inj || '') && r.mIf > 8), Phi = ev('Phi');
+  if (!r) return 'no questionable player before kickoff in the fixture';
+  const p = r.pPlay, P = ev('P_PLAY').Questionable[r.pos], above = x => p * (1 - Phi((x - r.mIf) / r.sdIf));
+  if (!(p === P && Math.abs(r.mean - p * r.mIf) < 1e-9)) return `${r.u.name}: pPlay ${p} (want ${P}), mean ${r.mean} vs ${p * r.mIf}`;
+  if (Math.abs(r.sd ** 2 - (p * r.sdIf ** 2 + p * (1 - p) * r.mIf ** 2)) > 1e-6) return 'sd is not the mixture sd';
+  if (1 - p >= 0.25 && r.floor !== 0) return `floor ${r.floor} with a ${Math.round((1 - p) * 100)}% chance he sits`;
+  if (!(r.ceil > r.mean && r.boom > r.ceil)) return `ceiling ${r.ceil}, boom ${r.boom}`;
+  return [[10, r.p10], [15, r.p15], [20, r.p20]].every(([x, v]) => Math.abs(v - above(x)) < 1e-9) && /played about \d+% of the time/.test(ev('detailBlock')(r)) || 'chances or detail text off';
+});
+test('a doubtful player counts the same on Lineup and Waivers: his chance to play this week, then healthy from his return', () => {
+  setup(); const D = ev('D'), r0 = preGame().find(r => ev('state').roster.includes(r.id) && !r.inj && ['RB', 'WR'].includes(r.pos)); if (!r0) return 'no roster player before kickoff';
+  const u = D.U.get(r0.id);
+  try {
+    u.inj = 'Doubtful'; D.wCache = null; ev('computeAll')(); const r = M(r0.id), wk = [D.week, D.week + 1, D.week + 2];
+    const v = ev('weekVals')(r0.id, wk), bye = w => ev('schedOpp')(u.team, w).bye;
+    if (!(r.status === 'ok' && r.pPlay === ev('P_PLAY').Doubtful)) return `status ${r.status}, pPlay ${r.pPlay}`;
+    if (Math.abs(v[0] - r.mean) > 1e-9) return `Waivers this week ${v[0]}, Lineup ${r.mean}`;
+    const back = ev('returnWeek')(r0.id), wi = wk.findIndex(w => w >= back && !bye(w));
+    return wi > 0 && v[wi] > 0.5 * r.mIf || `return week ${back}, values ${v.map(x => x.toFixed(1))}`;
+  } finally { u.inj = null; D.wCache = null; ev('computeAll')(); }
+});
+/* ---------- teammates of a regular who may sit (mateBumpOf, contOf) ---------- */
+// a running back regular before kickoff whose team has another back with games: [regular, teammate]
+function rbPair() {
+  const D = ev('D'), reg = ev('isRegular');
+  for (const r of preGame().filter(r => r.pos === 'RB' && !r.inj && reg(r.u) && r.projPts > 8)) {
+    const y = preGame().find(y => y.T === r.T && y.pos === 'RB' && y.id !== r.id && D.H[y.id]?.ra > 5 && y.projPts > 0 && !y.inj);
+    if (y) return [r, y];
+  }
+  return null;
+}
+test('a regular who may sit passes his work to teammates, at the chance he sits; none when he’s healthy or ruled out', () => {
+  setup(); const D = ev('D'), pr = rbPair(); if (!pr) return 'no running back pair before kickoff';
+  const [x, y] = pr, u = D.U.get(x.id), base = M(y.id).mean;
+  try {
+    if (M(y.id).mateBump) return `${y.u.name} has a bump with ${x.u.name} healthy`;
+    u.inj = 'Questionable'; ev('computeAll')(); const r = M(y.id), b = r.mateBump, pm = 1 - M(x.id).pPlay;
+    if (!b || b.from[0].x.id !== x.id || Math.abs(b.from[0].pm - pm) > 1e-9) return `bump ${JSON.stringify(b && { pts: b.pts, pm: b.from[0]?.pm })}, want pm ${pm}`;
+    if (!(Math.abs(r.mean - base - b.pts) < 1e-9 && /chance .+ sits/.test(ev('mateText')(r)))) return `mean ${r.mean} vs ${base} + ${b.pts}`;
+    u.inj = 'Out'; ev('computeAll')(); return !M(y.id).mateBump || `bump with ${x.u.name} out (Sleeper's projections already count it)`;
+  } finally { u.inj = null; ev('computeAll')(); }
+});
+test('a backup running back behind a regular who may sit counts as the starter, at the chance he starts', () => {
+  setup(); const D = ev('D'), reg = ev('isRegular');
+  const r0 = Object.values(D.M).find(r => r.role?.kind === 'backup' && r.pos === 'RB' && !r.locked && r.game?.state === 'pre' && reg(D.U.get(r.role.behind)) && !D.U.get(r.role.behind).inj);
+  if (!r0) return 'no backup running back before kickoff';
+  const s = D.U.get(r0.role.behind);
+  try {
+    if (r0.mean !== 0) return `${r0.u.name} worth ${r0.mean} behind a healthy starter`;
+    s.inj = 'Questionable'; ev('computeAll')(); const r = M(r0.id), p = 1 - ev('P_PLAY').Questionable.RB;
+    if (!(r.cont && Math.abs(r.pPlay - p) < 1e-9 && Math.abs(r.mean - p * r.mIf) < 1e-9 && r.mIf > 3)) return `cont ${JSON.stringify(r.cont && { p: r.cont.p, sv: r.cont.sv })}, mean ${r.mean}`;
+    return /^Backup to .+, who is questionable: if .+ sits/.test(ev('playText')(r)) || ev('playText')(r);
+  } finally { s.inj = null; ev('computeAll')(); }
+});
+/* ---------- role changes from snap counts (roleChgOf; the fixture predates snap counts, so they're set here) ---------- */
+// week 4 has three games behind it, so these run with RC.minGames at 3 (one earlier game against the last two)
+function withSnaps(snps, fn) {
+  const D = ev('D'), RC = ev('RC'), r0 = preGame().find(r => r.pos === 'WR' && !r.inj && !r.role && !r.doubt && D.H[r.id]?.n === 3 && D.H[r.id].tms.every(t => t === r.T) && r.projPts > 5);
+  if (!r0) return 'no receiver with three games before kickoff';
+  const h = D.H[r0.id], was = h.snp.slice(), n = h.n, mg = RC.minGames;
+  try { RC.minGames = 3; h.snp = h.snp.map((_, i) => snps[i - (n - snps.length)] ?? 0.6); ev('computeAll')(); return fn(r0, M(r0.id)); }
+  finally { RC.minGames = mg; h.snp = was; ev('computeAll')(); }
+}
+test('a rising role (snap share up the last two games) is flagged and shown, and doesn’t move his number', () => {
+  setup(); const before = {};
+  return withSnaps([0.3, 0.95, 0.95], (r0, r) => {
+    if (r.rc?.dir !== 'up') return `${r.u.name}: ${JSON.stringify(r.rc)}`;
+    const why = ev('waiverWhy')({ f: r.id, d: null, H: 2, starts: [], strength: 0, wd: [0, 0] }, { list: [] }, [ev('D').week, ev('D').week + 1], 2);
+    return Math.abs(r.mean - r0.mean) < 1e-9 && r.chip?.text === 'Rising role' && /^Rising role: 95% of the snaps .+ up from 30%/.test(ev('rcText')(r.rc, r.T)) && /Rising role: 95% of the snaps/.test(ev('detailBlock')(r)) && /rising role: 95% of the snaps/i.test(why) || `mean ${r0.mean} → ${r.mean}, chip ${r.chip?.text}, ${why}`;
+  });
+});
+test('a shrinking role moves his form RC.formMax.down of the way to his last two games; a drop in the game he got hurt doesn’t count', () => {
+  setup();
+  const down = withSnaps([0.9, 0.5, 0.5], (r0, r) => {
+    const D = ev('D'), h = D.H[r.id], f = ev('formOf')(r.id), now = ev('formNow')(r.id), U = ev('USAGE_W');
+    const rec = r.rc?.rec.map(i => (1 - U) * h.pts[i] + U * h.use[i]).reduce((a, x) => a + x, 0) / 2;
+    return r.rc?.dir === 'down' && Math.abs(now - (f + ev('RC').formMax.down * (rec - f))) < 1e-9 && r.chip?.text === 'Shrinking role' || `${JSON.stringify(r.rc)}, form ${f} → ${now}`;
+  });
+  if (down !== true) return down;
+  return withSnaps([0.9, 0.85, 0.3], (r0, r) => !r.rc || `flagged ${r.rc.dir} for a game he left early`);
+});
+/* ---------- Win chance (Pro, Sleeper league; the matchup is set here, no network) ---------- */
+// an opponent from players not on the roster: ranks lo..lo+n at each position by projection
+function oppRoster(lo) {
+  const D = ev('D'), mine = new Set(ev('state').roster), take = { QB: 2, RB: 4, WR: 5, TE: 2, K: 1, DEF: 1 }, ids = [];
+  for (const [P, n] of Object.entries(take)) ids.push(...Object.values(D.M).filter(r => r.pos === P && r.status === 'ok' && !mine.has(r.id)).sort((a, b) => b.mean - a.mean).slice(lo, lo + n).map(r => r.id));
+  return ids;
+}
+function withWin(lo, fn, opts = {}) {
+  const A = ev('acct'), D = ev('D'), st = ev('state'), was = [A.user, A.bootPro, st.sleeper, st.settings.strategy];
+  try {
+    A.user = null; A.bootPro = opts.free ? null : { until: Date.now() + 1e10 };
+    if (!opts.espn) st.sleeper = { leagueId: 'LTEST', rosterId: 1, starters: [] };
+    st.settings.strategy = opts.strategy || 'win';
+    const opp = oppRoster(lo);
+    D.slMatch['LTEST|' + D.week] = { rows: [{ roster_id: 1, matchup_id: 7, players: st.roster, starters: [] }, { roster_id: 2, matchup_id: 7, players: opp, starters: opp.slice(0, 9) }], at: Date.now() };
+    D.winCache = null; return fn(ev('optimize')());
+  } finally { [A.user, A.bootPro, st.sleeper, st.settings.strategy] = was; delete D.slMatch['LTEST|' + D.week]; D.winCache = null; }
+}
+const lineupOf = st => st.filter(s => s.r).map(s => s.r);
+test('Win chance is never below the Projected lineup’s, leans to spread as the underdog and to steadiness as the favorite, and keeps started players', () => {
+  setup(); const sd = x => ev('lineupSD')(lineupOf(x)), out = [];
+  for (const [lo, want] of [[0, 'underdog'], [45, 'favorite']]) {
+    const res = withWin(lo, R => {
+      const w = R.win; if (!w) return 'no win lineup';
+      if (want === 'underdog' ? w.mu >= w.oppMu : w.mu <= w.oppMu) return `${want} setup: you ${w.mu.toFixed(1)}, they ${w.oppMu.toFixed(1)}`;
+      if (w.p < w.base.p - 1e-12) return `${want}: win chance ${w.p} below Projected's ${w.base.p}`;
+      const a = sd(R.starters), b = sd(w.base.starters);
+      if (want === 'underdog' ? a < b - 1e-9 : a > b + 1e-9) return `${want}: spread ${a.toFixed(2)} vs Projected ${b.toFixed(2)}`;
+      const moved = w.base.starters.filter((s, i) => s.r?.locked && R.starters[i].r?.id !== s.r.id);
+      return moved.length ? `started players moved: ${moved.map(s => s.r.u.name)}` : true;
+    });
+    if (res !== true) out.push(res);
+  }
+  return !out.length || out.join(' | ');
+});
+test('Win chance is Pro and for Sleeper teams; a saved Safe or Boom choice becomes Win chance there', () => {
+  setup(); const S = () => ev('strategy')();
+  const r = [withWin(0, () => S(), { free: true }), withWin(0, () => S(), { strategy: 'floor' }), withWin(0, () => S(), { espn: true, strategy: 'win' }), withWin(0, () => S(), { espn: true, strategy: 'ceil' }), withWin(0, R => !!R.win, { free: true })];
+  return JSON.stringify(r) === JSON.stringify(['mean', 'win', 'mean', 'ceil', false]) || JSON.stringify(r);
+});
+test('the win chance counts how the two lineups move together (a QB against his own receiver)', () => {
+  setup(); const D = ev('D'), qb = preGame().find(r => r.pos === 'QB' && !r.inj && r.sd > 0), wr = preGame().find(r => r.pos === 'WR' && r.T === qb.T && !r.inj && r.sd > 0);
+  if (!qb || !wr) return 'no QB and receiver before kickoff';
+  const w = ev('winProb')([qb], [wr]), v = qb.sd ** 2 + wr.sd ** 2 - 2 * 0.35 * qb.sd * wr.sd;
+  return Math.abs(w.sd - Math.sqrt(v)) < 1e-9 && Math.abs(w.p - ev('Phi')((qb.mean - wr.mean) / Math.sqrt(v))) < 1e-12 || `sd ${w.sd} vs ${Math.sqrt(v)}`;
+});
+test('Lineup shows the win chance against the opponent, and why the lineup differs from Projected', () => {
+  setup(); return withWin(0, R => { const h = ev('lineupBody')(); // before kickoff the win chance has its own tile; once games start (the fixture is mid-week) it joins the score so far
+    return /<span class="label">Win chance<\/span><span class="big num">\d+%<\/span><span class="small muted">vs your opponent: you|starters playing or done · win chance \d+%/.test(h) && /Win chance: same lineup as Projected|Why this lineup differs from Projected \(win chance \d+% → \d+%\)/.test(h) && /data-strategy="win" aria-pressed="true"/.test(h) || 'tile or note missing'; });
+});
+test('still questionable once inactives are out (under 75 minutes to kickoff) means he plays', () => {
+  setup(); const D = ev('D'), r0 = preGame().find(r => /^questionable/i.test(r.inj || '')), g = r0.game, was = g.date;
+  try {
+    g.date = new Date(Date.now() + 30 * 60000).toISOString(); ev('computeAll')(); const r = M(r0.id);
+    return r.pPlay === ev('P_PLAY').late && /inactives out, so he’s playing/.test(ev('playText')(r)) || `pPlay ${r.pPlay}`;
+  } finally { g.date = was; ev('computeAll')(); }
 });
 test('a questionable player whose projection disappeared is a late scratch, not a backup (Jalen Coker)', () => {
   setup(); const r = M(idOf('Jalen Coker'));

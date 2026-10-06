@@ -33,6 +33,8 @@ if len(snap.get("own", [])) < 100:
     print("Warning: ESPN ownership didn't load; waiver suggestions on the saved copy will treat everyone as available.")
 if not snap.get("wx"):
     print("Warning: no weather forecasts in the snapshot (none due yet, or Open-Meteo didn't answer).")
+if not any(len(row) >= 16 and row[14] is not None for wk in snap.get("weeks", []) for row in wk.get("P", [])):
+    print("Warning: no snap counts in this season's weekly stats; role changes (roleChgOf) stay off until they load.")
 if not snap.get("split"):
     print("Warning: last season's indoor/outdoor splits didn't build; the weather factor will skip personal splits.")
 
@@ -71,7 +73,9 @@ snap["injLog"] = log
 
 # Frozen forecasts, for scripts/calibrate.py: forecasts/<season>-wNN.json keeps each player's forecast as it stood before
 # his game. A player's entry is written only while his game hasn't started, so the record never picks up news or scores
-# from after kickoff. Rows: [mean, sd, base, Sleeper projection, saved at]. Not kept in snapshot.json itself.
+# from after kickoff. Rows: [mean, sd, base, Sleeper projection, saved at, chance he plays]: mean and sd are what he
+# scores if he plays (calibrate.py scores players who played), the last field the chance he does (1 when untagged).
+# Not kept in snapshot.json itself.
 fc = snap.pop("fc", None) or {}
 if fc:
     fdir = os.path.join(os.path.dirname(os.path.abspath(out_path)), "forecasts")
@@ -85,7 +89,7 @@ if fc:
     frozen = 0
     for pid, row in fc.items():
         if row[4] == "pre":
-            book["players"][pid] = row[:4] + [snap["createdAt"]]
+            book["players"][pid] = row[:4] + [snap["createdAt"]] + row[5:6]
             frozen += 1
     with open(fpath, "w", encoding="utf-8") as f:
         json.dump(book, f, separators=(",", ":"), sort_keys=True)

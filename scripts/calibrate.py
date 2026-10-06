@@ -109,7 +109,7 @@ def main(root):
         if not scores:
             continue
         n0 = len(rows)
-        for pid, (mean, sd, _base, sleeper, _at) in book["players"].items():
+        for pid, (mean, sd, _base, sleeper, _at, *_rest) in book["players"].items():   # a 6th field, the chance he played, from Oct 2026
             if pid in scores:   # played (gp > 0); forecasts for players who sat out aren't judged
                 pts, pos = scores[pid]
                 rows.append({"week": book["week"], "pos": pos, "mean": mean, "sd": sd, "sleeper": sleeper, "actual": pts})
