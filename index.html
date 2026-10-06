@@ -339,7 +339,9 @@ body.welcome.wsign #acctBtn .acct-txt { position: static; width: auto; height: a
    The page background behind them hides what scrolls under, with a shadow once pinned. */
 #stickSentinel { height: 1px; margin-bottom: -17px; }
 .stick { position: sticky; top: env(safe-area-inset-top, 0px); z-index: 40; display: flex; flex-direction: column; gap: 10px;
-  margin: -6px -16px -8px; padding: 6px 16px 8px; background: var(--bg); }
+  --gut-l: max(16px, env(safe-area-inset-left, 0px)); --gut-r: max(16px, env(safe-area-inset-right, 0px));
+  margin: -6px calc(-1 * var(--gut-r)) -8px calc(-1 * var(--gut-l)); padding: 6px var(--gut-r) 8px var(--gut-l); background: var(--bg); }
+.wrap > .stick { max-width: none; }   /* spans the page's side padding too (.wrap > * caps the rest at the content width) */
 .stick.stuck { box-shadow: 0 6px 12px -8px rgba(0, 0, 0, .35); }
 .teampin { display: flex; flex-direction: column; gap: 8px; }
 .teampin:empty { display: none; }
