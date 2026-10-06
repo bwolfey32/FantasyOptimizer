@@ -528,7 +528,7 @@ test('Benny’s Pick never starts a player who won’t play, and says why the ot
 });
 test('a pick with an injury tag says to check the news', () => {
   setup(); const D = ev('D'), q = Object.values(D.M).find(r => r.status === 'ok' && /^questionable/i.test(r.inj || '') && r.mean > 3), l = Object.values(D.M).find(r => r.status === 'ok' && !r.inj && r.pos === q.pos && r.mean < q.mean);
-  const why = ev('pickReasons')(q, l); return why.some(x => /questionable: counted at his \d+% chance to play, so check inactives before kickoff/.test(x)) || why.join(' | ');
+  const why = ev('pickReasons')(q, l); return why.some(x => /questionable: counted at his \d+% chance to play, so check the news before kickoff/.test(x)) || why.join(' | ');
 });
 /* ---------- the chance to play (P_PLAY, pPlayOf) ---------- */
 const preGame = () => Object.values(ev('D').M).filter(r => r.status === 'ok' && !r.locked && r.game?.state === 'pre');
@@ -786,6 +786,62 @@ test('player pictures: headshot by ESPN id, team logo for a D/ST, silhouette whe
     return ['viewDefenses', 'viewTeams'].every(v => /class="tlogo"/.test(ev(v)())) || 'Research tables have no team logos';
   } finally { D.imgBad.clear(); D.pids = was[0]; gibbs.espnId = was[1]; }
 });
+
+/* ---------- the trained model (model/proj.json; useTrained in index.html) ----------
+   The fixture has no trained file, so every test above runs on the classic model. These give the page a made-up file for
+   this week, the same for every QB/RB/WR/TE: 20.0 PPR points with 6 catches and sd 7 next week, and 10, 11 and 12
+   points 2, 3 and 4 weeks ahead, so where the trained numbers land is plain to see. */
+function withTrained(fn) {
+  const D = ev('D'), old = D.ml, ids = {};
+  for (const [id, u] of D.U) if (['QB', 'RB', 'WR', 'TE', 'K'].includes(u.pos)) ids[id] = [20, 6, 7, 10, 3, 11, 3, 12, 3];
+  D.ml = { season: D.season, week: D.week, made: '2026-10-01T00:00:00Z', ids };
+  try { return fn(D); } finally { D.ml = old; setup(); }
+}
+// a healthy starter whose game hasn't started, with no teammate's work added (mateBump) and not a backup
+const trainedPick = (more = () => true) => { const D = ev('D'); return Object.keys(D.M).find(id => { const r = D.M[id]; return ['QB', 'RB', 'WR', 'TE'].includes(r.pos) && r.status === 'ok' && r.game?.state === 'pre' && !r.role && !r.mateBump && !r.cont && more(r); }); };
+test('trained: its number and sd are the base and range, in the team’s scoring', () => withTrained(() => {
+  setup(); const id = trainedPick(r => !r.u.inj), r = M(id);
+  if (!id) return 'no healthy pregame starter';
+  if (!r.trained || !near(r.base, 20) || !near(r.mean, 20) || !near(r.sd, 7)) return `${name(id)}: base ${r.base}, mean ${r.mean}, sd ${r.sd}`;
+  setup(st => { st.scoring = 'half'; }); const h = M(id);   // half-PPR: 20 less half a point for each of 6 catches = 17
+  return near(h.mean, 17) && near(h.sd, 7 * 17 / 20) || `half-PPR mean ${h.mean}, sd ${h.sd}`;
+}));
+test('trained: Classic in Settings, or a file for another week, uses the classic model', () => {
+  setup(); const id = trainedPick(r => !r.u.inj), c0 = M(id).mean;
+  return withTrained(D => {
+    setup(st => { st.settings.model = 'classic'; }); const a = M(id).mean;
+    D.ml.week = D.week + 1; setup(); const b = M(id).mean;
+    return near(a, c0) && near(b, c0) && !M(id).trained || `classic ${c0}, with Classic chosen ${a}, with next week's file ${b}`;
+  });
+});
+test('trained: kickers and D/STs stay on the classic model', () => {
+  setup(); const D = ev('D'), k = Object.keys(D.M).find(id => D.M[id].pos === 'K' && D.M[id].status === 'ok'), d = Object.keys(D.M).find(id => D.M[id].pos === 'DEF' && D.M[id].status === 'ok');
+  const k0 = M(k).mean, d0 = M(d).mean;
+  return withTrained(() => { setup(); return near(M(k).mean, k0) && near(M(d).mean, d0) && !M(k).trained || `K ${k0} -> ${M(k).mean}, D/ST ${d0} -> ${M(d).mean}`; });
+});
+test('trained: a questionable player counts at his chance to play, with no extra discount (the model counts the tag)', () => withTrained(() => {
+  setup(); const id = trainedPick(r => ev('injTag')(r.u.inj) === 'Questionable');
+  if (!id) return 'no questionable pregame starter in the fixture';
+  const r = M(id); return r.mix && near(r.mIf, 20) && near(r.mean, r.pPlay * 20) || `${name(id)}: mIf ${r.mIf}, mean ${r.mean}, chance ${r.pPlay}`;
+}));
+test('trained: an override still wins', () => withTrained(() => {
+  setup(); const id = trainedPick(r => !r.u.inj); setup(st => { st.overrides[id] = 3.5; });
+  return near(M(id).mean, 3.5) && ev('weekVals')(id, [ev('D').week + 1]).every(v => v === 0 || near(v, 3.5 * ev('matchupMult')(M(id).pos, ev('schedOpp')(M(id).u.team, ev('D').week + 1).opp, ev('D').week + 1, M(id).u.team))) || `mean ${M(id).mean}`;
+}));
+test('trained: Waivers stays on the classic numbers, this week included', () => {
+  setup(); const D = ev('D'), id = trainedPick(r => !r.u.inj), ws = [0, 1, 2, 3].map(k => D.week + k), c0 = ev('weekVals')(id, ws);
+  return withTrained(() => { setup(); const v = ev('weekVals')(id, ws); return M(id).trained && v.every((x, i) => near(x, c0[i])) || `classic ${c0}, trained ${v}`; });
+});
+test('trained: with Waivers on the trained model, its values 2-4 weeks ahead count, and the classic model after that', () => withTrained(D => {
+  const T = ev('TRAINED'); T.waivers = true;
+  try {
+    setup(); const id = trainedPick(r => !r.u.inj && !ev('fillInFor')(r.id) && !ev('bumpOf')(r.id));
+    const ws = [1, 2, 3, 4].map(k => D.week + k), v = ev('weekVals')(id, ws), bye = ws.map(w => ev('schedOpp')(M(id).u.team, w).bye);
+    const want = [10, 11, 12];
+    for (let k = 0; k < 3; k++) if (!(bye[k] ? v[k] === 0 : near(v[k], want[k]))) return `${name(id)} week +${k + 1}: ${v[k]}, want ${bye[k] ? 0 : want[k]}`;
+    return bye[3] || ![10, 11, 12].some(x => near(v[3], x)) || `week +4 is ${v[3]}: should be the classic value`;
+  } finally { T.waivers = false; }
+}));
 
 window.addEventListener('load', () => {
   const t0 = Date.now();

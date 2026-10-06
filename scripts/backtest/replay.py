@@ -5,7 +5,8 @@ Usage: python3 scripts/backtest/replay.py baseline            the model as shipp
        python3 scripts/backtest/replay.py sweep2              round two: narrower rules and structural variants
        python3 scripts/backtest/replay.py configs FILE.json   any list of configs, e.g. [{"name": "x", "params": {...},
                                                               "settings": {"blend": 0.5}, "full": true, "waivers": true}]
-Options: --fixtures 2025-w0* (glob on fixture names), --out NAME (default: the mode), --port 8765
+Options: --fixtures 2025-w0* (glob on fixture names), --out NAME (default: the mode), --port 8765, --dir fixtures-ml
+(fixtures carrying the trained model's predictions: scripts/model/backtest.py fixtures)
 
 Fixtures come from build_fixtures.py (scripts/backtest/out/fixtures). This script serves the repo folder, opens
 scripts/backtest/driver.html in headless Chrome, hands it the job, and appends each fixture's results to
@@ -89,8 +90,8 @@ def owned_proxy(fx):
     return owned
 
 
-def build_job(mode, configs, pattern):
-    files = sorted(glob.glob(os.path.join(OUT, "fixtures", "*.json")))
+def build_job(mode, configs, pattern, fdir="fixtures"):
+    files = sorted(glob.glob(os.path.join(OUT, fdir, "*.json")))
     files = [f for f in files if fnmatch.fnmatch(os.path.basename(f)[:-5], pattern)]
     if not files:
         sys.exit("No fixtures: run build_fixtures.py first.")
@@ -384,6 +385,7 @@ def main():
     ap.add_argument("--fixtures", default="*")
     ap.add_argument("--out")
     ap.add_argument("--port", type=int, default=8765)
+    ap.add_argument("--dir", default="fixtures", help="fixtures folder under scripts/backtest/out (fixtures-ml: with the trained model's predictions)")
     ap.add_argument("--timeout", type=int, default=6 * 3600)
     a = ap.parse_args()
     if a.mode == "baseline":
@@ -406,7 +408,7 @@ def main():
     else:
         with open(a.file, encoding="utf-8") as f:
             configs = json.load(f)
-    ok = run(build_job(a.mode, configs, a.fixtures), a.out or a.mode, a.port, a.timeout)
+    ok = run(build_job(a.mode, configs, a.fixtures, a.dir), a.out or a.mode, a.port, a.timeout)
     sys.exit(0 if ok else 1)
 
 

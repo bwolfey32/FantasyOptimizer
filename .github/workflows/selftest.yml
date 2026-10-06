@@ -45,6 +45,6 @@ jobs:
 
       - name: Check the data scripts
         run: |
-          python3 -m py_compile scripts/extract_snapshot.py scripts/calibrate.py scripts/player_ids.py scripts/audit.py scripts/weekly_pages.py
+          python3 -m py_compile scripts/extract_snapshot.py scripts/calibrate.py scripts/player_ids.py scripts/audit.py scripts/weekly_pages.py scripts/model/*.py
           node --check sw.js
           python3 scripts/calibrate.py --selfcheck

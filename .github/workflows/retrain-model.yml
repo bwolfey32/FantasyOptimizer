@@ -1,0 +1,62 @@
+# Retrains the trained model's next-week projections on every game played so far (scripts/model/, docs/model-report.md):
+# the backtest found retraining during the season, as the weeks come in, beat a model fixed before it. Runs Tuesday
+# mornings, once nflverse has Monday's box scores, or on demand from the Actions tab. The leakage and data checks run
+# first and stop it on any failure. The range models and the 2-4 week model keep their last training (rebuilding them
+# needs the backtest's replays: python scripts/model/train.py on a full checkout, see docs/model-report.md).
+name: Retrain model
+
+on:
+  schedule:
+    - cron: "0 13 * * 2"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: refresh-data
+  cancel-in-progress: false
+
+jobs:
+  retrain:
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+          cache-dependency-path: scripts/model/requirements.txt
+
+      - name: Restore downloaded NFL data
+        uses: actions/cache@v4
+        with:
+          path: scripts/backtest/cache/nflverse
+          key: nflverse-history-${{ github.run_id }}
+          restore-keys: |
+            nflverse-history-
+            nflverse-
+
+      - name: Install
+        run: pip install -q -r scripts/model/requirements.txt
+
+      - name: Build the history (2013 to this week)
+        run: python3 scripts/model/dataset.py --sleeper
+
+      - name: Leakage and data checks
+        run: python3 -m pytest -q tests/test_features.py
+
+      - name: Retrain next week's model
+        run: python3 scripts/model/train.py B-hl3-bsldb-md300-h1-rt2 --mean-only
+
+      - name: Commit and publish
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898583+github-actions[bot]@users.noreply.github.com"
+          git add scripts/model/models
+          if git diff --cached --quiet; then echo "No changes"; exit 0; fi
+          git commit -m "Retrain the trained model on this season's games"
+          git pull --rebase --autostash
+          git push

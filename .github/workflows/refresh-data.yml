@@ -18,7 +18,7 @@ concurrency:
 jobs:
   refresh:
     runs-on: ubuntu-latest
-    timeout-minutes: 15
+    timeout-minutes: 25
     steps:
       - uses: actions/checkout@v4
 
@@ -32,6 +32,25 @@ jobs:
 
       - name: Save snapshot.json
         run: python3 scripts/extract_snapshot.py "$RUNNER_TEMP/dom.html" snapshot.json
+
+      # the trained model's projections (model/proj.json) from the new snapshot, nflverse's box scores and depth charts,
+      # and the classic numbers the export wrote (model/classic.json); a failure keeps the last file, and the page falls
+      # back to the classic model whenever the file isn't for the current week
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+          cache-dependency-path: scripts/model/requirements.txt
+      - name: Restore downloaded NFL data
+        uses: actions/cache@v4
+        with:
+          path: scripts/backtest/cache/nflverse
+          key: nflverse-${{ github.run_id }}
+          restore-keys: nflverse-
+      - name: Trained projections
+        run: |
+          pip install -q -r scripts/model/requirements.txt
+          python3 scripts/model/predict.py || echo "Trained projections kept from the last run"
 
       # checks the frozen forecasts of finished weeks against what players scored; a failure here never blocks the snapshot
       - name: Check past forecasts against results
@@ -57,7 +76,7 @@ jobs:
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898583+github-actions[bot]@users.noreply.github.com"
-          for p in snapshot.json forecasts calibration.json player-ids.json share-players.json weekly sitemap.xml; do if [ -e "$p" ]; then git add "$p"; fi; done
+          for p in snapshot.json forecasts calibration.json player-ids.json share-players.json weekly sitemap.xml model; do if [ -e "$p" ]; then git add "$p"; fi; done
           if git diff --cached --quiet; then echo "No changes"; exit 0; fi
           git commit -m "Refresh data snapshot"
           git pull --rebase --autostash

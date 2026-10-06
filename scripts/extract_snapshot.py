@@ -95,6 +95,17 @@ if fc:
         json.dump(book, f, separators=(",", ":"), sort_keys=True)
     print(f"Forecasts: {frozen} pregame entries updated in {os.path.basename(fpath)} ({len(book['players'])} players)")
 
+# Benny's classic numbers, the trained model's inputs (scripts/model/predict.py): this week's forecast if he plays [mean, sd]
+# and Waivers' values for the next three weeks, at default settings (the export always computes the classic model).
+# Written to model/classic.json; not kept in snapshot.json.
+fut = snap.pop("fut", None) or {}
+if fc:
+    mdir = os.path.join(os.path.dirname(os.path.abspath(out_path)), "model")
+    os.makedirs(mdir, exist_ok=True)
+    with open(os.path.join(mdir, "classic.json"), "w", encoding="utf-8") as f:
+        json.dump({"season": snap["season"], "week": snap["week"], "made": snap["createdAt"],
+                   "fc": {pid: row[:2] for pid, row in fc.items()}, "fut": fut}, f, separators=(",", ":"))
+
 with open(out_path, "w", encoding="utf-8") as f:
     json.dump(snap, f, ensure_ascii=False, separators=(",", ":"))
 print(f"Saved snapshot for {snap['season']} week {snap['week']}: {len(snap['proj'])} players, created {snap['createdAt']}")
