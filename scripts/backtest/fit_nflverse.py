@@ -18,31 +18,22 @@ player ruled out, a depth-chart change), which only a full replay (replay.py) ca
 data alone says.
 """
 import argparse
-import csv
 import json
 import math
 import os
 import statistics
-import urllib.request
+import sys
 from collections import defaultdict
 
 HERE = os.path.dirname(os.path.abspath(__file__))
-CACHE = os.path.join(HERE, "cache", "nflverse")
-BASE = "https://github.com/nflverse/nflverse-data/releases/download"
+sys.path.insert(0, os.path.join(HERE, "..", "model"))
+from nflverse import BASE, load  # noqa: E402  (shared loader and cache, scripts/model/nflverse.py)
+
 SKILL = ("QB", "RB", "WR", "TE")
 # index.html's USAGE_PTS: PPR points a game's usage is worth [base, per target, per carry, per pass attempt]
 USAGE_PTS = {"QB": [-0.191, 0, 1.053, 0.422], "RB": [-0.367, 1.242, 0.769, 0], "WR": [0.06, 1.737, 0.682, 0], "TE": [-0.002, 1.904, 0.572, 0]}
 USAGE_W = 0.75
 RC_W = {"RB": (0.4, 0.35, 0.25), "WR": (0.5, 0, 0.5), "TE": (0.5, 0, 0.5)}   # index.html's RC.w: snap, carry, target share
-
-
-def load(name, url):
-    os.makedirs(CACHE, exist_ok=True)
-    path = os.path.join(CACHE, name)
-    if not os.path.exists(path):
-        urllib.request.urlretrieve(url, path)
-    with open(path, encoding="utf-8") as f:
-        return list(csv.DictReader(f))
 
 
 def num(x):
