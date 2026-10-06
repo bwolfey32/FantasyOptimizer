@@ -878,13 +878,13 @@ test('compare: an override doesn’t change the models’ own numbers', () => wi
 test('compare: it shows in an expanded player, Start/Sit and the best move, and not on the Classic setting', () => withTrained(() => {
   setup(); const D = ev('D'), id = trainedPick(r => !r.u.inj), id2 = trainedPick(r => !r.u.inj && r.id !== id && r.pos === M(id).pos);
   if (!id || !id2) return 'no two healthy pregame starters';
-  const bar = html => /class="mcmp"/.test(html) && /Trained/.test(html) && /Classic/.test(html) && /Sleeper/.test(html) && !/NaN|undefined/.test(html.match(/<div class="mcmp"[\s\S]*?<\/svg>[\s\S]*?<\/div>/)?.[0] || '');
+  const bar = html => /class="mcmp[ "]/.test(html) && /Trained/.test(html) && /Classic/.test(html) && /Sleeper/.test(html) && !/NaN|undefined/.test(html.match(/<div class="mcmp[ "][\s\S]*?<\/svg>[\s\S]*?<\/div>/)?.[0] || '');
   const detail = ev('detailBlock')(M(id));
   setup(st => { st.compare = [id, id2]; }); const ss = ev('viewCompare')();
   const move = ev('bestMoveCard')({ f: id, d: id2, hz: 3, H: 1 }, [], 1, () => '', null);
   const call = ev('classicCallNote')(M(id), M(id2), M(id));
-  const bad = [!bar(detail) && 'detail', (ss.match(/class="mcmp"/g) || []).length < 2 && 'Start/Sit', !bar(move) && 'best move', !/Waivers values use the Classic model/.test(move) && 'waivers note', !/^Classic /.test(call) && `classic call "${call}"`].filter(Boolean);
-  setup(st => { st.settings.model = 'classic'; }); const off = /class="mcmp"/.test(ev('detailBlock')(M(id))) || /class="mcmp"/.test(ev('viewCompare')());
+  const bad = [!bar(detail) && 'detail', !/class="mcmp boxed"[\s\S]*Baseline /.test(detail) && 'baseline in the box', (ss.match(/class="mcmp"/g) || []).length < 2 && 'Start/Sit', !bar(move) && 'best move', !/Waivers values use the Classic model/.test(move) && 'waivers note', !/^Classic /.test(call) && `classic call "${call}"`].filter(Boolean);
+  setup(st => { st.settings.model = 'classic'; }); const off = /class="mcmp[ "]/.test(ev('detailBlock')(M(id))) || /class="mcmp[ "]/.test(ev('viewCompare')());
   if (off) bad.push('shown on Classic');
   return !bad.length || bad.join(', ');
 }));

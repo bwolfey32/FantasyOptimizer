@@ -552,6 +552,7 @@ html { scroll-padding-top: calc(var(--stick-h, 0px) + 8px); }
 .mcmp-k { display: flex; flex-wrap: wrap; gap: 2px 14px; font-size: 13.5px; font-variant-numeric: tabular-nums; }
 .mcmp-k b { font-weight: 600; }
 .mcmp-k svg { display: inline-block; width: 11px; height: 11px; max-width: none; margin-right: 5px; vertical-align: -1px; }
+.mcmp.boxed { border: 1px solid var(--line); border-radius: 8px; padding: 10px 12px; gap: 6px; }
 .mcmp-row { display: flex; flex-wrap: wrap; gap: 12px 28px; }
 .mcmp-row > .mcmp { flex: 1 1 200px; }
 .math { font-size: 13px; color: var(--muted); font-variant-numeric: tabular-nums; }
@@ -4337,9 +4338,9 @@ function modelCompare(id, o = {}) {
   const label = `Trained ${f1(t.m)}, likely range ${f1(t.lo)} to ${f1(t.hi)}; Classic ${f1(c.m)}${s != null ? `; Sleeper ${f1(s)}` : ''}`;
   const svg = `<svg viewBox="0 0 300 40" role="img" aria-label="${esc(label)}"><line class="ax" x1="4" x2="296" y1="20" y2="20"/><rect class="band" x="${X(t.lo)}" y="15" width="${Math.max(1, X(t.hi) - X(t.lo)).toFixed(1)}" height="10" rx="4"/>
     <line class="mt" x1="${X(t.m)}" x2="${X(t.m)}" y1="11" y2="29"/><polygon class="mc" points="${X(c.m)},1 ${+X(c.m) + 6},7 ${X(c.m)},13 ${X(c.m) - 6},7"/>${s != null ? `<circle class="ms" cx="${X(s)}" cy="34" r="5"/>` : ''}</svg>`;
-  return `<div class="mcmp">${o.head ? `<span class="${o.headCls || 'label'}">${esc(o.head)}</span>` : ''}${svg}
+  return `<div class="mcmp${o.boxed ? ' boxed' : ''}">${o.head ? `<span class="${o.headCls || 'label'}">${esc(o.head)}</span>` : ''}${svg}
     <div class="mcmp-k"><span>${MC_KEY.t}Trained <b>${f1(t.m)}</b> <span class="muted">(${f1(t.lo)}–${f1(t.hi)})</span></span><span>${MC_KEY.c}Classic <b>${f1(c.m)}</b></span>${s != null ? `<span>${MC_KEY.s}Sleeper <b>${f1(s)}</b></span>` : ''}</div>
-    ${o.compact ? '' : `<div class="small muted">${note}${tri.ov ? ' These are the models’ own numbers, before your override.' : ''}</div>`}</div>`;
+    ${o.compact ? '' : `<div class="small muted">${note}${tri.ov ? ' These are the models’ own numbers, before your override.' : ''}</div>`}${o.extra || ''}</div>`;
 }
 /* Start/Sit: would the classic model make the same call? Said only when one of the two is on the trained model, and not
    when either has an override (the models' own numbers would no longer be what he sees). */
@@ -4385,8 +4386,12 @@ function lineupSD(rs) {
   for (let i = 0; i < rs.length; i++) { v += rs[i].sd ** 2; for (let j = i + 1; j < rs.length; j++) v += 2 * pairCorr(rs[i], rs[j]) * rs[i].sd * rs[j].sd; }
   return Math.sqrt(Math.max(0, v));
 }
+/* How the base was built, in a sentence (the expanded player: inside the three-models box when there is one). */
+function baselineLine(r) {
+  return `<div class="small muted">Baseline ${f1(r.base)}${r.projPart > 0 && r.share > 0 ? `: ${f1(r.projPart)} from Sleeper’s projection, which already counts this matchup, and ${f1(r.base - r.projPart)} from his scoring average` : r.projPart > 0 ? ', Sleeper’s projection, which already counts this matchup' : ', his scoring average'}. Matchup strength ${spct(r.mult - 1)}${r.share > 0 ? `, applied to the scoring-average part: ${spct(r.eff)} overall` : ', already in the projection'}${r.override != null ? `; your override sets it to ${f1(r.override)}` : ''}.</div>`;
+}
 function detailBlock(r) {
-  const h = r.h, why = topReasons(r);
+  const h = r.h, why = topReasons(r), cmp = r.status === 'bye' ? '' : modelCompare(r.id, { head: 'Three models, this week', boxed: true, extra: baselineLine(r) });
   return `<div class="detail"><div class="section">
     <h3 class="dh">Why ${f1(r.mean)} points</h3>
     ${r.role || r.doubt ? `<div class="small"><strong>${esc(r.role ? roleText(r.role) : doubtText(r.doubt))}.</strong></div>` : ''}
@@ -4394,10 +4399,10 @@ function detailBlock(r) {
     ${r.mateBump ? `<div class="small"><strong>${esc(mateText(r))}.</strong></div>` : ''}
     ${r.rc ? `<div class="small"><strong>${esc(rcText(r.rc, r.T))}.</strong></div>` : ''}
     ${oppText(r) ? `<div class="small"><strong>Opportunity:</strong> ${esc(oppText(r))}.</div>` : ''}
-    ${r.status === 'bye' ? '<div class="small muted">Bye week.</div>' : `<div class="small muted">Baseline ${f1(r.base)}${r.projPart > 0 && r.share > 0 ? `: ${f1(r.projPart)} from Sleeper’s projection, which already counts this matchup, and ${f1(r.base - r.projPart)} from his scoring average` : r.projPart > 0 ? ', Sleeper’s projection, which already counts this matchup' : ', his scoring average'}. Matchup strength ${spct(r.mult - 1)}${r.share > 0 ? `, applied to the scoring-average part: ${spct(r.eff)} overall` : ', already in the projection'}${r.override != null ? `; your override sets it to ${f1(r.override)}` : ''}.</div>
+    ${r.status === 'bye' ? '<div class="small muted">Bye week.</div>' : `${cmp ? '' : baselineLine(r)}
     ${why.length ? `<ul class="reasons">${why.map(x => `<li class="${x.up ? 'up' : 'down'}"><span class="rv">${spct(x.pct)}</span> ${esc(x.text)}</li>`).join('')}</ul>` : '<div class="small muted">No matchup factor moves him much this week.</div>'}`}
   </div>
-  <div class="section">${modelCompare(r.id, { head: 'Three models, this week' })}${probTiles(r)}${modelNote()}</div>
+  <div class="section">${cmp}${probTiles(r)}${modelNote()}</div>
   ${researchLinks(r)}
   ${!isPro() ? `<div style="grid-column:1/-1">${lockLine('Every matchup factor, the math and the coaching matchup')}</div>` : `<details class="more"><summary>All matchup factors and the math</summary><div class="section">${factorList(r)}${r.scheme ? `<div class="scheme"><strong>Scheme:</strong> ${esc(r.scheme)}</div>` : ''}
   <div class="math">Sleeper projection ${f1(r.projPts)} · season avg ${f1(h?.avg)} → ${f1(r.projPart)} from the projection + ${f1(r.base - r.projPart)} from the average × matchup ${r.mult.toFixed(2)} = <strong>${f1(r.model)}</strong>${r.override != null ? ` · your override ${f1(r.override)}` : ''}${h?.n ? ` · weekly scores: ${h.pts.map(x => x.toFixed(1)).join(', ')}` : ''}</div>
