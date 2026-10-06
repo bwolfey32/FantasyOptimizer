@@ -1888,6 +1888,18 @@ function forecastRows() {
   for (const [id, r] of Object.entries(D.M)) if (r.status === 'ok' && r.game && r.pos !== 'DEF' && (r.projPts > 0 || r.base > 0)) out[id] = [r2(r.mIf ?? r.mean), r2(r.sdIf ?? r.sd), r2(r.base), r2(r.projPts), r.game.state, r.pPlay ?? 1];   // mean and sd if he plays
   return out;
 }
+/* Waivers' values for the next three weeks (weekVals) for every QB/RB/WR/TE forecastRows covers, at default settings:
+   the trained far model starts from them (scripts/model/predict.py reads them from model/classic.json, which
+   extract_snapshot.py writes). */
+function futRows() {
+  const out = {}, ws = [1, 2, 3].map(k => D.week + k).filter(w => w <= 18), r2 = x => Math.round(x * 100) / 100;
+  for (const [id, r] of Object.entries(D.M)) if (ROLE_POS.has(r.pos) && r.status === 'ok' && r.game && (r.projPts > 0 || r.base > 0)) out[id] = weekVals(id, ws).map(r2);
+  return out;
+}
+/* The trained model's projections (model/proj.json, see useTrained): fetched after the data, then the board recomputes. */
+function loadTrained() {
+  fetchJSON('model/proj.json', 8000).then(m => { if (!m?.ids) return; D.ml = m; if (D.inp) { D.wCache = null; computeAll(); render(); } }).catch(() => {});
+}
 /* Loading order: the saved copy (snapshot.json, refreshed every few hours by a GitHub Action) paints the board
    right away, then live data from Sleeper and ESPN replaces it in the background. If live data can't be reached,
    the saved copy stays and the status line shows its age. `fresh` (a week or season change) skips the saved copy. */
@@ -1895,12 +1907,13 @@ async function load(opts = {}) {
   const exporting = location.hash === '#export';
   if (SELFTEST) {
     const snap = await fetchJSON(new URLSearchParams(location.search).get('fixture') || 'snapshot.json').catch(() => null);
-    if (snap?.v === 1) { D.coaches = snap.coaches || D.coaches; ingest(snap); }
+    if (snap?.v === 1) { D.coaches = snap.coaches || D.coaches; D.ml = snap.ml || null; ingest(snap); }
     D.loading = false; D.failed = !D.inp; render(); window.__ready = true; return;
   }
   if (opts.fresh) D.inp = null;
   // the forecast check (scripts/calibrate.py), shown in the "how sure is this?" notes once it covers three weeks
   if (!D.calib && !exporting) fetchJSON('calibration.json', 8000).then(c => { D.calib = c; render(); }).catch(() => {});
+  if (!exporting) loadTrained();
   D.failed = false; D.errors = []; D.progress = 0;
   const useSaved = snap => { D.snapshot = snap; D.coaches = snap.coaches || D.coaches; ingest(snap); };
   if (!exporting && !opts.fresh && !D.inp && !state.settings.season && !state.settings.week) {
@@ -1922,7 +1935,7 @@ async function load(opts = {}) {
   if (location.hash === '#export') {
     await checkCoaches(D.season);
     const split = await pSplit;
-    const snap = Object.assign({}, inp, { coaches: D.coaches, split, fc: forecastRows(), proj: inp.proj.filter(p => (p[5] || 0) > 0 || D.H[p[0]] || D.prevPPG[p[0]]) });
+    const snap = Object.assign({}, inp, { coaches: D.coaches, split, fc: forecastRows(), fut: futRows(), proj: inp.proj.filter(p => (p[5] || 0) > 0 || D.H[p[0]] || D.prevPPG[p[0]]) });
     const pre = document.createElement('pre'); pre.id = 'snapshot-out'; pre.hidden = true; pre.textContent = JSON.stringify(snap); document.body.appendChild(pre);
   } else checkCoaches(D.season);
 }
@@ -1977,6 +1990,25 @@ const projWeight = (b, pj, avg) => pj != null && avg != null && pj < avg ? Math.
 const P_PLAY = { Questionable: { QB: 0.45, RB: 0.73, WR: 0.72, TE: 0.78, K: 0.75 }, Doubtful: 0.02, late: 0.97, lateMin: 75 };
 const PLAY_K = { Questionable: 0.97, Doubtful: 1 };
 const injTag = inj => /^questionable/i.test(inj || '') ? 'Questionable' : /^doubtful/i.test(inj || '') ? 'Doubtful' : null;
+/* The trained model (scripts/model/, docs/model-report.md): LightGBM models learned from 2013-26 NFL games, one per
+   position, retrained during the season. model/proj.json (scripts/model/predict.py, after every data refresh) holds each
+   QB/RB/WR/TE's points and catches if he plays next week, the sd of his score, and the same 2, 3 and 4 weeks ahead:
+   ids[sleeperId] = [ppr, rec, sd, ppr2, rec2, ppr3, rec3, ppr4, rec4]. Next week's model starts from Sleeper's
+   projection less Sleeper's recent bias at the position and corrects it from usage, role, the depth chart, the line, the
+   opponent, the weather and injuries; the later weeks' model starts from this page's own Waivers values (weekVals).
+   When the file is for this week and the Trained setting is on (the default), its number is the base and its sd sets
+   the range: the matchup factors are still graded and shown but don't move the number (the model already counts the
+   matchup, the line and the weather). The chance to play, a teammate's work when he may sit (mateBumpOf), a backup
+   valued as the starter (contOf) and overrides work as before; kickers, D/STs, backups and anyone the file doesn't
+   cover stay on the classic model. The export (#export) always computes the classic model: it's the far model's input. */
+/* Waivers stays on the classic model (waivers: false), this week's value included, so a move's gain never mixes the two.
+   Replayed through this page on 2019-24 (docs/model-report.md), the trained numbers set better lineups but made worse
+   Waivers picks: quarterback swaps on edges smaller than the week-to-week noise, which the classic model's lean toward
+   the top quarterbacks (mostly rostered already) had held back. far: with waivers on, the trained values 2-4 weeks
+   ahead too. */
+const TRAINED = { waivers: false, far: true };
+function useTrained() { return !D.forceClassic && state.settings.model !== 'classic' && location.hash !== '#export' && D.ml?.season === D.season && D.ml?.week === D.week; }
+function mlOf(id) { return useTrained() && ROLE_POS.has(D.U.get(id)?.pos) && D.ml.ids?.[id]?.[0] != null ? D.ml.ids[id] : null; }
 /* This week only (the report is about now), and not once his game has started (then he's in or out). */
 function pPlayOf(r) {
   const tag = injTag(r.u.inj); if (!tag || r.status !== 'ok' || r.locked || !r.game) return 1;
@@ -2209,6 +2241,10 @@ function evalPlayer(id) {
   r.base = role?.kind === 'backup' ? 0 : r.projPart + (role ? (1 - ROLE_LEAD) * avg : pj != null ? (avg != null ? (1 - bl) * avg : 0) : (avg ?? 0));
   // a backup behind a starter who may sit (questionable or doubtful): valued as the starter, at the chance he sits (contOf)
   if (role?.kind === 'backup' && r.status === 'ok' && g.state === 'pre') { const c = contOf(id, role.behind, g); if (c) { r.cont = c; r.base = c.sv; } }
+  // the trained model's number, in this team's scoring, in place of the blend (mlOf)
+  const ml = r.scratch || role?.kind === 'backup' ? null : mlOf(id);
+  // other formats take the predicted catches back out, never below zero (points and catches are predicted apart)
+  if (ml) { r.trained = { ppr: ml[0], sd: ml[2] }; r.base = r.projPart = Math.max(0, fmtPts(ml[0], ml[1], pos)); }
   const add = (key, label, raw, note, short) => { const v = clamp(raw * I * (S.w[key] ?? 1), -0.25, 0.25); r.factors.push({ key, label, pct: v, note, short }); };
   const itT = implied(g, T), itO = implied(g, O), lgI = D.lgImplied;
   const st = staffOf(T), so = staffOf(O);
@@ -2270,13 +2306,14 @@ function evalPlayer(id) {
   const mb = r.cont || role?.kind === 'backup' || r.locked ? null : mateBumpOf(id, g);
   if (mb) { r.mateBump = mb; r.mean += mb.pts; }
   const n = h?.n || 0, dsd = CV[pos] * Math.max(r.mean, 3);
-  r.sd = SD_SCALE * Math.sqrt(((n > 1 ? n * h.sd ** 2 : 0) + 3 * dsd ** 2) / ((n > 1 ? n : 0) + 3)) * (r.newStaff ? 1.1 : 1);
+  r.sd = r.trained?.sd != null ? r.trained.sd * (r.trained.ppr > 0 ? clamp(r.base / r.trained.ppr, 0.5, 1.5) : 1)
+    : SD_SCALE * Math.sqrt(((n > 1 ? n * h.sd ** 2 : 0) + 3 * dsd ** 2) / ((n > 1 ? n : 0) + 3)) * (r.newStaff ? 1.1 : 1);
   if (r.mateBump) r.sd = Math.sqrt(r.sd ** 2 + r.mateBump.var);
   // on the injury report: what he scores if he plays (mIf, sdIf), counted at the chance he does (pPlayOf), with the
   // spread of both outcomes (a zero when he sits); finish reads the range from the two
   const pp = pPlayOf(r) * (r.cont ? r.cont.p : 1);   // a backup behind a starter who may sit "plays" when he starts
   if (pp < 1) {
-    r.pPlay = pp; r.mIf = r.mean * (PLAY_K[injTag(u.inj)] ?? 1); r.sdIf = r.sd; r.mix = true;
+    r.pPlay = pp; r.mIf = r.mean * (r.trained ? 1 : PLAY_K[injTag(u.inj)] ?? 1); r.sdIf = r.sd; r.mix = true;
     r.mean = pp * r.mIf; r.sd = Math.sqrt(pp * r.sdIf ** 2 + pp * (1 - pp) * r.mIf ** 2);
   }
   const adj = r.mult - 1; r.grade = adj >= 0.12 ? 'A' : adj >= 0.04 ? 'B' : adj > -0.04 ? 'C' : adj > -0.12 ? 'D' : 'F';
@@ -2434,6 +2471,12 @@ function computeAll() {
   // a D/ST's average turnover and touchdown points a game, league-wide (seasonAvg)
   { let s = 0, n = 0; for (const [id, h] of Object.entries(D.H)) if (h.stab && D.U.get(id)?.pos === 'DEF') { s += h.pts.reduce((a, x) => a + x, 0) - h.stab.reduce((a, x) => a + x, 0); n += h.n; } D.defVol = n ? s / n : null; }
   for (const id of D.U.keys()) { const r = evalPlayer(id); if (r) D.M[id] = r; }
+  // Waivers' classic numbers while the trained model sets the rest (TRAINED.waivers): the same players, evaluated classic
+  D.MC = null;
+  if (useTrained() && !TRAINED.waivers) {
+    D.forceClassic = true; D.MC = {};
+    try { for (const id of D.U.keys()) { const r = evalPlayer(id); if (r) D.MC[id] = r; } } finally { D.forceClassic = false; }
+  }
 }
 /* Lineup strategies are Pro; free lineups optimize the projection. A team linked to a Sleeper league plays a known
    opponent, so its Pro choice is Win chance (winLineup), which also stands in for a Safe or Boom choice saved earlier;
@@ -3151,7 +3194,7 @@ function fillInFor(id) {
   return [...D.U.values()].find(x => x.id !== id && x.team === u.team && x.pos === u.pos && /^(out|ir|doubtful|pup)/i.test(x.inj || '') && (D.H[x.id]?.avg ?? 0) >= 10 && (D.H[x.id]?.n ?? 0) > n) || null;
 }
 function weekVals(id, weeks) {
-  const r = D.M[id]; if (!r) return weeks.map(() => 0);
+  const r = D.MC?.[id] || D.M[id]; if (!r) return weeks.map(() => 0);   // Waivers' numbers stay classic (TRAINED.waivers)
   const u = r.u, fill = fillInFor(id);
   // rosBase already has this week's matchup taken out, so later weeks get only their own. A D/ST's or kicker's
   // projection is mostly matchup, and Sleeper's read of it can differ from this model's, so for them later weeks start
@@ -3163,7 +3206,7 @@ function weekVals(id, weeks) {
   const back = injKind(u.inj) ? returnWeek(id) : null;
   // a bigger role that comes from a teammate's absence lasts until he's expected back (bumpOf); from then on he's valued
   // on his own scoring, as before the injury
-  const bump = bumpOf(id);
+  const bump = bumpOf(id), ml = !TRAINED.waivers || state.overrides[id] != null && ok(+state.overrides[id]) ? null : mlOf(id);
   return weeks.map((w, i) => {
     // this week a doubtful player is still on the board, counted at his chance to play (pPlayOf) as on Lineup
     if (w === D.week && back != null && r.status === 'ok' && !r.locked) return r.mean;
@@ -3171,7 +3214,9 @@ function weekVals(id, weeks) {
     if (w === D.week && back == null) return r.status !== 'ok' || r.locked ? 0 : r.mean;
     if (w === D.week && r.locked) return 0;
     const s = schedOpp(u.team, w); if (s.bye || !u.team) return 0;
-    const b = bump && w >= bump.back ? bump.own : base;
+    const b = bump && w >= bump.back ? bump.own : base, k = w - D.week + 1;
+    // the trained model's value for that week (2-4 weeks ahead), unless a borrowed role or an override sets it
+    if (ml && TRAINED.far && !bump && k >= 2 && k <= 4 && ml[2 * k - 1] != null) return Math.max(0, fmtPts(ml[2 * k - 1], ml[2 * k], u.pos)) * (fill && i >= 2 ? 0.5 : 1);
     return Math.max(0, b * matchupMult(u.pos, s.opp, w, u.team) * (fill && !bump && i >= 2 ? 0.5 : 1));
   });
 }
@@ -5113,7 +5158,7 @@ function pickReasons(w, l) {
   if (w.floor > l.floor + 2) out.push({ s: 0.035, t: `Higher low end: ${f1(w.floor)} points in a below-average week, vs ${f1(l.floor)}` });
   const first = out.find(x => x.s === 1), rest = out.filter(x => x !== first).sort((a, b) => b.s - a.s);
   // the pick's own injury tag always shows: the projection assumes he plays
-  const tag = w.mix ? [`But ${w.u.name} is ${w.inj.toLowerCase()}: counted at his ${Math.round(w.pPlay * 100)}% chance to play, so check inactives before kickoff`]
+  const tag = w.mix ? [`But ${w.u.name} is ${w.inj.toLowerCase()}: counted at his ${Math.round(w.pPlay * 100)}% chance to play, so check the news before kickoff`]
     : /^(questionable|doubtful)/i.test(w.inj || '') ? [`But ${w.u.name} is ${w.inj.toLowerCase()}: check the news before kickoff`] : [];
   return [...(first ? [first] : []), ...rest].slice(0, 3 - tag.length).map(x => x.t).concat(tag);
 }
@@ -5233,6 +5278,9 @@ function viewSettings() {
   <div class="card panel"><h3>Season</h3>
     <div class="field inline"><label for="season">Season</label><input class="inp" id="season" type="number" data-season value="${D.season}" style="width:96px"></div>
   </div>
+  <div class="card panel"><h3>Projections</h3>
+    <div class="seg" role="group" aria-label="Projection model">${[['trained', 'Trained'], ['classic', 'Classic']].map(([k, l]) => `<button type="button" data-model="${k}" aria-pressed="${(S.model === 'classic' ? 'classic' : 'trained') === k}">${l}</button>`).join('')}</div>
+    <p class="small muted" style="margin:6px 0 0">${S.model === 'classic' ? 'Classic: Sleeper’s projection blended with each player’s form, moved by the matchup factors and weights below.' : `Trained: models learned from every NFL game since 2013 set each QB, RB, WR and TE’s number and range, next week and the three after; the weights below apply to kickers and D/STs. ${D.ml ? (useTrained() ? `Updated ${new Date(D.ml.made).toLocaleString()}.` : `Not available for this week yet, so the classic model is in use.`) : 'Loading…'}`}</p></div>
   <div class="card panel"><h3>Model weights</h3>
     ${sl('blend', 'Weekly projection vs. season average', S.blend, 0, 1, 0.05, v => Math.round(v * 100) + '%')}
     ${sl('intensity', 'Matchup strength', S.intensity, 0, 1.5, 0.05, v => Math.round(v * 100) + '%')}
@@ -5244,7 +5292,8 @@ function viewSettings() {
     ${ABBR.map(T => { const s = staffOf(T); const ti = (f, cls = '') => `<input class="inp ${cls}" type="text" id="st-${T}-${f}" data-staff="${T}.${f}" value="${esc(s[f])}" aria-label="${T} ${f}">`; const cb = f => `<input type="checkbox" id="st-${T}-${f}" data-staff="${T}.${f}" ${s[f] ? 'checked' : ''} aria-label="${T} ${f}">`; return `<tr><td><strong>${T}</strong></td><td class="l">${ti('hc')}</td><td class="l">${ti('offCaller')}</td><td class="l">${cb('offNew')}</td><td class="l">${ti('offPrev', 'ab')}</td><td class="l">${ti('defCaller')}</td><td class="l">${cb('defNew')}</td><td class="l">${ti('defPrev', 'ab')}</td></tr>`; }).join('')}
     </tbody></table></div><div class="toolbar"><button type="button" class="btn" data-act="resetstaff">Restore researched staffs</button></div></div>
   <div class="card panel"><details class="how"><summary>How the projection works</summary>
-    <ol><li><strong>Base:</strong> Sleeper’s weekly projection, converted to each team’s scoring (PPR, half-PPR or standard), blended with the player’s season average (slider above). A healthy player Sleeper doesn’t project while it projects a teammate at his position is a backup, with a base of 0 however he scored filling in. When the projection is under half or over 1.6× his average, his role changed and the projection leads (90%).</li>
+    <ol><li><strong>Trained model</strong> (the default): for quarterbacks, running backs, receivers and tight ends, models trained on every NFL game since 2013 start from Sleeper’s projection, take out how far Sleeper has run high or low at the position lately, and correct it from usage (targets, carries, snaps), role and depth chart, the betting line, the opponent, the weather and injuries. Two to four weeks ahead they start from Benny’s own Waivers values. They’re retrained during the season, and their ranges come from how far scores landed from their projections in past seasons. The steps below are the classic model, which kickers and D/STs always use, and everyone when Classic is chosen above.</li>
+    <li><strong>Base:</strong> Sleeper’s weekly projection, converted to each team’s scoring (PPR, half-PPR or standard), blended with the player’s season average (slider above). A healthy player Sleeper doesn’t project while it projects a teammate at his position is a backup, with a base of 0 however he scored filling in. When the projection is under half or over 1.6× his average, his role changed and the projection leads (90%).</li>
     <li><strong>Matchup factors</strong>, each capped at ±25%: fantasy points the opponent allows to the position; secondary (pass yards allowed) or run defense (yards per carry allowed, plus the player’s own line); sacks allowed by the offense vs. sacks by the opposing defense; the team’s Vegas implied total and spread, with the opponent’s record; the offense’s pass rate and pace; and the opponent’s defensive roster changes (signings, trades, injuries) that its stats don’t show yet. Together they’re capped at ±20%, and they move only the season-average part of the base, since Sleeper’s projection already counts the matchup.</li>
     <li><strong>Weather &amp; stadium:</strong> domes and closed retractable roofs give passers and kickers a small lift. Outdoors, the forecast for the three hours from kickoff (Open-Meteo) moves points between passing, running and kicking: wind over 10 mph hurts deep passing and kickers most, rain and snow add carries, and freezing cold costs kickers and passers a little. The betting total already lowers everyone in bad weather, so this factor doesn’t cut them all again. Each player’s role sets how much he feels it (a deep threat more than a slot receiver, a running quarterback less than a pocket passer), and his own scores indoors vs. outdoors are shown for context but don’t move the projection. Like every matchup factor, it moves only the part of the projection that comes from his scoring average, since Sleeper’s projection already counts the weather.</li>
     <li><strong>Scheme history:</strong> each team’s numbers blend ${D.season} games with last season. When the play-caller is unchanged, last season counts as ${S.priorWeeks} games. When the play-caller is new, it counts as at most 1.5 games, mixed with the new coach’s old team, and the player’s range widens by 10%.</li>
@@ -5256,7 +5305,8 @@ function viewSettings() {
 
 /* ---------- events ---------- */
 document.addEventListener('click', e => {
-  const t = e.target.closest('[data-tab],[data-expand],[data-add],[data-remove],[data-strategy],[data-act],[data-sort],[data-team],[data-fteam],[data-clearovr],[data-wh],[data-wsrc],[data-taken],[data-keepmode],[data-decide],[data-brief],[data-wrank],[data-acadd],[data-mrem],[data-flowmethod],[data-espnmode],[data-rview],[data-research],[data-hweek],[data-dc],[data-colmv],[data-started]'); if (!t) return;
+  const t = e.target.closest('[data-model],[data-tab],[data-expand],[data-add],[data-remove],[data-strategy],[data-act],[data-sort],[data-team],[data-fteam],[data-clearovr],[data-wh],[data-wsrc],[data-taken],[data-keepmode],[data-decide],[data-brief],[data-wrank],[data-acadd],[data-mrem],[data-flowmethod],[data-espnmode],[data-rview],[data-research],[data-hweek],[data-dc],[data-colmv],[data-started]'); if (!t) return;
+  if (t.dataset.model) { state.settings.model = t.dataset.model; track('model_changed', { model: t.dataset.model }); save(); D.wCache = null; computeAll(); render(); return; }
   if (t.dataset.dc) { D.dcOpen = D.dcOpen === t.dataset.dc ? null : t.dataset.dc; render(); return; }
   if (t.dataset.colmv) { const [k, d] = t.dataset.colmv.split('|'), c = defCols(), i = c.order.indexOf(k), j = i + +d; if (i < 0 || j < 0 || j >= c.order.length) return; [c.order[i], c.order[j]] = [c.order[j], c.order[i]]; saveDefCols(c); render(); $(`[data-colmv="${k}|${d}"]:not([disabled])`)?.focus(); return; }
   if (t.dataset.acadd) { e.preventDefault(); acPick(t.dataset.acadd, t.dataset.acmode); return; }

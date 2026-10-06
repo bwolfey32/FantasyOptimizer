@@ -237,7 +237,8 @@ def context(seasons, with_sleeper=False, live_season=None, with_classic=False):
         lg, tg = season_logs(s, age(s))
         L.append(lg); T.append(tg); S.append(season_status(s, age(s)))
     games = schedule(seasons)
-    depth = pd.concat([season_depth(s, games, age(s)) for s in seasons], ignore_index=True)
+    # the seasons asked for, not the extra one before them: a week's chart is read for that week alone
+    depth = pd.concat([season_depth(s, games, age(s)) for s in seasons[1:]], ignore_index=True)
     tg = pd.concat(T, ignore_index=True).merge(games[["season", "week", "team", "pf", "pa"]], on=["season", "week", "team"], how="left")
     ppl = people(seasons)
     ctx = {"logs": pd.concat(L, ignore_index=True), "tg": tg, "games": games.drop(columns=["pf", "pa"]),

@@ -615,6 +615,82 @@ def sec_compare(name="compare"):
     save(name, res)
 
 
+TRAINED_SPLITS = (("2019-24", lambda s: 2019 <= s <= 2024), ("2025", lambda s: s == 2025), ("2026 wk 1-4", lambda s: s == 2026))
+
+
+def sec_trained(name="trained"):
+    """The page on the trained model against the classic one (replay.py configs FILE --dir fixtures-ml, with a config
+    "base" (Settings: Classic) and one or more trained ones): the forecasts on the same player-weeks, Start/Sit's chance
+    to outscore, the lineup each sets for every roster and what it scored, and Waivers' Best moves, shown vs. realized."""
+    rep = replay.load(name)
+    cfgs = list(next(r for r in rep.values() if "error" not in r)["configs"])
+    others = [c for c in cfgs if c != "base"]
+    res = {}
+    print(f"### Trained vs. classic, through the page ({name})\n")
+    # forecasts: the same player-weeks for every config (the classic model projects 3+, he played)
+    out = []
+    for c in others:
+        for label, sel in TRAINED_SPLITS:
+            pairs = []
+            for key, r in rep.items():
+                if "error" in r:
+                    continue
+                s_, w = key_sw(key)
+                if not sel(s_):
+                    continue
+                rb, rt = r["configs"]["base"]["rows"], r["configs"][c]["rows"]
+                for pid, x in rb.items():
+                    y = rt.get(pid)
+                    a = pts_of(s_, w, pid)
+                    if y and a is not None and x["pos"] != "DEF" and x["mean"] >= calibrate.MIN_MEAN:
+                        pairs.append((x["mean"], y["mean"], a))
+            if not pairs:
+                continue
+            eb, et = (evaluate([r for r in scored(rep, k) if sel(r["season"])]) for k in ("base", c))
+            mb, mt = mean([abs(b - a) for b, t, a in pairs]), mean([abs(t - a) for b, t, a in pairs])
+            sb, st = math.sqrt(mean([(b - a) ** 2 for b, t, a in pairs])), math.sqrt(mean([(t - a) ** 2 for b, t, a in pairs]))
+            out.append([c, label, len(pairs), f(mb, 3), f(mt, 3), f(sb, 3), f(st, 3), f(eb["pairs"]["brier"], 4), f(et["pairs"]["brier"], 4),
+                        f(eb["coverage50"] * 100, 1) + "%", f(et["coverage50"] * 100, 1) + "%"])
+            res.setdefault(c, {}).setdefault(label, {})["forecast"] = {"n": len(pairs), "mae": [mb, mt], "rmse": [sb, st],
+                                                                       "brier": [eb["pairs"]["brier"], et["pairs"]["brier"]], "cov": [eb["coverage50"], et["coverage50"]]}
+    print(table(["Config", "Split", "Player-weeks", "Miss classic", "Miss trained", "RMSE classic", "RMSE trained", "Brier classic", "Brier trained",
+                 "In range classic", "In range trained"], out))
+    # lineups: every roster, every week, set by each model's forecasts, scored with what happened
+    out = []
+    for c in others:
+        for label, sel in TRAINED_SPLITS:
+            d = []
+            for key, r in rep.items():
+                if "error" in r or "waivers" not in r["configs"]["base"]:
+                    continue
+                s_, w = key_sw(key)
+                if not sel(s_):
+                    continue
+                for rk, Wv in r["configs"]["base"]["waivers"].items():
+                    a, b = lineup_points(Wv["roster"], s_, w, rep, "base"), lineup_points(Wv["roster"], s_, w, rep, c)
+                    if a is not None and b is not None:
+                        d.append(b - a)
+            if d:
+                se_ = statistics.stdev(d) / math.sqrt(len(d)) if len(d) > 1 else 0
+                out.append([c, label, len(d), f(mean(d), 2), f(se_, 2), f(100 * sum(x > 0 for x in d) / len(d), 0) + "%",
+                            f(100 * sum(x < 0 for x in d) / len(d), 0) + "%", f(100 * sum(x == 0 for x in d) / len(d), 0) + "%"])
+                res.setdefault(c, {}).setdefault(label, {})["lineups"] = {"n": len(d), "gain": mean(d), "se": se_}
+    print("\nLineups (roster-weeks): points the trained model's lineup scored over the classic model's\n")
+    print(table(["Config", "Split", "Roster-weeks", "Gain a week", "±", "Trained scored more", "Classic scored more", "Same lineup"], out))
+    # Waivers' Best moves
+    out = []
+    for c in cfgs:
+        best = audit_moves(rep, c, True)
+        for label, sel in TRAINED_SPLITS:
+            x = audit_summary([m for m in best if sel(m["season"])])
+            if x["n"]:
+                out.append([c, label, x["n"], f(x.get("pred"), 1), f(x.get("real"), 1), f(x.get("real_se"), 1), f((x.get("hit") or 0) * 100, 0) + "%", f(x.get("corr"))])
+                res.setdefault(c, {}).setdefault(label, {})["waivers"] = x
+    print("\nWaivers, Best moves: gain shown vs. gain the lineup realized\n")
+    print(table(["Config", "Split", "Moves", "Shown", "Realized", "±", "Helped", "Correlation"], out))
+    save(name, res)
+
+
 def main():
     secs = sys.argv[1:] or ["forecast"]
     if "all" in secs:
@@ -624,7 +700,7 @@ def main():
         if ":" in s:
             s, name = s.split(":", 1)
         fn = {"forecast": sec_forecast, "context": sec_context, "spread": sec_spread, "ros": sec_ros, "waivers": sec_waivers,
-              "sweep": sec_sweep, "usage": sec_usage, "compare": sec_compare}[s]
+              "sweep": sec_sweep, "usage": sec_usage, "compare": sec_compare, "trained": sec_trained}[s]
         fn(name) if name else fn()
         print()
 

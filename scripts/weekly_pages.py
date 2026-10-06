@@ -6,7 +6,8 @@ Runs scripts/weekly-pages.html in headless Chrome, which loads the site on the b
 site's own model, then writes:
   weekly/index.html                   this week's pages
   weekly/waiver-wire/index.html       the best free agents over the next four weeks, by position
-  weekly/rankings/index.html          this week's projections by position (PPR)
+  weekly/rankings/index.html          this week's projections by position (PPR; the trained model's when model/proj.json
+                                      is for the bundle's week)
   weekly/defense-rankings/index.html  D/STs to play, and fantasy points each defense allows by position
   weekly/weather/index.html           every game's stadium and kickoff forecast, and the players it moves
   sitemap.xml
@@ -41,6 +42,28 @@ except Exception:  # no time zone data: kickoffs in UTC
 esc = html.escape
 lab = lambda p: POS_LABEL.get(p, p)
 cap = lambda t: t[:1].upper() + t[1:]   # unlike str.capitalize, leaves names as they are
+
+
+def with_trained(fixture):
+    """The bundle with the trained model's projections (model/proj.json) inside it when they're for the same week, as
+    the live site reads them, so the rankings match what visitors see; written next to the bundle for the page to load,
+    and removed at exit. The bundle as it is otherwise."""
+    try:
+        with open(os.path.join(ROOT, fixture), encoding="utf-8") as f:
+            b = json.load(f)
+        with open(os.path.join(ROOT, "model", "proj.json"), encoding="utf-8") as f:
+            ml = json.load(f)
+    except (OSError, ValueError):
+        return fixture
+    if b.get("ml") or ml.get("season") != b.get("season") or ml.get("week") != b.get("week"):
+        return fixture
+    b["ml"] = ml
+    name = os.path.join(os.path.dirname(fixture), ".weekly-trained.json")
+    with open(os.path.join(ROOT, name), "w", encoding="utf-8") as f:
+        json.dump(b, f, separators=(",", ":"))
+    import atexit
+    atexit.register(lambda: os.path.exists(os.path.join(ROOT, name)) and os.remove(os.path.join(ROOT, name)))
+    return name.replace(os.sep, "/")
 
 
 def collect(fixture):
@@ -305,7 +328,7 @@ def main():
     ap.add_argument("--fixture", default="snapshot.json")
     ap.add_argument("--out", default=ROOT)
     a = ap.parse_args()
-    d = collect(a.fixture)
+    d = collect(with_trained(a.fixture))
     if not d["rankings"].get("WR") or not d["games"]:
         sys.exit("The weekly pages' data came back thin; keeping the old pages.")
     files = {"weekly/index.html": hub_page(d), "weekly/waiver-wire/index.html": waiver_page(d), "weekly/rankings/index.html": rankings_page(d),

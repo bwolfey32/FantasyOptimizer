@@ -7,6 +7,8 @@ Usage: python scripts/model/backtest.py tune [CONFIG ...]   configs scored on 20
                                                               2016-2026: 2025 confirms the choice, 2026 is the held-out
                                                               test, and the replays give the current model's numbers;
                                                               writes out/backtest/final.json (docs/model-report.md)
+       python scripts/model/backtest.py fixtures              replay fixtures carrying the final run's predictions, for
+                                                              replay.py --dir fixtures-ml (the page on the trained model)
 Options: --data scripts/model/out/player_weeks.parquet
 
 Out-of-season predictions are saved per config in scripts/model/out/backtest/<name>.parquet (reruns reuse them); a
@@ -219,13 +221,51 @@ def final(rows, near, near_a, far):
     return res
 
 
+def fixtures_ml():
+    """Copies of the replay fixtures (scripts/backtest/out/fixtures) with the trained model's out-of-season predictions
+    from the final run as their ml field, the way model/proj.json gives them to the page, in fixtures-ml/: replay.py
+    --dir fixtures-ml then runs the page on the trained model (Settings: Trained) and on the classic one. The predictions
+    exist for games players played (the backtest's rows), so a player who didn't play keeps the classic number in both;
+    catches aren't predicted here, which only matters outside PPR (the replay is PPR)."""
+    import glob
+    import data
+    near = pd.read_parquet(os.path.join(OUT, "final-near.parquet"))
+    far = pd.read_parquet(os.path.join(OUT, "final-far.parquet"))
+    sid = {g: s for s, g in data.gsis_map(data.people(list(range(2018, HELDOUT + 1)))).items()}
+    src = os.path.join(ROOT, "scripts", "backtest", "out", "fixtures")
+    dst = os.path.join(ROOT, "scripts", "backtest", "out", "fixtures-ml")
+    os.makedirs(dst, exist_ok=True)
+    far = far.assign(c=far.week - far.h + 1)
+    n = 0
+    for path in sorted(glob.glob(os.path.join(src, "*.json"))):
+        with open(path, encoding="utf-8") as f:
+            fx = json.load(f)
+        S, W = fx["season"], fx["week"]
+        if S < 2019:
+            continue
+        ids = {}
+        for g, p_, sd in near[(near.season == S) & (near.week == W) & (near.h == 1)][["pid", "pred", "sd"]].itertuples(index=False):
+            if sid.get(g) and p_ == p_:
+                ids[sid[g]] = [round(p_, 2), 0, round(sd, 2) if sd == sd else None] + [None] * 6
+        for g, h, p_ in far[(far.season == S) & (far.c == W)][["pid", "h", "pred"]].itertuples(index=False):
+            if sid.get(g) and sid[g] in ids and p_ == p_:
+                ids[sid[g]][2 * h - 1], ids[sid[g]][2 * h] = round(p_, 2), 0
+        fx["ml"] = {"season": S, "week": W, "made": "backtest", "ids": ids}
+        with open(os.path.join(dst, os.path.basename(path)), "w", encoding="utf-8") as f:
+            json.dump(fx, f, separators=(",", ":"))
+        n += 1
+    print(f"{n} fixtures with trained predictions -> {os.path.relpath(dst, ROOT)}")
+
+
 def main():
     ap = argparse.ArgumentParser(description=__doc__.split("\n")[0])
-    ap.add_argument("mode", choices=["tune", "final"])
+    ap.add_argument("mode", choices=["tune", "final", "fixtures"])
     ap.add_argument("names", nargs="*", help="tune: configs; final: NEAR NEAR_A FAR")
     ap.add_argument("--data", default=os.path.join(HERE, "out", "player_weeks.parquet"))
     a = ap.parse_args()
     rows = pd.read_parquet(a.data)
+    if a.mode == "fixtures":
+        return fixtures_ml()
     if a.mode == "tune":
         names = a.names or [f"{v}-hl{h}" for v in "AB" for h in ("1", "2", "3", "5", "inf")]
         tune(rows, names)

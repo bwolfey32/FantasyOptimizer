@@ -128,6 +128,36 @@ and tight ends are even.
 | 2025 | 5.13 | 5.20 | −0.12 to −0.03 | 5.41 | 5.51 |
 | 2026 wk 1-4 | 5.25 | 5.28 | −0.11 to +0.04 | 5.33 | 5.30 |
 
+## Through the page: lineups, Start/Sit and Waivers
+
+The numbers above score forecasts. This replay runs `index.html` itself on every week of 2019-26, once on the classic
+model and once on the trained one (`backtest.py fixtures`, then `replay.py configs … --dir fixtures-ml`, then
+`analyze.py trained:NAME`). It sets each synthetic roster's lineup, makes every Start/Sit call and Waivers move, and
+scores them with what happened.
+
+| | 2019-24 | 2025 | 2026 wk 1-4 |
+|---|---|---|---|
+| Average miss, classic / trained (same player-weeks) | 5.110 / **5.078** | **5.008** / 5.055 | 5.126 / 5.135 |
+| Chance-to-outscore score, classic / trained | 0.2188 / **0.2169** | 0.2178 / **0.2146** | 0.2163 / 0.2169 |
+| Scores inside the likely range, classic / trained | 51.8% / 53.4% | 51.0% / 52.2% | 45.6% / **50.3%** |
+| **Lineup points a week, trained over classic** (per roster) | **+0.47 ± 0.23** (1,300 roster-weeks) | −0.42 ± 0.46 | +0.48 ± 1.08 |
+
+**Waivers stays on the classic model.** With the trained numbers, Waivers' Best moves realized 1.1 points less each over
+2019-24 (95% interval −1.9 to −0.3, resampling whole roster-seasons), the same with or without the trained values for
+later weeks. The two models made the same move 77% of the time. Where they differed, the trained one's quarterback
+pickups realized −3.9 (71 moves) against the classic one's +5.5. The classic model's lean toward the top quarterbacks,
+most of them already rostered, had been holding back swaps on edges smaller than the week-to-week noise. So the page
+uses the trained numbers for the weekly projection (Lineup, Start/Sit, Benny's Moves, Grade, Win chance) and the ranges,
+and keeps Waivers, this week's value included, on the classic numbers (`TRAINED.waivers` in `index.html`). Replayed
+that way, Waivers makes exactly the classic moves.
+
+## What's live (October 6, 2026)
+
+The trained model is the default for every QB, RB, WR and TE's weekly number and range. Waivers, kickers and D/STs stay
+on the classic model, and Settings → Projections → Classic switches everything back. `scripts/model/predict.py` writes
+`model/proj.json` after every data refresh, and `.github/workflows/retrain-model.yml` retrains next week's model every
+Tuesday. The comparison below is the decision as it stood before that.
+
 ## Choosing between them
 
 The plan's rule was to switch when the trained model beats Benny today on average miss in 2025 and 2026. It doesn't: it

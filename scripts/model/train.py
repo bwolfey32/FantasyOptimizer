@@ -1,9 +1,9 @@
 """Train the projection model: LightGBM, one model per position (QB, RB, WR, TE), on dataset.py's player-week history.
 
 Usage: python scripts/model/train.py CONFIG [CONFIG ...] [--data scripts/model/out/player_weeks.parquet]
-                                     [--oof scripts/model/out/backtest] [--out model]
+                                     [--oof scripts/model/out/backtest] [--out scripts/model/models]
 
-Three models per position, written to model/<config>-<pos>-{mean,rec,spread}.txt with model/meta.json:
+Three models per position, written to scripts/model/models/<config>-<pos>-{mean,rec,spread}.txt with meta.json:
   mean    PPR points if he plays (L2), the projection
   rec     catches if he plays, so other scoring formats convert as index.html's fmtPts does
   spread  how far the score lands from the projection (the mean absolute miss), fitted on the backtest's out-of-season
@@ -237,27 +237,42 @@ def main():
     ap.add_argument("names", nargs="+", help="configs to train (see config()), e.g. B-hl3-bsl-md300-h1 A-hl5-md300-far")
     ap.add_argument("--data", default=os.path.join(HERE, "out", "player_weeks.parquet"))
     ap.add_argument("--oof", default=os.path.join(HERE, "out", "backtest"), help="the backtest's out-of-season predictions (spread models)")
-    ap.add_argument("--out", default=os.path.join(ROOT, "model"))
+    ap.add_argument("--out", default=os.path.join(HERE, "models"))
+    ap.add_argument("--mean-only", action="store_true", help="retrain the mean and catches models, keeping the spread model and its "
+                    "scale (the in-season retrain: .github/workflows/retrain-model.yml, which has no backtest results)")
     a = ap.parse_args()
     rows = pd.read_parquet(a.data)
-    S = int(rows.season.max()) + 1          # every season there is, as if predicting the next
+    cur = int(rows.season.max())
+    played = int(rows[rows.season == cur].week.max())
     os.makedirs(a.out, exist_ok=True)
     meta_path = os.path.join(a.out, "meta.json")
     meta = json.load(open(meta_path, encoding="utf-8")) if os.path.exists(meta_path) else {}
     for name in a.names:
         t, cfg = time.time(), config(name)
         v = cfg["variant"]
-        mean = fit_season(rows, S, v, cfg)
-        rec = fit_season(rows, S, v, cfg, y="y_rec")
-        oof = pd.read_parquet(os.path.join(a.oof, name + ".parquet"))
-        oof = oof.merge(rows[["pid", "season", "week", "h"] + [f for f in feature_list(v) if f not in oof.columns]], on=["pid", "season", "week", "h"])
-        sp, ks = fit_spread(oof, v, cfg)
+        if played < 17:
+            # a season under way: rounds from the seasons before it (early stopping on the last complete one), then a
+            # refit on every game played so far, as the backtest's in-season retraining does
+            mean = fit_season(rows, cur, v, cfg, upto=played + 1, rounds=fit_season(rows, cur, v, cfg)["rounds"])
+            rec = fit_season(rows, cur, v, cfg, y="y_rec", upto=played + 1, rounds=fit_season(rows, cur, v, cfg, y="y_rec")["rounds"])
+        else:
+            mean = fit_season(rows, cur + 1, v, cfg)
+            rec = fit_season(rows, cur + 1, v, cfg, y="y_rec")
+        if a.mean_only:
+            if name not in meta:
+                sys.exit(f"--mean-only keeps {name}'s spread model, but {meta_path} has none: train it in full first.")
+            sp, ks = {}, meta[name]["spreadK"]
+        else:
+            oof = pd.read_parquet(os.path.join(a.oof, name + ".parquet"))
+            oof = oof.merge(rows[["pid", "season", "week", "h"] + [f for f in feature_list(v) if f not in oof.columns]], on=["pid", "season", "week", "h"])
+            sp, ks = fit_spread(oof, v, cfg)
         for pos in POSITIONS:
-            for kind, m in (("mean", mean[pos]), ("rec", rec[pos]), ("spread", sp[pos])):
-                m.save_model(os.path.join(a.out, f"{name}-{pos}-{kind}.txt"))
-        meta[name] = {"config": cfg, "features": feature_list(v), "spreadK": ks, "seasons": [int(rows.season.min()), int(rows.season.max())],
-                      "trained": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime())}
-        print(f"{name}: 12 models in {time.time() - t:.0f}s -> {a.out}")
+            for kind, m in (("mean", mean[pos]), ("rec", rec[pos]), ("spread", sp.get(pos))):
+                if m is not None:
+                    m.save_model(os.path.join(a.out, f"{name}-{pos}-{kind}.txt"))
+        meta[name] = {"config": cfg, "features": feature_list(v), "spreadK": ks, "seasons": [int(rows.season.min()), cur],
+                      "through": [cur, played], "trained": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime())}
+        print(f"{name}: {8 if a.mean_only else 12} models in {time.time() - t:.0f}s -> {a.out}")
     with open(meta_path, "w", encoding="utf-8") as f:
         json.dump(meta, f, indent=1)
 

@@ -40,7 +40,7 @@ const DEFAULTS = {
 /* Constants index.html keeps in plain objects (P_PLAY, REDIST, RC, HC, WIN, ...): a param whose name has a dot, like
    "REDIST.k" or "HC.pMiss.RB", sets that property inside the page, no source edit needed. Each job starts from the
    page's own values (OBJ0, copied at install). */
-const OBJ_NAMES = ['P_PLAY', 'PLAY_K', 'REDIST', 'RC', 'HC', 'WIN'];
+const OBJ_NAMES = ['P_PLAY', 'PLAY_K', 'REDIST', 'RC', 'HC', 'WIN', 'TRAINED'];
 /* [function name, [[exact text, replacement, expected count]], text to insert at the top of the body] */
 const PATCHES = [
   ['priorGames', [['w <= 5 ? 4 - (w - 1) * 0.5 : 1', '__P.priorK(w)', 1], ['Math.min(k, 1.5)', 'Math.min(k, __P.MOVED_CAP)', 1]]],
@@ -50,7 +50,7 @@ const PATCHES = [
     ['h.pts[h.n - 1] >= 0.8 * pts', 'h.pts[h.n - 1] >= __P.DOUBT_LAST * pts', 1]],
     'if (!__P.DOUBT_ON) return null;'],
   ['roleOf', [['k < 0.5 ?', 'k < __P.ROLE_LO ?', 1], ['k > 1.6 &&', 'k > __P.ROLE_HI &&', 1]]],
-  ['evalPlayer', [['DOUBT_K', '__P.DOUBT_K', 1], ['ROLE_LEAD', '__P.ROLE_LEAD', 2], ['r.sd = SD_SCALE * Math.sqrt(', 'r.sd = __P.SD_K * SD_SCALE * Math.sqrt(', 1],
+  ['evalPlayer', [['DOUBT_K', '__P.DOUBT_K', 1], ['ROLE_LEAD', '__P.ROLE_LEAD', 2], [': SD_SCALE * Math.sqrt(', ': __P.SD_K * SD_SCALE * Math.sqrt(', 1],
     ['projWeight(S.blend', '__P.projWeight(__P.blendOf(S.blend, D.week)', 1],
     ['r.eff = r.base > 0 ? r.mean / r.base - 1 : 0;', "if (pos === 'QB') r.mean *= __P.QB_K; r.eff = r.base > 0 ? r.mean / r.base - 1 : 0;", 1]]],
   ['rosBase', [['ROS_PROJ', '__P.ROS_PROJ', 1], ['DOUBT_K', '__P.DOUBT_K', 1], ['ROLE_LEAD', '__P.ROLE_LEAD', 1],

@@ -1,2 +1,5 @@
 # Auto detect text files and perform LF normalization
 * text=auto
+
+# LightGBM model files are read back byte for byte: no line-ending conversion
+scripts/model/models/*.txt -text
