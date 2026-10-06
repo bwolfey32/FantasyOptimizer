@@ -1,0 +1,406 @@
+<!doctype html>
+<html lang="en">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex">
+<title>Model explorer · Benny’s Picks</title>
+<link rel="icon" href="assets/favicon.ico" sizes="any">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;600&family=Saira+Condensed:wght@700&display=swap">
+<style>
+:root { --bg: #eef2ee; --surface: #fff; --ink: #13201a; --muted: #4a5850; --line: #cfd8d1; --accent: #075b37;
+  --grid: #e3e9e4; --c-trained: #2a78d6; --c-classic: #eb6834; --c-sleeper: #1baf7a; --bar: #2a78d6; --bar-soft: #b7d3f6; }
+@media (prefers-color-scheme: dark) { :root { --bg: #0e1512; --surface: #151e1a; --ink: #e4ebe6; --muted: #a9b7af; --line: #29352f; --accent: #4fc38e;
+  --grid: #222d27; --c-trained: #3987e5; --c-classic: #d95926; --c-sleeper: #199e70; --bar: #3987e5; --bar-soft: #1c5cab; color-scheme: dark; } }
+* { box-sizing: border-box; }
+body { margin: 0; background: var(--bg); color: var(--ink); font: 15px/1.5 "IBM Plex Sans", system-ui, sans-serif; }
+.wrap { max-width: 1000px; margin: 0 auto; padding: 20px 16px 64px; }
+h1, h2, h3 { font-family: "Saira Condensed", "Arial Narrow", sans-serif; text-transform: uppercase; line-height: 1.1; margin: 0; }
+h1 { font-size: 34px; margin: 14px 0 2px; }
+h2 { font-size: 22px; margin: 0 0 4px; }
+h3 { font-size: 16px; letter-spacing: .02em; margin: 0 0 2px; }
+a { color: var(--accent); }
+.muted { color: var(--muted); }
+.small { font-size: 13px; }
+.home { display: inline-flex; align-items: center; gap: 10px; text-decoration: none; color: var(--ink); font-weight: 600; }
+.home img { width: 32px; height: 32px; }
+.tabs { display: flex; gap: 4px; margin: 16px 0 14px; border-bottom: 1px solid var(--line); overflow-x: auto; }
+.tabs button { font: inherit; font-weight: 600; background: none; border: 0; border-bottom: 3px solid transparent; color: var(--muted); padding: 8px 14px; cursor: pointer; white-space: nowrap; }
+.tabs button[aria-selected=true] { color: var(--ink); border-bottom-color: var(--accent); }
+.card { background: var(--surface); border: 1px solid var(--line); border-radius: 10px; padding: 14px 16px; margin: 0 0 14px; }
+.row { display: flex; flex-wrap: wrap; gap: 8px 18px; align-items: center; margin: 0 0 12px; }
+.seg { display: inline-flex; border: 1px solid var(--line); border-radius: 8px; overflow: hidden; }
+.seg button { font: inherit; font-size: 13px; background: none; border: 0; border-right: 1px solid var(--line); color: var(--muted); padding: 5px 11px; cursor: pointer; }
+.seg button:last-child { border-right: 0; }
+.seg button[aria-pressed=true] { background: var(--accent); color: #fff; }
+.lbl { font-size: 12px; text-transform: uppercase; letter-spacing: .05em; color: var(--muted); margin-right: 6px; }
+.tiles { display: grid; grid-template-columns: repeat(auto-fit, minmax(190px, 1fr)); gap: 10px; margin: 0 0 14px; }
+.tile { background: var(--surface); border: 1px solid var(--line); border-radius: 10px; padding: 12px 14px; }
+.tile b { display: block; font-family: "Saira Condensed", sans-serif; font-size: 36px; line-height: 1.05; }
+.key { display: inline-block; width: 14px; height: 0; border-top: 3px solid; vertical-align: middle; margin-right: 6px; border-radius: 2px; }
+table { border-collapse: collapse; width: 100%; font-size: 13.5px; font-variant-numeric: tabular-nums; }
+th, td { padding: 5px 8px; text-align: right; border-bottom: 1px solid var(--line); white-space: nowrap; }
+th:first-child, td:first-child { text-align: left; }
+th { font-weight: 600; color: var(--muted); font-size: 12px; text-transform: uppercase; letter-spacing: .04em; }
+tr.pool td { font-weight: 600; background: color-mix(in srgb, var(--accent) 7%, transparent); }
+td.best { font-weight: 600; }
+.scroll { overflow-x: auto; }
+.grid2 { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 14px; }
+.grid3 { display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: 12px; }
+svg { display: block; width: 100%; overflow: visible; }
+svg text { font: 11px "IBM Plex Sans", system-ui, sans-serif; fill: var(--muted); }
+svg text.ink { fill: var(--ink); }
+svg text.lab { font-size: 12px; }
+.tip { position: fixed; display: none; z-index: 9; pointer-events: none; background: var(--surface); color: var(--ink); border: 1px solid var(--line);
+  border-radius: 8px; padding: 7px 10px; font-size: 12.5px; box-shadow: 0 4px 16px rgba(0,0,0,.18); max-width: 280px; }
+.tip b { font-weight: 600; font-size: 14px; }
+.tip .r { display: flex; gap: 8px; align-items: baseline; }
+.tip .r .key { width: 10px; }
+.tip .m { color: var(--muted); }
+details { margin: 8px 0 0; }
+summary { cursor: pointer; font-size: 13px; color: var(--muted); }
+input[type=search] { font: inherit; font-size: 14px; padding: 5px 9px; border: 1px solid var(--line); border-radius: 8px; background: var(--surface); color: var(--ink); width: 180px; }
+label.chk { font-size: 13px; color: var(--muted); display: inline-flex; gap: 6px; align-items: center; }
+th.sort { cursor: pointer; user-select: none; }
+th.sort[aria-sort] { color: var(--ink); }
+td.name { white-space: normal; min-width: 150px; }
+td.name small { color: var(--muted); }
+.pos { font-size: 11px; font-weight: 600; padding: 1px 5px; border-radius: 4px; border: 1px solid var(--line); margin-right: 5px; }
+.err { padding: 24px; text-align: center; color: var(--muted); }
+@media (max-width: 560px) { h1 { font-size: 28px; } .tile b { font-size: 30px; } }
+</style>
+<div class="wrap">
+  <a class="home" href="./"><img src="assets/icon-192.png" alt="">Benny’s Picks</a>
+  <h1>Model explorer</h1>
+  <p class="muted small" id="sub">Loading…</p>
+  <div class="tabs" role="tablist" id="tabs"></div>
+  <div id="view"></div>
+</div>
+<script>
+'use strict';
+// ---- tiny DOM helpers (all text goes in through textContent, never innerHTML) ----
+const NS = 'http://www.w3.org/2000/svg';
+function mk(svg, tag, attrs, kids) {
+  const e = svg ? document.createElementNS(NS, tag) : document.createElement(tag);
+  for (const k in attrs || {}) {
+    const v = attrs[k];
+    if (v == null || v === false) continue;
+    if (k.startsWith('on')) e.addEventListener(k.slice(2), v); else e.setAttribute(k, v === true ? '' : v);
+  }
+  for (const c of kids.flat()) if (c != null) e.append(c.nodeType ? c : document.createTextNode(c));
+  return e;
+}
+const H = (t, a, ...k) => mk(0, t, a, k), S = (t, a, ...k) => mk(1, t, a, k);
+const lin = (d0, d1, r0, r1) => x => r0 + (x - d0) / ((d1 - d0) || 1) * (r1 - r0);
+const f1 = x => (+x).toFixed(1), f2 = x => (+x).toFixed(2), f3 = x => (+x).toFixed(3);
+const sgn = (x, f = f2) => { const t = f(Math.abs(x)); return (+t === 0 ? '' : x > 0 ? '+' : '−') + t; };
+function ticks(lo, hi, n = 5) {
+  const step0 = ((hi - lo) || 1) / n, mag = 10 ** Math.floor(Math.log10(step0)), m = step0 / mag;
+  const step = (m < 1.5 ? 1 : m < 3 ? 2 : m < 7 ? 5 : 10) * mag, out = [];
+  for (let v = Math.ceil(lo / step - 1e-9) * step; v <= hi + 1e-9; v += step) out.push(+v.toFixed(10));
+  return out;
+}
+const tip = H('div', { class: 'tip', role: 'status' });
+document.body.append(tip);
+function showTip(e, nodes) {
+  tip.replaceChildren(...nodes); tip.style.display = 'block';
+  const r = tip.getBoundingClientRect();
+  let x = e.clientX + 14, y = e.clientY + 14;
+  if (x + r.width > innerWidth - 8) x = e.clientX - r.width - 14;
+  if (y + r.height > innerHeight - 8) y = e.clientY - r.height - 14;
+  tip.style.left = Math.max(8, x) + 'px'; tip.style.top = Math.max(8, y) + 'px';
+}
+const hideTip = () => { tip.style.display = 'none'; };
+const tipRow = (color, value, name) => H('div', { class: 'r' }, color ? H('span', { class: 'key', style: 'border-color:' + color }) : null, H('b', {}, value), H('span', { class: 'm' }, name));
+
+// ---- charts ----
+const SRC = [['trained', 'Trained', 'var(--c-trained)'], ['classic', 'Classic', 'var(--c-classic)'], ['sleeper', 'Sleeper', 'var(--c-sleeper)']];
+function frame(w, h, m, label) {
+  return S('svg', { viewBox: `0 0 ${w} ${h}`, height: h, role: 'img', 'aria-label': label });
+}
+function yAxis(svg, y, tk, m, w, fmt) {
+  for (const t of tk) {
+    svg.append(S('line', { x1: m.l, x2: w - m.r, y1: y(t), y2: y(t), stroke: 'var(--grid)', 'stroke-width': 1 }));
+    svg.append(S('text', { x: m.l - 6, y: y(t) + 4, 'text-anchor': 'end' }, fmt(t)));
+  }
+}
+// line / dot chart: cat = evenly spaced labelled x; otherwise numeric x. series: [{name, color, ys, key}]
+function lineChart(o) {
+  const w = o.w, h = o.h || 220, cat = o.cat, direct = o.direct && o.series.length <= 4;
+  const m = { l: 42, r: direct ? 62 : 14, t: 10, b: 26 };
+  const svg = frame(w, h, m, o.label);
+  const all = o.series.flatMap(s => s.ys).filter(v => v != null);
+  let lo = Math.min(...all, ...(o.ref || []).map(r => r.y)), hi = Math.max(...all, ...(o.ref || []).map(r => r.y));
+  if (o.zero) { lo = Math.min(lo, 0); hi = Math.max(hi, 0); }
+  const pad = (hi - lo) * 0.08 || 1; lo -= pad; hi += pad;
+  if (o.ydom) [lo, hi] = o.ydom;
+  const y = lin(lo, hi, h - m.b, m.t);
+  const xs = o.xs, n = xs.length;
+  const xlo = cat ? 0 : (o.xdom ? o.xdom[0] : Math.min(...xs)), xhi = cat ? n - 1 : (o.xdom ? o.xdom[1] : Math.max(...xs));
+  const x = cat ? (i => lin(0, n - 1, m.l + 14, w - m.r - 6)(i)) : lin(xlo, xhi, m.l + 4, w - m.r - 6);
+  const px = i => x(cat ? i : xs[i]);
+  yAxis(svg, y, ticks(lo, hi, 4), m, w, o.fy || f1);
+  if (o.zero) svg.append(S('line', { x1: m.l, x2: w - m.r, y1: y(0), y2: y(0), stroke: 'var(--muted)', 'stroke-width': 1 }));
+  (o.xt || (cat ? xs.map((_, i) => i) : ticks(xlo, xhi, Math.max(2, Math.floor(w / 90))))).forEach(t => {
+    const xv = cat ? px(t) : x(t);
+    svg.append(S('text', { x: xv, y: h - 8, 'text-anchor': 'middle' }, cat ? (w / n < 44 ? '’' + String(xs[t]).slice(2) : xs[t]) : (o.fx || f1)(t)));
+  });
+  for (const r of o.ref || []) {
+    svg.append(S('line', { x1: m.l, x2: w - m.r, y1: y(r.y), y2: y(r.y), stroke: 'var(--muted)', 'stroke-dasharray': '4 3' }));
+    svg.append(S('text', { x: m.l + 4, y: y(r.y) - 4 }, r.label));
+  }
+  if (o.diag) svg.append(S('line', { x1: x(xlo), y1: y(xlo), x2: x(xhi), y2: y(xhi), stroke: 'var(--muted)', 'stroke-dasharray': '4 3' }));
+  if (o.xlab) svg.append(S('text', { x: (m.l + w - m.r) / 2, y: h + 4, 'text-anchor': 'middle' }, o.xlab));
+  if (o.rug) o.rug.forEach(q => svg.append(S('line', { x1: x(q), x2: x(q), y1: h - m.b - 5, y2: h - m.b, stroke: 'var(--muted)', 'stroke-width': 1 })));
+  const ends = [];
+  for (const s of o.series) {
+    const pts = s.ys.map((v, i) => v == null ? null : [px(i), y(v)]);
+    if (o.line !== false) {
+      let d = '', pen = false;
+      pts.forEach(p => { if (!p) { pen = false; return; } d += (pen ? 'L' : 'M') + p[0].toFixed(1) + ' ' + p[1].toFixed(1); pen = true; });
+      svg.append(S('path', { d, fill: 'none', style: 'stroke:' + s.color, 'stroke-width': 2, 'stroke-linejoin': 'round', 'stroke-linecap': 'round' }));
+    }
+    if (cat || n <= 14) pts.forEach(p => p && svg.append(S('circle', { cx: p[0], cy: p[1], r: 4, style: 'fill:' + s.color, stroke: 'var(--surface)', 'stroke-width': 2 })));
+    const last = pts.map((p, i) => p ? i : -1).filter(i => i >= 0).pop();
+    if (direct && last != null) ends.push({ name: s.name, y: pts[last][1], x: pts[last][0] });
+  }
+  ends.sort((a, b) => a.y - b.y);
+  for (let i = 1; i < ends.length; i++) if (ends[i].y - ends[i - 1].y < 13) ends[i].y = ends[i - 1].y + 13;
+  ends.forEach(e => svg.append(S('text', { x: e.x + 9, y: e.y + 4, class: 'lab ink' }, e.name)));
+  // hover: crosshair snaps to the nearest x, one tooltip lists every series there
+  const hair = S('line', { y1: m.t, y2: h - m.b, stroke: 'var(--muted)', 'stroke-width': 1, display: 'none' });
+  const dots = o.series.map(s => S('circle', { r: 6, style: 'fill:none;stroke:' + s.color, 'stroke-width': 2, display: 'none' }));
+  svg.append(hair, ...dots);
+  const hit = S('rect', { x: m.l, y: 0, width: w - m.l, height: h, fill: 'transparent', style: 'touch-action:pan-y' });
+  const at = e => {
+    const r = svg.getBoundingClientRect(), mx = (e.clientX - r.left) * (w / r.width);
+    let bi = 0, bd = 1e9;
+    for (let i = 0; i < n; i++) { const d = Math.abs(px(i) - mx); if (d < bd && o.series.some(s => s.ys[i] != null)) { bd = d; bi = i; } }
+    hair.setAttribute('x1', px(bi)); hair.setAttribute('x2', px(bi)); hair.removeAttribute('display');
+    o.series.forEach((s, k) => { const v = s.ys[bi]; if (v == null) dots[k].setAttribute('display', 'none'); else { dots[k].setAttribute('cx', px(bi)); dots[k].setAttribute('cy', y(v)); dots[k].removeAttribute('display'); } });
+    showTip(e, o.tip ? o.tip(bi) : [H('div', { class: 'm' }, cat ? xs[bi] : (o.fx || f1)(xs[bi])), ...o.series.map(s => s.ys[bi] == null ? null : tipRow(s.color, (o.fy || f1)(s.ys[bi]), s.name))]);
+  };
+  hit.addEventListener('pointermove', at); hit.addEventListener('pointerdown', at);
+  hit.addEventListener('pointerleave', () => { hair.setAttribute('display', 'none'); dots.forEach(d => d.setAttribute('display', 'none')); hideTip(); });
+  svg.append(hit);
+  return svg;
+}
+function barPath(x0, y0, w, h, r) {   // bar anchored at x0, rounded only at its data end
+  r = Math.min(r, w, h / 2);
+  return `M${x0} ${y0}h${w - r}a${r} ${r} 0 0 1 ${r} ${r}v${h - 2 * r}a${r} ${r} 0 0 1 ${-r} ${r}h${-(w - r)}z`;
+}
+function hbars(o) {
+  const w = o.w, rowH = 22, labW = Math.min(o.labW || 150, w * 0.42), m = { l: labW, r: 52 };
+  const h = o.items.length * rowH + 4, svg = frame(w, h, m, o.label);
+  const max = Math.max(...o.items.map(i => i.value), 1e-9), sx = lin(0, max, 0, w - m.l - m.r);
+  o.items.forEach((it, i) => {
+    const y = i * rowH + 2, bw = Math.max(sx(it.value), 1.5);
+    svg.append(S('text', { x: 0, y: y + 14, class: 'ink' }, it.label.length > 22 ? it.label.slice(0, 21) + '…' : it.label));
+    svg.append(S('path', { d: barPath(m.l, y + 3, bw, rowH - 8, 4), style: 'fill:' + (it.color || 'var(--bar)') }));
+    svg.append(S('text', { x: m.l + bw + 5, y: y + 14 }, o.fmt(it.value)));
+    const hit = S('rect', { x: 0, y, width: w, height: rowH, fill: 'transparent', tabindex: 0 });
+    const on = e => showTip(e, it.tip);
+    hit.addEventListener('pointermove', on); hit.addEventListener('pointerleave', hideTip);
+    hit.addEventListener('focus', () => { const r = hit.getBoundingClientRect(); showTip({ clientX: r.left + 60, clientY: r.top }, it.tip); }); hit.addEventListener('blur', hideTip);
+    svg.append(hit);
+  });
+  return svg;
+}
+function histChart(o) {   // bars of the share of scores in each bin, a normal curve over them
+  const w = o.w, h = o.h || 200, m = { l: 42, r: 12, t: 10, b: 28 }, svg = frame(w, h, m, o.label);
+  const [a, b, step] = o.edges, nb = o.counts.length, tot = o.counts.reduce((s, c) => s + c, 0);
+  const pct = o.counts.map(c => 100 * c / tot);
+  const cdf = z => 0.5 * (1 + erf(z / Math.SQRT2)), norm = [...Array(nb)].map((_, i) => 100 * (cdf(a + (i + 1) * step) - cdf(a + i * step)));
+  const hi = Math.max(...pct, ...norm) * 1.08, x = lin(a, b, m.l, w - m.r), y = lin(0, hi, h - m.b, m.t);
+  yAxis(svg, y, ticks(0, hi, 4), m, w, v => v + '%');
+  ticks(a, b, 8).forEach(t => svg.append(S('text', { x: x(t), y: h - 14, 'text-anchor': 'middle' }, (t > 0 ? '+' : t < 0 ? '−' : '') + Math.abs(t))));
+  svg.append(S('text', { x: (m.l + w - m.r) / 2, y: h - 1, 'text-anchor': 'middle' }, 'score minus projection, in sds'));
+  const half = 0.6745;
+  svg.append(S('rect', { x: x(-half), y: m.t, width: x(half) - x(-half), height: h - m.b - m.t, style: 'fill:var(--bar-soft)', opacity: 0.25 }));
+  pct.forEach((p, i) => {
+    const x0 = x(a + i * step) + 1, bw = x(a + (i + 1) * step) - x0 - 1;
+    svg.append(S('rect', { x: x0, y: y(p), width: Math.max(bw, 1), height: h - m.b - y(p), style: 'fill:var(--bar)', rx: 2 }));
+    const hit = S('rect', { x: x0, y: m.t, width: Math.max(bw, 1), height: h - m.t - m.b, fill: 'transparent' });
+    hit.addEventListener('pointermove', e => showTip(e, [H('div', { class: 'm' }, `${sgn(a + i * step, f1)} to ${sgn(a + (i + 1) * step, f1)} sd`), tipRow('var(--bar)', f1(p) + '%', 'of scores'), tipRow('var(--muted)', f1(norm[i]) + '%', 'if normal')]));
+    hit.addEventListener('pointerleave', hideTip); svg.append(hit);
+  });
+  let d = ''; norm.forEach((v, i) => { d += (i ? 'L' : 'M') + x(a + (i + 0.5) * step).toFixed(1) + ' ' + y(v).toFixed(1); });
+  svg.append(S('path', { d, fill: 'none', stroke: 'var(--muted)', 'stroke-width': 2, 'stroke-dasharray': '5 3', 'pointer-events': 'none' }));
+  return svg;
+}
+function erf(x) { const t = 1 / (1 + 0.3275911 * Math.abs(x)), y = 1 - (((((1.061405429 * t - 1.453152027) * t) + 1.421413741) * t - 0.284496736) * t + 0.254829592) * t * Math.exp(-x * x); return x >= 0 ? y : -y; }
+
+// ---- state and views ----
+const FEATURE_NOTES = {
+  sl_now: "Sleeper's projection for the week", sl_ratio: "Sleeper's projection vs. his recent average", sl_share: "His share of his position group's Sleeper projections",
+  sl_rank: "Rank of Sleeper's projection in his group", sl_bias: "How far Sleeper has been off at this position lately (this season, last season worth ~2 weeks)",
+  pos_share: "His share of the position group's usage", depth: "Depth-chart slot", dc_depth: "Depth-chart slot after teammates who are out", dc_eff: "Effective depth-chart weight",
+  use_cur: "Usage-weighted points, this season", use_ew: "Usage-weighted points, recent weeks weighted more", use_l3: "Usage-weighted points, last 3 games", use_prev: "Usage-weighted points, last season",
+  ppr_cur: "PPR points per game, this season", ppr_ew: "PPR points, recent weeks weighted more", ppr_l3: "PPR points, last 3 games", ppr_sd: "Week-to-week spread of his points", ppr_prev: "PPR points per game, last season",
+  tsh_cur: "Target share, this season", csh_cur: "Carry share, this season", snp_cur: "Snap share, this season", patt_cur: "Pass attempts per game, this season", patt_prev: "Pass attempts per game, last season",
+  implied: "Team's implied points from the betting line", spread: "Point spread (negative: favoured)", total: "Game total", dome: "Indoors", wind: "Wind, mph", temp: "Temperature",
+  inj: "Injury tag", vac_tgt: "Targets freed by teammates who are out", vac_car: "Carries freed by teammates who are out", vac_pos: "Position-group work freed by teammates who are out", qb_out: "His quarterback is out",
+  age: "Age", exp: "Years of experience", draft: "Draft pick", tm_change: "New team", new_hc: "New head coach", g: "Games played this season", g_prev: "Games played last season",
+  wk_since: "Weeks since his last game", miss: "Games missed", h: "Weeks ahead", week: "Week of the season", pred: "The projection the spread model scores",
+  t_prate: "Team pass rate", t_plays: "Team plays per game", t_pf: "Team points per game", o_fpa: "Fantasy points the opponent allows to the position", cl_now: "Benny's classic number this week", cl_sd: "Benny's classic spread", cl_fut: "Benny's classic value for the later week",
+};
+const KINDS = { mean: 'Points', rec: 'Catches', spread: 'Range width' };
+const st = { tab: location.hash.slice(1) || 'overview', pos: 'QB', cpos: 'all', model: 'near', kind: 'mean', how: 'gain', metric: 'mae', wpos: 'ALL', q: '', sort: 'trained', dir: -1, min: true, all: false };
+const TABS = [['overview', 'Overview'], ['learned', 'What it learned'], ['how', 'How well'], ['week', 'This week']];
+let V = null, pending = [];
+const slot = (fn, cls) => { const d = H('div', { class: 'slot ' + (cls || '') }); pending.push([d, fn]); return d; };
+function seg(opts, key, on) {
+  return H('span', { class: 'seg', role: 'group' }, opts.map(([v, t]) => H('button', { 'aria-pressed': st[key] === v, onclick: () => { st[key] = v; on ? on() : render(); } }, t)));
+}
+const ctl = (label, ...k) => H('span', {}, H('span', { class: 'lbl' }, label), ...k);
+const legend = () => H('div', { class: 'row small muted', style: 'margin:4px 0 6px' }, SRC.map(([, n, c]) => H('span', {}, H('span', { class: 'key', style: 'border-color:' + c }), n)));
+
+function viewOverview() {
+  const A = V.accuracy, M = V.meta, root = H('div');
+  if (A) {
+    const p = A.pooled['2019-24'];
+    root.append(H('div', { class: 'tiles' }, SRC.map(([k, n, c]) => H('div', { class: 'tile' },
+      H('span', { class: 'muted small' }, H('span', { class: 'key', style: 'border-color:' + c }), n + ' · average miss'),
+      H('b', {}, f2(p[k].mae)), H('span', { class: 'muted small' }, `2019-24, ${p.n.toLocaleString()} player-weeks, next week · squared miss ${f2(p[k].rmse)} · bias ${sgn(p[k].bias)}`)))));
+    const rows = [...Object.entries(A.seasons).map(([s, v]) => [s, v]), ['2019-24', p]];
+    const best = (v, m) => Math.min(...SRC.map(([k]) => v[k][m]));
+    root.append(H('div', { class: 'card' }, H('h2', {}, 'Next week, by season'),
+      H('p', { class: 'muted small', style: 'margin:0 0 8px' }, 'Same player-weeks for all three: weeks with a classic number, Sleeper projecting 3+. Bias is forecast − actual (+ means too high). Lower miss is better; the best of three is bold.'),
+      H('div', { class: 'scroll' }, H('table', {},
+        H('thead', {}, H('tr', {}, H('th', { rowspan: 2 }, 'Season'), H('th', { rowspan: 2 }, 'n'), ...['Average miss', 'Squared miss', 'Bias'].map((g, i) => H('th', { colspan: 3, style: 'text-align:center;border-bottom:0;' + (i ? 'border-left:1px solid var(--line)' : '') }, g))),
+          H('tr', {}, ...[0, 1, 2].flatMap(i => SRC.map(([, n], j) => H('th', { style: i && !j ? 'border-left:1px solid var(--line)' : '' }, n.slice(0, 5)))))),
+        H('tbody', {}, rows.map(([s, v]) => H('tr', { class: s.includes('-') ? 'pool' : '' }, H('td', {}, s === '2026' ? '2026 wk 1-4' : s), H('td', {}, v.n.toLocaleString()),
+          ...['mae', 'rmse'].flatMap(m => SRC.map(([k]) => H('td', { class: v[k][m] === best(v, m) ? 'best' : '', style: m === 'rmse' && k === 'trained' ? 'border-left:1px solid var(--line)' : '' }, f2(v[k][m])))),
+          ...SRC.map(([k]) => H('td', { style: k === 'trained' ? 'border-left:1px solid var(--line)' : '' }, sgn(v[k].bias))))))))));
+    root.append(H('div', { class: 'grid2' },
+      H('div', { class: 'card' }, H('h3', {}, 'By position, 2019-24'), H('div', { class: 'scroll' }, H('table', {},
+        H('thead', {}, H('tr', {}, H('th', {}, 'Pos'), H('th', {}, 'n'), ...SRC.map(([, n]) => H('th', {}, 'Miss · ' + n.slice(0, 5))))),
+        H('tbody', {}, M.positions.map(pos => { const v = A.byPos[pos]; return H('tr', {}, H('td', {}, pos), H('td', {}, v.n.toLocaleString()), ...SRC.map(([k]) => H('td', { class: v[k].mae === best(v, 'mae') ? 'best' : '' }, f2(v[k].mae)))); }))))),
+      A.farPooled ? H('div', { class: 'card' }, H('h3', {}, 'Waivers: 2-4 weeks ahead, 2019-24'), H('table', {},
+        H('thead', {}, H('tr', {}, H('th', {}, 'Weeks ahead'), H('th', {}, 'Trained'), H('th', {}, 'Sleeper'))),
+        H('tbody', {}, ['2', '3', '4'].map(h => H('tr', {}, H('td', {}, h), H('td', { class: A.farPooled[h].model < A.farPooled[h].sleeper ? 'best' : '' }, f2(A.farPooled[h].model)), H('td', {}, f2(A.farPooled[h].sleeper))))),
+      ), H('p', { class: 'muted small', style: 'margin:8px 0 0' }, 'Average miss. The far model is trained but unused while Waivers stays classic.')) : null));
+  } else root.append(H('div', { class: 'card err' }, 'No backtest in model/viz.json (scripts/model/out/backtest was missing when it was built).'));
+  const I = V.importance;
+  root.append(H('div', { class: 'card' }, H('h2', {}, 'The two models'), H('div', { class: 'scroll' }, H('table', {},
+    H('thead', {}, H('tr', {}, ['Model', 'Predicts', 'Starts from', 'Features', 'Trees QB/RB/WR/TE (points)', 'Retrain'].map((t, i) => H('th', { style: i < 2 || i == 2 ? 'text-align:left' : '' }, t)))),
+    H('tbody', {}, [['near', M.near, M.nearConfig, 'Next week'], ['far', M.far, M.farConfig, 'Weeks 2-4']].map(([k, name, c, what]) => H('tr', {},
+      H('td', { style: 'font-family:monospace;font-size:12px' }, name), H('td', { style: 'text-align:left' }, what),
+      H('td', { style: 'text-align:left' }, c.base === 'sleeperdb' ? "Sleeper less its running bias" : "Benny's classic number"),
+      H('td', {}, I[k].features.length), H('td', {}, M.positions.map(p => I[k][p].mean.trees).join(' / ')), H('td', {}, c.retrain ? `every ${c.retrain} weeks` : 'weekly Tue (near only)')))))),
+    H('p', { class: 'muted small', style: 'margin:8px 0 0' }, `Trained ${M.trained.slice(0, 10)} on ${M.seasons[0]}-${M.seasons[1]}, through week ${M.throughWeek} of ${M.throughSeason}. Each mean model learns a correction to its starting point; a third model per position sets the range. See docs/model-report.md.`)));
+  return root;
+}
+
+function viewLearned() {
+    const I = V.importance[st.model], feats = st.kind === 'spread' ? I.spreadFeatures : I.features, row = I[st.pos][st.kind], vals = row[st.how], fam = V.importance.families;
+  const items = feats.map((f, i) => ({ f, v: vals[i], fam: fam[f] || 'Usage' }));
+  const note = f => FEATURE_NOTES[f] || null;
+  const top = items.slice().sort((a, b) => b.v - a.v).slice(0, 20).map(it => ({
+    label: it.f, value: it.v, tip: [H('b', {}, it.f), H('div', { class: 'm' }, it.fam), note(it.f) ? H('div', {}, note(it.f)) : null, H('div', {}, `${f1(it.v)}% of ${st.how}`)] }));
+  const famSum = {}; items.forEach(it => famSum[it.fam] = (famSum[it.fam] || 0) + it.v);
+  const fams = Object.entries(famSum).sort((a, b) => b[1] - a[1]).map(([f, v]) => ({
+    label: f, value: v, tip: [H('b', {}, f), H('div', {}, `${f1(v)}% of ${st.how}`), H('div', { class: 'm' }, items.filter(i => i.fam === f).sort((a, b) => b.v - a.v).slice(0, 4).map(i => i.f).join(', '))] }));
+  const root = H('div');
+  root.append(H('div', { class: 'row' },
+    ctl('Position', seg(V.meta.positions.map(p => [p, p]), 'pos')),
+    ctl('Model', seg([['near', 'Next week'], ['far', 'Weeks 2-4']], 'model')),
+    ctl('Predicts', seg(Object.entries(KINDS), 'kind')),
+    ctl('Measure', seg([['gain', 'Gain'], ['split', 'Splits']], 'how'))));
+  root.append(H('p', { class: 'muted small', style: 'margin:-2px 0 12px' }, 'Gain is how much each feature cut the training error; splits is how often the trees used it. Both are shares of the model’s total. High use is not the same as high effect: the mean models only correct their starting point, and the monotone ones can’t go backwards on use_ew, use_cur, implied or sl_now.'));
+  root.append(H('div', { class: 'grid2' },
+    H('div', { class: 'card' }, H('h3', {}, 'By family'), H('p', { class: 'muted small', style: 'margin:0 0 6px' }, `${st.pos} · ${KINDS[st.kind].toLowerCase()} · ${row.trees} trees`), slot(w => hbars({ w, items: fams, fmt: v => f1(v) + '%', label: 'Feature importance by family', labW: 120 }))),
+    H('div', { class: 'card' }, H('h3', {}, 'Top 20 features'), H('p', { class: 'muted small', style: 'margin:0 0 6px' }, 'Hover for what each one is.'), slot(w => hbars({ w, items: top, fmt: v => f1(v) + '%', label: 'Top 20 features' })))));
+  if (V.pd) {
+    root.append(H('div', { class: 'card' }, H('h2', {}, `How ${st.pos} next-week points move with each feature`),
+      H('p', { class: 'muted small', style: 'margin:0 0 10px' }, 'Partial dependence of the correction the mean model adds to Sleeper’s bias-adjusted projection (points), averaged over ~2,500 sampled 2019-26 player-weeks with the feature swept. Ticks along the bottom mark deciles of the feature.'),
+      H('div', { class: 'grid3' }, V.pd[st.pos].map(c => H('div', {}, H('div', { class: 'small' }, H('b', {}, c.f), H('span', { class: 'muted' }, ` · ${f1(c.gain)}% gain`)),
+        H('div', { class: 'muted small', style: 'min-height:18px' }, FEATURE_NOTES[c.f] || ''),
+        slot(w => lineChart({ w, h: 150, xs: c.x, series: [{ name: 'Correction', color: 'var(--c-trained)', ys: c.y }], ref: [{ y: 0, label: '' }], rug: c.deciles.filter(q => q >= c.x[0] && q <= c.x[c.x.length - 1]), fy: f1, fx: v => +(+v).toPrecision(3) + '', label: c.f + ' partial dependence',
+          tip: i => [H('div', { class: 'm' }, `${c.f} = ${+(+c.x[i]).toPrecision(3)}`), tipRow('var(--c-trained)', sgn(c.y[i]), 'points vs. average')] })))))));
+  }
+  return root;
+}
+
+function viewHow() {
+  const A = V.accuracy, C = V.calibration, root = H('div');
+  if (!A || !C) return H('div', { class: 'card err' }, 'No backtest in model/viz.json.');
+  const seasons = Object.keys(A.seasons), M = { mae: 'Average miss', rmse: 'Squared miss (RMSE)', bias: 'Bias (forecast − actual)' };
+  root.append(H('div', { class: 'row' }, ctl('Position', seg([['all', 'All'], ...V.meta.positions.map(p => [p, p])], 'cpos')), ctl('Metric', seg(Object.entries(M).map(([k, t]) => [k, k === 'rmse' ? 'RMSE' : k === 'mae' ? 'Avg miss' : 'Bias']), 'metric'))));
+  const ser = SRC.map(([k, n, c]) => ({ name: n, color: c, ys: seasons.map(s => A.seasons[s][k][st.metric]) }));
+  const trows = seasons.map((s, i) => H('tr', {}, H('td', {}, s), ...ser.map(x => H('td', {}, f3(x.ys[i])))));
+  root.append(H('div', { class: 'card' }, H('h2', {}, M[st.metric] + ' by season'), legend(),
+    slot(w => lineChart({ w, h: 230, xs: seasons.map(s => s === '2026' ? '2026*' : s), cat: true, series: ser, direct: true, zero: st.metric === 'bias', fy: f2, label: M[st.metric] + ' by season' })),
+    H('p', { class: 'muted small', style: 'margin:2px 0 0' }, 'All positions; *2026 is weeks 1-4 only. Hover for exact values.'),
+    H('details', {}, H('summary', {}, 'Table'), H('table', {}, H('thead', {}, H('tr', {}, H('th', {}, 'Season'), ...SRC.map(([, n]) => H('th', {}, n)))), H('tbody', {}, trows)))));
+  const p = st.cpos, dec = C.deciles[p], cov = C.coverage[p], covYears = Object.keys(cov).filter(k => !k.includes('-'));
+  const mx = Math.max(...dec.map(d => Math.max(d[0], d[1]))) * 1.05;
+  root.append(H('div', { class: 'grid2' },
+    H('div', { class: 'card' }, H('h3', {}, 'Calibration: projected vs. what he scored'), H('p', { class: 'muted small', style: 'margin:0 0 6px' }, `${p === 'all' ? 'All positions' : p}, 2019-26, ten equal groups by projection. On the dashed line, projections are right on average.`),
+      slot(w => lineChart({ w, h: Math.min(w, 300), xs: dec.map(d => d[0]), series: [{ name: 'Actual', color: 'var(--c-trained)', ys: dec.map(d => d[1]) }], xdom: [0, mx], ydom: [0, mx], diag: true, fx: f1, fy: f1, xlab: 'projected (mean of group)', label: 'Calibration',
+        tip: i => [H('div', { class: 'm' }, `Group ${i + 1} of ${dec.length} · ${dec[i][2].toLocaleString()} player-weeks`), tipRow('var(--c-trained)', f1(dec[i][1]), 'scored on average'), tipRow('var(--muted)', f1(dec[i][0]), 'projected on average')] }))),
+    H('div', { class: 'card' }, H('h3', {}, 'Scores inside the likely range'), H('p', { class: 'muted small', style: 'margin:0 0 6px' }, `${p === 'all' ? 'All positions' : p}. The range is the 25th-75th percentile, so half should land inside; pooled 2019-24: ${f1(cov['2019-24'] * 100)}%.`),
+      slot(w => lineChart({ w, h: Math.min(w, 300), xs: covYears.map(y => y === '2026' ? '2026*' : y), cat: true, line: false, series: [{ name: 'Inside range', color: 'var(--c-trained)', ys: covYears.map(y => cov[y] * 100) }], ydom: [40, 60], ref: [{ y: 50, label: 'target 50%' }], fy: v => v + '%',
+        label: 'Share of scores inside the likely range by season', tip: i => [H('div', { class: 'm' }, covYears[i]), tipRow('var(--c-trained)', f1(cov[covYears[i]] * 100) + '%', 'inside the range')] })))));
+  root.append(H('div', { class: 'card' }, H('h3', {}, 'The misses, in standard deviations'), H('p', { class: 'muted small', style: 'margin:0 0 6px' }, 'Each miss divided by the model’s own spread for that player. The shaded band is the likely range (±0.67 sd); the dashed curve is what a normal distribution would give. Fantasy scores skew right, so the real shape leans high.'),
+    slot(w => histChart({ w, h: 210, counts: C.z[p], edges: [C.zEdges[0], C.zEdges[1], C.zEdges[2]], label: 'Misses in standard deviations' }))));
+  return root;
+}
+
+function viewWeek() {
+  const W = V.week, c = Object.fromEntries(W.cols.map((n, i) => [n, i])), root = H('div');
+  root.append(H('div', { class: 'row' },
+    ctl('Position', seg([['ALL', 'All'], ...V.meta.positions.map(p => [p, p])], 'wpos')),
+    H('input', { type: 'search', placeholder: 'Find a player', value: st.q, 'aria-label': 'Find a player', oninput: e => { st.q = e.target.value; clearTimeout(render.t); render.t = setTimeout(() => { render(); const i = $('input[type=search]'); i.focus(); i.setSelectionRange(1e3, 1e3); }, 200); } }),
+    H('label', { class: 'chk' }, H('input', { type: 'checkbox', checked: st.min, onchange: e => { st.min = e.target.checked; render(); } }), 'Hide under 2 points')));
+  let rows = W.rows.filter(r => (st.wpos === 'ALL' || r[c.pos] === st.wpos) && (!st.min || r[c.trained] >= 2) && (!st.q || r[c.name].toLowerCase().includes(st.q.toLowerCase())));
+  const val = (r, k) => k === 'delta' ? (r[c.sleeper] == null ? null : r[c.trained] - r[c.sleeper]) : k === 'name' ? r[c.name] : r[c[k]];
+  rows.sort((a, b) => { const x = val(a, st.sort), y = val(b, st.sort); if (x == null) return 1; if (y == null) return -1; return (typeof x === 'string' ? x.localeCompare(y) : x - y) * st.dir; });
+  const total = rows.length; if (!st.all) rows = rows.slice(0, 120);
+  const hiMax = Math.max(1, ...rows.map(r => r[c.trained] + 0.6745 * r[c.sd]), ...rows.map(r => r[c.sleeper] || 0));
+  const cols = [['name', 'Player'], ['trained', 'Trained'], ['range', 'Likely range'], ['classic', 'Classic'], ['sleeper', 'Sleeper'], ['delta', 'vs Sleeper'], ['t2', 'Wk +1'], ['t3', 'Wk +2'], ['t4', 'Wk +3']];
+  const rw = 150, rx = lin(0, hiMax, 4, rw - 4);
+  const rangeCell = r => { const p = r[c.trained], sd = r[c.sd], lo = Math.max(0, p - 0.6745 * sd), hi = p + 0.6745 * sd, sl = r[c.sleeper];
+    const svg = S('svg', { viewBox: `0 0 ${rw} 16`, width: rw, height: 16, style: 'width:' + rw + 'px', role: 'img', 'aria-label': `${f1(lo)} to ${f1(hi)}` },
+      S('rect', { x: rx(lo), y: 4, width: Math.max(rx(hi) - rx(lo), 2), height: 8, rx: 4, style: 'fill:var(--bar-soft)' }),
+      S('rect', { x: rx(p) - 1.5, y: 1, width: 3, height: 14, rx: 1.5, style: 'fill:var(--c-trained)' }),
+      sl != null ? S('circle', { cx: rx(sl), cy: 8, r: 4, style: 'fill:var(--c-sleeper)', stroke: 'var(--surface)', 'stroke-width': 2 }) : null);
+    svg.addEventListener('pointermove', e => showTip(e, [H('b', {}, r[c.name]), tipRow('var(--c-trained)', f1(p), 'trained'), H('div', { class: 'm' }, `likely range ${f1(lo)} to ${f1(hi)} (sd ${f1(sd)})`), sl != null ? tipRow('var(--c-sleeper)', f1(sl), 'Sleeper') : null, r[c.classic] != null ? tipRow('var(--c-classic)', f1(r[c.classic]), 'classic') : null]));
+    svg.addEventListener('pointerleave', hideTip); return svg; };
+  const th = ([k, t]) => { const sortable = k !== 'range'; return H('th', { class: sortable ? 'sort' : '', 'aria-sort': st.sort === k ? (st.dir > 0 ? 'ascending' : 'descending') : null, tabindex: sortable ? 0 : null,
+    style: k === 'range' ? 'text-align:left' : '', onclick: sortable ? () => { st.dir = st.sort === k ? -st.dir : (k === 'name' ? 1 : -1); st.sort = k; render(); } : null,
+    onkeydown: sortable ? e => { if (e.key === 'Enter') e.target.click(); } : null }, t + (st.sort === k ? (st.dir > 0 ? ' ▲' : ' ▼') : '')); };
+  root.append(H('div', { class: 'card' }, H('div', { class: 'row small muted', style: 'margin:0 0 8px' },
+    H('span', {}, H('span', { class: 'key', style: 'border-color:var(--c-trained)' }), 'Trained projection and likely range'), H('span', {}, H('span', { class: 'key', style: 'border-color:var(--c-sleeper)' }), 'Sleeper'),
+    H('span', {}, `Week ${W.week} · ${total} players · built ${W.made.slice(0, 16).replace('T', ' ')} UTC. “Wk +1…+3” is the trained far-model value for later weeks; a blank is a bye. A player tagged Out shows his number if he plays.`)),
+    H('div', { class: 'scroll' }, H('table', {}, H('thead', {}, H('tr', {}, cols.map(th))),
+      H('tbody', {}, rows.map(r => { const d = val(r, 'delta'); return H('tr', {},
+        H('td', { class: 'name' }, H('span', { class: 'pos' }, r[c.pos]), r[c.name], H('small', {}, ` ${r[c.team]}${r[c.opp] ? ' vs ' + r[c.opp] : ''}${r[c.inj] ? ' · ' + r[c.inj] : ''}`)),
+        H('td', { class: 'best' }, f1(r[c.trained])), H('td', { style: 'text-align:left' }, rangeCell(r)),
+        H('td', {}, r[c.classic] == null ? '–' : f1(r[c.classic])), H('td', {}, r[c.sleeper] == null ? '–' : f1(r[c.sleeper])),
+        H('td', { class: d != null && Math.abs(d) >= 2 ? 'best' : '' }, d == null ? '–' : sgn(d, f1)),
+        ...['t2', 't3', 't4'].map(k => H('td', {}, r[c[k]] == null ? '' : f1(r[c[k]])))); }))),
+    total > rows.length ? H('p', {}, H('button', { class: 'seg', style: 'font:inherit;font-size:13px;padding:5px 12px;background:none;color:var(--accent);cursor:pointer', onclick: () => { st.all = true; render(); } }, `Show all ${total}`)) : null)));
+  return root;
+}
+
+const $ = s => document.querySelector(s);
+function render() {
+  if (!V) return;
+  history.replaceState(null, '', '#' + st.tab);
+  const tabs = $('#tabs'); tabs.replaceChildren(...TABS.map(([k, t]) => H('button', { role: 'tab', 'aria-selected': st.tab === k, onclick: () => { st.tab = k; render(); } }, t)));
+  hideTip(); pending = [];
+  const view = { overview: viewOverview, learned: viewLearned, how: viewHow, week: viewWeek }[st.tab] || viewOverview;
+  const keepY = scrollY, root = $('#view'); root.replaceChildren(view());
+  pending.forEach(([d, fn]) => d.replaceChildren(fn(Math.floor(d.clientWidth) || 320)));
+  scrollTo(0, keepY);
+}
+let rw0 = innerWidth; addEventListener('resize', () => { if (innerWidth === rw0) return; rw0 = innerWidth; clearTimeout(render.r); render.r = setTimeout(render, 150); });
+addEventListener('hashchange', () => { const t = location.hash.slice(1); if (TABS.some(x => x[0] === t) && t !== st.tab) { st.tab = t; render(); } });
+fetch('model/viz.json').then(r => { if (!r.ok) throw new Error(r.status); return r.json(); }).then(j => {
+  V = j; const m = j.meta;
+  $('#sub').textContent = `Trained LightGBM projections for QB, RB, WR and TE · ${m.near} (next week) and ${m.far} (weeks 2-4) · trained ${m.trained.slice(0, 10)} through week ${m.throughWeek} of ${m.throughSeason}.`;
+  if (!TABS.some(x => x[0] === st.tab)) st.tab = 'overview';
+  render();
+}).catch(e => { $('#sub').textContent = ''; $('#view').replaceChildren(H('div', { class: 'card err' }, 'Couldn’t load model/viz.json (' + e.message + '). Serve the site over http (python -m http.server) and run scripts/model/export_viz.py.')); });
+</script>
+</html>
