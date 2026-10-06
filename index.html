@@ -345,6 +345,7 @@ body.welcome.wsign #acctBtn .acct-txt { position: static; width: auto; height: a
   margin: -6px calc(-1 * var(--gut-r)) -8px calc(-1 * var(--gut-l)); padding: 6px var(--gut-r) 8px var(--gut-l); background: var(--bg); }
 .wrap > .stick { max-width: none; }   /* spans the page's side padding too (.wrap > * caps the rest at the content width) */
 .stick.stuck { box-shadow: 0 6px 12px -8px rgba(0, 0, 0, .35); }
+.mrange td { padding: 3px 10px 3px 0; border: 0; white-space: normal; }
 .teampin { display: flex; flex-direction: column; gap: 8px; }
 .teampin:empty { display: none; }
 html { scroll-padding-top: calc(var(--stick-h, 0px) + 8px); }
@@ -3076,6 +3077,24 @@ const STREAM_H = 3;   // weeks a kicker or D/ST move counts (computeWaivers)
    and the rest as the gain that week would be with everyone playing his usual week (computeWaivers). Not the window's
    first week, the lineup you set next: a starter on bye then needs a fill-in now. */
 const BYE_W = 0.35;
+/* Waiver priority (m.priority) is the order moves are listed in. It starts from the ranked lineup gain (score) and adds a
+   share of the upside (UPS_W of the gap between the likely-high gain and the expected one, more for a rising role) and
+   extra weight on the fantasy playoffs (PO_W of the gain in weeks PO_WEEKS). The gain shown is always the expected lineup
+   points; whether a move is worth making at all is still judged on score alone, so upside and the playoffs can reorder
+   good moves but never make a marginal one the Best move. */
+const UPS_W = { base: 0.15, rising: 0.4 }, PO_W = 0.5, PO_WEEKS = [15, 17];
+/* How sure we are of a player's level (not his weekly swings): his weekly spread over the square root of the games behind
+   it (this season, last season's weight, and about 4 for Sleeper's projection), as a share of his level. Half again when
+   his role just changed, his games trail the projection, or he's filling in for someone. */
+function levelSE(id) {
+  const r = D.M[id], h = D.H[id]; if (!r) return 0.3;
+  // his spread from his own games blended with the position's usual one (3 games' worth), as the weekly range does
+  const m = Math.max(formOf(id) ?? 0, r.base || 0, r.projPts || 0, 1), n = h?.n > 1 && h.sd ? h.n : 0, d0 = CV[r.pos] * m;
+  const sd = Math.sqrt((n ? n * h.sd ** 2 : 0) + 3 * d0 ** 2) / Math.sqrt(n + 3);
+  let rel = sd / Math.sqrt((h?.n || 0) + priorGames(id) + 4) / m;
+  if (roleChgOf(id) || r.doubt || fillInFor(id) || bumpOf(id)) rel *= 1.5;
+  return clamp(rel, 0.05, 0.6);
+}
 /* A QB, RB, WR or TE most leagues roster (MARKET_OWN% and MARKET_GAP points more than the pickup, ESPN-wide) carries value
    the model can't see: talent, a role about to grow, what he'd fetch in a trade. Waivers never drops him for a pickup who
    doesn't raise your usual lineup (a bye or matchup patch), and says why he's expendable when it drops him for an upgrade. */
@@ -3304,7 +3323,8 @@ function computeWaivers() {
       const LS = bestLineup(nr, 0, VS, slots, RS, HCS), strength = (LS.total + LS.depth) - (baseS.total + baseS.depth);
       // a player most leagues roster is never the price of a short-term patch (marketHeld), nor of a handcuff's chance
       if (d && !single && strength - (LS.cont - baseS.cont) < 0.25 && marketHeld(d, f)) continue;
-      // hz, near and later are the lineup points the move adds (shown); the *Adj sums rank it, with a week touched by a
+      // hz, near and later are the lineup points the move adds (shown): each week, your best lineup with the move minus
+      // without it, so a bye is just a week he can't start and the optimizer fills the slot (no penalty on top); the *Adj sums rank it, with a week touched by a
       // bye counting BYE_W of its gain and the rest its gain with no one on bye: a bye is a short absence, not a player's value
       let hz = 0, near = 0, later = 0, hzAdj = 0, nearAdj = 0, laterAdj = 0, depLost = 0; const starts = [], wd = [];
       for (let wi = 0; wi < weeks.length; wi++) {
@@ -3344,6 +3364,18 @@ function computeWaivers() {
        over a zero, and counting the zero made "+4 a week" out of a one-week bye patch. */
     if (best && single && best.d && posOf(best.d) === fp) best.h2h = weeks.slice(0, h).map((_, wi) => V[f][wi] > 0 && V[best.d][wi] > 0 ? V[f][wi] - V[best.d][wi] : null);
     if (!best || best.score <= 1 || !(best.hz > 0.5 || best.strength * h > 1 || (longTerm && !single && best.hz >= 0 && best.later > 0))) continue;
+    /* The likely range of the gain (20th to 80th percentile of his level, levelSE): the same week-by-week lineups with his
+       weekly values scaled down and up. Confidence: high when even the low end keeps most of the gain and he starts at
+       least half the window, medium when it keeps a third, low otherwise. */
+    {
+      const rel = 0.8416 * levelSE(f), nr = roster.filter(x => x !== best.d).concat(f);
+      const gainAt = k => { const Vk = Object.assign({}, V, { [f]: V[f].map(x => x * k) }); let g = 0; for (let wi = 0; wi < h; wi++) { const L2 = bestLineup(nr, wi, Vk, slotsAt(wi), RW[wi], HCW); g += (L2.total + L2.depth) - (base[wi].total + base[wi].depth); } return g; };
+      best.gainLo = Math.min(best.hz, gainAt(Math.max(0, 1 - rel))); best.gainHi = Math.max(best.hz, gainAt(1 + rel));
+      best.conf = best.gainLo <= 0 ? 'low' : best.gainLo >= 0.6 * best.hz && best.starts.length >= h / 2 ? 'high' : best.gainLo >= 0.3 * best.hz ? 'medium' : 'low';
+      const po = best.wd.reduce((a, g, wi) => a + (weeks[wi] >= PO_WEEKS[0] && weeks[wi] <= PO_WEEKS[1] ? Math.max(0, g) : 0), 0);
+      best.poGain = po;
+      best.priority = best.score + (roleChgOf(f)?.dir === 'up' ? UPS_W.rising : UPS_W.base) * (best.gainHi - best.hz) + PO_W * po;
+    }
     /* Worth the roster churn? Projections miss by several points a week, so a small expected gain is no reason to give
        up a player: a move must add HOLD_BAR window points (or raise the usual lineup by as much), and a kicker or D/ST
        swap must average 1 pt a week, both over the window and head to head in the weeks both play. Covering the dropped
@@ -3372,7 +3404,7 @@ function computeWaivers() {
     best.marginal = (!clears && !best.longBet) || !!best.hold || best.hcDrop;
     moves.push(best);
   }
-  moves.sort((a, b) => a.marginal - b.marginal || b.score - a.score);
+  moves.sort((a, b) => a.marginal - b.marginal || b.priority - a.priority);
   // keep the list varied: at most two moves of the same kind (same position added, same player dropped)
   const seen = {}, shown = moves.filter(m => { const k = posOf(m.f) + '|' + m.d; seen[k] = (seen[k] || 0) + 1; return seen[k] <= 2; }).slice(0, 12);
   const needs = teamNeeds(roster, V, weeks, H, slotsAt, base);
@@ -3393,6 +3425,8 @@ function waiverWhy(m, needs, weeks, H) {
       : `Don’t drop ${nm(m.d)} for ${nm(m.f)}: ${rank}`;
   }
   const nd = needs.list.find(n => n.P === fu.pos), weak = nd && nd.level === 'Weak';
+  // what the move does to your lineups (the shown gain), its likely range and how sure that is (gainLo, gainHi, conf)
+  if (m.gainLo != null && m.hz > 0) why.push(`improves your lineups by +${f1(m.hz)} over ${H === 1 ? 'the week' : `${H} weeks`} (likely ${Math.abs(m.gainLo) < 0.05 ? '0' : `${m.gainLo < 0 ? '−' : '+'}${f1(Math.abs(m.gainLo))}`} to +${f1(m.gainHi)}), ${m.conf} confidence`);
   if (m.strength >= 1) why.push(`raises your usual lineup by +${f1(m.strength)} pts a week at ${weak ? `${P}, your weak spot` : P}`);
   else if (weak) why.push(`fills your weak ${P} spot`);
   // a handcuff: what he's worth when his regular misses, and how often that happens (handcuffOf, contValue)
@@ -3449,6 +3483,12 @@ function waiverWhy(m, needs, weeks, H) {
     const mvs = [...t.moves.filter(same).slice(0, 2), ...t.stMoves.filter(same)].slice(0, 2);
     if (Math.abs(net) >= 0.02) why.push(`${fu.team} defense ${net > 0 ? 'improved' : 'weakened'} (${spct(om - 1)}${mvs.length ? ': ' + mvs.map(moveText).join(', ') : ''})`);
   }
+  // with free agents estimated from ESPN roster %, how likely he's really on your waiver wire (a label; it doesn't change the order)
+  const Wv = state.waivers, exact = (Wv.source === 'list' && Wv.faList.length) || (Wv.source === 'sleeper' && state.sleeper?.rostered);
+  if (!exact && D.own.size) {
+    const o = D.own.get(m.f) ?? 0, lv = o >= 70 ? 'low' : o >= 40 ? 'medium' : 'high';
+    why.push(`availability ${lv}: on ${Math.round(o)}% of ESPN rosters${lv === 'low' ? ', so load your league’s free agents to be sure' : ''}`);
+  }
   // an injury designation on the pickup comes first: the gain assumes he plays from his expected return
   const fr = D.M[m.f], pc = fr?.mix && weeks[0] === D.week ? ` (counted at his ${Math.round(fr.pPlay * 100)}% chance to play)` : '';
   if (/^(out|doubtful)/i.test(fu.inj || '')) { const rw = returnWeek(m.f); why.unshift(`${fu.inj.toLowerCase()} now${pc}${rw > weeks[0] ? `, counted ${pc ? 'in full ' : ''}from week ${rw}, his earliest expected return` : ''}: check the news first`); }
@@ -3501,13 +3541,25 @@ function schedStrip(id, weeks, H) {
   return `<span class="wks">${weeks.slice(0, H).map(w => { const s = schedOpp(u.team, w); if (s.bye) return `<span class="wk bye" title="Bye week">${w} BYE</span>`; if (!s.opp) return `<span class="wk">${w}</span>`; const m = matchupMult(u.pos, s.opp, w, u.team), d = m - 1, a = Math.min(36, Math.abs(d) * 220), note = persNote(s.opp, u.pos); return `<span class="wk" title="Week ${w}: ${s.home ? 'vs' : 'at'} ${s.opp}, matchup ${spct(d)}${note ? '. ' + esc(note) : ''}" style="background:color-mix(in srgb, var(${d >= 0 ? '--good' : '--bad'}) ${a.toFixed(0)}%, transparent)">${w} ${s.home ? '' : '@'}${s.opp}${note ? '<i class="pmark" aria-hidden="true">•</i>' : ''}</span>`; }).join('')}</span>`;
 }
 /* The headline of the Waiver Optimizer: ADD X / DROP Y / +n expected lineup points. */
+/* Pro: the move's numbers behind the one-line reason: expected, conservative and upside gain, starts, confidence, and
+   what the priority adds for upside and the playoffs */
+function moveRange(m) {
+  if (!isPro() || m.gainLo == null) return '';
+  const sg = x => `${x < 0 ? '−' : '+'}${f1(Math.abs(x))}`, why = m.conf === 'high' ? 'his level is well established and he starts most weeks'
+    : m.conf === 'medium' ? 'the low end still keeps a good share of the gain' : m.gainLo <= 0 ? 'at the low end he wouldn’t make your lineup' : 'little of the gain survives at the low end';
+  return `<details class="more"><summary>Range and confidence</summary><table class="mrange"><tbody>
+    <tr><td>Expected lineup gain</td><td class="num">${sg(m.hz)}</td></tr><tr><td>Conservative (20th percentile)</td><td class="num">${sg(m.gainLo)}</td></tr>
+    <tr><td>Upside (80th percentile)</td><td class="num">${sg(m.gainHi)}</td></tr><tr><td>Starts in your lineup</td><td class="num">${m.starts.length} of ${m.H}</td></tr>
+    <tr><td>Confidence</td><td>${m.conf}: ${why}</td></tr>${m.poGain > 0.5 ? `<tr><td>Fantasy playoffs (weeks ${PO_WEEKS[0]}–${PO_WEEKS[1]})</td><td class="num">${sg(m.poGain)}, weighted extra in the order</td></tr>` : ''}
+  </tbody></table></details>`;
+}
 function bestMoveCard(m, weeks, H, ownTxt, near) {
   if (!m) return `<div class="card wbest"><span class="label">Best move</span><div class="wb-none">${near ? `<strong>Hold.</strong> No move clears Benny’s bar. The closest, add ${esc(D.U.get(near.f).name)}${near.d ? `, drop ${esc(D.U.get(near.d).name)}` : ''}, gains +${f1(near.hz)} over ${near.H} week${near.H > 1 ? 's' : ''}, less than projections typically miss by.` : 'Your roster is already the best Benny can build from these free agents. Check back after this week’s games.'}</div></div>`;
   const side = (kind, id) => `<div class="wb-side"><span class="wb-kind ${kind}">${kind === 'add' ? 'Add' : 'Drop'}</span>${playerIdentity(D.U.get(id), { size: 'lg', nameCls: 'wb-name', subCls: 'small muted', sub: kind === 'add' ? ' · ' + ownTxt(id) : '' })}</div>`;
   return `<div class="card wbest"><div class="row-head"><span class="label">Best move</span><button type="button" class="btn sm" data-act="sharemove">Share</button></div>
     <div class="wb-row">${side('add', m.f)}${m.d ? side('drop', m.d) : `<div class="wb-side"><span class="wb-kind keep">No drop</span><span class="small muted">You have an open roster spot</span></div>`}
       <div class="wb-gain"><span class="num">+${f1(m.hz)}</span><span class="small muted">expected lineup pts over the next ${m.H} week${m.H > 1 ? 's' : ''}</span></div></div>
-    ${m.whyText ? `<div class="small">${esc(m.whyText)}.</div>` : ''}</div>`;
+    ${m.whyText ? `<div class="small">${esc(m.whyText)}.</div>` : ''}${moveRange(m)}</div>`;
 }
 /* Someone opened a shared move (?add=&drop=&wk=&g=&h=, read at startup): show it as a card where the link lands, the
    welcome for a new visitor or Waivers for someone with a team, where R (their own waiver results) says what the same
@@ -3651,7 +3703,7 @@ function waiversBody() {
       <div class="mside"><span class="pill n">Add</span> <div>${pl(m.f, `<span class="psub">${ownTxt(m.f)}</span>`)}</div>${schedStrip(m.f, weeks, H)}</div>
       <div class="mside">${m.d ? `<span class="pill o">Drop</span> <div>${pl(m.d)}</div>${schedStrip(m.d, weeks, H)}` : `<span class="pill m">No drop</span> <div class="small muted">You have an open roster spot</div>`}</div>
       <div class="mgain"><span class="num">+${f1(m.hz)}</span><span class="small muted">expected lineup pts, next ${m.H} wk${m.H > 1 ? 's' : ''}</span>${m.H === H && H < weeks.length ? `<span class="small ${m.later >= 0 ? 'trend-up' : 'trend-down'}">${m.later >= 0 ? '+' : ''}${f1(m.later)} after that</span>` : ''}</div>
-      <div class="mwhy small">${m.hold ? '<span class="pill o">Keep yours</span> ' : m.marginal ? '<span class="pill m">Marginal: holding is fine</span> ' : m.longBet ? '<span class="pill q">Long-term bet</span> ' : ''}${esc(m.whyText)}. <button type="button" class="btn sm" data-taken="${esc(m.f)}">Taken in my league</button></div></div>`;
+      <div class="mwhy small">${m.hold ? '<span class="pill o">Keep yours</span> ' : m.marginal ? '<span class="pill m">Marginal: holding is fine</span> ' : m.longBet ? '<span class="pill q">Long-term bet</span> ' : ''}${esc(m.whyText)}. <button type="button" class="btn sm" data-taken="${esc(m.f)}">Taken in my league</button>${moveRange(m)}</div></div>`;
   }).join('') + (moves.length > shownMoves.length ? `<div class="item lock-row">${lockLine(hiddenTxt(moves.slice(shownMoves.length)))}</div>` : '')
     : `<div class="item" style="padding:14px"><span class="muted">No free agent improves your lineup over ${hLab}. Try a longer window or a higher ownership limit.</span></div>`;
   const posBest = POS.map(p => { const top = R.byH.filter(id => D.U.get(id).pos === p).slice(0, 4); return top.map(id => `<tr><td><strong>${esc(D.U.get(id).name)}</strong> <span class="small muted">${p} · ${D.U.get(id).team}</span></td><td>${ownTxt(id)}</td><td>${f1(rosBase(id))}</td><td>${f1(R.sumH(id))}</td><td class="l">${schedStrip(id, weeks, Math.min(H, 6))}</td><td><button type="button" class="btn sm" data-taken="${esc(id)}">Taken</button></td></tr>`).join(''); }).join('');
@@ -3930,7 +3982,7 @@ function bennysMoves() {
   const W = computeWaivers(), usedPos = new Set(), usedDrop = new Set(), picks = [];
   // one move per position added and per player dropped, compared per week so a 4-week gain doesn't outrank this week's lineup
   for (const m of W.moves) { if (m.marginal) continue; const p = D.U.get(m.f).pos; if (usedPos.has(p) || (m.d && usedDrop.has(m.d))) continue; usedPos.add(p); if (m.d) usedDrop.add(m.d); picks.push(m); if (picks.length === 3) break; }
-  for (const m of picks) out.push({ gain: m.score / m.H, tab: 'waivers', title: `Add ${nm(m.f)}${m.d ? `, drop ${nm(m.d)}` : ''}`, detail: esc(m.whyText || '') + '.', gainTxt: `+${f1(m.hz)} pts over ${m.H} wk${m.H > 1 ? 's' : ''}` });
+  for (const m of picks) out.push({ gain: m.priority / m.H, tab: 'waivers', title: `Add ${nm(m.f)}${m.d ? `, drop ${nm(m.d)}` : ''}`, detail: esc(m.whyText || '') + '.', gainTxt: `+${f1(m.hz)} pts over ${m.H} wk${m.H > 1 ? 's' : ''}` });
   out.sort((a, b) => b.gain - a.gain);
   /* Your weakest position by Benny Grade, with the best free agent there by name. It goes second, so a free account
      (top two) always sees it; a waiver move above that already adds the player isn't repeated. */

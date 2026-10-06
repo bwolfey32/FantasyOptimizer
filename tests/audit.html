@@ -68,7 +68,7 @@ function setTeam(roster, cfg, fa) {
 }
 
 /* ---------- detectors ---------- */
-const flags = [], counts = {};
+const flags = [], counts = {}, CONF = { rec: {}, marginal: {} };
 let CTX = null;   // the team being checked, kept with each flag so a case can be replayed
 function flag(level, kind, where, msg, data = CTX) {
   counts[kind] = counts[kind] || { level, n: 0 }; counts[kind].n++;
@@ -157,6 +157,12 @@ function checkWaivers(where, roster) {
       }
     }
   }
+  for (const m of Wv.moves) {
+    if (m.gainLo == null || !(m.gainLo <= m.hz + 1e-9 && m.hz <= m.gainHi + 1e-9)) flag('ERROR', 'gain-outside-its-range', where, `${nm(m.f)}: ${m.gainLo} / ${m.hz} / ${m.gainHi}`);
+    if (!Number.isFinite(m.priority)) flag('ERROR', 'priority-not-a-number', where, `${nm(m.f)} ${m.priority}`);
+    CONF[m.marginal ? 'marginal' : 'rec'][m.conf] = (CONF[m.marginal ? 'marginal' : 'rec'][m.conf] || 0) + 1;
+  }
+  if (Wv.best && Wv.best.conf === 'low' && Wv.best.gainLo <= 0) flag('WARN', 'best-move-may-gain-nothing', where, `${nm(Wv.best.f)} +${r1(Wv.best.hz)} (likely ${r1(Wv.best.gainLo)} to +${r1(Wv.best.gainHi)})`);
   for (const m of rec) {
     const f = D.U.get(m.f), d = m.d ? D.U.get(m.d) : null, txt = `add ${nm(m.f)}${d ? ', drop ' + nm(m.d) : ''} +${r1(m.hz)} over ${m.H}: ${m.whyText}`;
     const fh = D.H[m.f], dh = d && D.H[m.d], fp = D.prevPPG[m.f]?.[0], dp = d && D.prevPPG[m.d]?.[0];
@@ -264,6 +270,7 @@ function run() {
   }
   const kinds = Object.entries(counts).sort((a, b) => (a[1].level === 'ERROR' ? 0 : 1) - (b[1].level === 'ERROR' ? 0 : 1) || b[1].n - a[1].n);
   lines.push(`${summary.rosters} team-setups, ${summary.moves} waiver moves listed, ${summary.rec} recommended, a Best move for ${summary.best}`);
+  lines.push(`confidence of recommended moves: ${JSON.stringify(CONF.rec)}; of marginal ones: ${JSON.stringify(CONF.marginal)}`);
   lines.push('', 'SUMMARY');
   for (const [k, v] of kinds) lines.push(`  ${v.level} ${k}: ${v.n}`);
   lines.push('', 'DETAILS (up to 12 of each kind, distinct messages)');

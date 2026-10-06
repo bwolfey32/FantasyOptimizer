@@ -729,6 +729,41 @@ test('storage: Reset clears this site’s keys, old and new, and leaves the sign
   const ls = fakeStorage({ 'bp:schema': '1', 'bp:v1:state': '{}', 'fo1:stray': '1', 'sb-x-auth-token': 'tok', 'ph_x': '1' }), s = ev('makeStore')(ls);
   s.clear(); return [...ls._m.keys()].sort().join(',') === 'ph_x,sb-x-auth-token' || [...ls._m.keys()].join(',');
 });
+/* ---------- Waivers: expected lineup gain vs. waiver priority, the likely range, availability ---------- */
+test('a move’s gain is the sum of its weekly optimal-lineup differences, and a pickup’s own bye adds nothing and costs nothing', () => {
+  for (const hz of [4, 'ros']) {
+    setup(st => { st.waivers.horizon = hz; }); const W = ev('computeWaivers')(), D = ev('D'), so = ev('schedOpp');
+    for (const m of W.moves) {
+      const sum = m.wd.reduce((a, x) => a + x, 0); if (Math.abs(sum - m.hz) > 1e-6) return `${name(m.f)}: weeks sum ${sum.toFixed(2)} vs gain ${m.hz.toFixed(2)}`;
+      if (!m.d) for (let wi = 1; wi < m.wd.length; wi++) if (so(D.U.get(m.f).team, W.weeks[wi]).bye && Math.abs(m.wd[wi]) > 1e-9) return `${name(m.f)}'s bye week ${W.weeks[wi]} counted ${m.wd[wi].toFixed(2)}`;
+    }
+  }
+});
+test('every move has a likely range around its gain and a confidence; a rookie’s range is wider than a veteran’s', () => {
+  for (const hz of [2, 4, 'ros']) {
+    setup(st => { st.waivers.horizon = hz; });
+    for (const m of ev('computeWaivers')().moves) if (!(m.gainLo <= m.hz + 1e-9 && m.hz <= m.gainHi + 1e-9) || !['high', 'medium', 'low'].includes(m.conf)) return `${name(m.f)}: ${m.gainLo} / ${m.hz} / ${m.gainHi} ${m.conf}`;
+  }
+  const D = ev('D'), se = ev('levelSE'), avg = a => a.reduce((s, x) => s + x, 0) / a.length;
+  const ids = Object.keys(D.M).filter(id => ['WR', 'RB'].includes(D.M[id].pos) && D.M[id].projPts > 6);
+  const few = ids.filter(id => !D.prevPPG[id]), many = ids.filter(id => D.H[id]?.n >= 3 && D.prevPPG[id]);   // rookies: no last season behind them
+  return few.length && many.length && avg(few.map(se)) > avg(many.map(se)) || `few-games ${avg(few.map(se))} vs established ${avg(many.map(se))}`;
+});
+test('waiver priority adds upside and playoff weeks on top of the ranked gain, but never makes a marginal move the Best move', () => {
+  setup(st => { st.waivers.horizon = 'ros'; }); const W = ev('computeWaivers')(), PO = ev('PO_W');
+  for (const m of W.moves) {
+    if (m.priority < m.score + PO * m.poGain - 1e-6) return `${name(m.f)}: priority ${m.priority} under score ${m.score} + playoffs`;
+    if (m.poGain > 0 && m.poGain > m.hz + 1e-6 && m.wd.every(x => x >= 0)) return `${name(m.f)}: playoff gain ${m.poGain} over the whole gain ${m.hz}`;
+  }
+  const i = W.moves.findIndex(m => m.marginal); if (i >= 0 && W.moves.slice(i).some(m => !m.marginal)) return 'a marginal move listed above a recommended one';
+  return !W.best || !W.best.marginal || 'Best move is marginal';
+});
+test('availability is labeled only when free agents are estimated from roster %', () => {
+  setup(st => { st.waivers.horizon = 4; }); const m = ev('computeWaivers')().moves[0]; if (!m) return 'no move';
+  if (!/availability (low|medium|high): on \d+% of ESPN rosters/.test(m.whyText)) return 'own mode: ' + m.whyText;
+  setup(st => { st.waivers.horizon = 4; st.waivers.source = 'list'; st.waivers.faList = [m.f]; }); const L = ev('computeWaivers')().moves.find(x => x.f === m.f);
+  return !L || !/availability/.test(L.whyText) || 'list mode: ' + L.whyText;
+});
 test('player pictures: headshot by ESPN id, team logo for a D/ST, silhouette when missing or broken', () => {
   setup(); const D = ev('D'), img = ev('getPlayerImage'), gibbs = D.U.get(idOf('Jahmyr Gibbs')), pit = D.U.get('PIT');
   const was = [D.pids, gibbs.espnId];
