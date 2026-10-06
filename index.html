@@ -335,9 +335,11 @@ body.welcome.wsign #acctBtn .acct-txt { position: static; width: auto; height: a
 
 /* Team context bar (every page) */
 .teamctx { display: flex; flex-direction: column; gap: 8px; }
-/* The tabs, team chips and week line pin to the top once scrolled to (#stick, pinBar); above that they sit in place.
+/* The team chips and week line pin to the top once scrolled to (#stick, pinBar), at full size; above that they sit
+   in place. The main tabs scroll with the page.
    The page background behind them hides what scrolls under, with a shadow once pinned. */
 #stickSentinel { height: 1px; margin-bottom: -17px; }
+.stick:has(.teampin:empty) { display: none; }
 .stick { position: sticky; top: env(safe-area-inset-top, 0px); z-index: 40; display: flex; flex-direction: column; gap: 10px;
   --gut-l: max(16px, env(safe-area-inset-left, 0px)); --gut-r: max(16px, env(safe-area-inset-right, 0px));
   margin: -6px calc(-1 * var(--gut-r)) -8px calc(-1 * var(--gut-l)); padding: 6px var(--gut-r) 8px var(--gut-l); background: var(--bg); }
@@ -346,15 +348,6 @@ body.welcome.wsign #acctBtn .acct-txt { position: static; width: auto; height: a
 .teampin { display: flex; flex-direction: column; gap: 8px; }
 .teampin:empty { display: none; }
 html { scroll-padding-top: calc(var(--stick-h, 0px) + 8px); }
-@media (max-width: 600px) {
-  .stick.stuck { gap: 6px; padding-top: 4px; padding-bottom: 6px; }
-  .stick.stuck .tabs { padding: 4px; }
-  .stick.stuck .tabs .navlink { min-height: 32px; padding: 3px 4px 7px; font-size: 16px; }
-  .stick.stuck .tabs .navlink::after { bottom: 3px; }
-  .stick.stuck .tchip { padding: 3px 10px; }
-  .stick.stuck .tchip .tm { display: none; }
-  .stick.stuck .tb-ctx { font-size: 13px; }
-}
 .teamctx:empty { display: none; }
 .tb-teams { display: flex; gap: 6px; overflow-x: auto; scrollbar-width: thin; padding-bottom: 2px; }
 .tchip { flex: 0 0 auto; display: flex; flex-direction: column; align-items: flex-start; max-width: 220px; padding: 5px 12px 6px; background: var(--surface); border: 1px solid var(--line); border-radius: 8px; text-align: left; }
@@ -788,9 +781,9 @@ button, .btn, [role="button"], [role="tab"], nav, nav a, summary { -webkit-touch
     </div>
   </header>
   <div class="freshp card" id="fresh" hidden></div>
+  <nav class="tabs" id="tabs" aria-label="Main"></nav>
   <div id="stickSentinel" aria-hidden="true"></div>
   <div class="stick" id="stick">
-    <nav class="tabs" id="tabs" aria-label="Main"></nav>
     <section class="teampin" id="teampin" aria-label="Your team and week"></section>
   </div>
   <section class="teamctx" id="teamctx" aria-label="Your team"></section>
@@ -3676,7 +3669,7 @@ function navTop() {
   const st = $('#stick'), s = $('#stickSentinel'); if (!st?.classList.contains('stuck') || !s) return 0;
   return Math.max(0, s.getBoundingClientRect().top + scrollY - (parseFloat(getComputedStyle(st).top) || 0));
 }
-/* The pinned bar: .stuck once the tabs reach the top (compact on phones), and its height for scroll-padding */
+/* The pinned bar (team chips and week line): .stuck once it reaches the top, and its height for scroll-padding */
 function pinBar() {
   const st = $('#stick'), s = $('#stickSentinel'); if (!st || !s || SELFTEST || location.hash === '#export') return;
   if ('IntersectionObserver' in window) new IntersectionObserver(([e]) => st.classList.toggle('stuck', !e.isIntersecting && e.boundingClientRect.top < 0)).observe(s);
