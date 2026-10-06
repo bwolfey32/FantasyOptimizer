@@ -17,7 +17,8 @@ field is built from (functions ported from index.html are named after their orig
   prevPPG   last season's per-game PPR, catches and team (playerPPG).
   sched     Sleeper's season schedule.
   games     ESPN's scoreboard for the week (ids, kickoff, home/away, neutral sites), every game set to 'pre'. The scoreboard
-            drops odds once a game is played, so spread and total come from ESPN's odds feed: CLOSING lines.
+            drops odds once a game is played, so spread and total come from ESPN's odds feed: CLOSING lines (nflverse's
+            closing lines where the feed has none, most of 2023).
   rec       team records built from the final scores of weeks 1..N-1 (the scoreboard's records include the week's game).
   wx        Open-Meteo's historical-forecast archive for the three hours from kickoff, at open-air stadiums (the archived
             short-range forecast, close to what fell; the live site reads a forecast hours or days ahead).
@@ -378,6 +379,25 @@ def closing_line(eid):
     return None, 0, None
 
 
+_NV_LINES = {}
+
+
+def nflverse_line(season, week, home, away):
+    """nflverse's closing line for a game, for weeks ESPN's odds feed has lost (most of 2023): (favorite, points, total)."""
+    if not _NV_LINES:
+        sys.path.insert(0, os.path.join(HERE, "..", "model"))
+        from nflverse import frame
+        fixnv = {"LA": "LAR", "STL": "LAR", "OAK": "LV", "SD": "LAC"}
+        for r in frame("games.csv").itertuples():
+            if r.game_type == "REG" and r.spread_line == r.spread_line and r.total_line == r.total_line:
+                _NV_LINES[(r.season, r.week, fixnv.get(r.home_team, r.home_team), fixnv.get(r.away_team, r.away_team))] = (r.spread_line, r.total_line)
+    x = _NV_LINES.get((season, week, home, away))
+    if not x:
+        return None, 0, None
+    sp, ou = x   # spread_line: points the home team is favored by
+    return (home if sp > 0 else away if sp < 0 else None), abs(float(sp)), float(ou)
+
+
 def games_of(season, week):
     j = espn_week(season, week)
     games = []
@@ -391,6 +411,8 @@ def games_of(season, week):
         if not h or not a:
             continue
         fav, line, ou = closing_line(e["id"])
+        if ou is None:
+            fav, line, ou = nflverse_line(season, week, h["abbr"], a["abbr"])
         v = c.get("venue") or {}
         ad = v.get("address") or {}
         venue = None
@@ -686,6 +708,8 @@ def draft(season, teams=12, rounds=16):
                     continue
                 pick = i
                 break
+            if pick is None:   # a thin projection file (2018) runs out of players before the rosters fill
+                continue
             avail.remove(pick)
             rosters[t].append(pick)
     return [[(i, val[i][0], val[i][2]) for i in r] for r in rosters]
@@ -710,12 +734,14 @@ def main():
     cache = Cache()
     todo = parse_weeks(args.weeks)
     seasons = sorted({s for s, _ in todo})
-    rosters = {}
+    # other seasons' leagues are kept: building one season's fixtures never drops another's
+    rpath = os.path.join(args.out, "rosters.json")
+    rosters = json.load(open(rpath, encoding="utf-8")) if os.path.exists(rpath) else {}
     for s in seasons:
         teams = draft(s)
         # every team of the 12-team draft, lettered B-M by draft slot (A is the reviewer's roster, in replay.py)
         rosters[str(s)] = {chr(ord("B") + i): t for i, t in enumerate(teams)}
-    with open(os.path.join(args.out, "rosters.json"), "w", encoding="utf-8") as f:
+    with open(rpath, "w", encoding="utf-8") as f:
         json.dump(rosters, f, indent=1)
     for s, w in todo:
         t0 = time.time()

@@ -19,7 +19,7 @@ SEASON = 2025
 
 @pytest.fixture(scope="module")
 def ctx():
-    return data.context([SEASON])
+    return data.context([SEASON], with_sleeper=True)
 
 
 def keys_at(ctx, c):
@@ -37,7 +37,8 @@ def rows_at(ctx, c, keys=None):
 
 def scrambled(ctx, c, seed=7):
     """The same tables with everything that isn't known before week c changed: box scores and final scores from week c
-    on, injury tags of every other week, and lines, totals, weather and Sleeper projections of every week but c."""
+    on, injury tags of every other week, lines, totals, weather and depth charts of every week but c, and Sleeper's
+    projections for the weeks after c."""
     rng = np.random.default_rng(seed)
     x = {k: (v.copy() if isinstance(v, pd.DataFrame) else v) for k, v in ctx.items()}
     L = x["logs"]
@@ -59,6 +60,13 @@ def scrambled(ctx, c, seed=7):
     for col in ("spread", "total", "temp", "wind"):
         G[col] = G[col].astype(float)
         G.loc[mg, col] = rng.uniform(-20, 60, mg.sum())
+    D = x["depth"]
+    md = (D.season == SEASON) & (D.week != c)
+    D["depth"] = D["depth"].astype(float)
+    D.loc[md, "depth"] = rng.integers(1, 6, md.sum())
+    P = x["sproj"]
+    mp = (P.season == SEASON) & (P.week > c)   # past weeks' projections are known (sl_bias reads them)
+    P.loc[mp, "sproj"] = rng.uniform(0, 30, mp.sum())
     return x
 
 
@@ -68,7 +76,8 @@ def test_no_leakage(ctx, c):
     before = rows_at(ctx, c, keys)
     after = rows_at(scrambled(ctx, c), c, keys)
     assert len(before) > 300 and len(before) == len(after)
-    for col in F.FEATURES:
+    assert before.sl_now.notna().mean() > 0.5
+    for col in F.FEATURES + F.SLEEPER_FEATURES:
         a, b = before[col].to_numpy(dtype=float), after[col].to_numpy(dtype=float)
         assert np.allclose(a, b, equal_nan=True), f"{col} changed when week {c}+ results changed"
 

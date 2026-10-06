@@ -12,7 +12,9 @@ Tables (pandas DataFrames, team codes as the site writes them: LAR, LV, LAC, WAS
   status  one row per player-week on the injury report or a reserve list: inj = Out (reserve lists count as Out),
           Doubtful or Questionable
   people  one row per player: birth date, rookie year, draft pick, Sleeper id
-  sproj   Sleeper's PPR projection per player-week (model B only)
+  depth   each week's depth chart: one row per player and slot, depth 1 for the slot's starter
+  sproj   Sleeper's PPR projection per player-week (models B and C)
+  cproj   Benny's current hand-tuned forecast per player-week, from the replays (model C only)
 
 Box scores come from nflverse in both modes, so training and live features share one code path; a bundle only
 overrides what is known before kickoff (lines, forecast, injury tags, Sleeper's projection) and fills in weeks nflverse
@@ -116,6 +118,39 @@ def season_status(season, max_age=None):
     return s
 
 
+def season_depth(season, games, max_age=None):
+    """Each week's depth chart at QB/RB/WR/TE: one row per player and slot (a starting receiver spot, the running back
+    spot...), with depth 1 for the slot's starter, 2 for his backup and so on. Through 2024 nflverse has one chart per
+    team and week; from 2025 it has daily snapshots, and a week's chart is the last one taken before its first game."""
+    try:
+        d = nv.frame("depth_charts_{s}.csv", season, max_age)
+    except Exception:
+        return pd.DataFrame(columns=["season", "week", "pid", "team", "slot", "depth"])
+    if "club_code" in d:
+        d = d[(d.game_type == "REG") & (d.formation == "Offense") & d.position.isin(["QB", "RB", "FB", "WR", "TE"])].dropna(subset=["gsis_id", "week"])
+        out = pd.DataFrame({"week": d.week.astype(int), "pid": d.gsis_id, "team": fix(d.club_code),
+                            "slot": d.depth_position.fillna(d.position), "depth": pd.to_numeric(d.depth_team, errors="coerce")})
+    else:
+        d = d[d.pos_abb.isin(["QB", "RB", "WR", "TE"])].dropna(subset=["gsis_id"])
+        d = d.assign(t=pd.to_datetime(d.dt, utc=True))
+        g = games[games.season == season]
+        first = g.groupby("week").gameday.min()
+        parts = []
+        for w, day in first.items():
+            cut = pd.Timestamp(day, tz="UTC") + pd.Timedelta(hours=12)   # Thursday night kicks off after midnight UTC
+            snap = d[d.t < cut]
+            if snap.empty:
+                continue
+            snap = snap[snap.t == snap.t.max()]
+            # pos_rank orders the whole position; within a slot, the starter is the slot's best-ranked player
+            snap = snap.assign(depth=snap.groupby(["team", "pos_slot"]).pos_rank.rank(method="first"))
+            parts.append(pd.DataFrame({"week": int(w), "pid": snap.gsis_id, "team": fix(snap.team),
+                                       "slot": snap.pos_abb + snap.pos_slot.astype(str), "depth": snap.depth}))
+        out = pd.concat(parts, ignore_index=True) if parts else pd.DataFrame(columns=["week", "pid", "team", "slot", "depth"])
+    out.insert(0, "season", season)
+    return out.dropna(subset=["depth"])
+
+
 def people(seasons):
     """Birth date, rookie year and draft pick (the latest weekly roster that has them), and the Sleeper id
     (DynastyProcess's crosswalk, which matched every fantasy-relevant player of 2025)."""
@@ -166,7 +201,33 @@ def sleeper_proj(seasons, gsis_of, weeks=range(1, 19), live_season=None):
     return d.dropna(subset=["pid"]).rename(columns={"proj": "sproj"})[["season", "week", "pid", "sproj"]].drop_duplicates(["season", "week", "pid"])
 
 
-def context(seasons, with_sleeper=False, live_season=None):
+def classic_proj(gsis_of):
+    """Benny's current hand-tuned forecast a week ahead, per player-week, from the replays of index.html on past weeks
+    (scripts/backtest/replay.py baseline: every scripts/backtest/out/replay/baseline*.jsonl): what he scores if he plays
+    (mIf) and its sd, and Waivers' values for the next three weeks (cfut2-4: 2-4 weeks ahead; 0 for a bye or an
+    expected absence). Model C learns from them; live, the page writes this week's into snapshot.json (fc)."""
+    import glob
+    bdir = os.path.join(HERE, "..", "backtest")
+    if bdir not in sys.path:
+        sys.path.insert(0, bdir)
+    import replay
+    from analyze import key_sw
+    rows = []
+    for path in sorted(glob.glob(os.path.join(bdir, "out", "replay", "baseline*.jsonl"))):
+        for key, r in replay.load(os.path.basename(path)[:-6]).items():
+            if "error" in r:
+                continue
+            s, w = key_sw(key)
+            for sid, x in r["configs"]["base"]["rows"].items():
+                g = gsis_of.get(sid)
+                if g and x["pos"] in SKILL and "mIf" in x:
+                    fut = (x.get("fut") or []) + [None] * 3
+                    rows.append((s, w, g, x["mIf"], x["sdIf"], fut[0], fut[1], fut[2]))
+    d = pd.DataFrame(rows, columns=["season", "week", "pid", "cproj", "csd", "cfut2", "cfut3", "cfut4"])
+    return d.drop_duplicates(["season", "week", "pid"], keep="last")
+
+
+def context(seasons, with_sleeper=False, live_season=None, with_classic=False):
     """Every table for these seasons (the season before the first is loaded too, for last season's numbers). The season
     being played (live_season) is re-downloaded when its cached files are more than 6 hours old."""
     seasons = sorted(set(seasons) | {min(seasons) - 1})
@@ -176,12 +237,16 @@ def context(seasons, with_sleeper=False, live_season=None):
         lg, tg = season_logs(s, age(s))
         L.append(lg); T.append(tg); S.append(season_status(s, age(s)))
     games = schedule(seasons)
+    depth = pd.concat([season_depth(s, games, age(s)) for s in seasons], ignore_index=True)
     tg = pd.concat(T, ignore_index=True).merge(games[["season", "week", "team", "pf", "pa"]], on=["season", "week", "team"], how="left")
     ppl = people(seasons)
     ctx = {"logs": pd.concat(L, ignore_index=True), "tg": tg, "games": games.drop(columns=["pf", "pa"]),
-           "scores": games[["season", "week", "team", "pf", "pa"]], "status": pd.concat(S, ignore_index=True), "people": ppl, "sproj": None}
+           "scores": games[["season", "week", "team", "pf", "pa"]], "status": pd.concat(S, ignore_index=True), "people": ppl,
+           "depth": depth, "sproj": None}
     if with_sleeper:
         ctx["sproj"] = sleeper_proj([s for s in seasons if s >= 2018], gsis_map(ppl), live_season=live_season)
+    if with_classic:
+        ctx["cproj"] = classic_proj(gsis_map(ppl))
     return ctx
 
 

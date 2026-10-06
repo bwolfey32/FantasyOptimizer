@@ -25,7 +25,7 @@ FEATURES = [
     # last season
     "g_prev", "ppr_prev", "use_prev", "tsh_prev", "csh_prev", "snp_prev", "patt_prev", "bonus_prev",
     # role and career
-    "tm_change", "depth", "pos_share", "age", "exp", "draft",
+    "tm_change", "depth", "pos_share", "dc_depth", "dc_eff", "age", "exp", "draft",
     # his team's offense and the opponent's defense (this season before c, and last season)
     "t_g", "t_plays", "t_prate", "t_pf", "t_plays_prev", "t_prate_prev", "t_pf_prev",
     "o_g", "o_fpa", "o_ypc", "o_pyd", "o_sk", "o_pa", "o_fpa_prev", "o_ypc_prev", "o_pyd_prev", "o_pa_prev",
@@ -36,7 +36,9 @@ FEATURES = [
     # calendar
     "week", "h",
 ]
-SLEEPER_FEATURES = ["sl_now", "sl_ratio"]
+SLEEPER_FEATURES = ["sl_now", "sl_ratio", "sl_share", "sl_rank", "sl_bias"]
+SL_BIAS_PRIOR = 40    # player-weeks: last season's bias counts as this many of this season's (under two weeks of QBs)
+CLASSIC_FEATURES = ["cl_now", "cl_sd", "cl_fut"]   # Benny's current forecast for week c, and Waivers' value for the target week (model C)
 TARGETS = ["y_ppr", "y_rec"]
 
 
@@ -134,6 +136,32 @@ class Builder:
     def __init__(self, ctx):
         self.ctx = prepare(ctx)
         self._prev = {}
+        self._slerr = {}
+
+    def sl_errors(self, S):
+        """Sleeper's misses in season S: projection minus what he scored, per player-week (projected 3+, played)."""
+        if S not in self._slerr:
+            sp, L = self.ctx.get("sproj"), self.ctx["logs"]
+            if sp is None or not len(sp):
+                self._slerr[S] = pd.DataFrame(columns=["week", "pos", "err"])
+            else:
+                m = sp[(sp.season == S) & (sp.sproj >= 3)].merge(L[L.season == S][["week", "pid", "pos", "ppr"]], on=["week", "pid"])
+                self._slerr[S] = pd.DataFrame({"week": m.week, "pos": m.pos, "err": m.sproj - m.ppr})
+        return self._slerr[S]
+
+    def sl_bias(self, S, c):
+        """How far Sleeper has run over (+) or under what players scored at each position: this season's weeks before c,
+        with last season's bias worth SL_BIAS_PRIOR player-weeks. Sleeper's habits change (it ran 2-4 points high on
+        quarterbacks every year 2018-25 and stopped in 2026), so the model reads them instead of memorizing them."""
+        cur, prev = self.sl_errors(S), self.sl_errors(S - 1)
+        cur = cur[cur.week < c]
+        out = {}
+        for pos in USAGE_PTS:
+            a, b = cur[cur.pos == pos].err, prev[prev.pos == pos].err
+            k = SL_BIAS_PRIOR if len(b) else 0
+            n = len(a) + k
+            out[pos] = (a.sum() + (k * b.mean() if k else 0.0)) / n if n else np.nan
+        return out
 
     def prev(self, S):
         if S not in self._prev:
@@ -217,6 +245,9 @@ class Builder:
         # injuries at week c: his own tag, and the work of teammates who are out
         r["inj"] = st.reindex(pid).map({"Questionable": 1, "Doubtful": 2, "Out": 3}).fillna(0).to_numpy()
         self._c = c
+        self._chart(r, S, c, out_now)
+        sp = C.get("sproj")
+        self._sl = sp[(sp.season == S) & (sp.week == c)].set_index("pid").sproj if sp is not None and len(sp) else None
         self._roles(r, P, Pp, out_now)
 
         # career
@@ -228,14 +259,39 @@ class Builder:
         r["miss"] = np.maximum(r.t_g - r.g, 0)
 
         # Sleeper's projection for week c (model B)
-        sp = C.get("sproj")
-        if sp is not None and len(sp):
-            s = sp[(sp.season == S) & (sp.week == c)].set_index("pid").sproj
-            r["sl_now"] = s.reindex(pid).to_numpy()
+        if self._sl is not None:
+            r["sl_now"] = self._sl.reindex(pid).to_numpy()
             base = r.ppr_cur.where(r.g > 0, r.ppr_prev)
             r["sl_ratio"] = r.sl_now / base.where(base > 1)
+            r["sl_bias"] = r.pos.map(self.sl_bias(S, c)).astype(float)
+        # Benny's current forecast for week c (model C)
+        cp = C.get("cproj")
+        if cp is not None and len(cp):
+            x = cp[(cp.season == S) & (cp.week == c)].set_index("pid")
+            r["cl_now"], r["cl_sd"] = x.cproj.reindex(pid).to_numpy(), x.csd.reindex(pid).to_numpy()
+            fut = np.full(len(r), np.nan)
+            for h in (2, 3, 4):
+                m = (r.h == h).to_numpy()
+                if m.any():
+                    fut[m] = x["cfut%d" % h].reindex(pid[m]).to_numpy(dtype=float)
+            r["cl_fut"] = fut
         r["pos_code"] = r.pos.map(POS_CODE)
         return r.drop(columns=["coach"])
+
+    def _chart(self, r, S, c, out_now):
+        """dc_depth: his depth on week c's chart (1 = a starter; his best slot if he's listed at several; 5 when his
+        team has a chart he isn't on); dc_eff: the same after skipping teammates ahead of him who are out."""
+        ch = self.ctx.get("depth")
+        if ch is None or not len(ch):
+            r["dc_depth"] = r["dc_eff"] = np.nan
+            return
+        ch = ch[(ch.season == S) & (ch.week == c)]
+        q = ch.assign(up=~ch.pid.isin(out_now)).sort_values(["team", "slot", "depth"], kind="stable")
+        q["eff"] = q.groupby(["team", "slot"]).up.cumsum() - q.up + 1
+        best, eff = q.groupby("pid").depth.min(), q.groupby("pid").eff.min()
+        charted = r.team.isin(set(ch.team)).to_numpy()
+        r["dc_depth"] = np.where(charted, best.reindex(r.pid).fillna(5).to_numpy(), np.nan)
+        r["dc_eff"] = np.where(charted, eff.reindex(r.pid).fillna(5).to_numpy(), np.nan)
 
     def _roles(self, r, P, Pp, out_now):
         """depth: his rank at his position on his team by recent usage (1 = the lead), and pos_share his share of that
@@ -279,6 +335,14 @@ class Builder:
         idx = pd.MultiIndex.from_arrays([r.team, r.pos])
         num, den = gpos.reindex(idx).fillna(0).to_numpy(), allpos.reindex(idx).fillna(0).to_numpy()
         r["vac_pos"] = np.where(den > 0, num / np.where(den > 0, den, 1), 0)
+        # Sleeper's read of the depth chart (model B): his share of his position group's projections, and his rank in it
+        if self._sl is not None:
+            sl = live.assign(sl=self._sl.reindex(live.index).fillna(0).to_numpy())
+            sl = sl.assign(rk=sl.groupby(["team", "pos"]).sl.rank(ascending=False, method="first"),
+                           tot=sl.groupby(["team", "pos"]).sl.transform("sum"))
+            t = sl.tot.reindex(r.pid).to_numpy()
+            r["sl_share"] = np.where(t > 0, sl.sl.reindex(r.pid).to_numpy() / np.where(t > 0, t, 1), np.nan)
+            r["sl_rank"] = np.where(t > 0, sl.rk.reindex(r.pid).to_numpy(), np.nan)
         qbs = pool[pool.pos == "QB"].sort_values("patt", ascending=False).groupby("team").head(1)
         qb_out = qbs.groupby("team").out.first().astype(float)
         r["qb_out"] = qb_out.reindex(r.team).fillna(0).to_numpy()

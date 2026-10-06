@@ -140,7 +140,7 @@ function rowsOf(W, full) {
     const g = r.game, s = siteOf(g), cov = covered(s), L = cov ? null : wxLoad(D.wx?.[g.id]);
     const line = g.fav ? (g.fav === r.T ? g.line : -g.line) : (g.ou ? 0 : null);
     const pp = D.prevPPG?.[id], moved = !!(pp?.[2] && r.u.team && pp[2] !== r.u.team);
-    out[id] = { mean: r2(r.mean), sd: r2(r.sd), base: r2(r.base), proj: r2(r.projPts), projPart: r2(r.projPart), mult: r2(r.mult), pos: r.pos, team: r.T, opp: r.O,
+    out[id] = { mean: r2(r.mean), sd: r2(r.sd), mIf: r2(r.mIf ?? r.mean), sdIf: r2(r.sdIf ?? r.sd), pPlay: r.pPlay ?? 1, base: r2(r.base), proj: r2(r.projPts), projPart: r2(r.projPart), mult: r2(r.mult), pos: r.pos, team: r.T, opp: r.O,
       home: D.tg[r.T]?.home ? 1 : 0, covered: cov ? 1 : 0, wx: L ? r2(L.wind + L.rain + L.snow + L.cold) : null, line, implied: r2(implied(g, r.T)),
       role: r.role?.kind || '', doubt: r.doubt ? 1 : 0, form: r2(formOf(id)), cur: r2(formOf(id, false)), prior: priorGames(id), moved: moved ? 1 : 0,
       n: r.h?.n || 0, prev: pp ? pp[0] : null, inj: r.u.inj || '', ros: r2(rosBase(id)), fut, newStaff: r.newStaff ? 1 : 0 };

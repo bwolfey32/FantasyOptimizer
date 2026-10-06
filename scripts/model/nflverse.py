@@ -21,6 +21,7 @@ FILES = {
     "snap_counts_{s}.csv": BASE + "/snap_counts/snap_counts_{s}.csv",
     "injuries_{s}.csv": BASE + "/injuries/injuries_{s}.csv",
     "roster_weekly_{s}.csv": BASE + "/weekly_rosters/roster_weekly_{s}.csv",
+    "depth_charts_{s}.csv": BASE + "/depth_charts/depth_charts_{s}.csv",
     "games.csv": BASE + "/schedules/games.csv",
     "players.csv": BASE + "/players/players.csv",
     "db_playerids.csv": DP_IDS,
