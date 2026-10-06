@@ -360,6 +360,40 @@ test('an empty slot on a bye counts a streamer, not 0', () => {
   return wi > 0 && gain < 0.5 * W.V[idOf('Deshaun Watson')][wi] || `Goff's bye at index ${wi}, Watson move +${gain.toFixed(1)}`;
 });
 
+/* ---------- byes: a short absence, not part of a player's value (BYE_W) ---------- */
+/* a drafted 1-QB team (tests/audit.html, league 3 team 5) whose QB, Bryce Young, is on bye in week 5. Free agents: players
+   under 50% rostered, as in that league none of the quarterbacks rostered more than Jacoby Brissett */
+const youngBye = () => setup((st, D) => {
+  st.roster = ['Sam LaPorta', 'Chase Brown', 'Jonathan Taylor', 'Jaxon Smith-Njigba', 'Carnell Tate', 'Harold Fannin', 'Tony Pollard', 'Bryce Young',
+    'Alvin Kamara', 'Denzel Boston', 'Sam Darnold', 'Woody Marks', 'Jayden Reed', 'SEA', 'Eddy Pineiro', 'Rashod Bateman'].map(idOf);
+  const own = id => D.own.get(id) ?? 0, cap = own(idOf('Jacoby Brissett'));
+  const faList = [...D.U.values()].filter(u => D.M[u.id] && own(u.id) < 50 && (u.pos !== 'QB' || own(u.id) <= cap) && !st.roster.includes(u.id)).map(u => u.id);
+  Object.assign(st.waivers, { horizon: 4, source: 'list', faList });
+});
+test('a pickup sold on covering a bye after the first week is Marginal, says so, and still shows his true points (Brissett for Young)', () => {
+  youngBye(); const W = ev('computeWaivers')(), m = W.moves.find(m => m.f === idOf('Jacoby Brissett'));
+  if (!ev('schedOpp')(ev('D').U.get(idOf('Bryce Young')).team, 5).bye || W.weeks[0] !== 4) return 'fixture changed: Young not on bye in week 5';
+  if (!m) return 'Brissett not listed';
+  return m.marginal && m.byeCover && W.best !== m && /mostly bye-week cover/.test(m.whyText) && m.hz > m.hzAdj && m.hz >= 3 || `${m.marginal ? 'marginal' : 'recommended'}, hz ${m.hz.toFixed(1)} ranked ${m.hzAdj.toFixed(1)}: ${m.whyText}`;
+});
+test('a bye in the week you set a lineup for next counts in full: from Sunday night, Brissett for Young’s week-5 bye is a real move', () => {
+  youngBye(); const D = ev('D'), G = D.games, saved = G.map(g => g.state);
+  try {
+    G.forEach((g, i) => { g.state = i < G.length - 2 ? 'post' : 'pre'; }); D.wCache = null;
+    const W = ev('computeWaivers')(), m = W.moves.find(m => m.f === idOf('Jacoby Brissett'));
+    if (W.weeks[0] !== 5) return `window starts week ${W.weeks[0]}`;
+    return m && !m.marginal && !m.byeCover && m.wd[0] > 1 && Math.abs(m.nearAdj - m.near) < 1e-9 || (m ? `${m.marginal ? 'marginal' : 'recommended'}, near ${m.near.toFixed(1)} ranked ${m.nearAdj.toFixed(1)}: ${m.whyText}` : 'Brissett not listed');
+  } finally { G.forEach((g, i) => { g.state = saved[i]; }); D.wCache = null; }
+});
+test('a free agent’s own bye barely moves him in Top free agents: Malik Washington (bye week 6) ahead of Adonai Mitchell', () => {
+  setup(st => { st.waivers.horizon = 4; }); const W = ev('computeWaivers')(), D = ev('D'), mw = idOf('Malik Washington'), am = idOf('Adonai Mitchell');
+  const bye = id => W.weeks.slice(1, W.H).some(w => ev('schedOpp')(D.U.get(id).team, w).bye);
+  // the premise: Washington has the better usual week, and trails over the window only because of his bye
+  if (!(bye(mw) && !bye(am) && W.VS[mw][0] > W.VS[am][0] && W.sumH(mw) < W.sumH(am))) return 'fixture changed: the premise no longer holds';
+  const i = W.byH.indexOf(mw), j = W.byH.indexOf(am);
+  return i >= 0 && j >= 0 && i < j || `Washington #${i}, Mitchell #${j}`;
+});
+
 test('Waivers count from next week once nearly all of this week’s games have kicked off', () => {
   setup(); const D = ev('D'), G = D.games, saved = G.map(g => g.state), run = st => { G.forEach((g, i) => { g.state = st(i); }); D.wCache = null; return ev('computeWaivers')(); };
   try {
