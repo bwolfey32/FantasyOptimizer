@@ -1095,6 +1095,13 @@ test('polls: Start/Sit asks who you’d start; the split shows after your vote (
     if (/poll-row/.test(h)) return 'signed out with 4 votes: still no split';
     D.ss.set(key, { st: 'ok', n: [4, 2], mine: null, at: Date.now() }); h = ev('viewCompare')();
     if ((h.match(/class="poll-row/g) || []).length !== 2 || !/67%/.test(h) || !/33%/.test(h) || !/6 votes/.test(h)) return 'signed out with 6 votes: the split';
+    if (!poll(h).includes(`data-act="sharepoll" data-lo="${lo}" data-hi="${hi}"`)) return 'the poll has its own Share button, for the pair in id order';
+    // sharing asks the question: the two players in id order and the week, never the call, the edge or the split
+    const realOut = W.shareOut, sent = []; W.shareOut = (text, url) => { sent.push([text, url]); };
+    try { W.sharePoll(lo, hi); } finally { W.shareOut = realOut; }
+    const [text, link] = sent[0] || [], lq = new URL(link || 'x:/').searchParams;
+    if (!text || !/^Who would you start: /.test(text) || lq.get('start') !== lo || lq.get('sit') !== hi) return 'the shared poll names both players, in id order: ' + link;
+    if (['e', 'p', 'f', 'why', 'g'].some(k => lq.has(k)) || /\d+%|projected/.test(text)) return 'the shared poll carries no call, edge or split: ' + link;
     acct.user = { id: 'u-me' };
     D.ss.set(key, { st: 'ok', n: [4, 2], mine: null, at: Date.now() }); h = ev('viewCompare')();
     if (!/data-act="ssvote"/.test(h) || /poll-row/.test(h) || (h.match(/data-act="ssvote"/g) || []).length !== 2) return 'signed in, not voted: two buttons and no split';
@@ -1102,6 +1109,7 @@ test('polls: Start/Sit asks who you’d start; the split shows after your vote (
     const w = D.call.w;
     D.ss.set(key, { st: 'ok', n: [3, 1], mine: lo, at: Date.now() }); h = ev('viewCompare')();
     if (!/Your pick/.test(h) || !/75%/.test(h) || !/Change my vote/.test(h) || /data-act="ssvote"/.test(h)) return 'voted: the split, your pick, a way to change';
+    if (!/data-act="sharepoll"/.test(poll(h))) return 'voted: still a Share button';
     if (lo === w ? !/The crowd agrees with Benny/.test(h) : !/The crowd sides with/.test(h)) return 'the crowd line, with the 3-1 side being ' + lo;
     D.ss.set(key, { st: 'ok', n: [2, 2], mine: lo, at: Date.now() }); if (!/split evenly/.test(ev('viewCompare')())) return 'a tie';
     D.ssEdit = key; h = ev('viewCompare')(); D.ssEdit = null;

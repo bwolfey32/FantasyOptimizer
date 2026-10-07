@@ -3840,6 +3840,15 @@ async function shareCall() {
   }
   await shareOut(text, url, how => track('result_shared', { kind: 'start_sit', how, pos: W.pos, lean: c.call }));
 }
+/* Share the poll under Benny's Pick as a question: the two players and the week, no call and no split, so whoever opens
+   the link votes first. The pair goes in the poll's own (id) order so the link doesn't hint at a pick. */
+async function sharePoll(lo, hi) {
+  const A = D.U.get(lo), B = D.U.get(hi); if (!A || !B) return;
+  const text = `Who would you start: ${A.name} or ${B.name}? Week ${D.week} on Benny’s Picks.`;
+  const url = SHARE_HOST ? `${SHARE_HOST}/v?${new URLSearchParams({ start: lo, sit: hi, wk: D.week })}`
+    : `https://bennyspicks.us/?utm_source=share&utm_medium=poll&${new URLSearchParams({ start: lo, sit: hi, poll: 1 })}#start-sit`;
+  await shareOut(text, url, how => track('result_shared', { kind: 'poll', how, pos: A.pos }));
+}
 async function shareMove() {
   const R = D.wCache, m = R?.best; if (!m) return;
   const nm = id => D.U.get(id)?.name || id, H = m.H, wk = R.weeks[0];
@@ -6020,7 +6029,7 @@ function ssLoad(lo, hi, force) {
 }
 function ssInner(lo, hi, w) {
   const e = D.ss.get(ssKey(lo, hi)), nm = id => esc(D.U.get(id)?.name || id), k = esc(ssKey(lo, hi));
-  const total = e ? e.n[0] + e.n[1] : 0, head = `<div class="pick-head"><span class="label">Who would you start?</span>${total ? `<span class="small muted">${total} vote${total === 1 ? '' : 's'}</span>` : ''}</div>`;
+  const total = e ? e.n[0] + e.n[1] : 0, head = `<div class="pick-head"><span class="label">Who would you start?</span>${total ? `<span class="small muted">${total} vote${total === 1 ? '' : 's'}</span>` : ''}<button type="button" class="btn sm pick-share" data-act="sharepoll" data-lo="${esc(lo)}" data-hi="${esc(hi)}">Share</button></div>`;
   const buttons = pressed => `<div class="poll-btns">${[lo, hi].map(id => `<button type="button" class="btn" data-act="ssvote" data-ss="${k}" data-pick="${esc(id)}" data-w="${esc(w)}" aria-pressed="${pressed === id}">${nm(id)}</button>`).join('')}</div>`;
   const split = () => {
     const pctOf = i => total ? Math.round(e.n[i] / total * 100) : 0, major = e.n[0] > e.n[1] ? lo : e.n[1] > e.n[0] ? hi : null;
@@ -6446,7 +6455,9 @@ function viewCompare() {
     ${why.length ? `<ul class="reasons">${why.map(x => `<li class="${x.up ? 'up' : 'down'}"><span class="rv">${spct(x.pct)}</span> ${esc(x.text)}</li>`).join('')}</ul>` : ''}
     ${isPro() ? `<details class="more"><summary>All factors</summary>${factorList(r)}${r.scheme ? `<div class="scheme"><strong>Scheme:</strong> ${esc(r.scheme)}</div>` : ''}</details>
     <details class="more"><summary>Coaching and scheme matchup</summary>${schemeBlock(r)}</details>` : lockLine('Every matchup factor and the coaching matchup')}</div>`; };
-  const sharedNote = D.sharedCall && A && Bp && state.compare[0] === a && state.compare[1] === b
+  const sharedNote = D.sharedPoll && A && Bp && state.compare[0] === a && state.compare[1] === b
+    ? `<div class="banner info small exban"><span><strong>Someone asked who you’d start.</strong> Vote below to see what everyone else thinks.</span><button type="button" class="btn sm" data-act="sharedcallx">Dismiss</button></div>`
+    : D.sharedCall && A && Bp && state.compare[0] === a && state.compare[1] === b
     ? `<div class="banner info small exban"><span><strong>A shared start/sit call.</strong> Benny’s numbers here are live and in ${esc(fmtName(true))} scoring, so they can differ from when it was shared.</span><button type="button" class="btn sm" data-act="sharedcallx">Dismiss</button></div>` : '';
   return `<div class="section">${sharedNote}${decBar}<div class="cmp"><div class="field"><label class="label" for="cmp0">Player A</label>${pick(0, A)}</div><div class="field"><label class="label" for="cmp1">Player B</label>${pick(1, Bp)}</div></div>${verdict}<h2>Side by side</h2><div class="cmp">${col(A)}${col(Bp)}</div></div>`;
 }
@@ -6686,7 +6697,8 @@ document.addEventListener('click', e => {
   if (a === 'reload') { for (let s = 0; s < 4; s++) store.del('coach:' + ((D.season || 0) - s)); load({ manual: true }); }
   else if (a === 'sharemove') shareMove();
   else if (a === 'sharecall') shareCall();
-  else if (a === 'sharedcallx') { D.sharedCall = false; render(); }
+  else if (a === 'sharepoll') sharePoll(t.dataset.lo, t.dataset.hi);
+  else if (a === 'sharedcallx') { D.sharedCall = false; D.sharedPoll = false; render(); }
   else if (a === 'sharedx') { D.shared = null; render(); }
   else if (a === 'league') toggleLeague();
   else if (a === 'leagueretry') { delete D.lg[state.sleeper?.leagueId]; render(); }   // leaguePanel fetches it again
@@ -6952,8 +6964,9 @@ acctBoot();
 // a shared start/sit call (shareCall's link): open Start / Sit on those two players, team or not
 { const u = new URL(location.href), q = u.searchParams, idOk = s => /^[\w-]{1,12}$/.test(s || '') && !(s in {});   // not "constructor" and the like
   if (q.has('start') || q.has('sit')) {
-    if (idOk(q.get('start')) && idOk(q.get('sit'))) { state.compare = [q.get('start'), q.get('sit')]; D.sharedCall = true; track('shared_call_opened', { has_team: !needsTeam() }); }
-    q.delete('start'); q.delete('sit');
+    if (idOk(q.get('start')) && idOk(q.get('sit'))) { state.compare = [q.get('start'), q.get('sit')]; D.sharedCall = true; track('shared_call_opened', { has_team: !needsTeam() });
+      if (q.get('poll') === '1') { D.sharedCall = false; D.sharedPoll = true; D.after = () => $('[data-sspoll]')?.scrollIntoView({ block: 'center' }); track('shared_poll_opened', { has_team: !needsTeam() }); } }
+    q.delete('start'); q.delete('sit'); q.delete('poll');
     try { history.replaceState(null, '', u.pathname + u.search + u.hash); } catch {}
   } }
 // a shared league's power rankings (shareLeague's link): open the rankings for a team already linked to that league;
