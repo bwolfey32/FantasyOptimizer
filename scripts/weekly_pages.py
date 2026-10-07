@@ -307,7 +307,10 @@ def weather_page(d):
         where = esc(g["stadium"] or "") + (f' ({esc(g["city"])})' if g["city"] else "")
         flag = ' <span class="pill q">Weather game</span>' if g["rough"] else ""
         moves = f'<span class="small">Moves most: {moved}</span>' if moved else ""
-        cards.append(f'<div class="game"><span class="small muted">{esc(when(g["date"]))}{state}</span><strong>{esc(g["away"])} @ {esc(g["home"])}</strong>'
+        fx = g.get("fx") or {}
+        wx = (f' data-wx="{esc(fx["sky"] or "")}" data-wind="{fx["wind"]}" data-rain="{fx["rain"]}" data-snow="{fx["snow"]}"'
+              + (" data-rough" if g["rough"] else "")) if fx and g["state"] != "post" else ""
+        cards.append(f'<div class="game"{wx}><span class="small muted">{esc(when(g["date"]))}{state}</span><strong>{esc(g["away"])} @ {esc(g["home"])}</strong>'
                      f'<span class="small">{where}</span><span>{esc(cond)}{flag}</span>{moves}</div>')
     rough = [f'{g["away"]} @ {g["home"]}' for g in d["games"] if g["rough"]]
     return page("weather", d,
@@ -319,7 +322,21 @@ def weather_page(d):
                 "Wind over 10 mph hurts deep passing and kickers most, rain and snow shift work to running backs, and freezing cold costs kickers and passers a little. "
                 "The percentages are how much the conditions move each player’s projection.",
                 f'<div class="games">{"".join(cards)}</div>',
-                ("See how the weather moves the players on your own roster, game by game.", "#research-weather", "Open the weather"))
+                ("See how the weather moves the players on your own roster, game by game.", "#research-weather", "Open the weather"),
+                head=WX_FX)
+
+
+# Each open-air game's weather drawn faintly behind its card (rain, snow, wind, fog or sun; assets/fx.js), where the
+# browser has WebGPU and motion isn't reduced. Without it the cards are as they were.
+WX_FX = """
+<style>
+.game[data-wx] { position: relative; isolation: isolate; overflow: hidden; }
+.game > .fx { position: absolute; inset: 0; width: 100%; height: 100%; z-index: -1; pointer-events: none; opacity: 0; transition: opacity .8s; }
+.game > .fx.on { opacity: .6; } .game > .fx.calm.on { opacity: .4; }
+</style>
+<script type="module">
+if (navigator.gpu && !matchMedia('(prefers-reduced-motion: reduce)').matches) import('/assets/fx.js').then(fx => fx.weatherCards()).catch(() => {});
+</script>"""
 
 
 def hub_page(d):

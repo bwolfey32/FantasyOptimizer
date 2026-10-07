@@ -32,7 +32,7 @@ function collect() {
   D.wCache = null; ev('syncScoring')(); ev('computeAll')();
   const M = D.M, TEAMS = ev('TEAMS'), name = id => D.U.get(id)?.name || id;
   const roleText = ev('roleText'), doubtText = ev('doubtText'), bumpOf = ev('bumpOf'), fillInFor = ev('fillInFor'), schedOpp = ev('schedOpp'), matchupMult = ev('matchupMult');
-  const rosBase = ev('rosBase'), siteOf = ev('siteOf'), wxText = ev('wxText'), wxRough = ev('wxRough'), covered = ev('covered');
+  const rosBase = ev('rosBase'), siteOf = ev('siteOf'), wxText = ev('wxText'), wxRough = ev('wxRough'), covered = ev('covered'), wxIcons = ev('wxIcons'), wxLoad = ev('wxLoad');
   const opp = r => r.T && D.tg[r.T] ? { opp: D.tg[r.T].opp, home: !!D.tg[r.T].home } : { opp: null, home: null };
   const player = r => ({ id: r.id, name: r.pos === 'DEF' ? `${TEAMS[r.T]?.[1] || r.T} D/ST` : r.u.name, pos: r.pos, team: r.T || 'FA', ...opp(r),
     proj: r1(r.mean), lo: r1(r.floor), hi: r1(r.ceil), grade: r.grade, inj: r.inj || '', played: !!r.locked,
@@ -76,14 +76,16 @@ function collect() {
       rank: { QB: rk('fpaQB'), RB: rk('fpaRB'), WR: rk('fpaWR'), TE: rk('fpaTE'), K: rk('fpaK') } };
   });
 
-  // weather: every game, its stadium and the forecast at open-air ones, with the fantasy players it moves most
+  /* weather: every game, its stadium and the forecast at open-air ones, with the fantasy players it moves most; and for
+     the card's effect (assets/fx.js), the sky as the weather icons name it and how hard the wind, rain and snow are */
   const games = [...D.games].sort((a, b) => (a.date || '').localeCompare(b.date || '') || a.home.localeCompare(b.home)).map(g => {
-    const s = siteOf(g), w = D.wx?.[g.id], cov = covered(s);
+    const s = siteOf(g), w = D.wx?.[g.id], cov = covered(s), L = !cov && w ? wxLoad(w) : null;
     const moved = Object.values(M).filter(r => (r.T === g.home || r.T === g.away) && r.status === 'ok' && r.mean >= 6)
       .map(r => ({ r, f: r.factors.find(x => x.key === 'wx') })).filter(x => x.f && Math.abs(x.f.pct) >= 0.02)
       .sort((a, b) => Math.abs(b.f.pct) - Math.abs(a.f.pct)).slice(0, 4).map(x => ({ name: x.r.pos === 'DEF' ? `${TEAMS[x.r.T]?.[1]} D/ST` : x.r.u.name, pos: x.r.pos, pct: Math.round(x.f.pct * 100) }));
     return { away: g.away, home: g.home, date: g.date || null, state: g.state || 'pre', stadium: s?.name || null, city: s?.neutral ? s.city || null : null,
-      roof: !s ? null : s.roof, covered: cov, forecast: !cov && w ? wxText(w) : null, rough: !cov && w ? wxRough(w) : false, moved };
+      roof: !s ? null : s.roof, covered: cov, forecast: !cov && w ? wxText(w) : null, rough: !cov && w ? wxRough(w) : false, moved,
+      fx: L && { sky: wxIcons(g).find(n => n !== 'wind') || null, wind: r1(L.wind), rain: r1(L.rain), snow: r1(L.snow) } };
   });
 
   return { season: D.season, week: D.week, waiverWeeks: [weeks[0], weeks[H - 1]], createdAt: D.loadedAt?.toISOString() || null,
