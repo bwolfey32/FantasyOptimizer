@@ -908,15 +908,31 @@ test('discussion: 💬 counts beside names link to the discussion, never inside 
     if (!ev('D').cntQ.size && ![...D.talkN.keys()].length) return 'names without a count are queued for one query';
   } finally { D.talkN.clear(); D.cntQ.clear(); }
 });
-test('discussion: the composer asks signed-out readers to sign in, and a new poster for a public name', () => {
+test('discussion: the composer asks signed-out readers to sign in, and a new poster for a username', () => {
   setup(); const acct = ev('acct'), gibbs = idOf('Jahmyr Gibbs'), was = [acct.on, acct.user, acct.profile];
   try {
     acct.on = true; acct.user = null; if (!/Sign in to comment/.test(ev('composerHTML')(gibbs))) return 'signed out';
     acct.user = { id: 'u-me' }; acct.profile = null; let h = ev('composerHTML')(gibbs);
-    if (!/data-talkhandle/.test(h) || !/Your public name/.test(h)) return 'no name yet: asks for one';
+    if (!/data-talkhandle/.test(h) || !/Choose a username/.test(h)) return 'no name yet: asks for one';
     acct.profile = { handle: 'benfan' }; h = ev('composerHTML')(gibbs);
     if (/data-talkhandle/.test(h) || !/Posting as <strong>benfan<\/strong>/.test(h) || !/maxlength="1000"/.test(h)) return 'with a name';
   } finally { [acct.on, acct.user, acct.profile] = was; }
+});
+test('account: the username step after sign-in, and the username line in the Account panel', () => {
+  setup(); const acct = ev('acct'), was = [acct.on, acct.user, acct.profile, acct.nameStep, acct.choice, acct.msg];
+  try {
+    acct.on = true; acct.user = { id: 'u-me', email: 'me@example.com' }; acct.choice = null; acct.msg = null;
+    acct.nameStep = 'signin'; acct.profile = null; let h = ev('accountPanel')();
+    if (!/Choose your username/.test(h) || !/id="acctHandle"/.test(h) || !/data-act="namesave"/.test(h) || !/data-act="nameskip"/.test(h)) return 'the step: a field, Save and Not now';
+    acct.choice = { doc: { teams: [] }, rev: 1 }; h = ev('accountPanel')();
+    if (/acctHandle/.test(h) || !/data-act="acctchoice"/.test(h)) return 'the team choice comes before the username';
+    acct.choice = null; acct.nameStep = false; h = ev('accountPanel')();
+    if (/acctHandle/.test(h) || !/No username yet/.test(h) || !/data-act="namepick"/.test(h)) return 'no username: offers to choose one';
+    acct.profile = { handle: 'benfan' }; h = ev('accountPanel')();
+    if (!/Username: <strong>benfan<\/strong>/.test(h) || /namepick/.test(h)) return 'with a username: shows it';
+    acct.profile = undefined; h = ev('accountPanel')();
+    if (/Username:|No username yet/.test(h)) return 'not looked up yet: says nothing';
+  } finally { [acct.on, acct.user, acct.profile, acct.nameStep, acct.choice, acct.msg] = was; }
 });
 test('discussion: without the community tables nothing shows (no tab, no section, no counts)', () => {
   setup(); const D = ev('D'), st = ev('state'), was = [st.tab, D.pp], gibbs = idOf('Jahmyr Gibbs');

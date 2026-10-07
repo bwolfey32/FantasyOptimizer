@@ -1458,14 +1458,17 @@ async function resolveChoice(how) {
   signedInDone();
   await pullHist();
 }
-// signed in and synced: close the sign-in UI and say so
-function signedInDone() {
-  acct.toastNext = false; D.acctOpen = false; D.wSignin = false;
-  render();
+/* signed in and synced: close the sign-in UI and say so. An account with no username yet is asked for one (they can
+   skip it and pick one before their first comment), unless they're on their way to checkout. */
+async function signedInDone() {
+  acct.toastNext = false; D.wSignin = false;
   toast('Signed in. Your teams now sync to this account.');
   // they picked a Pro plan before signing in: carry on to checkout
   let buy = null; try { buy = sessionStorage.getItem('bp:buy'); sessionStorage.removeItem('bp:buy'); } catch {}
-  if (buy) loadPro().then(() => isPro() ? go('pro') : goPro(buy, true));
+  if (buy) { D.acctOpen = false; render(); loadPro().then(() => isPro() ? go('pro') : goPro(buy, true)); return; }
+  if (talkOn() && acct.profile === undefined) { render(); await acct.meP?.catch(() => {}); }
+  if (acct.user && talkOn() && acct.profile === null) { acct.nameStep = 'signin'; acct.msg = null; D.acctOpen = true; render(); revealPanel($('.acct')); deskFocus('#acctHandle'); }
+  else { D.acctOpen = false; render(); }
 }
 
 /* auth: an emailed code, or Google (PKCE: Google sends people back with ?code=, which leaves the #page routes alone) */
@@ -1497,7 +1500,7 @@ function onAuth(ev, session) {
       signedInDone();
     });
     render(); talkMe();
-  } else if (!u && acct.user && ev === 'SIGNED_OUT') { acct.user = null; acct.ready = false; anIdentify(null); talkMe(); render(); }   // session ended elsewhere: keep this browser's copy
+  } else if (!u && acct.user && ev === 'SIGNED_OUT') { acct.user = null; acct.ready = false; acct.nameStep = false; anIdentify(null); talkMe(); render(); }   // session ended elsewhere: keep this browser's copy
   renderAcct();
 }
 function stripAuthParams() { if (/[?&](code|error|error_description|checkout)=/.test(location.search)) try { history.replaceState(null, '', location.pathname + location.hash); } catch {} }
@@ -1537,7 +1540,7 @@ async function googleSignIn() {
 async function signOut(deleted) {
   if (!deleted) await push().catch(() => {});
   try { await acct.sb?.auth.signOut({ scope: 'local' }); } catch {}
-  acct.user = null; acct.ready = false; acct.choice = null; acct.delArm = false; acct.msg = null; acct.step = 'email'; clearTimeout(acct.pushT); talkMe();
+  acct.user = null; acct.ready = false; acct.choice = null; acct.nameStep = false; acct.delArm = false; acct.msg = null; acct.step = 'email'; clearTimeout(acct.pushT); talkMe();
   anIdentify(null); wipeLocal();
   toast(deleted ? 'Account deleted. Everything it held is gone.' : 'Signed out. Your teams are in your account, not in this browser.');
 }
@@ -4760,8 +4763,17 @@ function accountPanel() {
       </div>
       <p class="small muted" style="margin:0">Keep both adds this browser’s teams to your account, and a Sleeper or ESPN team on both counts once. The other two choices replace the teams on one side.</p></div>`;
   }
+  // just signed in (or asked from the line below) and no username yet: the name their comments will carry
+  if (acct.user && acct.nameStep) return `<div class="card panel acct"><div class="row-head"><h2>Choose your username</h2></div>
+    <p style="margin:0">It shows on your comments and reactions in place of your email. Use 3 to 20 letters, numbers or underscores.</p>
+    ${msg}<div class="field"><label class="label" for="acctHandle">Username</label><div class="acct-form"><input class="inp" id="acctHandle" maxlength="20" autocomplete="nickname" autocapitalize="off" spellcheck="false" value="${esc(D.drafts.handle || '')}" placeholder="Letters, numbers, _"><button type="button" class="btn primary" data-act="namesave">Save</button></div></div>
+    <div class="toolbar small"><button type="button" class="linkbtn" data-act="nameskip">Not now</button><span class="muted">You can choose one later, before your first comment.</span></div></div>`;
+  const uname = !talkOn() || acct.profile === undefined ? ''
+    : acct.profile ? `<p class="small" style="margin:0">Username: <strong>${esc(acct.profile.handle)}</strong></p>`
+    : `<p class="small" style="margin:0">No username yet. <button type="button" class="linkbtn" data-act="namepick">Choose one →</button></p>`;
   if (acct.user) return `<div class="card panel acct"><div class="row-head"><h2>Account <span class="hsub ph-mask">${esc(acct.user.email || '')}</span></h2>${close}</div>
     <p style="margin:0">Your teams, settings and Benny’s weekly lineups sync to this account. Sign in with the same email on your phone or computer to see them there. <span id="acctSync" class="muted">${esc(syncText())}</span></p>
+    ${uname}
     <div class="acct-plan">${isPro() ? `<span class="pill n">Pro</span> <span>${esc(proLine(acct.pro))}</span>${acct.pro?.plan === 'monthly' || subActive() ? ' <button type="button" class="linkbtn" data-act="billing">Manage billing</button>' : ''}`
       : `<span class="pill m">Free</span> <span>No ads and every one of Benny’s moves with Pro.</span> <a href="#pro" data-tab="pro">See Pro</a>`}</div>
     ${msg}
@@ -5514,7 +5526,8 @@ function viewNews() {
    his expanded lineup card; elsewhere a 💬 count beside his name links to it. The rows live in Supabase
    (supabase/community.sql), which enforces every rule (who may write what, how much, what a row may hold); this page only
    decides which buttons to show. Reading needs no account and no library: plain fetch with the publishable key. Posting
-   and reacting need a signed-in account and a public name (profiles.handle), chosen with the first comment.
+   and reacting need a signed-in account and a username (profiles.handle), asked for at sign-in (they can skip it) or
+   chosen with the first comment.
    Sections draw from caches (D.talk: a player's comments; D.talkN: comment counts; D.rx: reactions) and, when a fetch
    lands, repaint only their own elements, so a comment being typed is never wiped. */
 const RX = ['👍', '🔥', '🤔', '😂', '📈', '📉'];
@@ -5552,15 +5565,38 @@ const talkErr = e => e?.code === 'timeout' || e instanceof TypeError ? 'Couldn�
   : e?.code === '42501' || e?.status === 403 ? 'Your account can’t do that.'
   : e?.status === 401 ? 'Sign in again, then try once more.' : 'Something went wrong. Try again.';
 function talkSignIn() { D.alertsOpen = false; if (!acct.on) return; if (!D.acctOpen) { D.acctOpen = true; acct.msg = ['info', 'Sign in to join the discussion. It’s free.']; } render(); window.scrollTo(0, 0); deskFocus('#acctEmail'); }
-// after sign-in or sign-out: their public name and whether they moderate, and every cache that depends on who's asking
-async function talkMe() {
+// after sign-in or sign-out: their username and whether they moderate, and every cache that depends on who's asking
+function talkMe() {
   acct.profile = undefined; acct.admin = false; acct.replies = []; D.talk.clear(); D.rx.clear(); D.mod = null;
-  if (!acct.user || !talkNet()) return;
+  if (!acct.user || !talkNet()) return (acct.meP = Promise.resolve());
+  // kept so a fresh sign-in can wait for the username lookup (signedInDone) without asking twice
+  return (acct.meP = (async () => {
+    try {
+      const [p] = await sbRest(`profiles?user_id=eq.${acct.user.id}&select=handle`) || []; acct.profile = p || null;
+      acct.admin = (await sbRest('rpc/is_admin', { method: 'POST', body: {} })) === true;
+    } catch (e) { talkMissing(e); }
+    render(); alertsLoad();
+  })());
+}
+/* Save the signed-in person's username (asked at sign-in, from the Account panel, or with the first comment). The database
+   checks it too (format, taken ignoring case, reserved, blocked words); this turns its refusals into a sentence. */
+async function claimHandle(raw) {
+  const h = String(raw || '').trim();
+  if (!/^[A-Za-z0-9_]{3,20}$/.test(h)) throw new Error('A username is 3 to 20 letters, numbers or underscores.');
+  try { const [p] = await sbRest('profiles?select=handle', { method: 'POST', body: { user_id: acct.user.id, handle: h }, prefer: 'return=representation' }); acct.profile = p; return p; }
+  catch (e) { throw new Error(e.code === '23505' ? `“${h}” is taken. Try another.` : e.code === '23514' ? 'That username isn’t available. Try another.' : talkErr(e)); }
+}
+// the Account panel's username step: save it, then close the panel; a refusal stays in the panel
+async function saveName() {
+  if (acct.nameBusy || !acct.user) return;
+  const h = $('#acctHandle')?.value ?? D.drafts.handle, where = acct.nameStep || 'account';
+  acct.nameBusy = true; acct.msg = ['info', 'Saving…']; render();
   try {
-    const [p] = await sbRest(`profiles?user_id=eq.${acct.user.id}&select=handle`) || []; acct.profile = p || null;
-    acct.admin = (await sbRest('rpc/is_admin', { method: 'POST', body: {} })) === true;
-  } catch (e) { talkMissing(e); }
-  render(); alertsLoad();
+    const p = await claimHandle(h);
+    acct.nameStep = false; acct.msg = null; D.acctOpen = false; D.drafts.handle = '';
+    track('username_set', { where }); render(); toast(`You’re ${p.handle}. That’s the name on your comments.`);
+  } catch (e) { acct.msg = ['err', e.message]; render(); deskFocus('#acctHandle', true); }
+  finally { acct.nameBusy = false; }
 }
 
 /* A player's comments, newest first, with each author's name and the reactions. Refetched when over a minute old. */
@@ -5696,9 +5732,9 @@ function composerHTML(id, { compact = false } = {}) {
   if (!acct.on) return '';
   if (!acct.user) return `<div class="talk-in out"><button type="button" class="btn sm" data-talksignin>Sign in to comment</button><span class="small muted">Reading is open to everyone. Posting takes a free account.</span></div>`;
   const k = 'p:' + id, need = acct.profile === null, nm = esc(D.U.get(id)?.name || 'him');
-  return `<form class="talk-in" data-talkform="${esc(id)}">${need ? `<div class="talk-handle"><label class="small" for="th-${esc(id)}">Your public name</label><input class="inp" id="th-${esc(id)}" data-talkhandle maxlength="20" autocomplete="nickname" placeholder="Letters, numbers, _" value="${esc(D.drafts.handle || '')}"></div>` : ''}
+  return `<form class="talk-in" data-talkform="${esc(id)}">${need ? `<div class="talk-handle"><label class="small" for="th-${esc(id)}">Choose a username</label><input class="inp" id="th-${esc(id)}" data-talkhandle maxlength="20" autocomplete="nickname" placeholder="Letters, numbers, _" value="${esc(D.drafts.handle || '')}"></div>` : ''}
     <textarea class="inp" rows="${compact ? 1 : 2}" maxlength="1000" data-talkin="${esc(k)}" aria-label="Comment about ${nm}" placeholder="${compact ? 'Add a comment' : `What’s your take on ${nm}?`}">${esc(D.drafts[k] || '')}</textarea>
-    <div class="talk-in-row"><span class="small muted">${need ? 'Pick a name once; it shows on everything you post.' : acct.profile ? `Posting as <strong>${esc(acct.profile.handle)}</strong>` : ''}</span><span class="small talk-msg" data-talk-msg="${esc(k)}" role="status"></span><button type="submit" class="btn sm primary">Post</button></div></form>`;
+    <div class="talk-in-row"><span class="small muted">${need ? 'Pick a username once; it shows on everything you post.' : acct.profile ? `Posting as <strong>${esc(acct.profile.handle)}</strong>` : ''}</span><span class="small talk-msg" data-talk-msg="${esc(k)}" role="status"></span><button type="submit" class="btn sm primary">Post</button></div></form>`;
 }
 /* The discussion block: on his page (no limit, whole threads) and on cards (the newest two, compact). Starts loading
    his comments if they aren't loaded. */
@@ -5713,7 +5749,7 @@ function commentsSection(id, { limit = 0, compact = false } = {}) {
 }
 function pTalk(id, u) {
   if (!talkOn()) return '';
-  return `<div class="card ptalk">${commentsSection(id)}</div><div class="small muted">Comments are public and show your public name. Keep it about football and be civil; report anything abusive and a moderator will look at it.</div>`;
+  return `<div class="card ptalk">${commentsSection(id)}</div><div class="small muted">Comments are public and show your username. Keep it about football and be civil; report anything abusive and a moderator will look at it.</div>`;
 }
 // repaint one player's discussion wherever it shows (his page, an expanded card), and his counts
 function talkPaint(id, compose) {
@@ -5733,9 +5769,9 @@ async function talkPost(form) {
     if (acct.profile === undefined) { const [p] = await sbRest(`profiles?user_id=eq.${acct.user.id}&select=handle`) || []; acct.profile = p || null; }
     if (!acct.profile) {
       const h = (form.querySelector('[data-talkhandle]')?.value || D.drafts.handle || '').trim();
-      if (!/^[A-Za-z0-9_]{3,20}$/.test(h)) { if (!form.querySelector('[data-talkhandle]')) talkPaint(id, true); return talkSay(key, 'First pick a public name: 3 to 20 letters, numbers or underscores.'); }
-      try { const [p] = await sbRest('profiles?select=handle', { method: 'POST', body: { user_id: acct.user.id, handle: h }, prefer: 'return=representation' }); acct.profile = p; }
-      catch (e) { if (e.code === '23505') return talkSay(key, `“${h}” is taken. Try another name.`); if (e.code === '23514') return talkSay(key, 'That name isn’t available. Try another.'); throw e; }
+      if (!h) { if (!form.querySelector('[data-talkhandle]')) talkPaint(id, true); return talkSay(key, 'First choose a username: 3 to 20 letters, numbers or underscores.'); }
+      try { await claimHandle(h); } catch (e) { return talkSay(key, e.message); }
+      track('username_set', { where: 'composer' });
     }
     const [c] = await sbRest('comments?select=' + TALK_COLS,
       { method: 'POST', body: { player_id: id, parent_id: parent, author_id: acct.user.id, body, season: D.season || null, week: D.week || null }, prefer: 'return=representation' });
@@ -5916,7 +5952,7 @@ function viewMod() {
       (live ? b('hide', tid, 'Hide it', 'primary') : '') + (c ? b('del', tid, 'Delete it', 'danger') : '') + b('dismiss', tid, 'Dismiss the reports'));
   }).join('') || '<div class="card panel small muted">No open reports.</div>';
   else if (tab === 'hidden') list = M.hid.map(c => card(c, c.hidden_reason ? `<div class="small muted">${esc(c.hidden_reason === 'banned' ? 'Hidden with the account’s ban' : c.hidden_reason)}</div>` : '', b('restore', c.id, 'Restore') + b('del', c.id, 'Delete', 'danger'))).join('') || '<div class="card panel small muted">Nothing hidden.</div>';
-  else if (tab === 'bans') list = M.bans.map(x => `<div class="card panel modc"><div class="cmt-head"><strong>${esc(x.handle || 'An account with no public name')}</strong><span class="small muted">banned ${ago(Date.parse(x.created_at))}</span></div>${x.reason ? `<div class="small muted">${esc(x.reason)}</div>` : ''}<div class="toolbar">${b('unban', x.user_id, 'Lift the ban')}</div></div>`).join('') || '<div class="card panel small muted">Nobody is banned.</div>';
+  else if (tab === 'bans') list = M.bans.map(x => `<div class="card panel modc"><div class="cmt-head"><strong>${esc(x.handle || 'An account with no username')}</strong><span class="small muted">banned ${ago(Date.parse(x.created_at))}</span></div>${x.reason ? `<div class="small muted">${esc(x.reason)}</div>` : ''}<div class="toolbar">${b('unban', x.user_id, 'Lift the ban')}</div></div>`).join('') || '<div class="card panel small muted">Nobody is banned.</div>';
   else {
     const what = l => {
       const c = M.cs.get(l.target_id), on = c && !c.deleted_at ? ` by ${who(c)}` : '', txt = c && !c.deleted_at ? c.body : l.note, name = esc(M.names.get(l.target_id) || 'an account');
@@ -5984,6 +6020,7 @@ document.addEventListener('input', e => {
   const t = e.target;
   if (t.dataset?.talkin) { D.drafts[t.dataset.talkin] = t.value; D.talkFocus = { k: t.dataset.talkin, s: t.selectionStart, e: t.selectionEnd }; }
   else if (t.dataset && 'talkhandle' in t.dataset) { D.drafts.handle = t.value; D.talkFocus = { k: 'handle', s: t.selectionStart, e: t.selectionEnd }; }
+  else if (t.id === 'acctHandle') D.drafts.handle = t.value;   // kept through a repaint of the Account panel
 });
 document.addEventListener('focusin', e => { const t = e.target.closest?.('[data-talkin],[data-talkhandle]'); D.talkFocus = t ? { k: t.dataset.talkin || 'handle', s: t.selectionStart, e: t.selectionEnd } : null; });
 // left the box for somewhere else (not a repaint that replaced it): stop bringing focus back
@@ -6457,6 +6494,7 @@ document.addEventListener('click', e => {
   else if (a === 'account' && document.body.classList.contains('wsign')) actWelcomeSignIn();
   else if (a === 'account') {
     D.acctOpen = !D.acctOpen; D.flow = null; D.tsOpen = false; D.ioOpen = false; acct.delArm = false; if (!acct.user) acct.msg = null;
+    if (!D.acctOpen && acct.nameStep) { acct.nameStep = false; acct.msg = null; }
     if (D.acctOpen && !acct.user) cloudReady().catch(() => {});   // start loading the sign-in library while they type
     render(); if (D.acctOpen) { revealPanel($('.acct')); deskFocus(acct.step === 'code' ? '#acctCode' : '#acctEmail'); }
   }
@@ -6469,6 +6507,9 @@ document.addEventListener('click', e => {
   else if (a === 'acctback') { acct.step = 'email'; acct.code = ''; acct.msg = null; render(); deskFocus('#acctEmail'); }
   else if (a === 'acctgoogle') googleSignIn();
   else if (a === 'acctchoice') resolveChoice(t.dataset.how);
+  else if (a === 'namesave') saveName();
+  else if (a === 'nameskip') { acct.nameStep = false; acct.msg = null; D.acctOpen = false; track('username_skipped'); render(); }
+  else if (a === 'namepick') { acct.nameStep = 'account'; acct.msg = null; render(); deskFocus('#acctHandle'); }
   else if (a === 'acctsync') { acct.msg = null; pull().then(() => acct.ready && push()).then(pullHist); }
   else if (a === 'acctout') signOut();
   else if (a === 'acctdel') {
@@ -6522,6 +6563,7 @@ document.addEventListener('keydown', e => {
   if (e.key === 'Enter' && t.id === 'slQuery') { e.preventDefault(); slFind(); }
   if (e.key === 'Enter' && t.id === 'acctEmail') { e.preventDefault(); sendCode(); }
   if (e.key === 'Enter' && t.id === 'acctCode') { e.preventDefault(); verifyCode(); }
+  if (e.key === 'Enter' && t.id === 'acctHandle') { e.preventDefault(); saveName(); }
   // player search: arrows move through suggestions, Enter picks the highlighted one, Escape closes the list
   if (AC_BOX[t.id] && D.ac?.input === t.id) {
     const n = D.ac.items.length, [listId, mode] = AC_BOX[t.id];

@@ -68,11 +68,11 @@ The comments on player pages and cards, the reactions and the reports use the ta
 1. **SQL Editor → New query**: paste all of `community.sql` and run it. Like `schema.sql`, it's safe to run again.
 2. **Make yourself a moderator.** Find your user id under **Authentication → Users**, then run `insert into public.admins (user_id) values ('<your id>');`. Sign out and in again; **Settings** shows **Open moderation**, and every comment has **Hide**.
 3. **Banning an account:** from **Open moderation**, press **Ban the author…** on a reported or hidden comment. Give a reason, and choose whether to hide everything they've posted. The **Bans** tab lists bans and lifts them. A banned account can still read and delete its own comments, but can't post, react or report.
-4. **Blocked words (optional):** add each one in the SQL editor: `insert into public.blocked_terms values ('word');`. Use lower case letters and digits, and single spaces for a phrase. A comment can't contain one as a whole word, and a public name can't contain one anywhere. The list can't be read through the API, so it stays private.
+4. **Blocked words (optional):** add each one in the SQL editor: `insert into public.blocked_terms values ('word');`. Use lower case letters and digits, and single spaces for a phrase. A comment can't contain one as a whole word, and a username can't contain one anywhere. The list can't be read through the API, so it stays private.
 5. **Whenever `community.sql` changes,** run it again. It upgrades the tables in place and keeps every comment.
 
 What the database enforces, whatever the page sends:
-- You can post only as yourself, and only once you have a public name (`profiles.handle`: 3 to 20 letters, digits or underscores, unique ignoring case).
+- You can post only as yourself, and only once you have a username (`profiles.handle`: 3 to 20 letters, digits or underscores, unique ignoring case).
 - Nobody can edit a comment's text. Moderators can change only `hidden_at` and `hidden_reason`; hiding a thread's first comment hides its replies too, and restoring it brings them back.
 - Deleting a thread's first comment after other people replied leaves a "[deleted]" placeholder, with no text and no author, so their replies stay. The same happens when an account is deleted. A moderator who deletes the placeholder removes the whole thread.
 - Per account:
