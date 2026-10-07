@@ -1106,6 +1106,12 @@ test('polls: Start/Sit asks who you’d start; the split shows after your vote (
     D.ss.set(key, { st: 'ok', n: [4, 2], mine: null, at: Date.now() }); h = ev('viewCompare')();
     if (!/data-act="ssvote"/.test(h) || /poll-row/.test(h) || (h.match(/data-act="ssvote"/g) || []).length !== 2) return 'signed in, not voted: two buttons and no split';
     if (!h.includes(`data-pick="${lo}"`) || !h.includes(`data-pick="${hi}"`)) return 'a button for each player';
+    // the buttons sit in the same order as the Player A / Player B cards below, whichever id is smaller
+    for (const [a, b] of [[x.id, y.id], [y.id, x.id]]) {
+      st.compare = [a, b]; const picks = [...poll(ev('viewCompare')()).matchAll(/data-act="ssvote"[^>]*data-pick="([^"]+)"/g)].map(m => m[1]);
+      if (picks.join() !== `${a},${b}`) return `vote buttons follow Player A, Player B: ${picks} for ${a},${b}`;
+    }
+    st.compare = [x.id, y.id];
     const w = D.call.w;
     D.ss.set(key, { st: 'ok', n: [3, 1], mine: lo, at: Date.now() }); h = ev('viewCompare')();
     if (!/Your pick/.test(h) || !/75%/.test(h) || !/Change my vote/.test(h) || /data-act="ssvote"/.test(h)) return 'voted: the split, your pick, a way to change';

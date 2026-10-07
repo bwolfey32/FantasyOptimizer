@@ -6027,14 +6027,15 @@ function ssLoad(lo, hi, force) {
     .catch(e => { if (!ssMissing(e)) cur.st = cur.st === 'ok' ? 'ok' : 'err'; })
     .finally(() => ssPaint(k));
 }
-function ssInner(lo, hi, w) {
-  const e = D.ss.get(ssKey(lo, hi)), nm = id => esc(D.U.get(id)?.name || id), k = esc(ssKey(lo, hi));
+// `first` is the player on the left in Start / Sit (Player A): the buttons and the split follow the cards below, while votes stay keyed by the (lo, hi) pair
+function ssInner(lo, hi, w, first) {
+  const e = D.ss.get(ssKey(lo, hi)), nm = id => esc(D.U.get(id)?.name || id), k = esc(ssKey(lo, hi)), ord = first === hi ? [hi, lo] : [lo, hi];
   const total = e ? e.n[0] + e.n[1] : 0, head = `<div class="pick-head"><span class="label">Who would you start?</span>${total ? `<span class="small muted">${total} vote${total === 1 ? '' : 's'}</span>` : ''}<button type="button" class="btn sm pick-share" data-act="sharepoll" data-lo="${esc(lo)}" data-hi="${esc(hi)}">Share</button></div>`;
-  const buttons = pressed => `<div class="poll-btns">${[lo, hi].map(id => `<button type="button" class="btn" data-act="ssvote" data-ss="${k}" data-pick="${esc(id)}" data-w="${esc(w)}" aria-pressed="${pressed === id}">${nm(id)}</button>`).join('')}</div>`;
+  const buttons = pressed => `<div class="poll-btns">${ord.map(id => `<button type="button" class="btn" data-act="ssvote" data-ss="${k}" data-pick="${esc(id)}" data-w="${esc(w)}" aria-pressed="${pressed === id}">${nm(id)}</button>`).join('')}</div>`;
   const split = () => {
     const pctOf = i => total ? Math.round(e.n[i] / total * 100) : 0, major = e.n[0] > e.n[1] ? lo : e.n[1] > e.n[0] ? hi : null;
     const line = major === null ? 'The crowd is split evenly.' : major === w ? 'The crowd agrees with Benny.' : `The crowd sides with ${nm(major)}.`;
-    return `<div class="poll-split">${[lo, hi].map((id, i) => `<div class="poll-row${e.mine === id ? ' mine' : ''}"><span>${nm(id)}${e.mine === id ? ' <span class="pill n">Your pick</span>' : ''}</span><span class="num">${pctOf(i)}%</span><span class="poll-bar" aria-hidden="true"><span style="width:${pctOf(i)}%"></span></span></div>`).join('')}</div>
+    return `<div class="poll-split">${ord.map(id => { const i = id === lo ? 0 : 1; return `<div class="poll-row${e.mine === id ? ' mine' : ''}"><span>${nm(id)}${e.mine === id ? ' <span class="pill n">Your pick</span>' : ''}</span><span class="num">${pctOf(i)}%</span><span class="poll-bar" aria-hidden="true"><span style="width:${pctOf(i)}%"></span></span></div>`; }).join('')}</div>
       <div class="small muted">${line}</div>`;
   };
   if (!acct.user) {
@@ -6046,13 +6047,13 @@ function ssInner(lo, hi, w) {
   if (!e.mine || D.ssEdit === ssKey(lo, hi)) return `${head}${buttons(e.mine)}<div class="small muted">${e.mine ? 'Pick again to change your vote.' : 'Vote to see what everyone else thinks.'}</div>`;
   return `${head}${split()}<div><button type="button" class="linkbtn" data-act="ssedit" data-ss="${k}">Change my vote</button></div>`;
 }
-function pollHTML(lo, hi, w) {
+function pollHTML(lo, hi, w, first) {
   if (!talkOn() || D.ssOff) return '';
   ssLoad(lo, hi);
-  return `<div class="card poll" data-sspoll="${esc(ssKey(lo, hi))}" data-lo="${esc(lo)}" data-hi="${esc(hi)}" data-w="${esc(w)}">${ssInner(lo, hi, w)}</div>`;
+  return `<div class="card poll" data-sspoll="${esc(ssKey(lo, hi))}" data-lo="${esc(lo)}" data-hi="${esc(hi)}" data-w="${esc(w)}" data-first="${esc(first)}">${ssInner(lo, hi, w, first)}</div>`;
 }
 function ssPaint(k) {
-  document.querySelectorAll(`[data-sspoll="${qv(k)}"]`).forEach(el => { if (D.ssOff) el.remove(); else el.innerHTML = ssInner(el.dataset.lo, el.dataset.hi, el.dataset.w); });
+  document.querySelectorAll(`[data-sspoll="${qv(k)}"]`).forEach(el => { if (D.ssOff) el.remove(); else el.innerHTML = ssInner(el.dataset.lo, el.dataset.hi, el.dataset.w, el.dataset.first); });
 }
 async function ssVote(k, pick, w) {
   if (!acct.user) return talkSignIn();
@@ -6443,7 +6444,7 @@ function viewCompare() {
       ${classicCallNote(A, Bp, w) ? `<div class="small muted">${esc(classicCallNote(A, Bp, w))}</div>` : ''}
       ${gnote ? `<div class="pick-note">${esc(gnote)}</div>` : ''}
       ${modelNote()}</div>`;
-    if (!example) { const [lo, hi] = a < b ? [a, b] : [b, a]; verdict += pollHTML(lo, hi, w.id); }
+    if (!example) { const [lo, hi] = a < b ? [a, b] : [b, a]; verdict += pollHTML(lo, hi, w.id, a); }
   }
   const dec = reviewDecisions(), decShown = isPro() ? dec : dec.slice(0, 1), decMore = dec.length - decShown.length;
   const decBar = example && A && Bp ? `<div class="banner info small">An example close call: two ${esc(posLabel(A.pos))}s with nearly the same projection this week. Pick any two players above.</div>`
