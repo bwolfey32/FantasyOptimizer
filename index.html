@@ -581,7 +581,8 @@ a.more-link, a.plink.more-link { color: var(--accent); font-weight: 600; }
 .rx { font: inherit; font-size: 13px; line-height: 1; padding: 4px 7px; border-radius: 999px; border: 1px solid var(--line); background: var(--surface); color: var(--ink); cursor: pointer; }
 .rx span { font-variant-numeric: tabular-nums; color: var(--muted); }
 .rx.on { border-color: var(--accent); background: color-mix(in srgb, var(--accent) 12%, var(--surface)); }
-.rx.add { color: var(--muted); }
+.rx.add { color: var(--muted); display: inline-flex; align-items: center; }
+.rx.add svg { display: block; }
 .rxpick { display: inline-flex; flex-wrap: wrap; gap: 4px; }
 .rxpick.report { margin-top: 4px; }
 .rxpick.report .btn[aria-pressed="true"] { border-color: var(--accent); background: color-mix(in srgb, var(--accent) 10%, var(--surface)); box-shadow: inset 0 0 0 .8px var(--accent); }
@@ -5657,12 +5658,14 @@ async function rxLoad(keys, force) {
     for (const [k, v] of fresh) D.rx.set(k, v);
   } catch (e) { talkMissing(e); }
 }
+// An outline smiley with a plus, drawn rather than typed: iOS paints a bare ☺ as a full-colour emoji, which reads as a reaction.
+const RX_ADD = '<svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 12a9 9 0 1 1-9-9"/><path d="M8.5 14.5s1.3 1.8 3.5 1.8 3.5-1.8 3.5-1.8"/><path d="M9 9.5h.01M15 9.5h.01"/><path d="M19 2v6M16 5h6"/></svg>';
 function rxBarHTML(key, queue) {
   if (!talkOn()) return '';
   if (queue && !D.rx.has(key)) D.rxQ.add(key);
   const x = D.rx.get(key) || { c: {}, mine: null }, open = D.rxPick === key, shown = RX.filter(e => x.c[e] > 0);
   const b = (e, n) => `<button type="button" class="rx${x.mine === e ? ' on' : ''}" data-react="${esc(key)}|${e}" aria-pressed="${x.mine === e}" aria-label="${e}${n ? `, ${n}` : ''}">${e}${n ? ` <span>${n}</span>` : ''}</button>`;
-  return `<span class="rxbar" data-rxbar="${esc(key)}">${shown.map(e => b(e, x.c[e])).join('')}<button type="button" class="rx add" data-rxpick="${esc(key)}" aria-expanded="${open}" aria-label="Add a reaction">${shown.length ? '+' : '☺'}</button>${open ? `<span class="rxpick" role="group" aria-label="Reactions">${RX.map(e => b(e, 0)).join('')}</span>` : ''}</span>`;
+  return `<span class="rxbar" data-rxbar="${esc(key)}">${shown.map(e => b(e, x.c[e])).join('')}<button type="button" class="rx add" data-rxpick="${esc(key)}" aria-expanded="${open}" aria-label="Add a reaction">${RX_ADD}</button>${open ? `<span class="rxpick" role="group" aria-label="Reactions">${RX.map(e => b(e, 0)).join('')}</span>` : ''}</span>`;
 }
 function rxPaint(key) { const h = rxBarHTML(key); document.querySelectorAll(`[data-rxbar="${qv(key)}"]`).forEach(el => { el.outerHTML = h; }); }
 // react, change a reaction, or take it back: on screen at once, undone if the database says no
