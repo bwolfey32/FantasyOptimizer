@@ -555,7 +555,11 @@ a.more-link, a.plink.more-link { color: var(--accent); font-weight: 600; }
 .phead .psub { font-size: 14px; }
 .ptags { display: flex; flex-wrap: wrap; gap: 6px 10px; align-items: center; }
 .ptabs { align-self: flex-start; max-width: 100%; overflow-x: auto; }
-.ptabs a { white-space: nowrap; }
+.ptabs a { white-space: nowrap; position: relative; }
+/* the Discussion tab's comment count: inside the tab's corner, since the tab bar clips (it scrolls on phones) */
+.tab-n { position: absolute; top: 2px; right: 2px; min-width: 16px; height: 16px; padding: 0 4px; border-radius: 8px; background: var(--bad); color: #fff; font-size: 10px; font-weight: 700; line-height: 16px; text-align: center; }
+.tab-n[hidden] { display: none; }
+.ptabs a:has(.tab-n:not([hidden])) { padding-right: 24px; }
 .talk { display: flex; flex-direction: column; gap: 8px; }
 .talk .row-head h3 { margin: 0; }
 .talk-n { color: var(--muted); font-weight: 400; }
@@ -5446,7 +5450,7 @@ function viewPlayer() {
       <div class="psub">${posLabel(u.pos)} · ${u.team ? esc(TEAM_CITY[u.team] ? `${TEAM_CITY[u.team]} ${TEAMS[u.team][1]}` : u.team) : 'Free agent'}${bye ? ` · bye week ${bye}` : ''} ${r ? injPill(r) : u.inj ? `<span class="pill q">${esc(u.inj)}</span>` : ''}</div>
       <div class="ptags">${st ? `<span class="pill ${st[0]}">${st[1]}</span>` : ''}${ownLine(id) ? `<span class="small muted">${ownLine(id)} across ESPN leagues</span>` : ''}</div></div></div>
     <div class="toolbar">${r && other ? `<button type="button" class="btn sm" data-decide="${esc(id)}|${esc(other)}">Compare in Start / Sit</button>` : ''}${canEdit && r ? (state.roster.includes(id) ? `<button type="button" class="btn sm" data-remove="${esc(id)}">Remove from roster</button>` : `<button type="button" class="btn sm primary" data-add="${esc(id)}">Add to roster</button>`) : ''}${watchBtn(id)}<button type="button" class="btn sm" data-act="shareplayer">Share</button></div></div>`;
-  const seg = `<nav class="seg sub ptabs" aria-label="${esc(u.name)}">${tabs.map(([k, l]) => `<a href="#${playerHash(id, k)}" ${k === tab ? 'aria-current="page"' : ''}>${l}</a>`).join('')}</nav>`;
+  const seg = `<nav class="seg sub ptabs" aria-label="${esc(u.name)}">${tabs.map(([k, l]) => `<a href="#${playerHash(id, k)}" ${k === tab ? 'aria-current="page"' : ''}>${l}${k === 'talk' ? talkTabBadge(id) : ''}</a>`).join('')}</nav>`;
   const body = tab === 'games' ? pGames(id, u, H) : tab === 'news' ? pNewsTab(id, u) : tab === 'talk' ? pTalk(id, u) : tab === 'history' ? pHistory(id, u, H) : tab === 'stats' ? pStats(id, u, H) : pOverview(id, u, r, H);
   const from = D.pfrom && D.pfrom !== 'player' ? ([...NAV, ...Object.values(SUBNAV).flat()].find(n => n[0] === D.pfrom)?.[1] || null) : null;
   return `<div class="section player">${from ? `<a href="#${HASH[D.pfrom]}" class="small back-link" data-act="pback">← Back to ${esc(from)}</a>` : ''}${head}${seg}${body}</div>`;
@@ -5822,6 +5826,11 @@ function talkChip(id) {
   if (!talkOn() || !id) return '';
   const n = D.talkN.get(id); if (!n || Date.now() - n.at > 3e5) D.cntQ.add(id);
   return `<a class="talkn" href="#${playerHash(id, 'talk')}" data-talkn="${esc(id)}" title="Comments about this player"${n?.n ? '' : ' hidden'}>💬 <span>${n?.n || ''}</span><span class="sr-only"> comments</span></a>`;
+}
+// the same count, as a red badge on the Discussion tab of his page (chipPaint repaints both)
+function talkTabBadge(id) {
+  const n = D.talkN.get(id); if (!n || Date.now() - n.at > 3e5) D.cntQ.add(id);
+  return `<span class="tab-n" data-talkn="${esc(id)}"${n?.n ? '' : ' hidden'}><span>${n?.n || ''}</span><span class="sr-only"> comments</span></span>`;
 }
 function chipPaint(id) { const n = D.talkN.get(id)?.n || 0; document.querySelectorAll(`[data-talkn="${qv(id)}"]`).forEach(el => { el.hidden = !n; el.firstElementChild.textContent = n || ''; }); }
 async function cntFlush() {

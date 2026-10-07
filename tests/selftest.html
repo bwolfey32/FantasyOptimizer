@@ -908,6 +908,18 @@ test('discussion: 💬 counts beside names link to the discussion, never inside 
     if (!ev('D').cntQ.size && ![...D.talkN.keys()].length) return 'names without a count are queued for one query';
   } finally { D.talkN.clear(); D.cntQ.clear(); }
 });
+test('discussion: his page has a red count on the Discussion tab, hidden with no comments', () => {
+  setup(); const D = ev('D'), st = ev('state'), was = [st.tab, D.pp], gibbs = idOf('Jahmyr Gibbs');
+  try {
+    st.tab = 'player'; D.pp = { id: gibbs, tab: 'overview' };
+    const badge = () => new RegExp(`>Discussion<span class="tab-n" data-talkn="${gibbs}"( hidden)?><span>(\\d*)</span>`).exec(ev('viewPlayer')());
+    D.talkN.set(gibbs, { n: 4, at: Date.now() }); let m = badge();
+    if (!m || m[1] || m[2] !== '4') return 'a visible 4 on the tab';
+    D.talkN.set(gibbs, { n: 0, at: Date.now() }); m = badge();
+    if (!m || !m[1]) return 'hidden with no comments';
+    D.talkN.delete(gibbs); D.cntQ.clear(); badge(); if (!D.cntQ.has(gibbs)) return 'an unknown count is queued';
+  } finally { st.tab = was[0]; D.pp = was[1]; D.talkN.clear(); D.cntQ.clear(); }
+});
 test('discussion: the composer asks signed-out readers to sign in, and a new poster for a username', () => {
   setup(); const acct = ev('acct'), gibbs = idOf('Jahmyr Gibbs'), was = [acct.on, acct.user, acct.profile];
   try {
