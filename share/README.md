@@ -45,6 +45,21 @@ It runs on Netlify because GitHub Pages can't make a page per link, and Supabase
 6. In `index.html`, set `const SHARE_URL = 'https://share.bennyspicks.us/w';`, then commit and push. Until then, the Share button keeps sharing plain `bennyspicks.us` links.
 7. Paste a shared link into [opengraph.xyz](https://www.opengraph.xyz) (or a Discord or Slack message to yourself) to see the preview.
 
+## Starting the data refresh on time
+
+`netlify/functions/refresh.mjs` is a scheduled function, not a link: every 3 hours (at :17) it starts the site's data refresh, `.github/workflows/refresh-data.yml`, through GitHub's API. GitHub runs that workflow's own schedule late or skips it when GitHub is busy, so it ran about every 7 hours, and the player pages' News waited with it. GitHub's schedule stays on as a backup. A run that finds nothing new commits nothing.
+
+It needs a GitHub token, set up once:
+
+1. On GitHub: **Settings → Developer settings → Personal access tokens → Fine-grained tokens → Generate new token**. Name it "Benny's Picks refresh", pick **Only select repositories** → this repository, and under **Repository permissions** set **Actions: Read and write**. Choose an expiry (a year at most), and put a reminder in your calendar for it.
+2. In Netlify: **Project configuration → Environment variables → Add a variable**: key `GH_DISPATCH_TOKEN`, the token as the value, with the **Functions** scope.
+3. Deploy, so the function picks the variable up. A push that changes something in `share/` deploys. Otherwise use **Deploys → Trigger deploy**.
+4. Check **Logs → Functions → refresh** after the next :17 past a multiple of 3 hours (UTC). It says "data refresh started", and a run started by `workflow_dispatch` shows on GitHub's Actions tab.
+
+When the token expires, the function logs a 401 and only GitHub's own schedule runs, until you make a new token and replace the variable.
+
+To start a refresh yourself (or from a script), use **Actions → Refresh data → Run workflow**, or `python scripts/run_refresh.py --wait` with the same kind of token in `GH_DISPATCH_TOKEN`. `python scripts/run_refresh.py --status` lists the last runs and needs no token.
+
 ## Notes
 
 - `satori` and `@resvg/resvg-wasm` are pinned in `package.json`. The resvg engine loads from jsDelivr at the same version (`RESVG_WASM` in `lib/card.mjs`), so change both together.

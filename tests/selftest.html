@@ -853,6 +853,13 @@ test('news: a player’s News tab and overview, Research → News with its filte
     D.pp = { id: gibbs, tab: 'overview' }; h = ev('viewPlayer')(); if (!/Latest news/.test(h)) return 'the overview shows his latest news';
     D.pp = { id: goff, tab: 'news' }; h = ev('viewPlayer')(); if (h.includes('javascript:')) return 'only https links';
     D.pp = { id: 'PIT', tab: 'news' }; D.pnews.set('PIT', { st: 'none' }); h = ev('viewPlayer')(); if (!/No news about/.test(h) || !/>News</.test(h)) return 'a D/ST has a News tab, empty';
+    const gu = D.U.get(gibbs), gInj = gu.inj; D.pp = { id: gibbs, tab: 'news' };
+    try {
+      gu.inj = 'Questionable'; h = ev('viewPlayer')(); if (!/Sleeper lists [^<]* as questionable/.test(h)) return 'a live tag his news doesn’t have yet gets a note';
+      D.news.d.items.unshift({ ...it(`inj-${gibbs}-Questionable-209901010000`, 'injury', [gibbs], 'Gibbs listed Questionable'), t: '2099-01-01T00:00:00Z' }); h = ev('viewPlayer')(); D.news.d.items.shift();
+      if (/Sleeper lists/.test(h)) return 'no note when his newest injury item has his tag';
+      gu.inj = null; h = ev('viewPlayer')(); if (/Sleeper lists/.test(h)) return 'no note without a tag';
+    } finally { gu.inj = gInj; }
     st.tab = 'news'; D.newsKind = 'all'; D.newsWho = 'all'; h = ev('viewResearch')();
     if ((h.match(/class="nitem"/g) || []).length !== 4 || !/Most added/.test(h) || !h.includes('12,345')) return 'the feed and trending';
     D.newsKind = 'injury'; h = ev('viewResearch')(); if ((h.match(/class="nitem"/g) || []).length !== 1) return 'the kind filter';

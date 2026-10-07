@@ -1,5 +1,7 @@
 # Refreshes snapshot.json, the saved copy of the data that the site shows instantly while live data loads
 # (and keeps showing if Sleeper or ESPN can't be reached). Runs every 3 hours, or on demand from the Actions tab.
+# GitHub runs the schedule below late or not at all when it's busy, so share.bennyspicks.us starts this workflow on time
+# every 3 hours as well (share/netlify/functions/refresh.mjs); scripts/run_refresh.py starts it from the command line.
 name: Refresh data
 
 on:
