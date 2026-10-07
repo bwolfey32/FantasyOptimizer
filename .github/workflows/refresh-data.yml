@@ -65,6 +65,11 @@ jobs:
       - name: Update player ids
         run: python3 scripts/player_ids.py player-ids.json || echo "Player ids kept from the last run"
 
+      # player news (news/): injury, team and depth-chart changes since the last run, Sleeper's most-added players, and
+      # ESPN headlines that name a player; a failure keeps the old feed, and a source that fails is a warning
+      - name: Update player news
+        run: python3 scripts/news.py 2> >(tee -a "$RUNNER_TEMP/warnings.log" >&2) || echo "News kept from the last run"
+
       # every QB/RB/WR/TE's seasons and game logs since 2013 for the player pages (players/data/), and the static player
       # pages search engines read (players/<slug>/); rebuilt at most once a day, and a failure keeps the old ones
       - name: Update player pages
@@ -83,7 +88,7 @@ jobs:
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898583+github-actions[bot]@users.noreply.github.com"
-          for p in snapshot.json forecasts calibration.json player-ids.json share-players.json players weekly sitemap.xml model; do if [ -e "$p" ]; then git add "$p"; fi; done
+          for p in snapshot.json forecasts calibration.json player-ids.json share-players.json news players weekly sitemap.xml model; do if [ -e "$p" ]; then git add "$p"; fi; done
           if git diff --cached --quiet; then echo "No changes"; exit 0; fi
           git commit -m "Refresh data snapshot"
           git pull --rebase --autostash

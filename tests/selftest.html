@@ -777,10 +777,11 @@ test('player pages: addresses for each player and tab; the old addresses still l
   if (ph('player/4046').ptab !== 'overview' || ph('player/4046/nonsense').ptab !== 'overview') return 'an unknown tab should be the overview';
   if (ph('player/PIT').id !== 'PIT') return 'a D/ST id';
   if (ph(hash('4046', 'history')).ptab !== 'history' || hash('4046', 'overview') !== 'player/4046') return 'playerHash round trip';
-  const old = { lineup: 'lineup', 'start-sit': 'compare', waivers: 'waivers', roster: 'players', research: 'defenses', 'research-teams': 'teams', 'research-weather': 'weather', settings: 'settings', pro: 'pro', players: 'pool' };
+  const old = { lineup: 'lineup', 'start-sit': 'compare', waivers: 'waivers', roster: 'players', research: 'defenses', 'research-teams': 'teams', 'research-weather': 'weather', 'research-news': 'news', settings: 'settings', pro: 'pro', players: 'pool' };
   for (const [h, t] of Object.entries(old)) if (ph(h)?.tab !== t) return `#${h} should open ${t}, got ${JSON.stringify(ph(h))}`;
   if (ph('export') !== null || ph('') !== null) return 'non-page addresses should be null';
-  const nav = ev('navOf'); if (nav('compare') !== 'lineup' || nav('players') !== 'lineup' || nav('player') !== 'pool' || nav('weather') !== 'defenses') return 'nav groups';
+  const nav = ev('navOf'); if (nav('compare') !== 'lineup' || nav('players') !== 'lineup' || nav('player') !== 'pool' || nav('weather') !== 'defenses' || nav('news') !== 'defenses') return 'nav groups';
+  if (ph('player/4046/news').ptab !== 'news') return 'the News tab';
 });
 test('player pages: names and pictures link to the player page everywhere, but never inside a button', () => {
   setup(); const gibbs = idOf('Jahmyr Gibbs'), st = ev('state'), D = ev('D');
@@ -833,6 +834,115 @@ test('player pages: every tab renders for each position, with and without past s
     D.pp = { id: 'nobody-here', tab: 'overview' }; D.phist.set('nobody-here', { st: 'none' });
     if (!ev('viewPlayer')().includes('Player not found')) return 'an unknown id should say so';
   } finally { st.tab = was[0]; D.pp = was[1]; D.pseason = null; setup(); }
+});
+test('news: a player’s News tab and overview, Research → News with its filters, escaped and linking out only over https', () => {
+  setup(); const D = ev('D'), st = ev('state'), was = [st.tab, D.pp, D.news, D.newsKind, D.newsWho];
+  const gibbs = idOf('Jahmyr Gibbs'), goff = idOf('Jared Goff'), now = new Date().toISOString();
+  const it = (id, k, ids, title, url = null) => ({ id, t: now, k, ids, names: ids.map(() => 'Someone'), title, sub: k === 'injury' ? 'was Questionable' : null, src: url ? 'ESPN' : 'Benny’s Picks', url, note: null });
+  D.news = { st: 'ok', d: { v: 1, updated: now, trend: { add: [[gibbs, 12345]], drop: [[goff, 99]] }, items: [
+    it('a', 'injury', [gibbs], 'Gibbs listed <b>Out</b>'), it('b', 'article', [gibbs, goff], 'Lions win', 'https://www.espn.com/x'),
+    it('c', 'article', [goff], 'Bad link', 'javascript:alert(1)'), it('d', 'team', ['999999'], 'Somebody joins NYJ')] } };
+  D.pnews.set(gibbs, { st: 'ok', d: { v: 1, id: gibbs, items: [it('a', 'injury', [gibbs], 'Gibbs listed <b>Out</b>'), it('old', 'depth', [gibbs], 'Old depth move')] } });
+  D.pnews.set(goff, { st: 'none' });
+  try {
+    st.tab = 'player'; D.pp = { id: gibbs, tab: 'news' }; let h = ev('viewPlayer')();
+    if (!h.includes('Gibbs listed &lt;b&gt;Out&lt;/b&gt;')) return 'titles should be escaped';
+    if ((h.match(/class="nitem"/g) || []).length !== 3) return 'his file and the feed, once each: ' + (h.match(/class="nitem"/g) || []).length;
+    if (!h.includes('href="https://www.espn.com/x" target="_blank" rel="noopener"')) return 'an ESPN headline links out';
+    if (!h.includes(`href="#player/${goff}"`) || h.includes(`class="plink nchip">${'Jahmyr Gibbs'}`)) return 'the other players named link their pages, not his own';
+    D.pp = { id: gibbs, tab: 'overview' }; h = ev('viewPlayer')(); if (!/Latest news/.test(h)) return 'the overview shows his latest news';
+    D.pp = { id: goff, tab: 'news' }; h = ev('viewPlayer')(); if (h.includes('javascript:')) return 'only https links';
+    D.pp = { id: 'PIT', tab: 'news' }; D.pnews.set('PIT', { st: 'none' }); h = ev('viewPlayer')(); if (!/No news about/.test(h) || !/>News</.test(h)) return 'a D/ST has a News tab, empty';
+    st.tab = 'news'; D.newsKind = 'all'; D.newsWho = 'all'; h = ev('viewResearch')();
+    if ((h.match(/class="nitem"/g) || []).length !== 4 || !/Most added/.test(h) || !h.includes('12,345')) return 'the feed and trending';
+    D.newsKind = 'injury'; h = ev('viewResearch')(); if ((h.match(/class="nitem"/g) || []).length !== 1) return 'the kind filter';
+    D.newsKind = 'all'; D.newsWho = 'QB'; h = ev('viewResearch')(); if ((h.match(/class="nitem"/g) || []).length !== 2) return 'the position filter (Goff’s two)';
+    D.newsWho = 'mine'; h = ev('viewResearch')(); const mine = D.news.d.items.filter(i => i.ids.some(id => st.roster.includes(id))).length;
+    if (!mine) return 'the test roster should hold Gibbs or Goff'; if ((h.match(/class="nitem"/g) || []).length !== mine) return `the my-team filter: ${mine} expected`;
+    if (/undefined|NaN/.test(h.replace(/<[^>]+>/g, ' '))) return 'undefined or NaN on the page';
+    D.news = { st: 'none' }; if (!/isn’t available/.test(ev('viewResearch')())) return 'a missing feed says so';
+  } finally { st.tab = was[0]; D.pp = was[1]; D.news = was[2]; D.newsKind = was[3]; D.newsWho = was[4]; D.pnews.clear(); setup(); }
+});
+/* ---------- discussion (filled from caches: the self-test never calls the live database) ---------- */
+function talkFixture(id) {
+  const D = ev('D'), t0 = Date.now(), at = m => new Date(t0 - m * 60000).toISOString();
+  const c = (cid, parent, who, body, m, extra) => Object.assign({ id: cid, player_id: id, parent_id: parent, author_id: 'u-' + who, body, season: D.season, week: D.week, hidden_at: null, hidden_reason: null, created_at: at(m), profiles: { handle: who } }, extra);
+  const rows = [c('r3', null, 'carol', 'Newest <b>take</b>', 1), c('r2', null, 'bob', 'Middle', 30), c('r1', null, 'alice', 'Oldest thread', 90),
+    c('k1', 'r1', 'bob', 'reply one', 80), c('k2', 'r1', 'carol', 'reply two', 70), c('k3', 'r1', 'dan', 'reply three', 60)];
+  D.talk.set(id, { st: 'ok', rows, at: Date.now() }); D.talkN.set(id, { n: rows.length, at: Date.now() });
+  D.rx.set('c:r3', { c: { '🔥': 3, '👍': 1 }, mine: '🔥' });
+  return rows;
+}
+test('discussion: his page shows threads newest first with two replies each, the overview and cards the newest two, all escaped', () => {
+  setup(); const D = ev('D'), st = ev('state'), was = [st.tab, D.pp], gibbs = idOf('Jahmyr Gibbs');
+  try {
+    talkFixture(gibbs);
+    st.tab = 'player'; D.pp = { id: gibbs, tab: 'talk' }; let h = ev('viewPlayer')();
+    if (!/>Discussion</.test(h)) return 'a Discussion tab';
+    const order = ['Newest', 'Middle', 'Oldest thread'].map(x => h.indexOf(x)); if (order.some(i => i < 0) || order[0] > order[1] || order[1] > order[2]) return 'threads newest first: ' + order;
+    if (!h.includes('Newest &lt;b&gt;take&lt;/b&gt;')) return 'comment text is escaped';
+    if (!h.includes('reply one') || !h.includes('reply two') || h.includes('reply three') || !/View 1 more reply/.test(h)) return 'two replies, then View more';
+    if (h.indexOf('reply one') > h.indexOf('reply two')) return 'replies oldest first';
+    if (!/data-react="c:r3\|🔥" aria-pressed="true"/.test(h) || !/🔥 <span>3<\/span>/.test(h)) return 'reactions with counts and the reader’s own';
+    if (!/data-talk-n="[^"]+">· 6</.test(h)) return 'the comment count';
+    D.talkMore.add('r1'); h = ev('viewPlayer')(); D.talkMore.clear(); if (!h.includes('reply three')) return 'View more shows the rest';
+    D.pp = { id: gibbs, tab: 'overview' }; h = ev('viewPlayer')();
+    const ov = h.slice(h.indexOf('class="card ptalk"')); if (!ov.includes('Newest') || !ov.includes('Middle') || ov.includes('Oldest thread') || ov.includes('reply one')) return 'the overview: the newest two, no replies';
+    if (!/3 replies/.test(ev('talkThreadHTML')(gibbs, { limit: 3, compact: true }))) return 'a card says how many replies';
+    D.open.add(gibbs); const lin = ev('viewLineup')(); D.open.delete(gibbs);
+    if (!lin.includes(`data-talk-thread="${gibbs}" data-limit="2" data-compact="1"`)) return 'an expanded lineup card has the discussion';
+    if (/undefined|NaN|\[object/.test(h.replace(/<[^>]+>/g, ' '))) return 'undefined or NaN on the page';
+  } finally { st.tab = was[0]; D.pp = was[1]; D.talk.clear(); D.talkN.clear(); D.rx.clear(); setup(); }
+});
+test('discussion: 💬 counts beside names link to the discussion, never inside a button, and only with comments', () => {
+  setup(); const D = ev('D'), gibbs = idOf('Jahmyr Gibbs'), cook = idOf('James Cook');
+  try {
+    D.talkN.set(gibbs, { n: 4, at: Date.now() }); D.talkN.set(cook, { n: 0, at: Date.now() });
+    const lin = ev('viewLineup')(), ros = (D.rview = 'mine', ev('viewPlayers')());
+    const chip = id => new RegExp(`<a class="talkn" href="#player/${id}/talk" data-talkn="${id}"[^>]*?(hidden)?>`);
+    for (const [k, h] of Object.entries({ lineup: lin, roster: ros })) {
+      const m = chip(gibbs).exec(h); if (!m || m[1]) return `${k}: a visible count for a player with comments`;
+      const n = chip(cook).exec(h); if (n && !n[1]) return `${k}: no count shown for a player without comments`;
+      const bad = [...h.matchAll(/<button\b[^>]*>([\s\S]*?)<\/button>/g)].find(x => /class="talkn"/.test(x[1])); if (bad) return `${k}: a count inside a button`;
+    }
+    if (!ev('D').cntQ.size && ![...D.talkN.keys()].length) return 'names without a count are queued for one query';
+  } finally { D.talkN.clear(); D.cntQ.clear(); }
+});
+test('discussion: the composer asks signed-out readers to sign in, and a new poster for a public name', () => {
+  setup(); const acct = ev('acct'), gibbs = idOf('Jahmyr Gibbs'), was = [acct.on, acct.user, acct.profile];
+  try {
+    acct.on = true; acct.user = null; if (!/Sign in to comment/.test(ev('composerHTML')(gibbs))) return 'signed out';
+    acct.user = { id: 'u-me' }; acct.profile = null; let h = ev('composerHTML')(gibbs);
+    if (!/data-talkhandle/.test(h) || !/Your public name/.test(h)) return 'no name yet: asks for one';
+    acct.profile = { handle: 'benfan' }; h = ev('composerHTML')(gibbs);
+    if (/data-talkhandle/.test(h) || !/Posting as <strong>benfan<\/strong>/.test(h) || !/maxlength="1000"/.test(h)) return 'with a name';
+  } finally { [acct.on, acct.user, acct.profile] = was; }
+});
+test('discussion: without the community tables nothing shows (no tab, no section, no counts)', () => {
+  setup(); const D = ev('D'), st = ev('state'), was = [st.tab, D.pp], gibbs = idOf('Jahmyr Gibbs');
+  try {
+    D.talkOff = true; D.talkN.set(gibbs, { n: 4, at: Date.now() });
+    st.tab = 'player'; D.pp = { id: gibbs, tab: 'overview' }; const h = ev('viewPlayer')();
+    if (/>Discussion</.test(h) || /data-talk-thread/.test(h)) return 'no Discussion tab or section';
+    D.open.add(gibbs); const lin = ev('viewLineup')(); D.open.delete(gibbs);
+    if (/class="talkn"|data-talk-thread/.test(lin)) return 'no counts or section on the lineup';
+  } finally { D.talkOff = false; st.tab = was[0]; D.pp = was[1]; D.talkN.clear(); }
+});
+test('watching: a player’s news reaches the alerts, the watchlist syncs, and Players can list who you watch', () => {
+  setup(); const D = ev('D'), st = ev('state'), gibbs = idOf('Jahmyr Gibbs'), far = idOf('Brandon Aubrey'), was = [st.watch, st.alertsSeen, D.news, D.alertsSince, st.tab];
+  const now = Date.now(), it = (id, ids, m) => ({ id, t: new Date(now - m * 60000).toISOString(), k: 'injury', ids, names: ids.map(() => 'X'), title: id, src: 'Benny’s Picks' });
+  try {
+    st.watch = []; st.alertsSeen = now - 120 * 60000; D.alertsSince = null;
+    const notMine = ev('state').roster.includes(far) ? idOf('Justin Tucker') : far;
+    D.news = { st: 'ok', at: now, d: { v: 1, items: [it('a', [st.roster[0]], 10), it('b', [notMine], 20), it('old', [st.roster[0]], 300)] } };
+    if (ev('alertItems')().n !== 1) return 'only news about your team since the bell was opened: ' + ev('alertItems')().n;
+    ev('toggleWatch')(notMine); if (!st.watch.includes(notMine)) return 'watch adds him';
+    if (ev('alertItems')().n !== 2) return 'a watched player’s news counts too';
+    if (!ev('cloudDoc')().shared.watch.includes(notMine)) return 'the watchlist syncs with the shared settings';
+    D.poolPos = 'watch'; st.tab = 'pool'; const h = ev('viewPool')(); if (!/★ Watching/.test(h) || (D.M[notMine] && !h.includes(`#player/${notMine}`))) return 'Players lists who you watch';
+    D.pp = { id: notMine, tab: 'overview' }; if (!/★ Watching/.test(ev('watchBtn')(notMine))) return 'the button shows it';
+    ev('toggleWatch')(notMine); if (st.watch.includes(notMine)) return 'watch again removes him';
+  } finally { [st.watch, st.alertsSeen, D.news, D.alertsSince, st.tab] = was; D.poolPos = 'QB'; setup(); }
 });
 test('player pages: Benny’s call says where a rostered player plays, and a waiver pick links Waivers', () => {
   setup(); const pc = ev('pCall'), D = ev('D'), { starters, bench } = ev('optimize')();

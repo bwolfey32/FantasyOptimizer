@@ -10,7 +10,8 @@ exits 1 when something has gone stale, which fails the run, and GitHub emails th
   - players/data/index.json is over 48 hours old: the player history has failed to rebuild twice (it runs daily)
   - there are fewer than 500 player pages
 Warnings (printed as annotations, the run still passes): an nflverse file served from an old cached copy because none
-of its addresses answered (lines starting "WARNING" in --warnings, the earlier steps' stderr).
+of its addresses answered, or a news source skipped (lines starting "WARNING" in --warnings, the earlier steps' stderr);
+news/feed.json over 12 hours old (news is optional: the site works without it).
 Everything found goes to --summary (the run's summary page) too.
 """
 import argparse
@@ -61,6 +62,12 @@ def main():
     pages = sum(os.path.exists(os.path.join(ROOT, "players", s, "index.html")) for s in set(slugs.values()))
     if pages < 500:
         errors.append(f"Only {pages} player pages: scripts/player_pages.py may be failing.")
+
+    feed = load("news/feed.json")
+    if not feed:
+        warns.append("news/feed.json is missing: scripts/news.py has never run.")
+    elif hours_since(feed["updated"]) > 12:
+        warns.append(f"Player news is {hours_since(feed['updated']):.0f} hours old: scripts/news.py is failing.")
 
     if a.warnings and os.path.exists(a.warnings):
         with open(a.warnings, encoding="utf-8", errors="replace") as f:

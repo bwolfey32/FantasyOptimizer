@@ -61,6 +61,22 @@ To keep the emails out of spam:
 - **Rows are private.** In Supabase, open **Table Editor → user_state**. There is one row per person. Signed in as a different person, a request for someone else's row returns nothing.
 - **Delete account.** Delete a test account from **Account → Delete account**. Its row disappears from both tables and from **Authentication → Users**.
 
+## 7. Turn on the player discussion
+
+The comments on player pages and cards, the reactions and the reports use the tables in `community.sql`. Until it's run, the page shows no discussion anywhere (it notices the tables are missing and hides it).
+
+1. **SQL Editor → New query**: paste all of `community.sql` and run it. Like `schema.sql`, it's safe to run again.
+2. **Make yourself a moderator.** Find your user id under **Authentication → Users**, then run `insert into public.admins (user_id) values ('<your id>');`. Sign out and in again; **Settings** shows **Open moderation**, and every comment has **Hide**.
+3. **Banning an account:** `insert into public.bans (user_id, reason) values ('<their id>', 'spam');`. They can still read and delete their own comments, but can't post, react or report.
+
+What the database enforces, whatever the page sends:
+- You can post only as yourself, and only once you have a public name (`profiles.handle`: 3 to 20 letters, digits or underscores, unique ignoring case).
+- Nobody can edit a comment's text. Moderators can change only `hidden_at` and `hidden_reason`; hiding a thread's first comment hides its replies too, and restoring it brings them back.
+- At most 5 comments a minute and 60 a day per account, 500 reactions a day, and 30 reports a day.
+- Reports are visible only to the person who filed them and to moderators, and nobody can delete one.
+
+**Checking it:** with two accounts, post, reply and react. Report a comment from the second account, then hide and restore it from **Open moderation** as the first. A request with only the publishable key, such as `curl "https://<ref>.supabase.co/rest/v1/comments?select=*" -H "apikey: sb_publishable_…"`, must not return hidden comments, and `.../rest/v1/reports?select=*` must return nothing.
+
 # Setting up Pro payments (Stripe)
 
 Pro ($4.99/month, or $14.99 for the season) runs on Stripe. Three small server functions live in Supabase (`functions/`):

@@ -547,6 +547,75 @@ a.more-link, a.plink.more-link { color: var(--accent); font-weight: 600; }
 .ptags { display: flex; flex-wrap: wrap; gap: 6px 10px; align-items: center; }
 .ptabs { align-self: flex-start; max-width: 100%; overflow-x: auto; }
 .ptabs a { white-space: nowrap; }
+.talk { display: flex; flex-direction: column; gap: 8px; }
+.talk .row-head h3 { margin: 0; }
+.talk-n { color: var(--muted); font-weight: 400; }
+.talk-thread { display: flex; flex-direction: column; gap: 2px; }
+.cthread { border-bottom: 1px solid var(--line); padding-bottom: 6px; }
+.cthread:last-child { border-bottom: 0; }
+.cmt { display: flex; flex-direction: column; gap: 4px; padding: 8px 0; }
+.cmt.is-hidden { opacity: .6; }
+.cmt-head { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 8px; font-size: 14px; }
+.cmt-body { white-space: pre-wrap; overflow-wrap: anywhere; line-height: 1.45; }
+.clamp { display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; }
+.cmt-acts { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 12px; font-size: 13px; }
+.creplies { margin-left: 14px; padding-left: 12px; border-left: 2px solid var(--line); }
+.rxbar { display: inline-flex; flex-wrap: wrap; align-items: center; gap: 4px; position: relative; }
+.rx { font: inherit; font-size: 13px; line-height: 1; padding: 4px 7px; border-radius: 999px; border: 1px solid var(--line); background: var(--surface); color: var(--ink); cursor: pointer; }
+.rx span { font-variant-numeric: tabular-nums; color: var(--muted); }
+.rx.on { border-color: var(--accent); background: color-mix(in srgb, var(--accent) 12%, var(--surface)); }
+.rx.add { color: var(--muted); }
+.rxpick { display: inline-flex; flex-wrap: wrap; gap: 4px; }
+.rxpick.report { margin-top: 4px; }
+.talk-in { display: flex; flex-direction: column; gap: 6px; }
+.talk-in textarea.inp { width: 100%; resize: vertical; min-height: 44px; font-family: inherit; font-size: inherit; }
+.talk-in-row { display: flex; flex-wrap: wrap; align-items: center; justify-content: flex-end; gap: 6px 10px; }
+.talk-in-row > .small:first-child { margin-right: auto; }
+.talk-in.out { flex-direction: row; flex-wrap: wrap; align-items: center; gap: 6px 10px; }
+.talk-in.reply { margin-top: 6px; }
+.talk-msg { color: var(--bad); }
+.talk-msg:empty { display: none; }
+.talk-handle { display: flex; flex-direction: column; gap: 2px; max-width: 280px; }
+.ptalk { padding: 14px 16px; }
+.dtalk { grid-column: 1 / -1; border-top: 1px solid var(--line); padding-top: 10px; }
+.talk.compact .cmt { padding: 6px 0; }
+a.talkn { display: inline-flex; align-items: center; gap: 2px; font-size: 12px; color: var(--muted); text-decoration: none; margin-left: 6px; white-space: nowrap; }
+a.talkn:hover, a.talkn:focus-visible { color: var(--accent); }
+a.talkn[hidden] { display: none; }
+.item:has(> .talkrow) { position: relative; }
+.talkrow { position: absolute; right: 12px; bottom: 3px; line-height: 1; }
+.talkrow a.talkn { margin: 0; font-size: 11px; }
+.talkrow:has(.talkn[hidden]) { display: none; }
+.talkhot { padding: 10px 14px; display: flex; flex-wrap: wrap; align-items: baseline; gap: 6px 14px; }
+.talkhot-l { display: flex; flex-wrap: wrap; gap: 4px 14px; }
+.btn.bell { position: relative; display: inline-flex; align-items: center; padding-left: 10px; padding-right: 10px; }
+.btn.bell[hidden] { display: none; }
+.bell-n { position: absolute; top: -6px; right: -6px; min-width: 18px; height: 18px; padding: 0 4px; border-radius: 9px; background: var(--bad); color: #fff; font-size: 11px; font-weight: 700; line-height: 18px; text-align: center; }
+.bell-n[hidden] { display: none; }
+.alerts { display: flex; flex-direction: column; gap: 8px; }
+.alerts:focus { outline: none; }
+.modc { display: flex; flex-direction: column; gap: 6px; }
+.sr-only { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0, 0, 0, 0); white-space: nowrap; border: 0; }
+.nfilters .seg { max-width: 100%; overflow-x: auto; }
+.nfilters .seg button { white-space: nowrap; }
+.nlist { list-style: none; margin: 0; padding: 0; }
+.nlist.card { padding: 4px 16px; }
+.nitem { display: flex; flex-direction: column; gap: 3px; padding: 12px 0; border-bottom: 1px solid var(--line); }
+.nitem:last-child { border-bottom: 0; }
+.nmeta { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
+.ntitle { font-weight: 600; line-height: 1.35; }
+.ntitle a { color: inherit; }
+.ntitle a:hover, .ntitle a:focus-visible { color: var(--accent); }
+.nwho { display: flex; flex-wrap: wrap; gap: 4px 12px; font-size: 13px; }
+.pnews { padding: 14px 16px; }
+.pnews .nitem:first-child { padding-top: 4px; }
+.nlayout { display: grid; grid-template-columns: minmax(0, 1fr) 280px; gap: 16px; align-items: start; }
+.nmain { display: flex; flex-direction: column; gap: 10px; min-width: 0; }
+.ntrends { padding: 14px 16px; display: flex; flex-direction: column; gap: 8px; }
+.ntrend-cols { display: grid; grid-template-columns: 1fr; gap: 12px; }
+.ntrend { margin: 0; padding-left: 22px; display: flex; flex-direction: column; gap: 4px; font-size: 14px; }
+.ntrend li span { margin-left: 6px; }
+@media (max-width: 860px) { .nlayout { grid-template-columns: minmax(0, 1fr); } .ntrend-cols { grid-template-columns: 1fr 1fr; } }
 .pweek { padding: 14px 16px; display: flex; flex-direction: column; gap: 10px; }
 .pweek .summary .grade { display: inline-grid; width: 40px; height: 34px; font-size: 22px; }
 .pcall { display: flex; flex-direction: column; gap: 2px; padding: 10px 12px; border-radius: 8px; background: color-mix(in srgb, var(--accent) 7%, var(--surface-2)); font-size: 14.5px; }
@@ -829,6 +898,7 @@ button, .btn, [role="button"], [role="tab"], nav, nav a, summary { -webkit-touch
     <div class="controls">
       <button type="button" class="status" id="status" data-act="fresh" aria-expanded="false" aria-controls="fresh" title="When each kind of data was last updated"><i></i><span>Loading…</span></button>
       <button class="btn" data-act="reload" type="button" title="Get the newest projections, injuries and lines">Refresh projections</button>
+      <button class="btn bell" type="button" id="bellBtn" data-bell aria-expanded="false" aria-label="Alerts" title="News about your players and the players you watch, and replies to your comments" hidden><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9"/><path d="M10.3 21a1.94 1.94 0 0 0 3.4 0"/></svg><span class="bell-n" hidden></span></button>
       <span class="acct-grp"><button class="btn gopro" data-tab="pro" type="button" id="proBtn" hidden>Go Pro</button><button class="btn" data-act="account" type="button" id="acctBtn" aria-expanded="false" hidden>Sign in</button></span>
     </div>
   </header>
@@ -1065,7 +1135,7 @@ const DEFAULT_STATE = {
   slots: { QB:1, RB:2, WR:2, TE:1, FLEX:1, 'RB/WR':0, 'WR/TE':0, OP:0, 'D/ST':1, K:1 },
   espn: { leagueId: '', teamId: null, slotOf: {} },
   waivers: { horizon: 4, teams: 12, ownMax: 50, source: 'own', faList: [], faListAt: null, taken: {}, allowDrop: {}, forceKeep: {}, rank: 'window' },
-  teams: [], activeTeam: null, returnWeek: {}, liveFix: {}, scoring: 'ppr', tePrem: 0, sleeper: null,
+  teams: [], activeTeam: null, returnWeek: {}, liveFix: {}, scoring: 'ppr', tePrem: 0, sleeper: null, watch: [], alertsSeen: 0,
 };
 /* Fantasy teams. The active team's fields live on `state` itself (state.roster, state.slots, ...) so the rest of the
    app reads one team at a time; save() copies them back into state.teams, and switching loads another team's copy.
@@ -1123,7 +1193,7 @@ function loadState() {
 }
 let state = loadState();
 const save = () => { stashTeam(); stampChanges(); store.set('state', state); queuePush(); };
-const D = { loading: true, progress: 0, errors: [], open: new Set(), phist: new Map(), scrollOf: {}, lg: {}, U: new Map(), proj: {}, H: {}, tg: {}, rec: {}, prior: {}, cur: {}, B: {}, L: {}, ranks: {}, M: {}, imgBad: new Set(), coaches: null, espnTeams: null, defSort: ['fpaWR', -1], teamOpen: null, resetArm: false };
+const D = { loading: true, progress: 0, errors: [], open: new Set(), phist: new Map(), pnews: new Map(), talk: new Map(), talkN: new Map(), rx: new Map(), cntQ: new Set(), rxQ: new Set(), talkMore: new Set(), scrollOf: {}, lg: {}, U: new Map(), proj: {}, H: {}, tg: {}, rec: {}, prior: {}, cur: {}, B: {}, L: {}, ranks: {}, M: {}, imgBad: new Set(), coaches: null, espnTeams: null, defSort: ['fpaWR', -1], teamOpen: null, resetArm: false };
 
 /* ---------- accounts and sync ----------
    Signing in is optional. This browser's copy (state) stays the working copy; a signed-in account keeps a mirror of
@@ -1199,7 +1269,7 @@ function hash53(s) {
   return (4294967296 * (2097151 & h2) + (h1 >>> 0)).toString(36);
 }
 // what syncs: every team except an empty placeholder, plus the settings shared by all teams; the week and season being viewed stay per device
-const sharedPart = st => { const s = Object.assign({}, st.settings); delete s.season; delete s.week; return { overrides: st.overrides || {}, staffEdits: st.staffEdits || {}, returnWeek: st.returnWeek || {}, settings: s }; };
+const sharedPart = st => { const s = Object.assign({}, st.settings); delete s.season; delete s.week; return { overrides: st.overrides || {}, staffEdits: st.staffEdits || {}, returnWeek: st.returnWeek || {}, settings: s, watch: st.watch || [], alertsSeen: st.alertsSeen || 0 }; };
 const teamBody = t => { const o = Object.assign({}, t); delete o.mtime; return o; };
 /* Stamp each team with the time it last changed, and mark teams that disappeared as deleted. Runs on every save, so merges
    between devices can tell which copy is newer. */
@@ -1235,6 +1305,7 @@ function applyDoc(doc) {
   state.deleted = Object.assign({}, doc.deleted); state.gmtime = doc.gmtime || 0;
   const g = doc.shared || {}, view = { season: state.settings.season, week: state.settings.week };
   state.overrides = Object.assign({}, g.overrides); state.staffEdits = Object.assign({}, g.staffEdits); state.returnWeek = Object.assign({}, g.returnWeek);
+  if (Array.isArray(g.watch)) state.watch = g.watch.slice(); state.alertsSeen = Math.max(state.alertsSeen || 0, g.alertsSeen || 0);
   state.settings = Object.assign({}, DEFAULT_STATE.settings, g.settings, view);
   state.settings.w = Object.assign({}, DEFAULT_STATE.settings.w, g.settings?.w);
   applyTeam(curTeam()); primeSigs(); store.set('state', state);
@@ -1398,8 +1469,8 @@ function onAuth(ev, session) {
       if (!acct.toastNext || acct.choice) return;
       signedInDone();
     });
-    render();
-  } else if (!u && acct.user && ev === 'SIGNED_OUT') { acct.user = null; acct.ready = false; anIdentify(null); render(); }   // session ended elsewhere: keep this browser's copy
+    render(); talkMe();
+  } else if (!u && acct.user && ev === 'SIGNED_OUT') { acct.user = null; acct.ready = false; anIdentify(null); talkMe(); render(); }   // session ended elsewhere: keep this browser's copy
   renderAcct();
 }
 function stripAuthParams() { if (/[?&](code|error|error_description|checkout)=/.test(location.search)) try { history.replaceState(null, '', location.pathname + location.hash); } catch {} }
@@ -1439,7 +1510,7 @@ async function googleSignIn() {
 async function signOut(deleted) {
   if (!deleted) await push().catch(() => {});
   try { await acct.sb?.auth.signOut({ scope: 'local' }); } catch {}
-  acct.user = null; acct.ready = false; acct.choice = null; acct.delArm = false; acct.msg = null; acct.step = 'email'; clearTimeout(acct.pushT);
+  acct.user = null; acct.ready = false; acct.choice = null; acct.delArm = false; acct.msg = null; acct.step = 'email'; clearTimeout(acct.pushT); talkMe();
   anIdentify(null); wipeLocal();
   toast(deleted ? 'Account deleted. Everything it held is gone.' : 'Signed out. Your teams are in your account, not in this browser.');
 }
@@ -4163,17 +4234,17 @@ function renderFresh() {
 setInterval(renderStatus, 60000);
 /* ---------- navigation ----------
    Four groups: My Team (Lineup, Start / Sit, Waivers, Roster), Players (search and rankings, and each player's page),
-   Research (Defenses, Teams & schemes, Weather) and Settings. Every page has its own address (#lineup, #start-sit,
+   Research (Defenses, News, Teams & schemes, Weather) and Settings. Every page has its own address (#lineup, #start-sit,
    #waivers, #roster, #players, #player/<id>, #research, #settings...), so Back, refresh and shared links land on the same
    screen; a group's pages show as a row under the main tabs (SUBNAV).
    A visitor with no team yet can use every page that doesn't need one (Start / Sit for any two players, Players,
    Research, Settings, Pro); Lineup, Waivers and Roster show the welcome, which asks for a team. */
 const NAV = [['lineup', 'My Team'], ['pool', 'Players'], ['defenses', 'Research'], ['settings', 'Settings']];
 const SUBNAV = { lineup: [['lineup', 'Lineup'], ['compare', 'Start / Sit'], ['waivers', 'Waivers'], ['players', 'Roster']],
-  defenses: [['defenses', 'Defenses'], ['teams', 'Teams & schemes'], ['weather', 'Weather']] };
-const HASH = { lineup: 'lineup', compare: 'start-sit', waivers: 'waivers', players: 'roster', pool: 'players', defenses: 'research', teams: 'research-teams', weather: 'research-weather', settings: 'settings', pro: 'pro' };
+  defenses: [['defenses', 'Defenses'], ['news', 'News'], ['teams', 'Teams & schemes'], ['weather', 'Weather']] };
+const HASH = { lineup: 'lineup', compare: 'start-sit', waivers: 'waivers', players: 'roster', pool: 'players', defenses: 'research', teams: 'research-teams', weather: 'research-weather', news: 'research-news', settings: 'settings', pro: 'pro', mod: 'mod' };
 const TAB_OF = Object.fromEntries(Object.entries(HASH).map(([k, v]) => [v, k]));
-const NAV_OF = { compare: 'lineup', waivers: 'lineup', players: 'lineup', player: 'pool', teams: 'defenses', weather: 'defenses' };
+const NAV_OF = { compare: 'lineup', waivers: 'lineup', players: 'lineup', player: 'pool', teams: 'defenses', weather: 'defenses', news: 'defenses', mod: 'settings' };
 const navOf = tab => NAV_OF[tab] || tab;
 /* An address: a page (TAB_OF), or a player's page, #player/<id> or #player/<id>/<tab> (PTABS). Null for anything else. */
 function parseHash(h = location.hash.slice(1)) {
@@ -4240,7 +4311,7 @@ function render() {
   renderStatus(); renderAcct(); renderAd();
   $('#teampin').innerHTML = D.loading || D.failed || needsTeam() ? '' : teamPin();
   $('#teamctx').innerHTML = D.loading || D.failed ? '' : needsTeam() ? guestBar() : teamActions();
-  $('#panels').innerHTML = D.acctOpen && acct.on ? accountPanel() : D.loading || D.failed ? '' : D.flow ? flowPanel() : D.tsOpen ? teamSettingsPanel() : D.ioOpen ? sharePanel() : '';
+  $('#panels').innerHTML = D.alertsOpen ? alertsPanel() : D.acctOpen && acct.on ? accountPanel() : D.loading || D.failed ? '' : D.flow ? flowPanel() : D.tsOpen ? teamSettingsPanel() : D.ioOpen ? sharePanel() : '';
   const msgs = [];
   if (D.flash && !D.loading) msgs.push(`<div class="banner info flash"><span>${D.flash.html}</span><button type="button" class="btn sm" data-act="flashclose" aria-label="Dismiss">Dismiss</button></div>`);
   // skipped the account step on the walkthrough: one reminder on Lineup until they sign in or dismiss it
@@ -4254,7 +4325,8 @@ function render() {
   if (D.failed) { renderBrief(); main.innerHTML = `<div class="card panel"><h2>Couldn’t load this week’s data</h2><p style="margin:0">Sleeper and ESPN didn’t respond. Check your connection and press Refresh projections.</p></div>`; return; }
   if (D.loading) { renderBrief(); main.innerHTML = `<div class="card loading"><h3>Loading week ${D.week || ''}</h3><div class="small">Projections, stats and schedules. Past seasons are saved after your first visit.</div><div class="bar"><span id="lbar" style="width:${Math.round(D.progress * 100)}%"></span></div></div>`; return; }
   renderBrief();
-  main.innerHTML = ({ lineup: viewLineup, compare: viewCompare, waivers: viewWaivers, defenses: viewResearch, teams: viewResearch, players: viewPlayers, pool: viewPool, player: viewPlayer, settings: viewSettings, weather: viewResearch, pro: viewPro })[state.tab]();
+  main.innerHTML = ({ lineup: viewLineup, compare: viewCompare, waivers: viewWaivers, defenses: viewResearch, teams: viewResearch, news: viewResearch, players: viewPlayers, pool: viewPool, player: viewPlayer, settings: viewSettings, weather: viewResearch, pro: viewPro, mod: viewMod })[state.tab]();
+  talkAfterRender();
 }
 // an injury designation after "is": "on IR", "suspended", "out"
 const injWords = inj => /^ir/i.test(inj || '') ? 'on IR' : /^pup/i.test(inj || '') ? 'on the PUP list' : /^sus/i.test(inj || '') ? 'suspended' : /^na/i.test(inj || '') ? 'not with the team' : (inj || 'out').toLowerCase();
@@ -4331,7 +4403,7 @@ document.addEventListener('error', e => {
    inside a button (the lineup's rows, search suggestions), where a link can't go: spans only then. */
 function playerIdentity(u, { sub = '', after = '', size = '', name, line, nameCls = 'pname', subCls = 'psub', link = true } = {}) {
   const L = link && u?.id, nm = name ?? esc(u.name);
-  return `<span class="pid${size ? ' ' + size : ''}">${L ? plink(u.id, playerImg(u), 'pimg-a', true) : playerImg(u)}<span class="pid-txt">${L ? plink(u.id, nm, nameCls) : `<span class="${nameCls}">${nm}</span>`}<span class="${subCls}">${line ?? `${posLabel(u.pos)} · ${u.team || 'FA'}${sub}`}</span>${after}</span></span>`;
+  return `<span class="pid${size ? ' ' + size : ''}">${L ? plink(u.id, playerImg(u), 'pimg-a', true) : playerImg(u)}<span class="pid-txt">${L ? plink(u.id, nm, nameCls) : `<span class="${nameCls}">${nm}</span>`}<span class="${subCls}">${line ?? `${posLabel(u.pos)} · ${u.team || 'FA'}${sub}`}</span>${L ? talkChip(u.id) : ''}${after}</span></span>`;
 }
 function playerRow(r, slotLabel, starting) {
   const open = D.open.has(r.id);
@@ -4344,7 +4416,7 @@ function playerRow(r, slotLabel, starting) {
     <span class="proj num">${r.status === 'bye' ? '—' : f1(r.mean)}</span>
     <span class="range">${r.status === 'bye' ? '' : f1(r.floor) + '–' + f1(r.ceil)}</span>
     <span class="pav">${r.pAvg != null ? pct(r.pAvg) : '—'}</span>
-  </button>${r.locked && !state.sleeper?.starters ? `<div class="lfix small"><span class="muted">🔒 Game started${starting ? '' : ', on your bench here'}.</span> <button type="button" class="linkbtn" data-started="${esc(r.id)}">${starting ? 'I didn’t start him' : 'I started him'}</button></div>` : ''}${open ? detailBlock(r) : ''}</div>`;
+  </button>${r.locked && !state.sleeper?.starters ? `<div class="lfix small"><span class="muted">🔒 Game started${starting ? '' : ', on your bench here'}.</span> <button type="button" class="linkbtn" data-started="${esc(r.id)}">${starting ? 'I didn’t start him' : 'I started him'}</button></div>` : ''}${open || !talkOn() ? '' : `<div class="talkrow">${talkChip(r.id)}</div>`}${open ? detailBlock(r) : ''}</div>`;
 }
 function factorList(r) {
   if (!r.factors.length) return '<div class="small muted">No matchup factors (bye week or no game data).</div>';
@@ -4486,6 +4558,7 @@ function detailBlock(r) {
   <div class="section">${cmp}${probTiles(r)}${modelNote()}</div>
   ${researchLinks(r)}
   ${proDetails(r)}
+  ${r.status === 'bye' || !talkOn() ? '' : `<div class="dtalk">${commentsSection(r.id, { limit: 2, compact: true })}</div>`}
   <div class="ovr" style="grid-column:1/-1"><label for="ov-${esc(r.id)}">Override projection</label><input class="inp" id="ov-${esc(r.id)}" type="number" step="0.1" data-ovr="${esc(r.id)}" value="${r.override ?? ''}" placeholder="${f1(r.model)}">${r.override != null ? `<button type="button" class="btn sm" data-clearovr="${esc(r.id)}">Clear</button>` : ''}</div>
   </div>`;
 }
@@ -4642,6 +4715,7 @@ function renderAcct() {
   b.innerHTML = acct.user ? `<i class="${acct.sync}" aria-hidden="true"></i>${ico}<span class="acct-txt">Account</span>` : `${ico}<span class="acct-txt">Sign in</span>`;
   b.title = acct.user ? syncText() : 'Sign in to use your teams on any device';
   const s = $('#acctSync'); if (s) s.textContent = syncText();
+  renderBell();
 }
 function accountPanel() {
   const msg = acct.msg ? `<div class="banner ${acct.msg[0] === 'err' ? 'err' : 'info'}" role="status">${esc(acct.msg[1])}</div>` : '';
@@ -4788,7 +4862,7 @@ function viewPro() {
    the site for AdSense it shows Benny's own promotions; fill in ADS to switch to AdSense. Pro members get no slot and the
    ad script never loads for them. */
 const ADS = { client: 'ca-pub-5224356068909594', slot: '' };   // AdSense publisher ID, and the display ad unit's slot ID once approved (house ads until then)
-const AD_TABS = new Set(['waivers', 'compare', 'defenses', 'teams', 'weather', 'players']);
+const AD_TABS = new Set(['waivers', 'compare', 'defenses', 'news', 'teams', 'weather', 'players']);
 const HOUSE_ADS = [
   ['No ads. All of Benny’s moves.', 'Pro unlocks every lineup change, pickup and drop for your team.', `${PRO_PRICE.season} for the whole season`],
   ['Play in more than one league?', 'Pro keeps every team in one place, each with its own lineup, waivers and moves.', 'See Pro'],
@@ -5102,7 +5176,7 @@ function refreshPlayers() {
    This season's games come from the data bundle (D.inp.weeks: compactWeek rows); earlier seasons, for QBs, RBs, WRs and
    TEs, from players/data/<id>.json (scripts/model/player_history.py: nflverse box scores since 2013), fetched the first
    time a page needs them. Their points are PPR with the catches alongside, so fmtPts puts them in this team's scoring. */
-const PTABS = [['overview', 'Overview'], ['games', 'Game log'], ['history', 'History'], ['stats', 'Stats']];
+const PTABS = [['overview', 'Overview'], ['news', 'News'], ['talk', 'Discussion'], ['games', 'Game log'], ['history', 'History'], ['stats', 'Stats']];
 const HIST_POS = new Set(['QB', 'RB', 'WR', 'TE']);
 const playerHash = (id, tab) => `player/${encodeURIComponent(id)}${tab && tab !== 'overview' ? '/' + tab : ''}`;
 // a link to a player's page around any markup; `deco` for a second link to the same page (his picture next to his name)
@@ -5232,6 +5306,9 @@ function pOverview(id, u, r, H) {
     const weeks = Array.from({ length: Math.min(4, 18 - D.week) }, (_, i) => D.week + 1 + i);
     out.push(`<div class="card pnext"><div class="row-head"><h3>Coming up</h3><span class="small muted">Rest-of-season value ${f1(rosBase(id))} pts a game</span></div>${schedStrip(id, weeks, weeks.length)}<div class="small muted">Green is an easier matchup for a ${posLabel(u.pos)}, red a harder one.</div></div>`);
   }
+  const nw = playerNews(id);
+  if (nw.items.length) out.push(`<div class="card pnews"><div class="row-head"><h3>Latest news</h3>${plinkTab(id, 'news', 'All news →')}</div><ul class="nlist">${nw.items.slice(0, 2).map(i => newsItemHTML(i, { self: id })).join('')}</ul></div>`);
+  if (talkOn()) out.push(`<div class="card ptalk">${commentsSection(id, { limit: 2, compact: true })}</div>`);
   const gs = seasonGames(id);
   if (gs.length) {
     const t = sumGames(gs), pts = gs.reduce((s, g) => s + gPts(g, u.pos), 0), rk = seasonRank(id, u.pos);
@@ -5308,15 +5385,15 @@ function viewPlayer() {
   if (!u && H.st === 'ok') u = { id, name: H.d.name, pos: H.d.pos, team: null, inj: null, espnId: D.pids?.[id]?.[0] || null };
   if (!u) return H.st === 'loading' ? `<div class="card loading"><h3>Loading player</h3></div>`
     : `<div class="card panel"><h2>Player not found</h2><p style="margin:0">Benny has no player with that address. <a href="#players" data-tab="pool">Search players</a></p></div>`;
-  const tabs = PTABS.filter(([k]) => k === 'overview' || k === 'games' || HIST_POS.has(u.pos)), tab = tabs.some(t => t[0] === D.pp.tab) ? D.pp.tab : 'overview';
+  const tabs = PTABS.filter(([k]) => k === 'overview' || k === 'games' || k === 'news' || (k === 'talk' ? talkOn() : HIST_POS.has(u.pos))), tab = tabs.some(t => t[0] === D.pp.tab) ? D.pp.tab : 'overview';
   trackOnce(`pv:${id}:${tab}`, 'player_page_viewed', { pos: u.pos, tab, from: D.pfrom || null });
   const bye = byeOf(u.team), st = pStatus(id), canEdit = !needsTeam() && !state.sleeper, other = r ? exampleCall(id)[1] : null;
   const head = `<div class="card phead"><div class="phead-main">${playerImg(u)}<div class="phead-txt"><h2>${esc(u.name)}</h2>
       <div class="psub">${posLabel(u.pos)} · ${u.team ? esc(TEAM_CITY[u.team] ? `${TEAM_CITY[u.team]} ${TEAMS[u.team][1]}` : u.team) : 'Free agent'}${bye ? ` · bye week ${bye}` : ''} ${r ? injPill(r) : u.inj ? `<span class="pill q">${esc(u.inj)}</span>` : ''}</div>
       <div class="ptags">${st ? `<span class="pill ${st[0]}">${st[1]}</span>` : ''}${ownLine(id) ? `<span class="small muted">${ownLine(id)} across ESPN leagues</span>` : ''}</div></div></div>
-    <div class="toolbar">${r && other ? `<button type="button" class="btn sm" data-decide="${esc(id)}|${esc(other)}">Compare in Start / Sit</button>` : ''}${canEdit && r ? (state.roster.includes(id) ? `<button type="button" class="btn sm" data-remove="${esc(id)}">Remove from roster</button>` : `<button type="button" class="btn sm primary" data-add="${esc(id)}">Add to roster</button>`) : ''}<button type="button" class="btn sm" data-act="shareplayer">Share</button></div></div>`;
+    <div class="toolbar">${r && other ? `<button type="button" class="btn sm" data-decide="${esc(id)}|${esc(other)}">Compare in Start / Sit</button>` : ''}${canEdit && r ? (state.roster.includes(id) ? `<button type="button" class="btn sm" data-remove="${esc(id)}">Remove from roster</button>` : `<button type="button" class="btn sm primary" data-add="${esc(id)}">Add to roster</button>`) : ''}${watchBtn(id)}<button type="button" class="btn sm" data-act="shareplayer">Share</button></div></div>`;
   const seg = `<nav class="seg sub ptabs" aria-label="${esc(u.name)}">${tabs.map(([k, l]) => `<a href="#${playerHash(id, k)}" ${k === tab ? 'aria-current="page"' : ''}>${l}</a>`).join('')}</nav>`;
-  const body = tab === 'games' ? pGames(id, u, H) : tab === 'history' ? pHistory(id, u, H) : tab === 'stats' ? pStats(id, u, H) : pOverview(id, u, r, H);
+  const body = tab === 'games' ? pGames(id, u, H) : tab === 'news' ? pNewsTab(id, u) : tab === 'talk' ? pTalk(id, u) : tab === 'history' ? pHistory(id, u, H) : tab === 'stats' ? pStats(id, u, H) : pOverview(id, u, r, H);
   const from = D.pfrom && D.pfrom !== 'player' ? ([...NAV, ...Object.values(SUBNAV).flat()].find(n => n[0] === D.pfrom)?.[1] || null) : null;
   return `<div class="section player">${from ? `<a href="#${HASH[D.pfrom]}" class="small back-link" data-act="pback">← Back to ${esc(from)}</a>` : ''}${head}${seg}${body}</div>`;
 }
@@ -5328,11 +5405,456 @@ async function sharePlayer() {
   const slug = D.slugs[id], url = slug ? `https://bennyspicks.us/players/${slug}/` : `https://bennyspicks.us/#${playerHash(id)}`;
   await shareOut(`${u.name}: projection, game log and history on Benny’s Picks.`, url, how => track('result_shared', { kind: 'player', how, pos: u.pos || null }));
 }
+/* ---------- News ----------
+   news/feed.json (scripts/news.py, every 3 hours): the last 14 days of player news, newest first. Benny writes most of
+   it from its own data (injury tags, team changes, depth-chart moves, Sleeper's most-added players); ESPN headlines that
+   name a player link out to ESPN. news/players/<id>.json: one player's last 50 items. Both load the first time a page
+   needs them; a missing file is no news, never an error. */
+const NEWS_KIND = { injury: ['Injury', 'o'], team: ['Team', 'n'], depth: ['Depth chart', 'n'], trend: ['Trending', 'q'], article: ['Headline', 'm'] };
+const NEWS_FILTERS = [['all', 'All'], ['injury', 'Injuries'], ['team', 'Moves'], ['depth', 'Depth charts'], ['trend', 'Trending'], ['article', 'Headlines']];
+function newsFile(e, url, done) {
+  fetchJSON(url, 15000).then(j => { if (j?.v === 1) { e.st = 'ok'; e.d = j; } else e.st = 'none'; }).catch(() => { e.st = 'none'; }).finally(done);
+  return e;
+}
+function newsFeed() {
+  return D.news || (D.news = newsFile({ st: 'loading', at: Date.now() }, 'news/feed.json', () => { if (state.tab === 'news' || state.tab === 'player') render(); else renderBell(); }));
+}
+function pNews(id) {
+  let e = D.pnews.get(id); if (e) return e;
+  D.pnews.set(id, e = { st: 'loading' });
+  return newsFile(e, `news/players/${encodeURIComponent(id)}.json`, () => { if (state.tab === 'player' && D.pp?.id === id) render(); });
+}
+// one player's news: his file, and anything about him in the feed (either may be the newer copy), once each, newest first
+function playerNews(id) {
+  const N = pNews(id), F = newsFeed(), seen = new Set(), items = [];
+  for (const i of [...(N.d?.items || []), ...(F.d?.items || []).filter(i => i.ids?.includes(id))]) if (!seen.has(i.id)) { seen.add(i.id); items.push(i); }
+  items.sort((a, b) => b.t < a.t ? -1 : b.t > a.t ? 1 : 0);
+  return { st: N.st === 'loading' || F.st === 'loading' ? 'loading' : 'ok', items };
+}
+/* One item: its kind, source and age, the headline (a link to the story for ESPN's), and the players it's about, each a
+   link to his page (except `self`, the page it's shown on). */
+function newsItemHTML(it, { self = null } = {}) {
+  const [kl, kc] = NEWS_KIND[it.k] || ['News', 'm'], at = Date.parse(it.t);
+  const who = (it.ids || []).map((id, i) => [id, D.U.get(id)?.name || it.names?.[i] || id]).filter(([id]) => id !== self).map(([id, nm]) => plink(id, esc(nm), 'nchip')).join('');
+  const url = /^https:\/\//.test(it.url || '') ? it.url : null;
+  const title = url ? `<a href="${esc(url)}" target="_blank" rel="noopener">${esc(it.title)} <span aria-hidden="true">↗</span></a>` : esc(it.title);
+  return `<li class="nitem"><div class="nmeta"><span class="pill ${kc}">${kl}</span><span class="small muted">${esc(it.src || '')}${at ? ` · <time datetime="${esc(it.t)}" title="${esc(new Date(at).toLocaleString())}">${ago(at)}</time>` : ''}</span></div>
+    <div class="ntitle">${title}</div>${it.sub ? `<div class="small muted">${esc(it.sub)}</div>` : ''}${who ? `<div class="nwho">${who}</div>` : ''}${talkOn() ? `<div class="cmt-acts">${rxBarHTML('n:' + it.id, true)}</div>` : ''}</li>`;
+}
+const NEWS_FOOT = `<div class="small muted">Injury, team and depth-chart items are Benny’s, from Sleeper’s injury tags and rosters and nflverse depth charts. Headlines link to the story on ESPN. Updated every 3 hours.</div>`;
+function pNewsTab(id, u) {
+  const nw = playerNews(id);
+  if (!nw.items.length) return `<div class="card panel small muted">${nw.st === 'loading' ? 'Loading news…' : `No news about ${esc(u.name)} yet. Injury, team and depth-chart changes, and ESPN headlines that name him, show up here.`}</div>`;
+  return `<div class="row-head"><h2>News</h2><span class="small muted">${nw.items.length} item${nw.items.length === 1 ? '' : 's'}</span></div><ul class="nlist card">${nw.items.map(i => newsItemHTML(i, { self: id })).join('')}</ul>${NEWS_FOOT}`;
+}
+/* Research → News: everything in the feed, by kind and by whose news it is (your team, or a position), with Sleeper's
+   most-added and most-dropped players of the last day alongside. */
+function viewNews() {
+  const F = newsFeed();
+  if (F.st === 'loading') return `<div class="card loading"><h3>Loading news</h3></div>`;
+  if (F.st !== 'ok') return `<div class="card panel"><h2>News isn’t available right now</h2><p style="margin:0" class="small muted">Benny’s news file didn’t load. Try again in a few minutes.</p></div>`;
+  const kind = NEWS_FILTERS.some(f => f[0] === D.newsKind) ? D.newsKind : 'all', mineOk = state.roster.length > 0;
+  const who = D.newsWho === 'mine' && mineOk ? 'mine' : POS.includes(D.newsWho) ? D.newsWho : 'all', mine = new Set(state.roster);
+  const hits = F.d.items.filter(i => (kind === 'all' || i.k === kind) && (who === 'all' || (i.ids || []).some(id => who === 'mine' ? mine.has(id) : D.U.get(id)?.pos === who)));
+  const list = D.newsAll ? hits : hits.slice(0, 60);
+  const tr = F.d.trend || {}, tl = (rows, label) => rows?.length ? `<div><h3 class="dh">${label}</h3><ol class="ntrend">${rows.slice(0, 10).map(([id, n]) => `<li>${plink(id, esc(D.U.get(id)?.name || id))}<span class="small muted">${n.toLocaleString()}</span></li>`).join('')}</ol></div>` : '';
+  const trend = tr.add?.length ? `<div class="card ntrends"><div class="row-head"><h3>Trending on Sleeper</h3></div><div class="small muted">Leagues that added or dropped each player in the last 24 hours.</div><div class="ntrend-cols">${tl(tr.add, 'Most added')}${tl(tr.drop, 'Most dropped')}</div></div>` : '';
+  const btn = (attr, k, l, on) => `<button type="button" ${attr}="${k}" aria-pressed="${on}">${l}</button>`;
+  return `<div class="row-head"><h2>News <span class="hsub">Injuries, moves, depth charts and headlines, by player</span></h2><span class="small muted">Updated ${ago(Date.parse(F.d.updated))}</span></div>
+  <div class="toolbar nfilters"><div class="seg" role="group" aria-label="Kind of news">${NEWS_FILTERS.map(([k, l]) => btn('data-newskind', k, l, k === kind)).join('')}</div>
+    <div class="seg" role="group" aria-label="Whose news">${btn('data-newswho', 'all', 'Everyone', who === 'all')}${mineOk ? btn('data-newswho', 'mine', esc(curTeam()?.name || 'My team'), who === 'mine') : ''}${POS.filter(p => p !== 'K').map(p => btn('data-newswho', p, posLabel(p), who === p)).join('')}</div></div>
+  <div class="nlayout"><div class="nmain">${list.length ? `<ul class="nlist card">${list.map(i => newsItemHTML(i)).join('')}</ul>` : `<div class="card panel small muted">Nothing ${kind === 'all' ? '' : 'of that kind '}in the last two weeks${who === 'all' ? '' : who === 'mine' ? ' about your players' : ` about ${posLabel(who)}s`}.</div>`}
+    ${hits.length > list.length ? `<div class="toolbar"><button type="button" class="btn sm" data-act="newsmore">Show all ${hits.length}</button></div>` : ''}${NEWS_FOOT}</div>${trend}</div>`;
+}
+
+/* ---------- Discussion ----------
+   Every player has a discussion: on his page (the Discussion tab, and the newest two comments on the Overview) and on
+   his expanded lineup card; elsewhere a 💬 count beside his name links to it. The rows live in Supabase
+   (supabase/community.sql), which enforces every rule (who may write what, how much, what a row may hold); this page only
+   decides which buttons to show. Reading needs no account and no library: plain fetch with the publishable key. Posting
+   and reacting need a signed-in account and a public name (profiles.handle), chosen with the first comment.
+   Sections draw from caches (D.talk: a player's comments; D.talkN: comment counts; D.rx: reactions) and, when a fetch
+   lands, repaint only their own elements, so a comment being typed is never wiped. */
+const RX = ['👍', '🔥', '🤔', '😂', '📈', '📉'];
+const REPORT_WHY = [['spam', 'Spam'], ['abuse', 'Abusive'], ['off-topic', 'Off topic'], ['misinformation', 'Misleading'], ['other', 'Something else']];
+// shown at all: an accounts backend, not the #export snapshot, and the tables exist (community.sql has been run)
+const talkOn = () => !!(CLOUD.url && CLOUD.key) && location.hash !== '#export' && !D.talkOff;
+// fetching: the self-test renders from caches it fills itself, never the live database
+const talkNet = () => talkOn() && (!SELFTEST || D.talkNet);
+const qv = v => CSS.escape(String(v));
+const inList = ids => `(${ids.map(x => `"${String(x).replace(/["\\,()]/g, '')}"`).join(',')})`;
+async function talkToken() { if (!acct.user || !acct.sb) return null; try { return (await acct.sb.auth.getSession()).data.session?.access_token || null; } catch { return null; } }
+// one call to the database's REST API: as the signed-in person when there is one (a moderator then sees hidden comments)
+async function sbRest(path, { method = 'GET', body, prefer } = {}) {
+  const tok = await talkToken(), h = { apikey: CLOUD.key };
+  if (tok) h.Authorization = 'Bearer ' + tok;
+  if (body !== undefined) h['Content-Type'] = 'application/json';
+  if (prefer) h.Prefer = prefer;
+  const ac = new AbortController(), t = setTimeout(() => ac.abort(), 12000);
+  try {
+    const r = await fetch(`${CLOUD.url}/rest/v1/${path}`, { method, headers: h, body: body === undefined ? undefined : JSON.stringify(body), signal: ac.signal, credentials: 'omit' });
+    const txt = await r.text(); let j = null; try { j = txt ? JSON.parse(txt) : null; } catch { /* not JSON */ }
+    if (!r.ok) { const e = new Error(j?.message || 'HTTP ' + r.status); e.status = r.status; e.code = j?.code; throw e; }
+    return j;
+  } catch (e) { if (e.name === 'AbortError') { const x = new Error('timed out'); x.code = 'timeout'; throw x; } throw e; }
+  finally { clearTimeout(t); }
+}
+// the tables aren't there (community.sql not run yet): no discussion anywhere this visit
+function talkMissing(e) {
+  if (!(e?.status === 404 || /^(PGRST20[025]|42P01|42883)$/.test(e?.code || ''))) return false;
+  if (!D.talkOff) { D.talkOff = true; setTimeout(render, 0); }
+  return true;
+}
+const talkErr = e => e?.code === 'timeout' || e instanceof TypeError ? 'Couldn’t reach the server. Check your connection and try again.'
+  : (e?.code === '23514' || e?.code === 'P0001') && !/^new row/.test(e.message || '') ? e.message
+  : e?.code === '42501' || e?.status === 403 ? 'Your account can’t do that.'
+  : e?.status === 401 ? 'Sign in again, then try once more.' : 'Something went wrong. Try again.';
+function talkSignIn() { D.alertsOpen = false; if (!acct.on) return; if (!D.acctOpen) { D.acctOpen = true; acct.msg = ['info', 'Sign in to join the discussion. It’s free.']; } render(); window.scrollTo(0, 0); deskFocus('#acctEmail'); }
+// after sign-in or sign-out: their public name and whether they moderate, and every cache that depends on who's asking
+async function talkMe() {
+  acct.profile = undefined; acct.admin = false; acct.replies = []; D.talk.clear(); D.rx.clear(); D.mod = null;
+  if (!acct.user || !talkNet()) return;
+  try {
+    const [p] = await sbRest(`profiles?user_id=eq.${acct.user.id}&select=handle`) || []; acct.profile = p || null;
+    acct.admin = (await sbRest('rpc/is_admin', { method: 'POST', body: {} })) === true;
+  } catch (e) { talkMissing(e); }
+  render(); alertsLoad();
+}
+
+/* A player's comments, newest first, with each author's name and the reactions. Refetched when over a minute old. */
+function talkLoad(id, force) {
+  if (!talkNet()) return;
+  const e = D.talk.get(id); if (e && !force && (e.st === 'loading' || Date.now() - e.at < 60000)) return;
+  const cur = e || { st: 'loading', rows: [], at: 0 }; if (!e) D.talk.set(id, cur); else if (cur.st === 'err') cur.st = 'loading';
+  cur.at = Date.now();
+  sbRest(`comments?player_id=eq.${encodeURIComponent(id)}&select=id,player_id,parent_id,author_id,body,season,week,hidden_at,hidden_reason,created_at,profiles(handle)&order=created_at.desc&limit=300`)
+    .then(async rows => {
+      cur.rows = rows || []; cur.st = 'ok'; cur.at = Date.now();
+      D.talkN.set(id, { n: cur.rows.filter(c => !c.hidden_at).length, at: Date.now() });
+      await rxLoad(cur.rows.map(c => 'c:' + c.id), true);
+    })
+    .catch(e => { if (!talkMissing(e)) cur.st = cur.rows.length ? 'ok' : 'err'; })
+    .finally(() => talkPaint(id));
+}
+/* Reactions on comments (c:<id>) and news items (n:<id>): {c: {emoji: count}, mine: the reader's emoji or null}. */
+async function rxLoad(keys, force) {
+  const want = keys.filter(k => force || !D.rx.has(k)); if (!want.length || !talkNet()) return;
+  const me = acct.user?.id, fresh = new Map(want.map(k => [k, { c: {}, mine: null }]));
+  for (const k of want) if (!D.rx.has(k)) D.rx.set(k, { c: {}, mine: null });
+  const add = (k, r) => { const x = fresh.get(k); if (!x) return; x.c[r.emoji] = (x.c[r.emoji] || 0) + 1; if (me && r.user_id === me) x.mine = r.emoji; };
+  const cs = want.filter(k => k[0] === 'c').map(k => k.slice(2)), ns = want.filter(k => k[0] === 'n').map(k => k.slice(2));
+  try {
+    for (let i = 0; i < cs.length; i += 80) for (const r of await sbRest(`reactions?select=comment_id,emoji,user_id&comment_id=in.${encodeURIComponent(inList(cs.slice(i, i + 80)))}&limit=5000`) || []) add('c:' + r.comment_id, r);
+    for (let i = 0; i < ns.length; i += 60) for (const r of await sbRest(`reactions?select=news_id,emoji,user_id&news_id=in.${encodeURIComponent(inList(ns.slice(i, i + 60)))}&limit=5000`) || []) add('n:' + r.news_id, r);
+    for (const [k, v] of fresh) D.rx.set(k, v);
+  } catch (e) { talkMissing(e); }
+}
+function rxBarHTML(key, queue) {
+  if (!talkOn()) return '';
+  if (queue && !D.rx.has(key)) D.rxQ.add(key);
+  const x = D.rx.get(key) || { c: {}, mine: null }, open = D.rxPick === key, shown = RX.filter(e => x.c[e] > 0);
+  const b = (e, n) => `<button type="button" class="rx${x.mine === e ? ' on' : ''}" data-react="${esc(key)}|${e}" aria-pressed="${x.mine === e}" aria-label="${e}${n ? `, ${n}` : ''}">${e}${n ? ` <span>${n}</span>` : ''}</button>`;
+  return `<span class="rxbar" data-rxbar="${esc(key)}">${shown.map(e => b(e, x.c[e])).join('')}<button type="button" class="rx add" data-rxpick="${esc(key)}" aria-expanded="${open}" aria-label="Add a reaction">${shown.length ? '+' : '☺'}</button>${open ? `<span class="rxpick" role="group" aria-label="Reactions">${RX.map(e => b(e, 0)).join('')}</span>` : ''}</span>`;
+}
+function rxPaint(key) { const h = rxBarHTML(key); document.querySelectorAll(`[data-rxbar="${qv(key)}"]`).forEach(el => { el.outerHTML = h; }); }
+// react, change a reaction, or take it back: on screen at once, undone if the database says no
+async function react(key, emoji) {
+  if (!acct.user) return talkSignIn();
+  const x = D.rx.get(key) || { c: {}, mine: null }, before = JSON.parse(JSON.stringify(x)), was = x.mine, next = was === emoji ? null : emoji;
+  if (was) x.c[was] = Math.max(0, (x.c[was] || 1) - 1); if (next) x.c[next] = (x.c[next] || 0) + 1;
+  x.mine = next; D.rx.set(key, x); D.rxPick = null; rxPaint(key);
+  const col = key[0] === 'c' ? 'comment_id' : 'news_id', tid = key.slice(2), uid = acct.user.id;
+  try {
+    if (was) await sbRest(`reactions?user_id=eq.${uid}&${col}=eq.${encodeURIComponent(tid)}`, { method: 'DELETE' });
+    if (next) await sbRest('reactions', { method: 'POST', body: { [col]: tid, user_id: uid, emoji: next }, prefer: 'return=minimal' });
+  } catch (e) { D.rx.set(key, before); rxPaint(key); toast(talkErr(e)); }
+}
+
+const talkWho = c => esc(c.profiles?.handle || 'someone');
+const talkCountTxt = id => { const n = D.talkN.get(id)?.n; return n ? `· ${n}` : ''; };
+function commentHTML(c, { id, compact = false, nReplies = 0 } = {}) {
+  const mine = acct.user && c.author_id === acct.user.id, at = Date.parse(c.created_at), acts = [];
+  if (!compact && !c.parent_id && !c.hidden_at) acts.push(`<button type="button" class="linkbtn" data-talkreply="${esc(c.id)}">Reply</button>`);
+  if (compact && nReplies) acts.push(`<a class="linkbtn" href="#${playerHash(id, 'talk')}">${nReplies} repl${nReplies === 1 ? 'y' : 'ies'}</a>`);
+  if (mine) acts.push(`<button type="button" class="linkbtn" data-talkdel="${esc(c.id)}">${D.talkDel === c.id ? 'Delete it? Yes' : 'Delete'}</button>`);
+  else if (acct.user) acts.push(`<button type="button" class="linkbtn" data-talkrep="${esc(c.id)}" aria-expanded="${D.talkRep === c.id}">Report</button>`);
+  if (acct.admin) acts.push(`<button type="button" class="linkbtn" data-talkhide="${esc(c.id)}|${c.hidden_at ? 0 : 1}">${c.hidden_at ? 'Restore' : 'Hide'}</button>`);
+  const why = D.talkRep === c.id ? `<div class="rxpick report" role="group" aria-label="Why report it">${REPORT_WHY.map(([k, l]) => `<button type="button" class="btn sm" data-talkwhy="${esc(c.id)}|${k}">${l}</button>`).join('')}</div>` : '';
+  const wk = c.week ? `<span class="pill m" title="Posted in week ${c.week}${c.season ? ` of ${c.season}` : ''}">Wk ${c.week}${c.season && c.season !== D.season ? ` ’${String(c.season).slice(2)}` : ''}</span>` : '';
+  return `<article class="cmt${c.parent_id ? ' reply' : ''}${c.hidden_at ? ' is-hidden' : ''}">
+    <div class="cmt-head"><strong>${talkWho(c)}</strong>${wk}<span class="small muted">${at ? `<time datetime="${esc(c.created_at)}" title="${esc(new Date(at).toLocaleString())}">${ago(at)}</time>` : ''}</span>${c.hidden_at ? `<span class="pill o">${c.hidden_reason === '__parent' ? 'Hidden with its thread' : 'Hidden'}</span>` : ''}</div>
+    <div class="cmt-body${compact ? ' clamp' : ''}">${esc(c.body)}</div>
+    <div class="cmt-acts">${rxBarHTML('c:' + c.id)}${acts.join('')}</div>${why}</article>`;
+}
+function replyBox(id, root) {
+  const k = 'r:' + root.id;
+  return `<form class="talk-in reply" data-talkform="${esc(id)}" data-parent="${esc(root.id)}"><textarea class="inp" rows="2" maxlength="1000" data-talkin="${esc(k)}" aria-label="Reply to ${talkWho(root)}" placeholder="Reply to ${talkWho(root)}">${esc(D.drafts[k] || '')}</textarea>
+    <div class="talk-in-row"><span class="small talk-msg" data-talk-msg="${esc(k)}" role="status"></span><button type="button" class="btn sm" data-talkreply="${esc(root.id)}">Cancel</button><button type="submit" class="btn sm primary">Reply</button></div></form>`;
+}
+/* The comments: each thread's first comment, newest first, with its replies under it oldest first (two, then "View
+   more"). `limit` keeps the newest few threads; `compact` (a card) shows first comments only, clamped, with a reply count. */
+function talkThreadHTML(id, { limit = 0, compact = false } = {}) {
+  const e = D.talk.get(id);
+  if (!e || (e.st === 'loading' && !e.rows.length)) return `<div class="small muted">${talkNet() ? 'Loading the discussion…' : 'No comments yet.'}</div>`;
+  if (e.st === 'err') return `<div class="small muted">Couldn’t load the discussion. <button type="button" class="linkbtn" data-talkretry="${esc(id)}">Try again</button></div>`;
+  const roots = e.rows.filter(c => !c.parent_id), kids = new Map();
+  for (const c of e.rows) if (c.parent_id) { if (!kids.has(c.parent_id)) kids.set(c.parent_id, []); kids.get(c.parent_id).push(c); }
+  if (!roots.length) return `<div class="small muted">No comments yet.${acct.user ? ' Start the discussion.' : ''}</div>`;
+  return (limit ? roots.slice(0, limit) : roots).map(r => {
+    const ks = (kids.get(r.id) || []).slice().sort((a, b) => a.created_at < b.created_at ? -1 : 1);
+    if (compact) return commentHTML(r, { id, compact, nReplies: ks.length });
+    const vis = D.talkMore.has(r.id) ? ks : ks.slice(0, 2);
+    return `<div class="cthread">${commentHTML(r, { id })}${vis.length || D.replyTo === r.id ? `<div class="creplies">${vis.map(k => commentHTML(k, { id })).join('')}${ks.length > vis.length ? `<button type="button" class="linkbtn" data-talkmore="${esc(r.id)}">View ${ks.length - vis.length} more repl${ks.length - vis.length === 1 ? 'y' : 'ies'}</button>` : ''}${D.replyTo === r.id ? replyBox(id, r) : ''}</div>` : ''}</div>`;
+  }).join('');
+}
+function composerHTML(id, { compact = false } = {}) {
+  if (!acct.on) return '';
+  if (!acct.user) return `<div class="talk-in out"><button type="button" class="btn sm" data-talksignin>Sign in to comment</button><span class="small muted">Reading is open to everyone. Posting takes a free account.</span></div>`;
+  const k = 'p:' + id, need = acct.profile === null, nm = esc(D.U.get(id)?.name || 'him');
+  return `<form class="talk-in" data-talkform="${esc(id)}">${need ? `<div class="talk-handle"><label class="small" for="th-${esc(id)}">Your public name</label><input class="inp" id="th-${esc(id)}" data-talkhandle maxlength="20" autocomplete="nickname" placeholder="Letters, numbers, _" value="${esc(D.drafts.handle || '')}"></div>` : ''}
+    <textarea class="inp" rows="${compact ? 1 : 2}" maxlength="1000" data-talkin="${esc(k)}" aria-label="Comment about ${nm}" placeholder="${compact ? 'Add a comment' : `What’s your take on ${nm}?`}">${esc(D.drafts[k] || '')}</textarea>
+    <div class="talk-in-row"><span class="small muted">${need ? 'Pick a name once; it shows on everything you post.' : acct.profile ? `Posting as <strong>${esc(acct.profile.handle)}</strong>` : ''}</span><span class="small talk-msg" data-talk-msg="${esc(k)}" role="status"></span><button type="submit" class="btn sm primary">Post</button></div></form>`;
+}
+/* The discussion block: on his page (no limit, whole threads) and on cards (the newest two, compact). Starts loading
+   his comments if they aren't loaded. */
+function commentsSection(id, { limit = 0, compact = false } = {}) {
+  if (!talkOn() || !id) return '';
+  talkLoad(id);
+  return `<section class="talk${compact ? ' compact' : ''}" aria-label="Discussion about ${esc(D.U.get(id)?.name || 'this player')}">
+    <div class="row-head"><h3 class="dh">Discussion <span class="talk-n" data-talk-n="${esc(id)}">${talkCountTxt(id)}</span></h3>${limit ? `<a class="more-link" href="#${playerHash(id, 'talk')}">${compact ? 'See all →' : 'All comments →'}</a>` : ''}</div>
+    <div class="talk-thread" data-talk-thread="${esc(id)}" data-limit="${limit}" data-compact="${compact ? 1 : 0}">${talkThreadHTML(id, { limit, compact })}</div>
+    <div class="talk-compose" data-talk-compose="${esc(id)}" data-compact="${compact ? 1 : 0}">${composerHTML(id, { compact })}</div></section>`;
+}
+function pTalk(id, u) {
+  if (!talkOn()) return '';
+  return `<div class="card ptalk">${commentsSection(id)}</div><div class="small muted">Comments are public and show your public name. Keep it about football and be civil; report anything abusive and a moderator will look at it.</div>`;
+}
+// repaint one player's discussion wherever it shows (his page, an expanded card), and his counts
+function talkPaint(id, compose) {
+  document.querySelectorAll(`[data-talk-thread="${qv(id)}"]`).forEach(el => { el.innerHTML = talkThreadHTML(id, { limit: +el.dataset.limit || 0, compact: el.dataset.compact === '1' }); });
+  document.querySelectorAll(`[data-talk-n="${qv(id)}"]`).forEach(el => { el.textContent = talkCountTxt(id); });
+  if (compose) document.querySelectorAll(`[data-talk-compose="${qv(id)}"]`).forEach(el => { el.innerHTML = composerHTML(id, { compact: el.dataset.compact === '1' }); });
+  chipPaint(id); talkRefocus();
+}
+const talkSay = (key, text) => document.querySelectorAll(`[data-talk-msg="${qv(key)}"]`).forEach(el => { el.textContent = text; });
+async function talkPost(form) {
+  const id = form.dataset.talkform, parent = form.dataset.parent || null, ta = form.querySelector('textarea'), key = ta.dataset.talkin, body = ta.value.trim();
+  if (!acct.user) return talkSignIn();
+  if (!body) return talkSay(key, 'Write something first.');
+  if (D.talkBusy) return;
+  D.talkBusy = true; const btn = form.querySelector('[type=submit]'); if (btn) btn.disabled = true; talkSay(key, '');
+  try {
+    if (acct.profile === undefined) { const [p] = await sbRest(`profiles?user_id=eq.${acct.user.id}&select=handle`) || []; acct.profile = p || null; }
+    if (!acct.profile) {
+      const h = (form.querySelector('[data-talkhandle]')?.value || D.drafts.handle || '').trim();
+      if (!/^[A-Za-z0-9_]{3,20}$/.test(h)) { if (!form.querySelector('[data-talkhandle]')) talkPaint(id, true); return talkSay(key, 'First pick a public name: 3 to 20 letters, numbers or underscores.'); }
+      try { const [p] = await sbRest('profiles?select=handle', { method: 'POST', body: { user_id: acct.user.id, handle: h }, prefer: 'return=representation' }); acct.profile = p; }
+      catch (e) { if (e.code === '23505') return talkSay(key, `“${h}” is taken. Try another name.`); if (e.code === '23514') return talkSay(key, 'That name isn’t available. Try another.'); throw e; }
+    }
+    const [c] = await sbRest('comments?select=id,player_id,parent_id,author_id,body,season,week,hidden_at,hidden_reason,created_at,profiles(handle)',
+      { method: 'POST', body: { player_id: id, parent_id: parent, author_id: acct.user.id, body, season: D.season || null, week: D.week || null }, prefer: 'return=representation' });
+    const e = D.talk.get(id) || { st: 'ok', rows: [], at: Date.now() }; e.rows.unshift(c); if (e.st !== 'ok') e.st = 'ok'; D.talk.set(id, e);
+    D.talkN.set(id, { n: (D.talkN.get(id)?.n || 0) + 1, at: Date.now() }); D.rx.set('c:' + c.id, { c: {}, mine: null });
+    D.drafts[key] = ''; if (parent) { D.replyTo = null; D.talkMore.add(c.parent_id); }
+    D.talkFocus = null;
+    track('comment_posted', { pos: D.U.get(id)?.pos || null, reply: !!parent, screen: state.tab });
+    talkPaint(id, true);
+  } catch (e) { talkSay(key, talkErr(e)); }
+  finally { D.talkBusy = false; if (btn?.isConnected) btn.disabled = false; }
+}
+async function talkDelete(id, cid) {
+  try {
+    const r = await sbRest(`comments?id=eq.${cid}&select=id`, { method: 'DELETE', prefer: 'return=representation' });
+    if (!r?.length) throw Object.assign(new Error('not allowed'), { code: '42501' });
+    const e = D.talk.get(id); if (e) e.rows = e.rows.filter(c => c.id !== cid && c.parent_id !== cid);
+    D.talkN.set(id, { n: (e?.rows || []).filter(c => !c.hidden_at).length, at: Date.now() }); toast('Comment deleted.');
+  } catch (e) { toast(talkErr(e)); }
+  D.talkDel = null; talkPaint(id);
+}
+async function talkReport(id, cid, why) {
+  D.talkRep = null; talkPaint(id);
+  try { await sbRest('reports', { method: 'POST', body: { target_kind: 'comment', target_id: cid, reporter_id: acct.user.id, reason: why }, prefer: 'return=minimal' }); toast('Reported. A moderator will take a look.'); }
+  catch (e) { toast(e.code === '23505' ? 'You’ve already reported this comment.' : talkErr(e)); }
+}
+// a moderator hides a comment (its thread's replies go with it) or brings it back; the database checks they may
+async function talkHide(cid, hide) {
+  const r = await sbRest(`comments?id=eq.${cid}&select=id,player_id`, { method: 'PATCH', body: hide ? { hidden_at: new Date().toISOString(), hidden_reason: 'Hidden by a moderator' } : { hidden_at: null }, prefer: 'return=representation' });
+  if (!r?.length) throw Object.assign(new Error('not allowed'), { code: '42501' });
+  return r[0].player_id;
+}
+
+/* 💬 n beside a player's name on cards and lists, linking to his discussion. Counts come from one query per screen
+   (discussion_counts for every name on it, after the render), kept 5 minutes. */
+function talkChip(id) {
+  if (!talkOn() || !id) return '';
+  const n = D.talkN.get(id); if (!n || Date.now() - n.at > 3e5) D.cntQ.add(id);
+  return `<a class="talkn" href="#${playerHash(id, 'talk')}" data-talkn="${esc(id)}" title="Comments about this player"${n?.n ? '' : ' hidden'}>💬 <span>${n?.n || ''}</span><span class="sr-only"> comments</span></a>`;
+}
+function chipPaint(id) { const n = D.talkN.get(id)?.n || 0; document.querySelectorAll(`[data-talkn="${qv(id)}"]`).forEach(el => { el.hidden = !n; el.firstElementChild.textContent = n || ''; }); }
+async function cntFlush() {
+  if (!talkNet() || !D.cntQ.size || D.cntBusy) return;
+  const ids = [...D.cntQ].slice(0, 150); ids.forEach(i => D.cntQ.delete(i)); D.cntBusy = true;
+  for (const i of ids) if (!D.talkN.has(i)) D.talkN.set(i, { n: 0, at: Date.now() });   // asked once, whatever the answer
+  try {
+    const got = new Map((await sbRest(`discussion_counts?select=player_id,n&player_id=in.${encodeURIComponent(inList(ids))}`) || []).map(r => [r.player_id, r.n]));
+    for (const i of ids) D.talkN.set(i, { n: got.get(i) || 0, at: Date.now() });
+  } catch (e) { talkMissing(e); }
+  finally { D.cntBusy = false; ids.forEach(chipPaint); if (D.cntQ.size) cntFlush(); }
+}
+async function rxFlush() {
+  if (!talkNet() || !D.rxQ.size) return;
+  const keys = [...D.rxQ]; D.rxQ.clear(); await rxLoad(keys); keys.forEach(rxPaint);
+}
+// "Most discussed this week" on the Players page: its own fetch, painted into its placeholder
+function talkHot() {
+  const el = $('[data-talkhot]'); if (!el) return;
+  const paint = () => { const rows = (D.talkHot?.rows || []).filter(r => D.U.get(r.player_id)); el.innerHTML = rows.length ? `<div class="card talkhot"><span class="label">Most discussed this week</span><div class="talkhot-l">${rows.map(r => `<span>${plink(r.player_id, esc(D.U.get(r.player_id).name))} <span class="small muted">💬 ${r.n7}</span></span>`).join('')}</div></div>` : ''; };
+  if (D.talkHot && Date.now() - D.talkHot.at < 3e5) return paint();
+  if (!talkNet()) return paint();
+  D.talkHot = { rows: D.talkHot?.rows || [], at: Date.now() };
+  sbRest('discussion_counts?select=player_id,n7&n7=gt.0&order=n7.desc&limit=8').then(r => { D.talkHot.rows = r || []; }).catch(talkMissing).finally(paint);
+}
+// typing survives repaints: the draft is kept as it's typed, and focus goes back to the box it was in
+function talkRefocus() {
+  const f = D.talkFocus; if (!f || document.activeElement?.closest?.('[data-talkin],[data-talkhandle]')) return;
+  const el = f.k === 'handle' ? $('[data-talkhandle]') : document.querySelector(`[data-talkin="${qv(f.k)}"]`);
+  if (el) { el.focus({ preventScroll: true }); try { el.setSelectionRange(f.s, f.e); } catch { /* not a text box */ } }
+}
+function talkAfterRender() { if (talkNet()) { cntFlush(); rxFlush(); } if (state.tab === 'pool') talkHot(); talkRefocus(); }
+
+/* Watching a player: his news joins your players' in the alerts. Kept with the shared settings, so it syncs. */
+const watching = id => (state.watch || []).includes(id);
+const watchBtn = id => `<button type="button" class="btn sm" data-watch="${esc(id)}" aria-pressed="${watching(id)}" title="${watching(id) ? 'Stop getting his news in your alerts' : 'Get his news in your alerts'}">${watching(id) ? '★ Watching' : '☆ Watch'}</button>`;
+function toggleWatch(id) {
+  const w = state.watch || (state.watch = []), i = w.indexOf(id), nm = D.U.get(id)?.name || 'this player';
+  if (i >= 0) w.splice(i, 1); else { w.push(id); if (w.length > 200) w.shift(); }
+  save(); track('player_watched', { on: i < 0, pos: D.U.get(id)?.pos || null }); render();
+  toast(i < 0 ? `Watching ${nm}: his news shows in your alerts (the bell).` : `Stopped watching ${nm}.`);
+}
+
+/* The bell: news from the last week about your team's players and the players you watch, and replies in the threads
+   you've posted in, since you last opened it (the first time, the last two days). */
+const alertsSince = () => D.alertsSince ?? (state.alertsSeen || Date.now() - 2 * 864e5);
+function alertItems() {
+  const since = alertsSince(), ids = new Set([...(state.watch || []), ...state.roster]), wk = Date.now() - 7 * 864e5;
+  const news = (D.news?.d?.items || []).filter(i => { const t = Date.parse(i.t); return t > since && t > wk && i.ids?.some(id => ids.has(id)); });
+  const reps = (acct.replies || []).filter(c => Date.parse(c.created_at) > since);
+  return { news, reps, n: news.length + reps.length };
+}
+async function alertsLoad() {
+  if (!acct.user || !talkNet()) { acct.replies = []; return renderBell(); }
+  const since = new Date(Math.max(state.alertsSeen || 0, Date.now() - 14 * 864e5)).toISOString();
+  try { acct.replies = await sbRest('rpc/my_replies?select=id,player_id,parent_id,author_id,body,created_at,profiles(handle)', { method: 'POST', body: { since } }) || []; }
+  catch (e) { talkMissing(e); }
+  renderBell();
+}
+function renderBell() {
+  const b = $('#bellBtn'); if (!b) return;
+  const show = location.hash !== '#export' && !SELFTEST && ((state.watch || []).length > 0 || state.roster.length > 0 || !!acct.user);
+  b.hidden = !show; if (!show) return;
+  if (D.news?.st === 'ok' && Date.now() - (D.news.at || 0) > 18e5 && !D.alertsOpen) D.news = null;   // the feed changes every 3 hours
+  newsFeed();
+  const { n } = alertItems(), c = b.querySelector('.bell-n');
+  c.hidden = !n; c.textContent = n > 9 ? '9+' : String(n);
+  b.setAttribute('aria-expanded', String(!!D.alertsOpen)); b.setAttribute('aria-label', n ? `Alerts, ${n} new` : 'Alerts');
+}
+function toggleAlerts() {
+  if (D.alertsOpen) { D.alertsOpen = false; D.alertsSince = null; }
+  else { D.alertsSince = alertsSince(); D.alertsOpen = true; D.acctOpen = false; state.alertsSeen = Date.now(); save(); track('alerts_opened', { n: alertItems().n }); }
+  render(); if (D.alertsOpen) $('#panels .alerts')?.focus();
+}
+function alertsPanel() {
+  const { news, reps } = alertItems(), W = (state.watch || []).length;
+  const items = [...reps.map(c => ({ t: c.created_at, h: `<li class="nitem"><div class="nmeta"><span class="pill n">Reply</span><span class="small muted">${ago(Date.parse(c.created_at))}</span></div>
+      <div class="ntitle"><a href="#${playerHash(c.player_id, 'talk')}">${talkWho(c)} replied in the ${esc(D.U.get(c.player_id)?.name || 'player')} discussion</a></div><div class="small muted clamp">${esc(c.body)}</div></li>` })),
+    ...news.map(i => ({ t: i.t, h: newsItemHTML(i) }))].sort((a, b) => a.t < b.t ? 1 : -1);
+  return `<div class="card panel alerts" tabindex="-1" role="region" aria-label="Alerts"><div class="row-head"><h2>Alerts</h2><button type="button" class="btn sm" data-bell>Close</button></div>
+    ${items.length ? `<ul class="nlist">${items.map(x => x.h).join('')}</ul>` : `<p class="small muted" style="margin:0">Nothing new since you last looked.</p>`}
+    <p class="small muted" style="margin:0">News about the players on ${esc(curTeam()?.name || 'your team')}${W ? ` and the ${W} player${W === 1 ? '' : 's'} you watch` : ''}${acct.user ? ', and replies in discussions you’ve joined' : ''}. ${W ? '' : 'Watch any player from his page to add his news. '}${!acct.user && acct.on && talkOn() ? 'Sign in to hear about replies to your comments.' : ''}</p></div>`;
+}
+
+/* #mod: open reports, grouped by comment (hide it, delete it, or dismiss the reports), and the hidden comments (restore
+   or delete). For moderators; the database refuses everyone else whatever this page shows. */
+async function modLoad() {
+  D.mod = { st: 'loading' };
+  const cols = 'id,player_id,parent_id,author_id,body,hidden_at,hidden_reason,created_at,profiles(handle)';
+  try {
+    const reps = await sbRest('reports?select=id,target_id,reason,note,created_at&resolved_at=is.null&order=created_at.desc&limit=300') || [];
+    const ids = [...new Set(reps.map(r => r.target_id))];
+    const cs = ids.length ? await sbRest(`comments?select=${cols}&id=in.${encodeURIComponent(inList(ids))}`) || [] : [];
+    const hid = await sbRest(`comments?select=${cols}&hidden_at=not.is.null&hidden_reason=neq.__parent&order=hidden_at.desc&limit=100`) || [];
+    D.mod = { st: 'ok', reps, cs: new Map(cs.map(c => [c.id, c])), hid };
+  } catch (e) { D.mod = { st: 'err', msg: talkErr(e) }; }
+  if (state.tab === 'mod') render();
+}
+function viewMod() {
+  if (!acct.user || !acct.admin) return `<div class="card panel"><h2>Moderation</h2><p class="small muted" style="margin:0">This page is for moderators.${acct.user ? '' : ' Sign in first.'}</p></div>`;
+  if (!D.mod) modLoad();
+  const M = D.mod; if (!M || M.st === 'loading') return `<div class="card loading"><h3>Loading reports</h3></div>`;
+  if (M.st === 'err') return `<div class="card panel"><h2>Moderation</h2><p>${esc(M.msg)}</p><button type="button" class="btn sm" data-modact="reload|">Try again</button></div>`;
+  const tab = D.modTab === 'hidden' ? 'hidden' : 'reports', who = c => `${talkWho(c)} on ${plink(c.player_id, esc(D.U.get(c.player_id)?.name || c.player_id))}`;
+  const groups = new Map(); for (const r of M.reps) { if (!groups.has(r.target_id)) groups.set(r.target_id, []); groups.get(r.target_id).push(r); }
+  const card = (c, body, btns) => `<div class="card panel modc"><div class="cmt-head">${c ? who(c) : '<span class="muted">Deleted comment</span>'}${c ? `<span class="small muted">${ago(Date.parse(c.created_at))}</span>` : ''}${c?.hidden_at ? '<span class="pill o">Hidden</span>' : ''}</div>${c ? `<div class="cmt-body">${esc(c.body)}</div>` : ''}${body}<div class="toolbar">${btns}</div></div>`;
+  const b = (act, id, l, cls = '') => `<button type="button" class="btn sm ${cls}" data-modact="${act}|${esc(id)}">${l}</button>`;
+  const list = tab === 'reports'
+    ? [...groups].map(([tid, rs]) => { const c = M.cs.get(tid), why = Object.entries(rs.reduce((o, r) => (o[r.reason] = (o[r.reason] || 0) + 1, o), {})).map(([k, n]) => `${esc((REPORT_WHY.find(x => x[0] === k) || [k, k])[1])} ×${n}`).join(' · ');
+        return card(c, `<div class="small"><strong>${rs.length} report${rs.length === 1 ? '' : 's'}:</strong> ${why}${rs.filter(r => r.note).map(r => `<div class="small muted">“${esc(r.note)}”</div>`).join('')}</div>`,
+          (c && !c.hidden_at ? b('hide', tid, 'Hide it', 'primary') : '') + (c ? b('del', tid, 'Delete it', 'danger') : '') + b('dismiss', tid, 'Dismiss the reports')); }).join('') || '<div class="card panel small muted">No open reports.</div>'
+    : M.hid.map(c => card(c, c.hidden_reason ? `<div class="small muted">${esc(c.hidden_reason)}</div>` : '', b('restore', c.id, 'Restore') + b('del', c.id, 'Delete', 'danger'))).join('') || '<div class="card panel small muted">Nothing hidden.</div>';
+  return `<div class="section"><div class="row-head"><h2>Moderation</h2><button type="button" class="btn sm" data-modact="reload|">Refresh</button></div>
+    <div class="seg" role="group" aria-label="Moderation"><button type="button" data-modtab="reports" aria-pressed="${tab === 'reports'}">Reports (${groups.size})</button><button type="button" data-modtab="hidden" aria-pressed="${tab === 'hidden'}">Hidden (${M.hid.length})</button></div>
+    ${list}<p class="small muted">Hiding a thread’s first comment hides its replies too, and restoring it brings them back. To ban an account, add it to the bans table in the Supabase SQL editor.</p></div>`;
+}
+async function modAct(act, cid) {
+  const uid = acct.user?.id, now = new Date().toISOString(), dismiss = () => sbRest(`reports?target_id=eq.${cid}&resolved_at=is.null`, { method: 'PATCH', body: { resolved_at: now, resolved_by: uid }, prefer: 'return=minimal' });
+  try {
+    if (act === 'hide') { const pid = await talkHide(cid, true); await dismiss(); D.talk.delete(pid); toast('Hidden.'); }
+    else if (act === 'restore') { const pid = await talkHide(cid, false); D.talk.delete(pid); toast('Restored.'); }
+    else if (act === 'dismiss') { await dismiss(); toast('Reports dismissed.'); }
+    else if (act === 'del') { await dismiss(); const r = await sbRest(`comments?id=eq.${cid}&select=id,player_id`, { method: 'DELETE', prefer: 'return=representation' }); if (!r?.length) throw Object.assign(new Error(), { code: '42501' }); D.talk.delete(r[0].player_id); toast('Deleted.'); }
+  } catch (e) { toast(talkErr(e)); }
+  modLoad();
+}
+
+document.addEventListener('click', e => {
+  const t = e.target.closest('[data-react],[data-rxpick],[data-talkreply],[data-talkmore],[data-talkdel],[data-talkrep],[data-talkwhy],[data-talkhide],[data-talkretry],[data-talksignin],[data-watch],[data-bell],[data-modact],[data-modtab]'); if (!t) return;
+  const d = t.dataset, pid = () => t.closest('[data-talk-thread]')?.dataset.talkThread || D.pp?.id;
+  if (d.react) { const [k, em] = d.react.split('|'); react(k, em); return; }
+  if (d.rxpick) { const was = D.rxPick; D.rxPick = was === d.rxpick ? null : d.rxpick; if (was && was !== d.rxpick) rxPaint(was); rxPaint(d.rxpick); return; }
+  if (d.talksignin !== undefined) { talkSignIn(); return; }
+  if (d.talkreply) { if (!acct.user) return talkSignIn(); const id = pid(); D.replyTo = D.replyTo === d.talkreply ? null : d.talkreply; D.talkFocus = D.replyTo ? { k: 'r:' + D.replyTo, s: 0, e: 0 } : null; talkPaint(id); return; }
+  if (d.talkmore) { D.talkMore.add(d.talkmore); talkPaint(pid()); return; }
+  if (d.talkdel) { const id = pid(); if (D.talkDel === d.talkdel) talkDelete(id, d.talkdel); else { D.talkDel = d.talkdel; talkPaint(id); } return; }
+  if (d.talkrep) { D.talkRep = D.talkRep === d.talkrep ? null : d.talkrep; talkPaint(pid()); return; }
+  if (d.talkwhy) { const [cid, why] = d.talkwhy.split('|'); talkReport(pid(), cid, why); return; }
+  if (d.talkhide) { const [cid, h] = d.talkhide.split('|'); talkHide(cid, h === '1').then(id => { toast(h === '1' ? 'Hidden.' : 'Restored.'); talkLoad(id, true); }).catch(er => toast(talkErr(er))); return; }
+  if (d.talkretry) { talkLoad(d.talkretry, true); talkPaint(d.talkretry); return; }
+  if (d.watch) { toggleWatch(d.watch); return; }
+  if (d.bell !== undefined) { toggleAlerts(); return; }
+  if (d.modtab) { D.modTab = d.modtab; render(); return; }
+  if (d.modact) { const [act, cid] = d.modact.split('|'); if (act === 'reload') modLoad(); else modAct(act, cid); render(); }
+});
+document.addEventListener('submit', e => { const f = e.target.closest?.('form[data-talkform]'); if (!f) return; e.preventDefault(); talkPost(f); });
+document.addEventListener('keydown', e => {
+  const t = e.target; if (!t.dataset?.talkin || e.key !== 'Enter' || e.shiftKey || e.isComposing) return;
+  e.preventDefault(); t.form?.requestSubmit();
+});
+document.addEventListener('input', e => {
+  const t = e.target;
+  if (t.dataset?.talkin) { D.drafts[t.dataset.talkin] = t.value; D.talkFocus = { k: t.dataset.talkin, s: t.selectionStart, e: t.selectionEnd }; }
+  else if (t.dataset && 'talkhandle' in t.dataset) { D.drafts.handle = t.value; D.talkFocus = { k: 'handle', s: t.selectionStart, e: t.selectionEnd }; }
+});
+document.addEventListener('focusin', e => { const t = e.target.closest?.('[data-talkin],[data-talkhandle]'); D.talkFocus = t ? { k: t.dataset.talkin || 'handle', s: t.selectionStart, e: t.selectionEnd } : null; });
+// left the box for somewhere else (not a repaint that replaced it): stop bringing focus back
+document.addEventListener('focusout', e => { const t = e.target; if (!t.closest?.('[data-talkin],[data-talkhandle]')) return; setTimeout(() => { if (t.isConnected && !document.activeElement?.closest?.('[data-talkin],[data-talkhandle]')) D.talkFocus = null; }, 0); });
+document.addEventListener('visibilitychange', () => { if (!document.hidden && acct.user) alertsLoad(); });
+
 /* Players: find anyone, or browse a position ranked on this week's projection or on rest-of-season value (posRanks). */
 function viewPool() {
-  const P = POS.includes(D.poolPos) ? D.poolPos : 'QB', mode = D.poolMode === 'ros' ? 'ros' : 'week';
+  const W = state.watch || [], P = D.poolPos === 'watch' && W.length ? 'watch' : POS.includes(D.poolPos) ? D.poolPos : 'QB', mode = D.poolMode === 'ros' ? 'ros' : 'week';
   let list;
-  if (mode === 'ros') { const rk = posRanks(P); list = [...rk.keys()].map(id => D.M[id]).filter(Boolean); }
+  if (P === 'watch') list = W.map(id => D.M[id]).filter(Boolean).sort((a, b) => mode === 'ros' ? rosBase(b.id) - rosBase(a.id) : b.mean - a.mean);
+  else if (mode === 'ros') { const rk = posRanks(P); list = [...rk.keys()].map(id => D.M[id]).filter(Boolean); }
   else list = Object.values(D.M).filter(r => r.pos === P && r.status === 'ok' && r.mean > 0).sort((a, b) => b.mean - a.mean);
   const total = list.length; if (!D.poolAll) list = list.slice(0, 50);
   const stat = id => { const s = pStatus(id); return s ? `<span class="pill ${s[0]}">${s[0] === 'n' ? 'Yours' : s[0] === 'm' ? 'Taken' : 'Free agent'}</span>` : ''; };
@@ -5344,10 +5866,11 @@ function viewPool() {
   <div class="row-head"><h2>Players <span class="hsub">Every name opens his page: projection, game log, history</span></h2><a class="small" href="players/">Player directory</a></div>
   <div class="addbox card"><label class="label" for="pq">Find any player</label>
     <div class="ac"><input class="inp" id="pq" type="search" autocomplete="off" placeholder="Name or NFL team, e.g. Bijan or KC" role="combobox" aria-expanded="false" aria-controls="pqList" aria-autocomplete="list" value="${esc(D.pq || '')}"><div class="ac-list" id="pqList" role="listbox" hidden></div></div></div>
-  <div class="toolbar"><div class="seg" role="group" aria-label="Position">${POS.map(p => `<button type="button" data-poolpos="${p}" aria-pressed="${p === P}">${posLabel(p)}</button>`).join('')}</div>
+  ${talkOn() ? '<div data-talkhot></div>' : ''}
+  <div class="toolbar"><div class="seg" role="group" aria-label="Position">${POS.map(p => `<button type="button" data-poolpos="${p}" aria-pressed="${p === P}">${posLabel(p)}</button>`).join('')}${W.length ? `<button type="button" data-poolpos="watch" aria-pressed="${P === 'watch'}">★ Watching</button>` : ''}</div>
     <div class="seg" role="group" aria-label="Rank on"><button type="button" data-poolmode="week" aria-pressed="${mode === 'week'}">Week ${D.week}</button><button type="button" data-poolmode="ros" aria-pressed="${mode === 'ros'}">Rest of season</button></div></div>
   <div class="tscroll"><table class="glog pool"><thead><tr><th>#</th><th class="l">Player</th><th class="l">Opp</th>${mode === 'ros' ? '<th title="Rest-of-season value: points a game, before each week’s matchup">ROS pts/g</th><th>Week ' + D.week + '</th>' : `<th>Proj</th><th title="Middle half of outcomes">Likely range</th>`}<th title="Share of ESPN leagues that roster him">Owned</th><th class="l"></th></tr></thead>
-    <tbody>${rows || `<tr><td class="l" colspan="7">No ${posLabel(P)}s with numbers this week.</td></tr>`}</tbody></table></div>
+    <tbody>${rows || `<tr><td class="l" colspan="7">${P === 'watch' ? 'None of the players you watch has numbers this week.' : `No ${posLabel(P)}s with numbers this week.`}</td></tr>`}</tbody></table></div>
   ${total > list.length ? `<div class="toolbar"><button type="button" class="btn sm" data-act="poolmore">Show all ${total}</button></div>` : ''}
   <div class="small muted">${mode === 'ros' ? 'Rest of season: Benny’s value per game from here on, the same for every opponent; each week’s matchup moves it up or down.' : `Week ${D.week} projections in ${fmtName(true)} scoring, for players expected to play.`}</div></div>`;
 }
@@ -5359,8 +5882,8 @@ function viewLineup() {
   return lineupBody();
 }
 function viewResearch() {
-  const sub = state.tab === 'teams' || state.tab === 'weather' ? state.tab : 'defenses';
-  return `<div class="section">${sub === 'teams' ? viewTeams() : sub === 'weather' ? viewWeather() : viewDefenses()}</div>`;
+  const sub = ['teams', 'weather', 'news'].includes(state.tab) ? state.tab : 'defenses';
+  return `<div class="section">${sub === 'teams' ? viewTeams() : sub === 'weather' ? viewWeather() : sub === 'news' ? viewNews() : viewDefenses()}</div>`;
 }
 /* Every game this week: where it's played, roof or open air, the forecast for kickoff, and how it moves the players on
    the selected team. */
@@ -5672,7 +6195,7 @@ function teamDetail(T, seasons) {
 }
 function viewSettings() {
   const S = state.settings, sl = (id, label, val, min, max, step, fmt) => `<div class="slider"><label for="${id}">${label}</label><input type="range" id="${id}" data-set="${id}" min="${min}" max="${max}" step="${step}" value="${val}"><span class="num" id="${id}-v">${fmt(val)}</span></div>`;
-  return `<div class="section"><div class="row-head"><h2>Settings</h2><span class="small muted">These apply to every team. Scoring, lineup slots and league size are per team, in <button type="button" class="linkbtn" data-act="teamsettings">Team settings</button>.</span></div>
+  return `<div class="section">${acct.admin ? '<div class="banner info"><span>You’re a moderator.</span><a class="btn sm" href="#mod">Open moderation</a></div>' : ''}<div class="row-head"><h2>Settings</h2><span class="small muted">These apply to every team. Scoring, lineup slots and league size are per team, in <button type="button" class="linkbtn" data-act="teamsettings">Team settings</button>.</span></div>
   <div class="card panel"><h3>Season</h3>
     <div class="field inline"><label for="season">Season</label><input class="inp" id="season" type="number" data-season value="${D.season}" style="width:96px"></div>
   </div>
@@ -5704,7 +6227,9 @@ function viewSettings() {
 /* ---------- events ---------- */
 document.addEventListener('click', e => {
   if (e.target.closest('a[href^="#"]')) D.fwdNav = true;   // a link: the next page starts at the top (hashchange)
-  const t = e.target.closest('[data-poolpos],[data-poolmode],[data-model],[data-tab],[data-expand],[data-add],[data-remove],[data-strategy],[data-act],[data-sort],[data-team],[data-fteam],[data-clearovr],[data-wh],[data-wsrc],[data-taken],[data-keepmode],[data-decide],[data-brief],[data-wrank],[data-acadd],[data-mrem],[data-flowmethod],[data-espnmode],[data-rview],[data-research],[data-hweek],[data-dc],[data-colmv],[data-started]'); if (!t) return;
+  const t = e.target.closest('[data-newskind],[data-newswho],[data-poolpos],[data-poolmode],[data-model],[data-tab],[data-expand],[data-add],[data-remove],[data-strategy],[data-act],[data-sort],[data-team],[data-fteam],[data-clearovr],[data-wh],[data-wsrc],[data-taken],[data-keepmode],[data-decide],[data-brief],[data-wrank],[data-acadd],[data-mrem],[data-flowmethod],[data-espnmode],[data-rview],[data-research],[data-hweek],[data-dc],[data-colmv],[data-started]'); if (!t) return;
+  if (t.dataset.newskind) { D.newsKind = t.dataset.newskind; D.newsAll = false; render(); return; }
+  if (t.dataset.newswho) { D.newsWho = t.dataset.newswho; D.newsAll = false; render(); return; }
   if (t.dataset.poolpos) { D.poolPos = t.dataset.poolpos; D.poolAll = false; render(); return; }
   if (t.dataset.poolmode) { D.poolMode = t.dataset.poolmode; render(); return; }
   if (t.dataset.model) { state.settings.model = t.dataset.model; track('model_changed', { model: t.dataset.model }); save(); D.wCache = null; computeAll(); render(); return; }
@@ -5745,6 +6270,7 @@ document.addEventListener('click', e => {
   const a = t.dataset.act;
   if (a === 'pback') { e.preventDefault(); D.fwdNav = false; history.back(); return; }
   if (a === 'poolmore') { D.poolAll = true; render(); return; }
+  if (a === 'newsmore') { D.newsAll = true; render(); return; }
   if (a === 'shareplayer') { sharePlayer(); return; }
   if (a === 'reload') { for (let s = 0; s < 4; s++) store.del('coach:' + ((D.season || 0) - s)); load({ manual: true }); }
   else if (a === 'sharemove') shareMove();

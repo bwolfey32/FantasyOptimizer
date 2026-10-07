@@ -50,6 +50,10 @@ CSS = """<style>
 .now { display: flex; flex-wrap: wrap; gap: 4px 16px; align-items: baseline; padding: 12px 16px; border: 1px solid var(--line); border-radius: 10px; background: var(--surface); }
 .now[hidden] { display: none; }
 .now b { font-family: "Saira Condensed", sans-serif; font-size: 30px; color: var(--accent); }
+.news[hidden] { display: none; }
+.news ul { list-style: none; margin: 0; padding: 0; border: 1px solid var(--line); border-radius: 10px; background: var(--surface); }
+.news li { padding: 10px 16px; border-bottom: 1px solid var(--line); } .news li:last-child { border-bottom: 0; }
+.news li b { display: block; }
 .dir { columns: 3 220px; gap: 24px; } .dir a { display: block; padding: 2px 0; }
 .dir h3 { margin: 10px 0 2px; font-size: 13px; text-transform: uppercase; letter-spacing: .06em; color: var(--muted); break-after: avoid; }
 </style>"""
@@ -116,6 +120,7 @@ def player_page(sid, h, info, slug, season):
             + "".join(f'<p class="small">{esc(f)}.</p>' for f in facts) + "</div></div>",
             f'<div class="now" id="now" hidden><span>Week <span id="now-w"></span> projection</span><b id="now-p"></b><span class="small muted">PPR points · likely <span id="now-r"></span> · '
             f'<a href="/#player/{esc(sid)}">why, and how he fits your lineup</a></span></div>',
+            '<section class="news" id="news" hidden><h2>Latest news</h2><ul id="news-l"></ul></section>',
             f'<h2 id="seasons">Fantasy stats by season</h2>{season_table(h)}']
     logs = [s for s in (season, season - 1) if h["games"].get(str(s))]
     for s in logs:
@@ -129,7 +134,13 @@ def player_page(sid, h, info, slug, season):
           "isPartOf": {"@type": "WebSite", "name": "Benny’s Picks", "url": SITE + "/"}}
     script = (f'<script>fetch("/model/proj.json").then(r=>r.json()).then(j=>{{const x=j.ids&&j.ids[{json.dumps(sid)}];if(!x||x[0]==null)return;'
               f'const f=v=>Math.max(0,v).toFixed(1);document.getElementById("now-w").textContent=j.week;document.getElementById("now-p").textContent=f(x[0]);'
-              f'document.getElementById("now-r").textContent=f(x[0]-.674*x[2])+"–"+f(x[0]+.674*x[2]);document.getElementById("now").hidden=false}}).catch(()=>{{}})</script>')
+              f'document.getElementById("now-r").textContent=f(x[0]-.674*x[2])+"–"+f(x[0]+.674*x[2]);document.getElementById("now").hidden=false}}).catch(()=>{{}});'
+              # his latest news (scripts/news.py), filled in here so the page itself only changes about weekly
+              f'fetch("/news/players/"+{json.dumps(sid)}+".json").then(r=>r.ok?r.json():null).then(j=>{{const it=j&&j.items||[];if(!it.length)return;'
+              f'const l=document.getElementById("news-l");for(const i of it.slice(0,5)){{const li=document.createElement("li"),b=document.createElement((i.url||"").startsWith("https://")?"a":"b");'
+              f'b.textContent=i.title;if(b.tagName==="A"){{b.href=i.url;b.rel="noopener";b.style.fontWeight="600";b.style.display="block"}}const m=document.createElement("span");m.className="small muted";'
+              f'm.textContent=[i.sub,i.src,new Date(i.t).toLocaleDateString([],{{month:"short",day:"numeric"}})].filter(Boolean).join(" · ");li.append(b,m);l.append(li)}}'
+              f'document.getElementById("news").hidden=false}}).catch(()=>{{}})</script>')
     top = f"{best['season']} {pos}{best['rank']}" if best else f"{season} {pos}{last['rank']}"
     return page(None, {}, f"{name} Fantasy Stats, Game Log & Projections | Benny’s Picks",
                 f"{name} ({pos}, {team or 'FA'}) fantasy football stats: season-by-season PPR points and finishes ({top}), game logs, and this week’s projection.",
