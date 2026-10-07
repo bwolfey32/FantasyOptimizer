@@ -316,6 +316,12 @@ body.welcome.wsign #acctBtn .acct-txt { position: static; width: auto; height: a
 .wxt td:first-child, .wxt td:nth-child(2) { white-space: nowrap; }
 .wxt .wxc { min-width: 230px; }
 .wxt .chip { margin: 0 2px 2px 0; }
+/* each open-air game's weather drawn faintly behind its row (assets/fx.js, WebGPU only): the canvas sits in the first
+   cell, sized to the row, over the table's background and under its words */
+.wxs { isolation: isolate; }
+.wxt td:first-child { position: relative; }
+.wxt td > .fx { position: absolute; left: 0; top: 0; z-index: -1; pointer-events: none; opacity: 0; transition: opacity .8s; }
+.wxt td > .fx.on { opacity: .6; } .wxt td > .fx.calm.on { opacity: .4; }
 .wxline { display: flex; align-items: center; gap: 8px; }
 .wxi { display: inline-flex; gap: 3px; flex: 0 0 auto; }
 .wxi img { width: 32px; height: 32px; border-radius: 8px; background: var(--wx-tile); object-fit: contain; }
@@ -4315,9 +4321,8 @@ function render() {
   if (welcome) {
     for (const s of ['#teampin', '#teamctx', '#panels', '#brief', '#msgs']) $(s).innerHTML = '';
     renderStatus(); renderAcct(); renderAd();
-    $('#main').innerHTML = viewWelcome(); fxWelcome(true); return;
+    $('#main').innerHTML = viewWelcome(); fxSync(true); return;
   }
-  fxWelcome(false);
   const pb = $('#proBtn'); if (pb) { pb.hidden = !acct.on; pb.textContent = isPro() ? 'Pro ✓' : 'Go Pro'; pb.classList.toggle('is-pro', isPro()); pb.setAttribute('aria-pressed', String(state.tab === 'pro')); }
   renderStatus(); renderAcct(); renderAd();
   $('#teampin').innerHTML = D.loading || D.failed || needsTeam() ? '' : teamPin();
@@ -4333,11 +4338,11 @@ function render() {
   if (!D.loading && !D.snapshot && D.errors.some(e => /projections|schedule/i.test(e))) msgs.push(`<div class="banner err"><strong>Some of this week’s data didn’t load.</strong> Picks may be incomplete. Press Refresh to try again.</div>`);
   $('#msgs').innerHTML = msgs.join('');
   const main = $('#main');
-  if (D.failed) { renderBrief(); main.innerHTML = `<div class="card panel"><h2>Couldn’t load this week’s data</h2><p style="margin:0">Sleeper and ESPN didn’t respond. Check your connection and press Refresh projections.</p></div>`; return; }
-  if (D.loading) { renderBrief(); main.innerHTML = `<div class="card loading"><h3>Loading week ${D.week || ''}</h3><div class="small">Projections, stats and schedules. Past seasons are saved after your first visit.</div><div class="bar"><span id="lbar" style="width:${Math.round(D.progress * 100)}%"></span></div></div>`; return; }
+  if (D.failed) { renderBrief(); main.innerHTML = `<div class="card panel"><h2>Couldn’t load this week’s data</h2><p style="margin:0">Sleeper and ESPN didn’t respond. Check your connection and press Refresh projections.</p></div>`; fxSync(false); return; }
+  if (D.loading) { renderBrief(); main.innerHTML = `<div class="card loading"><h3>Loading week ${D.week || ''}</h3><div class="small">Projections, stats and schedules. Past seasons are saved after your first visit.</div><div class="bar"><span id="lbar" style="width:${Math.round(D.progress * 100)}%"></span></div></div>`; fxSync(false); return; }
   renderBrief();
   main.innerHTML = ({ lineup: viewLineup, compare: viewCompare, waivers: viewWaivers, defenses: viewResearch, teams: viewResearch, news: viewResearch, players: viewPlayers, pool: viewPool, player: viewPlayer, settings: viewSettings, weather: viewResearch, pro: viewPro, mod: viewMod })[state.tab]();
-  talkAfterRender();
+  talkAfterRender(); fxSync(false);
 }
 // an injury designation after "is": "on IR", "suspended", "out"
 const injWords = inj => /^ir/i.test(inj || '') ? 'on IR' : /^pup/i.test(inj || '') ? 'on the PUP list' : /^sus/i.test(inj || '') ? 'suspended' : /^na/i.test(inj || '') ? 'not with the team' : (inj || 'out').toLowerCase();
@@ -4807,15 +4812,17 @@ const FLOW_TITLES = { sleeper: 'Import from Sleeper', espn: 'Import from ESPN', 
 const WL_GO =wlSvg('<path d="M5 12h14"/><path d="m13 6 6 6-6 6"/>');
 // platform logos, shown in place of the icon once the files are in assets/: { sleeper: 'assets/logo-sleeper.svg', espn: 'assets/logo-espn.svg' }
 const WL_LOGOS = {};
-/* The add-your-team cards' moving gradient and glass lens (assets/fx.js), where the browser has WebGPU and motion isn't
-   reduced. It loads the first time the cards show; after each render the kept canvases move into the new buttons,
-   and they're released once the welcome is gone. */
+/* Shader effects (assets/fx.js), where the browser has WebGPU and motion isn't reduced: the add-your-team cards' moving
+   gradient and glass lens, and the forecast behind each open-air game on Research → Weather. It loads the first time
+   either shows; after each render the kept canvases move into the new elements, and they're released once their
+   page is gone (the welcome cards are only paused while a setup flow covers them). */
 const FX = { mod: null, on: !!navigator.gpu && !SELFTEST && location.hash !== '#export' };
-function fxWelcome(welcome) {
+function fxSync(welcome) {
   if (!FX.on || matchMedia('(prefers-reduced-motion: reduce)').matches) return;
   const btns = welcome ? [...document.querySelectorAll('.wl-method')] : [];   // leaving the welcome: its old cards are still on the page
-  if (!FX.mod && !btns.length) return;
-  (FX.mod ||= import('./assets/fx.js')).then(m => m.platformCards(btns, welcome)).catch(() => { FX.on = false; });
+  const rows = !welcome && state.tab === 'weather' ? [...document.querySelectorAll('.wxt tr[data-wx]')] : [];
+  if (!FX.mod && !btns.length && !rows.length) return;
+  (FX.mod ||= import('./assets/fx.js')).then(m => { m.platformCards(btns, welcome); m.weatherRows(rows); }).catch(() => { FX.on = false; });
 }
 function viewWelcome() {
   const top = !acct.on ? '' : acct.user ? `<span class="small muted ph-mask">Signed in as ${esc(acct.user.email || '')}. Your team will save to your account.</span>`
@@ -5917,12 +5924,15 @@ function viewWeather() {
     const s = siteOf(g);
     const when = g.date ? new Date(g.date).toLocaleString([], { weekday: 'short', hour: 'numeric', minute: '2-digit' }) : '';
     const mine = ros.filter(r => r.T === g.home || r.T === g.away).map(r => { const f = r.factors.find(x => x.key === 'wx'); const v = f && Math.abs(f.pct) >= 0.005 ? f.pct : 0; return `<span class="chip ${v >= 0.01 ? 'up' : v <= -0.01 ? 'down' : ''}">${esc(shortName(r.id))}${v ? ' ' + spct(v) : ''}</span>`; }).join(' ');
-    return `<tr><td class="l">${esc(when)}${g.state === 'post' ? ' <span class="pill m">Final</span>' : g.state === 'in' ? ' <span class="pill m">Live</span>' : ''}</td><td class="l"><strong>${g.away} @ ${g.home}</strong></td>
+    // the forecast drawn behind the row (fxSync): the sky as the icons name it and how hard the wind, rain and snow are
+    const w = D.wx?.[g.id], L = s && !covered(s) && w && g.state !== 'post' ? wxLoad(w) : null;
+    const fx = L ? ` data-game="${esc(String(g.id))}" data-wx="${wxIcons(g).find(n => n !== 'wind') || ''}" data-wind="${L.wind.toFixed(1)}" data-rain="${L.rain.toFixed(1)}" data-snow="${L.snow.toFixed(1)}"${wxRough(w) ? ' data-rough' : ''}` : '';
+    return `<tr${fx}><td class="l">${esc(when)}${g.state === 'post' ? ' <span class="pill m">Final</span>' : g.state === 'in' ? ' <span class="pill m">Live</span>' : ''}</td><td class="l"><strong>${g.away} @ ${g.home}</strong></td>
       <td class="l">${s ? esc(s.name) + (s.neutral && s.city ? ` <span class="muted">(${esc(s.city)})</span>` : '') : ''}</td><td class="l wxc">${wxLine(g)}</td>${mineCol ? `<td class="l">${mine}</td>` : ''}</tr>`;
   }).join('');
   return `<div class="row-head"><h2>Stadiums &amp; weather <span class="hsub">week ${D.week}</span></h2></div>
     <p class="small muted" style="margin:0">Forecast for the three hours from kickoff at each open-air stadium${anyWx ? '' : ' (forecasts appear about two weeks before a game)'}, from Open-Meteo. Domes and retractable roofs play without weather. ${mineCol ? 'The numbers next to your players are how much the weather and stadium move their projection; open a player on Lineup for the details.' : 'Add your team to see how the weather moves each of your players.'}</p>
-    <div class="tscroll"><table class="wxt"><thead><tr><th class="l">Kickoff</th><th class="l">Game</th><th class="l">Stadium</th><th class="l">Conditions</th>${mineCol ? '<th class="l">Your players</th>' : ''}</tr></thead><tbody>${rows}</tbody></table></div>`;
+    <div class="tscroll wxs"><table class="wxt"><thead><tr><th class="l">Kickoff</th><th class="l">Game</th><th class="l">Stadium</th><th class="l">Conditions</th>${mineCol ? '<th class="l">Your players</th>' : ''}</tr></thead><tbody>${rows}</tbody></table></div>`;
 }
 /* Win chance on Lineup: the opponent's set lineup, and each slot where Benny's pick differs from the Projected lineup,
    with why (a wider range when you're projected to lose, a steadier one when you're projected to win, a stack). */

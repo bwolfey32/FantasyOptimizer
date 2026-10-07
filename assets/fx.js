@@ -1,8 +1,9 @@
 /* Shader effects: decoration drawn on WebGPU with the shaders library (shaders.com, MIT).
-   Two places use it: the weather report's game cards (rain, snow, wind, fog or sun behind each open-air game, from the
-   same forecast as the words on the card) and the welcome screen's four "add your team" cards (a slow gradient in each
-   card's colour, under a glass lens). Each canvas sits behind its card's content and fades in once it has drawn; the
-   card's own CSS look is underneath, so a browser without WebGPU, a failed load or offline just shows that.
+   Three places use it: the weekly weather report's game cards and the app's Research → Weather table (rain, snow,
+   wind, fog or sun behind each open-air game, from the same forecast as the words beside it), and the welcome screen's
+   four "add your team" cards (a slow gradient in each card's colour, under a glass lens). Each canvas sits behind the
+   content and fades in once it has drawn; the CSS look is underneath, so a browser without WebGPU, a failed load or
+   offline just shows that.
    Callers check fxOk() before importing this file, so nothing loads for reduced motion or a browser without WebGPU.
    The library is one pinned file from jsdelivr (about 700 KB compressed), checked against its hash before it runs, and
    only fetched when a page has something to draw. Its telemetry (frame-rate samples sent to shaders.com) is off. */
@@ -27,11 +28,46 @@ async function mount(canvas, components) {
 }
 const fxCanvas = () => { const c = document.createElement('canvas'); c.className = 'fx'; c.setAttribute('aria-hidden', 'true'); return c; };
 
-/* ---------- weather cards ----------
-   A card carries data-wx (the sky, as the weather icons name it) and data-wind / data-rain / data-snow, each 0 (no
-   effect) to about 1.5 (strong), the loads the model uses. "Weather game" cards (data-rough) move at full speed; the
-   rest drift slower and fainter, so a page of fourteen games isn't busy. */
-const dark = () => matchMedia('(prefers-color-scheme: dark)').matches;
+/* Canvases kept across the app's renders. The app rebuilds its HTML on every render, so each effect's canvas is kept by
+   key and moved into the new element (a canvas keeps its GPU context when it moves); a new signature (the forecast
+   changed, say) starts it over. An item is { key, host (where the canvas goes), watch (what to follow for size, the
+   host by default), sig, cls }; place(fx) fits a canvas to its item, after each sync and when the watched element
+   resizes. Keys missing from a sync are paused while keep is set and released when it isn't. */
+function keeper(layers, place) {
+  const kept = new Map();   // key → { canvas, shader (a promise), sig, item, host, watch, dead }
+  const ro = typeof ResizeObserver === 'function' && new ResizeObserver(es => { for (const e of es) for (const fx of kept.values()) if (fx.watch === e.target) place?.(fx); });
+  const drop = (k, fx) => { if (ro && fx.watch) ro.unobserve(fx.watch); fx.shader.then(s => s?.destroy()); fx.canvas.remove(); kept.delete(k); };
+  return (items, keep) => {
+    const live = new Set();
+    for (const it of items) {
+      let fx = kept.get(it.key);
+      if (fx && fx.sig !== it.sig) { drop(it.key, fx); fx = null; }
+      if (!fx) {
+        const ls = layers(it); if (!ls) continue;
+        const canvas = fxCanvas(), f = { canvas, sig: it.sig, shader: mount(canvas, ls).catch(() => null) };
+        if (it.cls) canvas.classList.add(it.cls);
+        f.shader.then(s => { if (!s) { f.dead = true; canvas.remove(); } });   // failed to start: the CSS look, and no retries
+        kept.set(it.key, fx = f);
+      }
+      live.add(it.key);
+      if (fx.dead) continue;
+      fx.item = it;
+      const watch = it.watch || it.host;
+      if (fx.watch !== watch) { if (ro) { if (fx.watch) ro.unobserve(fx.watch); ro.observe(watch); } fx.watch = watch; }
+      if (fx.host !== it.host) { fx.host = it.host; it.host.prepend(fx.canvas); }
+      place?.(fx);
+      fx.shader.then(s => s?.resume());
+    }
+    for (const [k, fx] of kept) if (!live.has(k)) { if (keep) fx.shader.then(s => s?.pause()); else drop(k, fx); }
+    return kept;
+  };
+}
+
+/* ---------- weather ----------
+   A card or table row carries data-wx (the sky, as the weather icons name it) and data-wind / data-rain / data-snow,
+   each 0 (no effect) to about 1.5 (strong), the loads the model uses. "Weather games" (data-rough) move at full speed;
+   the rest drift slower and fainter, so a page of fourteen games isn't busy. */
+const dark = () => { const t = document.documentElement.dataset.theme; return t ? t === 'dark' : matchMedia('(prefers-color-scheme: dark)').matches; };
 const clamp = (x, a, b) => Math.min(b, Math.max(a, x));
 function weatherLayers(ds) {
   const sky = ds.wx, wind = +ds.wind || 0, rain = +ds.rain || 0, snow = +ds.snow || 0, pace = ds.rough != null ? 1 : 0.5, d = dark();
@@ -68,14 +104,22 @@ export function weatherCards(root = document) {
     mount(c, layers).catch(() => c.remove());
   }
 }
+/* The app's weather table: a row can't reliably hold a positioned box, so each canvas sits in the row's first cell and
+   is sized to cover the whole row (re-fitted when the row resizes, as in the narrow-screen stacked layout). */
+function overRow(fx) {
+  const tr = fx.watch, td = fx.host, r = tr.getBoundingClientRect(), c = td.getBoundingClientRect(), st = fx.canvas.style;
+  st.left = `${r.left - c.left - td.clientLeft}px`; st.top = `${r.top - c.top - td.clientTop}px`; st.width = `${r.width}px`; st.height = `${r.height}px`;
+}
+const syncRows = keeper(it => weatherLayers(it.ds), overRow);
+export function weatherRows(rows, keep) {
+  syncRows(rows.filter(tr => tr.cells.length).map(tr => { const ds = tr.dataset;
+    return { key: ds.game, host: tr.cells[0], watch: tr, ds, cls: ds.rough == null ? 'calm' : '', sig: [ds.wx, ds.wind, ds.rain, ds.snow, ds.rough != null, dark()].join() }; }), keep);
+}
 
 /* ---------- welcome cards ----------
    Each "add your team" card gets a slow mesh gradient in its own --wl-bg (darker, the colour, lighter: the same three
    the CSS gradient under it uses) and a glass disc where the faint corner icon sits, bending the gradient as it moves.
-   The page redraws the cards on every render, so each card's canvas is kept and moved into the new button (a canvas
-   keeps its GPU context when it moves). Cards missing from btns are paused while keep is set (the welcome is showing
-   something else, like a setup flow) and released when it isn't (the welcome is gone). */
-const cards = new Map();   // method → { canvas, shader (a promise), btn (the button it's in) }
+   The canvases are kept across renders (keeper, above). */
 const mix = (hex, to, t) => { const n = parseInt(hex.slice(1), 16), m = parseInt(to.slice(1), 16), ch = s => Math.round(((n >> s) & 255) * (1 - t) + ((m >> s) & 255) * t);
   return '#' + ((ch(16) << 16) | (ch(8) << 8) | ch(0)).toString(16).padStart(6, '0'); };
 /* The lens sits on .wl-mark's icon, at its size, in the card's 0–1 coordinates; measured, since the icon moves on narrow
@@ -94,32 +138,14 @@ function cardLayers(bg, at) {
   ];
 }
 // a card that changes size (the narrow-screen layout) moves its lens with the icon
-const sized = typeof ResizeObserver === 'function' && new ResizeObserver(es => { for (const e of es) {
-  const b = e.target, fx = cards.get(b.dataset.method), at = lens(b); if (fx && at && fx.btn === b) fx.shader.then(s => s?.update('glass', at));
-} });
+const syncCards = keeper(it => { const at = lens(it.host); return at && cardLayers(it.bg, at); },
+  fx => { const at = lens(fx.host); if (at) fx.shader.then(s => s?.update('glass', at)); });
 export function platformCards(btns, keep) {
-  const live = new Set();
+  const kept = syncCards(btns.map(b => ({ key: b.dataset.method, host: b, sig: '', bg: getComputedStyle(b).getPropertyValue('--wl-bg').trim() || '#075b37' })), keep);
   for (const b of btns) {
-    const k = b.dataset.method; live.add(k);
-    let fx = cards.get(k);
-    if (!fx) {
-      const canvas = fxCanvas(), bg = getComputedStyle(b).getPropertyValue('--wl-bg').trim() || '#075b37', at = lens(b);
-      if (!at) continue;
-      fx = { canvas, shader: mount(canvas, cardLayers(bg, at)).catch(() => null) };
-      cards.set(k, fx);
-      fx.shader.then(s => { if (!s) { fx.dead = true; canvas.remove(); } });   // failed to start: the CSS look, and no retries
-    }
-    if (fx.dead) continue;
-    if (fx.btn !== b) { if (sized) { if (fx.btn) sized.unobserve(fx.btn); sized.observe(b); } fx.btn = b; b.prepend(fx.canvas); }
-    fx.shader.then(s => s?.resume());
+    const fx = kept.get(b.dataset.method); if (!fx || fx.dead) continue;
     // the lens bends harder on hover, as the corner icon turns
     b.onpointerenter = () => fx.shader.then(s => s?.update('glass', { refraction: 0.95, aberration: 0.4 }));
     b.onpointerleave = () => fx.shader.then(s => s?.update('glass', { refraction: 0.7, aberration: 0.25 }));
-  }
-  for (const [k, fx] of cards) {
-    if (live.has(k)) continue;
-    if (keep) { fx.shader.then(s => s?.pause()); continue; }   // another screen of the welcome (a setup flow): kept for coming back
-    if (sized && fx.btn) sized.unobserve(fx.btn);
-    fx.shader.then(s => s?.destroy()); fx.canvas.remove(); cards.delete(k);
   }
 }
