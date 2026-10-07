@@ -52,7 +52,7 @@ It runs on Netlify because GitHub Pages can't make a page per link, and Supabase
 It needs a GitHub token, set up once:
 
 1. On GitHub: **Settings → Developer settings → Personal access tokens → Fine-grained tokens → Generate new token**. Name it "Benny's Picks refresh", pick **Only select repositories** → this repository, and under **Repository permissions** set **Actions: Read and write**. Choose an expiry (a year at most), and put a reminder in your calendar for it.
-2. In Netlify: **Project configuration → Environment variables → Add a variable**: key `GH_DISPATCH_TOKEN`, the token as the value, with the **Functions** scope.
+2. In Netlify: **Project configuration → Environment variables → Add a variable**: key `GH_DISPATCH_TOKEN`, the token as the value. Leave the scope on **All scopes** (limiting it to Functions needs a paid plan, and the function reads the variable at runtime either way).
 3. Deploy, so the function picks the variable up. A push that changes something in `share/` deploys. Otherwise use **Deploys → Trigger deploy**.
 4. Check **Logs → Functions → refresh** after the next :17 past a multiple of 3 hours (UTC). It says "data refresh started", and a run started by `workflow_dispatch` shows on GitHub's Actions tab.
 
