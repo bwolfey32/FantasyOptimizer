@@ -564,6 +564,10 @@ a.more-link, a.plink.more-link { color: var(--accent); font-weight: 600; }
 .cthread:last-child { border-bottom: 0; }
 .cmt { display: flex; flex-direction: column; gap: 4px; padding: 8px 0; }
 .cmt.is-hidden { opacity: .6; }
+.cmt.gone { padding: 6px 0; }
+.cmt-body a { color: var(--accent); overflow-wrap: anywhere; }
+.cweek { margin: 10px 0 2px; color: var(--muted); }
+.talk .row-head .talksort { margin: 0; }
 .cmt-head { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 8px; font-size: 14px; }
 .cmt-body { white-space: pre-wrap; overflow-wrap: anywhere; line-height: 1.45; }
 .clamp { display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; }
@@ -576,6 +580,7 @@ a.more-link, a.plink.more-link { color: var(--accent); font-weight: 600; }
 .rx.add { color: var(--muted); }
 .rxpick { display: inline-flex; flex-wrap: wrap; gap: 4px; }
 .rxpick.report { margin-top: 4px; }
+.rxpick.report .btn[aria-pressed="true"] { border-color: var(--accent); background: color-mix(in srgb, var(--accent) 10%, var(--surface)); box-shadow: inset 0 0 0 .8px var(--accent); }
 .talk-in { display: flex; flex-direction: column; gap: 6px; }
 .talk-in textarea.inp { width: 100%; resize: vertical; min-height: 44px; font-family: inherit; font-size: inherit; }
 .talk-in-row { display: flex; flex-wrap: wrap; align-items: center; justify-content: flex-end; gap: 6px 10px; }
@@ -604,6 +609,12 @@ a.talkn[hidden] { display: none; }
 .alerts { display: flex; flex-direction: column; gap: 8px; }
 .alerts:focus { outline: none; }
 .modc { display: flex; flex-direction: column; gap: 6px; }
+.modban { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 10px; }
+.modban .inp { flex: 1 1 220px; max-width: 420px; }
+.modc > .inp { width: 100%; max-width: 420px; }
+.modlog { list-style: none; margin: 0; padding: 0; }
+.modlog li { padding: 6px 0; border-bottom: 1px solid var(--line); overflow-wrap: anywhere; }
+.modlog li:last-child { border-bottom: 0; }
 .sr-only { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0, 0, 0, 0); white-space: nowrap; border: 0; }
 .nfilters .seg { max-width: 100%; overflow-x: auto; }
 .nfilters .seg button { white-space: nowrap; }
@@ -3748,7 +3759,7 @@ function bestMoveCard(m, weeks, H, ownTxt, near) {
       <div class="wb-gain"><span class="num">+${f1(m.hz)}</span><span class="small muted">expected lineup pts over the next ${m.H} week${m.H > 1 ? 's' : ''}</span></div></div>
     ${(() => { const bars = [[m.f, 'Add'], [m.d, 'Drop']].filter(x => x[0]).map(([id, k]) => modelCompare(id, { head: `${k} · ${shortName(id)}, this week`, compact: true })).filter(Boolean);
       return bars.length ? `<div class="mcmp-row">${bars.join('')}</div>${TRAINED.waivers ? '' : '<div class="small muted">Waivers values use the Classic model, so a move’s gain is Classic’s; the other two are shown for comparison.</div>'}` : ''; })()}
-    ${m.whyText ? `<div class="small">${esc(m.whyText)}.</div>` : ''}${moveRange(m)}</div>`;
+    ${m.whyText ? `<div class="small">${newsLinked(esc(m.whyText), m.f)}.</div>` : ''}${moveRange(m)}</div>`;
 }
 /* Someone opened a shared move (?add=&drop=&wk=&g=&h=, read at startup): show it as a card where the link lands, the
    welcome for a new visitor or Waivers for someone with a team, where R (their own waiver results) says what the same
@@ -3892,7 +3903,7 @@ function waiversBody() {
       <div class="mside"><span class="pill n">Add</span> <div>${pl(m.f, `<span class="psub">${ownTxt(m.f)}</span>`)}</div>${schedStrip(m.f, weeks, H)}</div>
       <div class="mside">${m.d ? `<span class="pill o">Drop</span> <div>${pl(m.d)}</div>${schedStrip(m.d, weeks, H)}` : `<span class="pill m">No drop</span> <div class="small muted">You have an open roster spot</div>`}</div>
       <div class="mgain"><span class="num">+${f1(m.hz)}</span><span class="small muted">expected lineup pts, next ${m.H} wk${m.H > 1 ? 's' : ''}</span>${m.H === H && H < weeks.length ? `<span class="small ${m.later >= 0 ? 'trend-up' : 'trend-down'}">${m.later >= 0 ? '+' : ''}${f1(m.later)} after that</span>` : ''}</div>
-      <div class="mwhy small">${m.hold ? '<span class="pill o">Keep yours</span> ' : m.marginal ? '<span class="pill m">Marginal: holding is fine</span> ' : m.longBet ? '<span class="pill q">Long-term bet</span> ' : ''}${esc(m.whyText)}. <button type="button" class="btn sm" data-taken="${esc(m.f)}">Taken in my league</button>${moveRange(m)}</div></div>`;
+      <div class="mwhy small">${m.hold ? '<span class="pill o">Keep yours</span> ' : m.marginal ? '<span class="pill m">Marginal: holding is fine</span> ' : m.longBet ? '<span class="pill q">Long-term bet</span> ' : ''}${newsLinked(esc(m.whyText), m.f)}. <button type="button" class="btn sm" data-taken="${esc(m.f)}">Taken in my league</button>${moveRange(m)}</div></div>`;
   }).join('') + (moves.length > shownMoves.length ? `<div class="item lock-row">${lockLine(hiddenTxt(moves.slice(shownMoves.length)))}</div>` : '')
     : `<div class="item" style="padding:14px"><span class="muted">No free agent improves your lineup over ${hLab}. Try a longer window or a higher ownership limit.</span></div>`;
   const posBest = POS.map(p => { const top = R.byH.filter(id => D.U.get(id).pos === p).slice(0, 4); return top.map(id => `<tr><td><strong>${plink(id, esc(D.U.get(id).name))}</strong> <span class="small muted">${p} · ${D.U.get(id).team}</span></td><td>${ownTxt(id)}</td><td>${f1(rosBase(id))}</td><td>${f1(R.sumH(id))}</td><td class="l">${schedStrip(id, weeks, Math.min(H, 6))}</td><td><button type="button" class="btn sm" data-taken="${esc(id)}">Taken</button></td></tr>`).join(''); }).join('');
@@ -4171,14 +4182,14 @@ function bennysMoves() {
   const W = computeWaivers(), usedPos = new Set(), usedDrop = new Set(), picks = [];
   // one move per position added and per player dropped, compared per week so a 4-week gain doesn't outrank this week's lineup
   for (const m of W.moves) { if (m.marginal) continue; const p = D.U.get(m.f).pos; if (usedPos.has(p) || (m.d && usedDrop.has(m.d))) continue; usedPos.add(p); if (m.d) usedDrop.add(m.d); picks.push(m); if (picks.length === 3) break; }
-  for (const m of picks) out.push({ gain: m.priority / m.H, tab: 'waivers', title: `Add ${nm(m.f)}${m.d ? `, drop ${nm(m.d)}` : ''}`, detail: esc(m.whyText || '') + '.', gainTxt: `+${f1(m.hz)} pts over ${m.H} wk${m.H > 1 ? 's' : ''}` });
+  for (const m of picks) out.push({ gain: m.priority / m.H, tab: 'waivers', title: `Add ${nm(m.f)}${m.d ? `, drop ${nm(m.d)}` : ''}`, detail: newsLinked(esc(m.whyText || ''), m.f) + '.', gainTxt: `+${f1(m.hz)} pts over ${m.H} wk${m.H > 1 ? 's' : ''}` });
   out.sort((a, b) => b.gain - a.gain);
   /* Your weakest position by Benny Grade, with the best free agent there by name. It goes second, so a free account
      (top two) always sees it; a waiver move above that already adds the player isn't repeated. */
   const ws = weakSpot(), added = new Set(picks.map(m => m.f)), pk = ws?.picks.find(p => !added.has(p.id));
   if (ws) {
     const P = posLabel(ws.P), vs = ws.mine ? ` vs ${nm(ws.mine)}’s ${f1(ws.mineVal)}` : '', av = pk ? availTxt(pk.id) : '';
-    const pi = pk ? D.U.get(pk.id).inj || '' : '', inj = /^(out|doubtful|questionable)/i.test(pi) ? ` He’s ${esc(pi.toLowerCase())} now, so check the news first.` : '';
+    const pi = pk ? D.U.get(pk.id).inj || '' : '', inj = /^(out|doubtful|questionable)/i.test(pi) ? newsLinked(` He’s ${esc(pi.toLowerCase())} now, so check the news first.`, pk.id) : '';
     out.splice(Math.min(1, out.length), 0, pk
       ? { gain: 0, tab: 'waivers', taken: pk.id, title: `Upgrade ${P}, your weakest spot: add ${nm(pk.id)}`,
           detail: `Your ${P}s score ${ws.score}/100 on Benny Grade. ${nm(pk.id)} projects ${f1(pk.val)} pts a usual week${vs}${pk.gain > 0.5 ? '' : ', the best free agent there but not an upgrade yet'}${av ? `; ${av}` : ''}.${inj}`,
@@ -5209,6 +5220,9 @@ const HIST_POS = new Set(['QB', 'RB', 'WR', 'TE']);
 const playerHash = (id, tab) => `player/${encodeURIComponent(id)}${tab && tab !== 'overview' ? '/' + tab : ''}`;
 // a link to a player's page around any markup; `deco` for a second link to the same page (his picture next to his name)
 const plink = (id, inner, cls = '', deco = false) => `<a href="#${playerHash(id)}" class="plink${cls ? ' ' + cls : ''}"${deco ? ' tabindex="-1" aria-hidden="true"' : ''}>${inner}</a>`;
+// "check the news" in advice (already escaped) opens that player's News tab; the advice itself stays plain text, so
+// Share and the tests read the same words
+const newsLinked = (html, id) => id ? html.replace('check the news', `<a href="#${playerHash(id, 'news')}">check the news</a>`) : html;
 /* His past seasons: {st: 'loading' | 'ok' | 'none', d}. Kickers and D/STs have none; a missing file (a rookie, a player
    nflverse doesn't list) is 'none' too, never an error. */
 function pHist(id) {
@@ -5550,15 +5564,18 @@ async function talkMe() {
 }
 
 /* A player's comments, newest first, with each author's name and the reactions. Refetched when over a minute old. */
+const TALK_COLS = 'id,player_id,parent_id,author_id,body,season,week,hidden_at,hidden_reason,deleted_at,created_at,profiles(handle)';
+// what the counts count: not hidden, and not a "[deleted]" placeholder kept for its replies
+const talkVisible = rows => rows.filter(c => !c.hidden_at && !c.deleted_at).length;
 function talkLoad(id, force) {
   if (!talkNet()) return;
   const e = D.talk.get(id); if (e && !force && (e.st === 'loading' || Date.now() - e.at < 60000)) return;
   const cur = e || { st: 'loading', rows: [], at: 0 }; if (!e) D.talk.set(id, cur); else if (cur.st === 'err') cur.st = 'loading';
   cur.at = Date.now();
-  sbRest(`comments?player_id=eq.${encodeURIComponent(id)}&select=id,player_id,parent_id,author_id,body,season,week,hidden_at,hidden_reason,created_at,profiles(handle)&order=created_at.desc&limit=300`)
+  sbRest(`comments?player_id=eq.${encodeURIComponent(id)}&select=${TALK_COLS}&order=created_at.desc&limit=300`)
     .then(async rows => {
       cur.rows = rows || []; cur.st = 'ok'; cur.at = Date.now();
-      D.talkN.set(id, { n: cur.rows.filter(c => !c.hidden_at).length, at: Date.now() });
+      D.talkN.set(id, { n: talkVisible(cur.rows), at: Date.now() });
       await rxLoad(cur.rows.map(c => 'c:' + c.id), true);
     })
     .catch(e => { if (!talkMissing(e)) cur.st = cur.rows.length ? 'ok' : 'err'; })
@@ -5569,17 +5586,17 @@ async function rxLoad(keys, force) {
   const want = keys.filter(k => force || !D.rx.has(k)); if (!want.length || !talkNet()) return;
   const me = acct.user?.id, fresh = new Map(want.map(k => [k, { c: {}, mine: null }]));
   for (const k of want) if (!D.rx.has(k)) D.rx.set(k, { c: {}, mine: null });
-  const add = (k, r) => { const x = fresh.get(k); if (!x) return; x.c[r.emoji] = (x.c[r.emoji] || 0) + 1; if (me && r.user_id === me) x.mine = r.emoji; };
-  const cs = want.filter(k => k[0] === 'c').map(k => k.slice(2)), ns = want.filter(k => k[0] === 'n').map(k => k.slice(2));
-  // the API returns at most 1000 rows a request (Supabase's default "Max rows"): a full page may be cut short, so ask again in halves
-  const get = async (col, ids) => {
-    const rows = await sbRest(`reactions?select=${col},emoji,user_id&${col}=in.${encodeURIComponent(inList(ids))}&limit=1000`) || [];
-    if (rows.length < 1000 || ids.length < 2) return rows;
-    const h = ids.length >> 1; return [...await get(col, ids.slice(0, h)), ...await get(col, ids.slice(h))];
-  };
   try {
-    for (let i = 0; i < cs.length; i += 40) for (const r of await get('comment_id', cs.slice(i, i + 40))) add('c:' + r.comment_id, r);
-    for (let i = 0; i < ns.length; i += 40) for (const r of await get('news_id', ns.slice(i, i + 40))) add('n:' + r.news_id, r);
+    for (const [p, col] of [['c', 'comment_id'], ['n', 'news_id']]) {
+      const ids = want.filter(k => k[0] === p).map(k => k.slice(2)), x = r => fresh.get(`${p}:${r[col]}`);
+      // counts (at most six rows a target, so 150 targets stay under the API's 1000-row cap), and the reader's own
+      for (let i = 0; i < ids.length; i += 150) {
+        const q = `${col}=in.${encodeURIComponent(inList(ids.slice(i, i + 150)))}`;
+        const [cnt, own] = await Promise.all([sbRest(`reaction_counts?select=${col},emoji,n&${q}`), me ? sbRest(`reactions?select=${col},emoji&user_id=eq.${me}&${q}`) : null]);
+        for (const r of cnt || []) { const t = x(r); if (t) t.c[r.emoji] = r.n; }
+        for (const r of own || []) { const t = x(r); if (t) t.mine = r.emoji; }
+      }
+    }
     for (const [k, v] of fresh) D.rx.set(k, v);
   } catch (e) { talkMissing(e); }
 }
@@ -5601,23 +5618,44 @@ async function react(key, emoji) {
   try {
     if (was) await sbRest(`reactions?user_id=eq.${uid}&${col}=eq.${encodeURIComponent(tid)}`, { method: 'DELETE' });
     if (next) await sbRest('reactions', { method: 'POST', body: { [col]: tid, user_id: uid, emoji: next }, prefer: 'return=minimal' });
+    track('comment_reacted', { on: !!next, news: col === 'news_id' });
   } catch (e) { D.rx.set(key, before); rxPaint(key); toast(talkErr(e)); }
 }
 
 const talkWho = c => esc(c.profiles?.handle || 'someone');
 const talkCountTxt = id => { const n = D.talkN.get(id)?.n; return n ? `· ${n}` : ''; };
+/* A comment's text: escaped, with web addresses as links. Only http(s) addresses that parse become links; search engines
+   are told not to credit them (ugc, nofollow), and a long one is shortened on screen. */
+const TALK_URL = /\b(?:https?:\/\/|www\.)[^\s<>"']+/gi;
+function talkBody(s) {
+  s = String(s ?? ''); let out = '', i = 0;
+  for (const m of s.matchAll(TALK_URL)) {
+    const raw = m[0].replace(/[.,;:!?)\]]+$/, '');   // a sentence's closing punctuation isn't part of the address
+    let u = null; try { u = new URL(/^www\./i.test(raw) ? 'https://' + raw : raw); } catch { /* not an address */ }
+    if (!u || !/^https?:$/.test(u.protocol)) continue;
+    const shown = raw.replace(/^https?:\/\//i, '');
+    out += esc(s.slice(i, m.index)) + `<a href="${esc(u.href)}" target="_blank" rel="nofollow ugc noopener">${esc(shown.length > 40 ? shown.slice(0, 39) + '…' : shown)}</a>`;
+    i = m.index + raw.length;
+  }
+  return out + esc(s.slice(i));
+}
 function commentHTML(c, { id, compact = false, nReplies = 0 } = {}) {
+  // deleted by its author after others replied: kept as a placeholder so the replies still read in context
+  if (c.deleted_at) return `<article class="cmt gone"><div class="cmt-body small muted">[deleted]</div>${acct.admin && !compact ? `<div class="cmt-acts"><button type="button" class="linkbtn" data-talkdel="${esc(c.id)}">${D.talkDel === c.id ? 'Delete the whole thread? Yes' : 'Delete the thread'}</button></div>` : ''}</article>`;
   const mine = acct.user && c.author_id === acct.user.id, at = Date.parse(c.created_at), acts = [];
   if (!compact && !c.parent_id && !c.hidden_at) acts.push(`<button type="button" class="linkbtn" data-talkreply="${esc(c.id)}">Reply</button>`);
   if (compact && nReplies) acts.push(`<a class="linkbtn" href="#${playerHash(id, 'talk')}">${nReplies} repl${nReplies === 1 ? 'y' : 'ies'}</a>`);
   if (mine) acts.push(`<button type="button" class="linkbtn" data-talkdel="${esc(c.id)}">${D.talkDel === c.id ? 'Delete it? Yes' : 'Delete'}</button>`);
   else if (acct.user) acts.push(`<button type="button" class="linkbtn" data-talkrep="${esc(c.id)}" aria-expanded="${D.talkRep === c.id}">Report</button>`);
   if (acct.admin) acts.push(`<button type="button" class="linkbtn" data-talkhide="${esc(c.id)}|${c.hidden_at ? 0 : 1}">${c.hidden_at ? 'Restore' : 'Hide'}</button>`);
-  const why = D.talkRep === c.id ? `<div class="rxpick report" role="group" aria-label="Why report it">${REPORT_WHY.map(([k, l]) => `<button type="button" class="btn sm" data-talkwhy="${esc(c.id)}|${k}">${l}</button>`).join('')}</div>` : '';
+  const rw = D.talkRepWhy?.cid === c.id ? D.talkRepWhy.why : null, nk = 'rep:' + c.id;
+  const why = D.talkRep === c.id ? `<div class="rxpick report" role="group" aria-label="Why report it">${REPORT_WHY.map(([k, l]) => `<button type="button" class="btn sm" data-talkwhy="${esc(c.id)}|${k}" aria-pressed="${rw === k}">${l}</button>`).join('')}</div>
+    ${rw ? `<form class="talk-in reply" data-talkrepform="${esc(c.id)}"><textarea class="inp" rows="2" maxlength="300" data-talkin="${esc(nk)}" aria-label="A note for the moderator (optional)" placeholder="Anything the moderator should know? (optional)">${esc(D.drafts[nk] || '')}</textarea>
+      <div class="talk-in-row"><span class="small muted">Only moderators see reports.</span><button type="button" class="btn sm" data-talkrep="${esc(c.id)}">Cancel</button><button type="submit" class="btn sm primary">Send report</button></div></form>` : ''}` : '';
   const wk = c.week ? `<span class="pill m" title="Posted in week ${c.week}${c.season ? ` of ${c.season}` : ''}">Wk ${c.week}${c.season && c.season !== D.season ? ` ’${String(c.season).slice(2)}` : ''}</span>` : '';
   return `<article class="cmt${c.parent_id ? ' reply' : ''}${c.hidden_at ? ' is-hidden' : ''}">
-    <div class="cmt-head"><strong>${talkWho(c)}</strong>${wk}<span class="small muted">${at ? `<time datetime="${esc(c.created_at)}" title="${esc(new Date(at).toLocaleString())}">${ago(at)}</time>` : ''}</span>${c.hidden_at ? `<span class="pill o">${c.hidden_reason === '__parent' ? 'Hidden with its thread' : 'Hidden'}</span>` : ''}</div>
-    <div class="cmt-body${compact ? ' clamp' : ''}">${esc(c.body)}</div>
+    <div class="cmt-head"><strong>${talkWho(c)}</strong>${wk}<span class="small muted">${at ? `<time datetime="${esc(c.created_at)}" title="${esc(new Date(at).toLocaleString())}">${ago(at)}</time>` : ''}</span>${c.hidden_at ? `<span class="pill o">${c.hidden_reason === '__parent' ? 'Hidden with its thread' : c.hidden_reason === 'banned' ? 'Hidden: account banned' : 'Hidden'}</span>` : ''}</div>
+    <div class="cmt-body${compact ? ' clamp' : ''}">${talkBody(c.body)}</div>
     <div class="cmt-acts">${rxBarHTML('c:' + c.id)}${acts.join('')}</div>${why}</article>`;
 }
 function replyBox(id, root) {
@@ -5631,14 +5669,27 @@ function talkThreadHTML(id, { limit = 0, compact = false } = {}) {
   const e = D.talk.get(id);
   if (!e || (e.st === 'loading' && !e.rows.length)) return `<div class="small muted">${talkNet() ? 'Loading the discussion…' : 'No comments yet.'}</div>`;
   if (e.st === 'err') return `<div class="small muted">Couldn’t load the discussion. <button type="button" class="linkbtn" data-talkretry="${esc(id)}">Try again</button></div>`;
-  const roots = e.rows.filter(c => !c.parent_id), kids = new Map();
+  const kids = new Map();
   for (const c of e.rows) if (c.parent_id) { if (!kids.has(c.parent_id)) kids.set(c.parent_id, []); kids.get(c.parent_id).push(c); }
+  // a "[deleted]" placeholder shows only while it has replies to hold up; cards skip it (it has nothing to say)
+  let roots = e.rows.filter(c => !c.parent_id && (!c.deleted_at || (!compact && kids.has(c.id))));
   if (!roots.length) return `<div class="small muted">No comments yet.${acct.user ? ' Start the discussion.' : ''}</div>`;
+  const full = !limit && !compact;
+  // Top (the Discussion tab only): reactions plus two for each reply, newest first on a tie
+  if (full && D.talkSort === 'top') {
+    const score = c => Object.values(D.rx.get('c:' + c.id)?.c || {}).reduce((a, b) => a + b, 0) + 2 * (kids.get(c.id)?.length || 0);
+    roots = roots.map(c => [c, score(c)]).sort((a, b) => b[1] - a[1] || (a[0].created_at < b[0].created_at ? 1 : -1)).map(x => x[0]);
+  }
+  // newest first on the tab: a divider where the week changes, so an old take reads as old (only once there are two weeks)
+  const wkOf = c => c.week ? `${c.season || ''}|${c.week}` : '', weeks = full && D.talkSort !== 'top' && new Set(roots.map(wkOf)).size > 1;
+  let prevWk = null;
   return (limit ? roots.slice(0, limit) : roots).map(r => {
     const ks = (kids.get(r.id) || []).slice().sort((a, b) => a.created_at < b.created_at ? -1 : 1);
     if (compact) return commentHTML(r, { id, compact, nReplies: ks.length });
+    let div = '';
+    if (weeks && wkOf(r) !== prevWk) { prevWk = wkOf(r); div = `<div class="cweek label">${r.week ? `Week ${r.week}${r.season && r.season !== D.season ? `, ${r.season}` : ''}` : 'Earlier'}</div>`; }
     const vis = D.talkMore.has(r.id) ? ks : ks.slice(0, 2);
-    return `<div class="cthread">${commentHTML(r, { id })}${vis.length || D.replyTo === r.id ? `<div class="creplies">${vis.map(k => commentHTML(k, { id })).join('')}${ks.length > vis.length ? `<button type="button" class="linkbtn" data-talkmore="${esc(r.id)}">View ${ks.length - vis.length} more repl${ks.length - vis.length === 1 ? 'y' : 'ies'}</button>` : ''}${D.replyTo === r.id ? replyBox(id, r) : ''}</div>` : ''}</div>`;
+    return `${div}<div class="cthread">${commentHTML(r, { id })}${vis.length || D.replyTo === r.id ? `<div class="creplies">${vis.map(k => commentHTML(k, { id })).join('')}${ks.length > vis.length ? `<button type="button" class="linkbtn" data-talkmore="${esc(r.id)}">View ${ks.length - vis.length} more repl${ks.length - vis.length === 1 ? 'y' : 'ies'}</button>` : ''}${D.replyTo === r.id ? replyBox(id, r) : ''}</div>` : ''}</div>`;
   }).join('');
 }
 function composerHTML(id, { compact = false } = {}) {
@@ -5655,7 +5706,8 @@ function commentsSection(id, { limit = 0, compact = false } = {}) {
   if (!talkOn() || !id) return '';
   talkLoad(id);
   return `<section class="talk${compact ? ' compact' : ''}" aria-label="Discussion about ${esc(D.U.get(id)?.name || 'this player')}">
-    <div class="row-head"><h3 class="dh">Discussion <span class="talk-n" data-talk-n="${esc(id)}">${talkCountTxt(id)}</span></h3>${limit ? `<a class="more-link" href="#${playerHash(id, 'talk')}">${compact ? 'See all →' : 'All comments →'}</a>` : ''}</div>
+    <div class="row-head"><h3 class="dh">Discussion <span class="talk-n" data-talk-n="${esc(id)}">${talkCountTxt(id)}</span></h3>${limit ? `<a class="more-link" href="#${playerHash(id, 'talk')}">${compact ? 'See all →' : 'All comments →'}</a>`
+      : compact ? '' : `<div class="seg sub talksort" role="group" aria-label="Sort the comments">${[['new', 'Newest'], ['top', 'Top']].map(([k, l]) => `<button type="button" data-talksort="${k}" aria-pressed="${(D.talkSort === 'top' ? 'top' : 'new') === k}">${l}</button>`).join('')}</div>`}</div>
     <div class="talk-thread" data-talk-thread="${esc(id)}" data-limit="${limit}" data-compact="${compact ? 1 : 0}">${talkThreadHTML(id, { limit, compact })}</div>
     <div class="talk-compose" data-talk-compose="${esc(id)}" data-compact="${compact ? 1 : 0}">${composerHTML(id, { compact })}</div></section>`;
 }
@@ -5685,7 +5737,7 @@ async function talkPost(form) {
       try { const [p] = await sbRest('profiles?select=handle', { method: 'POST', body: { user_id: acct.user.id, handle: h }, prefer: 'return=representation' }); acct.profile = p; }
       catch (e) { if (e.code === '23505') return talkSay(key, `“${h}” is taken. Try another name.`); if (e.code === '23514') return talkSay(key, 'That name isn’t available. Try another.'); throw e; }
     }
-    const [c] = await sbRest('comments?select=id,player_id,parent_id,author_id,body,season,week,hidden_at,hidden_reason,created_at,profiles(handle)',
+    const [c] = await sbRest('comments?select=' + TALK_COLS,
       { method: 'POST', body: { player_id: id, parent_id: parent, author_id: acct.user.id, body, season: D.season || null, week: D.week || null }, prefer: 'return=representation' });
     const e = D.talk.get(id) || { st: 'ok', rows: [], at: Date.now() }; e.rows.unshift(c); if (e.st !== 'ok') e.st = 'ok'; D.talk.set(id, e);
     D.talkN.set(id, { n: (D.talkN.get(id)?.n || 0) + 1, at: Date.now() }); D.rx.set('c:' + c.id, { c: {}, mine: null });
@@ -5696,23 +5748,34 @@ async function talkPost(form) {
   } catch (e) { talkSay(key, talkErr(e)); }
   finally { D.talkBusy = false; if (btn?.isConnected) btn.disabled = false; }
 }
+// the database decides what deleting does: 'deleted', or 'kept' when other people's replies keep it as "[deleted]"
+const delComment = cid => sbRest('rpc/delete_comment', { method: 'POST', body: { cid } });
+function talkDropped(id, cid, kept) {
+  const e = D.talk.get(id); if (!e) return;
+  if (kept) { const c = e.rows.find(x => x.id === cid); if (c) Object.assign(c, { body: '', author_id: null, profiles: null, deleted_at: new Date().toISOString() }); D.rx.delete('c:' + cid); }
+  else {
+    const gone = e.rows.find(x => x.id === cid); e.rows = e.rows.filter(c => c.id !== cid && c.parent_id !== cid);
+    // the last reply under a placeholder takes the placeholder with it (the database does the same)
+    if (gone?.parent_id && !e.rows.some(c => c.parent_id === gone.parent_id)) e.rows = e.rows.filter(c => !(c.id === gone.parent_id && c.deleted_at));
+  }
+  D.talkN.set(id, { n: talkVisible(e.rows), at: Date.now() });
+}
 async function talkDelete(id, cid) {
   try {
-    const r = await sbRest(`comments?id=eq.${cid}&select=id`, { method: 'DELETE', prefer: 'return=representation' });
-    if (!r?.length) throw Object.assign(new Error('not allowed'), { code: '42501' });
-    const e = D.talk.get(id); if (e) e.rows = e.rows.filter(c => c.id !== cid && c.parent_id !== cid);
-    D.talkN.set(id, { n: (e?.rows || []).filter(c => !c.hidden_at).length, at: Date.now() }); toast('Comment deleted.');
+    const r = await delComment(cid); talkDropped(id, cid, r === 'kept');
+    toast(r === 'kept' ? 'Deleted. The replies stay, under “[deleted]”.' : 'Comment deleted.'); track('comment_deleted', { soft: r === 'kept' });
   } catch (e) { toast(talkErr(e)); }
   D.talkDel = null; talkPaint(id);
 }
-async function talkReport(id, cid, why) {
-  D.talkRep = null; talkPaint(id);
-  try { await sbRest('reports', { method: 'POST', body: { target_kind: 'comment', target_id: cid, reporter_id: acct.user.id, reason: why }, prefer: 'return=minimal' }); toast('Reported. A moderator will take a look.'); }
+async function talkReport(id, cid, why, note) {
+  D.talkRep = null; D.talkRepWhy = null; delete D.drafts['rep:' + cid]; D.talkFocus = null; talkPaint(id);
+  const body = { target_kind: 'comment', target_id: cid, reporter_id: acct.user.id, reason: why }; if (note) body.note = note.slice(0, 300);
+  try { await sbRest('reports', { method: 'POST', body, prefer: 'return=minimal' }); toast('Reported. A moderator will take a look.'); track('comment_reported', { reason: why, note: !!note }); }
   catch (e) { toast(e.code === '23505' ? 'You’ve already reported this comment.' : talkErr(e)); }
 }
 // a moderator hides a comment (its thread's replies go with it) or brings it back; the database checks they may
-async function talkHide(cid, hide) {
-  const r = await sbRest(`comments?id=eq.${cid}&select=id,player_id`, { method: 'PATCH', body: hide ? { hidden_at: new Date().toISOString(), hidden_reason: 'Hidden by a moderator' } : { hidden_at: null }, prefer: 'return=representation' });
+async function talkHide(cid, hide, why) {
+  const r = await sbRest(`comments?id=eq.${cid}&select=id,player_id`, { method: 'PATCH', body: hide ? { hidden_at: new Date().toISOString(), hidden_reason: (why || '').trim().slice(0, 200) || 'Hidden by a moderator' } : { hidden_at: null }, prefer: 'return=representation' });
   if (!r?.length) throw Object.assign(new Error('not allowed'), { code: '42501' });
   return r[0].player_id;
 }
@@ -5807,17 +5870,27 @@ function alertsPanel() {
     <p class="small muted" style="margin:0">News about the players on ${esc(curTeam()?.name || 'your team')}${W ? ` and the ${W} player${W === 1 ? '' : 's'} you watch` : ''}${acct.user ? ', and replies in discussions you’ve joined' : ''}. ${W ? '' : 'Watch any player from his page to add his news. '}${!acct.user && acct.on && talkOn() ? 'Sign in to hear about replies to your comments.' : ''}</p></div>`;
 }
 
-/* #mod: open reports, grouped by comment (hide it, delete it, or dismiss the reports), and the hidden comments (restore
-   or delete). For moderators; the database refuses everyone else whatever this page shows. */
+/* #mod, for moderators (the database refuses everyone else whatever this page shows):
+   - Reports, grouped by comment: hide it (with a reason, if you like), delete it, dismiss the reports, or ban its author;
+   - Hidden comments: restore or delete;
+   - Bans: who, why, and lifting one;
+   - Log: the last 100 things moderators did (mod_log, written by the database). */
+const MOD_TABS = [['reports', 'Reports'], ['hidden', 'Hidden'], ['bans', 'Bans'], ['log', 'Log']];
 async function modLoad() {
   D.mod = { st: 'loading' };
-  const cols = 'id,player_id,parent_id,author_id,body,hidden_at,hidden_reason,created_at,profiles(handle)';
+  const cols = 'id,player_id,parent_id,author_id,body,hidden_at,hidden_reason,deleted_at,created_at,profiles(handle)';
   try {
-    const reps = await sbRest('reports?select=id,target_id,reason,note,created_at&resolved_at=is.null&order=created_at.desc&limit=300') || [];
-    const ids = [...new Set(reps.map(r => r.target_id))];
-    const cs = ids.length ? await sbRest(`comments?select=${cols}&id=in.${encodeURIComponent(inList(ids))}`) || [] : [];
-    const hid = await sbRest(`comments?select=${cols}&hidden_at=not.is.null&hidden_reason=neq.__parent&order=hidden_at.desc&limit=100`) || [];
-    D.mod = { st: 'ok', reps, cs: new Map(cs.map(c => [c.id, c])), hid };
+    const [reps, hid, bans, log] = await Promise.all([
+      sbRest('reports?select=id,target_id,reason,note,created_at&resolved_at=is.null&order=created_at.desc&limit=300'),
+      sbRest(`comments?select=${cols}&hidden_at=not.is.null&hidden_reason=neq.__parent&order=hidden_at.desc&limit=100`),
+      sbRest('rpc/list_bans', { method: 'POST', body: {} }),
+      sbRest('mod_log?select=id,at,action,target_kind,target_id,note&order=at.desc&limit=100')]);
+    // the comments the reports and the log are about, and the names of the accounts the log mentions
+    const ids = [...new Set([...(reps || []).map(r => r.target_id), ...(log || []).filter(l => l.target_kind === 'comment').map(l => l.target_id)])];
+    const users = [...new Set((log || []).filter(l => l.target_kind === 'user').map(l => l.target_id))];
+    const [cs, ps] = await Promise.all([ids.length ? sbRest(`comments?select=${cols}&id=in.${encodeURIComponent(inList(ids))}`) : [],
+      users.length ? sbRest(`profiles?select=user_id,handle&user_id=in.${encodeURIComponent(inList(users))}`) : []]);
+    D.mod = { st: 'ok', reps: reps || [], cs: new Map((cs || []).map(c => [c.id, c])), hid: hid || [], bans: bans || [], log: log || [], names: new Map((ps || []).map(p => [p.user_id, p.handle])) };
   } catch (e) { D.mod = { st: 'err', msg: talkErr(e) }; }
   if (state.tab === 'mod') render();
 }
@@ -5826,33 +5899,60 @@ function viewMod() {
   if (!D.mod) modLoad();
   const M = D.mod; if (!M || M.st === 'loading') return `<div class="card loading"><h3>Loading reports</h3></div>`;
   if (M.st === 'err') return `<div class="card panel"><h2>Moderation</h2><p>${esc(M.msg)}</p><button type="button" class="btn sm" data-modact="reload|">Try again</button></div>`;
-  const tab = D.modTab === 'hidden' ? 'hidden' : 'reports', who = c => `${talkWho(c)} on ${plink(c.player_id, esc(D.U.get(c.player_id)?.name || c.player_id))}`;
+  const tab = MOD_TABS.some(([k]) => k === D.modTab) ? D.modTab : 'reports';
+  const who = c => `${talkWho(c)} on ${plink(c.player_id, esc(D.U.get(c.player_id)?.name || c.player_id))}`;
   const groups = new Map(); for (const r of M.reps) { if (!groups.has(r.target_id)) groups.set(r.target_id, []); groups.get(r.target_id).push(r); }
-  const card = (c, body, btns) => `<div class="card panel modc"><div class="cmt-head">${c ? who(c) : '<span class="muted">Deleted comment</span>'}${c ? `<span class="small muted">${ago(Date.parse(c.created_at))}</span>` : ''}${c?.hidden_at ? '<span class="pill o">Hidden</span>' : ''}</div>${c ? `<div class="cmt-body">${esc(c.body)}</div>` : ''}${body}<div class="toolbar">${btns}</div></div>`;
   const b = (act, id, l, cls = '') => `<button type="button" class="btn sm ${cls}" data-modact="${act}|${esc(id)}">${l}</button>`;
-  const list = tab === 'reports'
-    ? [...groups].map(([tid, rs]) => { const c = M.cs.get(tid), why = Object.entries(rs.reduce((o, r) => (o[r.reason] = (o[r.reason] || 0) + 1, o), {})).map(([k, n]) => `${esc((REPORT_WHY.find(x => x[0] === k) || [k, k])[1])} ×${n}`).join(' · ');
-        return card(c, `<div class="small"><strong>${rs.length} report${rs.length === 1 ? '' : 's'}:</strong> ${why}${rs.filter(r => r.note).map(r => `<div class="small muted">“${esc(r.note)}”</div>`).join('')}</div>`,
-          (c && !c.hidden_at ? b('hide', tid, 'Hide it', 'primary') : '') + (c ? b('del', tid, 'Delete it', 'danger') : '') + b('dismiss', tid, 'Dismiss the reports')); }).join('') || '<div class="card panel small muted">No open reports.</div>'
-    : M.hid.map(c => card(c, c.hidden_reason ? `<div class="small muted">${esc(c.hidden_reason)}</div>` : '', b('restore', c.id, 'Restore') + b('del', c.id, 'Delete', 'danger'))).join('') || '<div class="card panel small muted">Nothing hidden.</div>';
+  // banning the author: a reason and whether to hide what they've posted, then Ban (one form open at a time)
+  const bannable = c => c && !c.deleted_at && c.author_id && c.author_id !== acct.user.id;
+  const banForm = c => `<div class="modban"><input class="inp" id="modBanWhy" maxlength="200" placeholder="Reason (only moderators see it)" aria-label="Reason for the ban"><label class="small"><input type="checkbox" id="modBanHide" checked> Hide everything they’ve posted</label>${b('ban', c.author_id, `Ban ${talkWho(c)}`, 'danger')}${b('banask', '', 'Cancel')}</div>`;
+  const card = (c, body, btns) => `<div class="card panel modc"><div class="cmt-head">${c && !c.deleted_at ? who(c) : '<span class="muted">Deleted comment</span>'}${c ? `<span class="small muted">${ago(Date.parse(c.created_at))}</span>` : ''}${c?.hidden_at ? '<span class="pill o">Hidden</span>' : ''}</div>${c && !c.deleted_at ? `<div class="cmt-body">${esc(c.body)}</div>` : ''}${body}
+    <div class="toolbar">${btns}${bannable(c) && D.modBan !== c.author_id ? b('banask', c.author_id, 'Ban the author…') : ''}</div>${bannable(c) && D.modBan === c.author_id ? banForm(c) : ''}</div>`;
+  let list;
+  if (tab === 'reports') list = [...groups].map(([tid, rs]) => {
+    const c = M.cs.get(tid), why = Object.entries(rs.reduce((o, r) => (o[r.reason] = (o[r.reason] || 0) + 1, o), {})).map(([k, n]) => `${esc((REPORT_WHY.find(x => x[0] === k) || [k, k])[1])} ×${n}`).join(' · ');
+    const live = c && !c.deleted_at && !c.hidden_at;
+    return card(c, `<div class="small"><strong>${rs.length} report${rs.length === 1 ? '' : 's'}:</strong> ${why}${rs.filter(r => r.note).map(r => `<div class="small muted">“${esc(r.note)}”</div>`).join('')}</div>${live ? `<input class="inp" data-modwhy="${esc(tid)}" maxlength="200" placeholder="Reason for hiding (optional, only moderators see it)" aria-label="Reason for hiding">` : ''}`,
+      (live ? b('hide', tid, 'Hide it', 'primary') : '') + (c ? b('del', tid, 'Delete it', 'danger') : '') + b('dismiss', tid, 'Dismiss the reports'));
+  }).join('') || '<div class="card panel small muted">No open reports.</div>';
+  else if (tab === 'hidden') list = M.hid.map(c => card(c, c.hidden_reason ? `<div class="small muted">${esc(c.hidden_reason === 'banned' ? 'Hidden with the account’s ban' : c.hidden_reason)}</div>` : '', b('restore', c.id, 'Restore') + b('del', c.id, 'Delete', 'danger'))).join('') || '<div class="card panel small muted">Nothing hidden.</div>';
+  else if (tab === 'bans') list = M.bans.map(x => `<div class="card panel modc"><div class="cmt-head"><strong>${esc(x.handle || 'An account with no public name')}</strong><span class="small muted">banned ${ago(Date.parse(x.created_at))}</span></div>${x.reason ? `<div class="small muted">${esc(x.reason)}</div>` : ''}<div class="toolbar">${b('unban', x.user_id, 'Lift the ban')}</div></div>`).join('') || '<div class="card panel small muted">Nobody is banned.</div>';
+  else {
+    const what = l => {
+      const c = M.cs.get(l.target_id), on = c && !c.deleted_at ? ` by ${who(c)}` : '', txt = c && !c.deleted_at ? c.body : l.note, name = esc(M.names.get(l.target_id) || 'an account');
+      const q = txt && l.action !== 'ban' ? ` <span class="muted">“${esc(txt.length > 120 ? txt.slice(0, 119) + '…' : txt)}”</span>` : '';
+      return { hide: `Hid a comment${on}${q}${l.note ? ` <span class="pill m">${esc(l.note)}</span>` : ''}`, restore: `Restored a comment${on}${q}`, delete: `Deleted a comment${q}`,
+        dismiss: `Dismissed the reports on a comment${on}${q}`, ban: `Banned ${name}${l.note ? `: ${esc(l.note)}` : ''}`, unban: `Lifted the ban on ${name}` }[l.action] || esc(l.action);
+    };
+    list = M.log.length ? `<div class="card panel"><ul class="modlog">${M.log.map(l => `<li><time class="small muted" datetime="${esc(l.at)}">${esc(new Date(l.at).toLocaleString([], { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' }))}</time> ${what(l)}</li>`).join('')}</ul></div>` : '<div class="card panel small muted">Nothing yet.</div>';
+  }
+  const n = { reports: groups.size, hidden: M.hid.length, bans: M.bans.length };
   return `<div class="section"><div class="row-head"><h2>Moderation</h2><button type="button" class="btn sm" data-modact="reload|">Refresh</button></div>
-    <div class="seg" role="group" aria-label="Moderation"><button type="button" data-modtab="reports" aria-pressed="${tab === 'reports'}">Reports (${groups.size})</button><button type="button" data-modtab="hidden" aria-pressed="${tab === 'hidden'}">Hidden (${M.hid.length})</button></div>
-    ${list}<p class="small muted">Hiding a thread’s first comment hides its replies too, and restoring it brings them back. To ban an account, add it to the bans table in the Supabase SQL editor.</p></div>`;
+    <div class="seg" role="group" aria-label="Moderation">${MOD_TABS.map(([k, l]) => `<button type="button" data-modtab="${k}" aria-pressed="${tab === k}">${l}${k in n ? ` (${n[k]})` : ''}</button>`).join('')}</div>
+    ${list}<p class="small muted">Hiding a thread’s first comment hides its replies too, and restoring it brings them back. Deleting a comment others replied to leaves “[deleted]” above the replies; delete that too to remove the whole thread. A banned account can still read, and delete its own comments, but can’t post, react or report.</p></div>`;
 }
 async function modAct(act, cid) {
-  const uid = acct.user?.id, now = new Date().toISOString(), dismiss = () => sbRest(`reports?target_id=eq.${cid}&resolved_at=is.null`, { method: 'PATCH', body: { resolved_at: now, resolved_by: uid }, prefer: 'return=minimal' });
+  if (act === 'banask') { D.modBan = cid || null; return; }
+  // read what was typed now: the page redraws as soon as the button is pressed
+  const uid = acct.user?.id, now = new Date().toISOString(), M = D.mod || {}, c = M.cs?.get(cid) || M.hid?.find(x => x.id === cid);
+  const why = document.querySelector(`[data-modwhy="${qv(cid)}"]`)?.value || '', banWhy = $('#modBanWhy')?.value.trim() || null, banHide = !!$('#modBanHide')?.checked;
+  const dismiss = () => sbRest(`reports?target_id=eq.${cid}&resolved_at=is.null`, { method: 'PATCH', body: { resolved_at: now, resolved_by: uid }, prefer: 'return=minimal' });
   try {
-    if (act === 'hide') { const pid = await talkHide(cid, true); await dismiss(); D.talk.delete(pid); toast('Hidden.'); }
+    if (act === 'hide') { const pid = await talkHide(cid, true, why); await dismiss(); D.talk.delete(pid); toast('Hidden.'); }
     else if (act === 'restore') { const pid = await talkHide(cid, false); D.talk.delete(pid); toast('Restored.'); }
     else if (act === 'dismiss') { await dismiss(); toast('Reports dismissed.'); }
     // delete first: if the database refuses, the reports stay open
-    else if (act === 'del') { const r = await sbRest(`comments?id=eq.${cid}&select=id,player_id`, { method: 'DELETE', prefer: 'return=representation' }); if (!r?.length) throw Object.assign(new Error(), { code: '42501' }); await dismiss(); D.talk.delete(r[0].player_id); toast('Deleted.'); }
+    else if (act === 'del') { const r = await delComment(cid); await dismiss(); if (c) D.talk.delete(c.player_id); toast(r === 'kept' ? 'Deleted. Its replies stay, under “[deleted]”.' : 'Deleted.'); }
+    else if (act === 'ban') { await sbRest('rpc/ban_user', { method: 'POST', body: { uid: cid, reason: banWhy, hide_all: banHide } }); D.modBan = null; D.talk.clear(); toast(banHide ? 'Banned, and everything they posted is hidden.' : 'Banned.'); }
+    else if (act === 'unban') { await sbRest('rpc/unban_user', { method: 'POST', body: { uid: cid } }); toast('Ban lifted.'); }
+    else return;
+    track('mod_action', { act });
   } catch (e) { toast(talkErr(e)); }
   modLoad();
 }
 
 document.addEventListener('click', e => {
-  const t = e.target.closest('[data-react],[data-rxpick],[data-talkreply],[data-talkmore],[data-talkdel],[data-talkrep],[data-talkwhy],[data-talkhide],[data-talkretry],[data-talksignin],[data-watch],[data-bell],[data-modact],[data-modtab]'); if (!t) return;
+  const t = e.target.closest('[data-react],[data-rxpick],[data-talkreply],[data-talkmore],[data-talkdel],[data-talkrep],[data-talkwhy],[data-talkhide],[data-talkretry],[data-talksignin],[data-talksort],[data-watch],[data-bell],[data-modact],[data-modtab]'); if (!t) return;
   const d = t.dataset, pid = () => t.closest('[data-talk-thread]')?.dataset.talkThread || D.pp?.id;
   if (d.react) { const [k, em] = d.react.split('|'); react(k, em); return; }
   if (d.rxpick) { const was = D.rxPick; D.rxPick = was === d.rxpick ? null : d.rxpick; if (was && was !== d.rxpick) rxPaint(was); rxPaint(d.rxpick); return; }
@@ -5860,8 +5960,10 @@ document.addEventListener('click', e => {
   if (d.talkreply) { if (!acct.user) return talkSignIn(); const id = pid(); D.replyTo = D.replyTo === d.talkreply ? null : d.talkreply; D.talkFocus = D.replyTo ? { k: 'r:' + D.replyTo, s: 0, e: 0 } : null; talkPaint(id); return; }
   if (d.talkmore) { D.talkMore.add(d.talkmore); talkPaint(pid()); return; }
   if (d.talkdel) { const id = pid(); if (D.talkDel === d.talkdel) talkDelete(id, d.talkdel); else { D.talkDel = d.talkdel; talkPaint(id); } return; }
-  if (d.talkrep) { D.talkRep = D.talkRep === d.talkrep ? null : d.talkrep; talkPaint(pid()); return; }
-  if (d.talkwhy) { const [cid, why] = d.talkwhy.split('|'); talkReport(pid(), cid, why); return; }
+  if (d.talkrep) { D.talkRep = D.talkRep === d.talkrep ? null : d.talkrep; D.talkRepWhy = null; talkPaint(pid()); return; }
+  // a reason picked: then an optional note, sent with "Send report"
+  if (d.talkwhy) { const [cid, why] = d.talkwhy.split('|'); D.talkRepWhy = { cid, why }; D.talkFocus = { k: 'rep:' + cid, s: 0, e: 0 }; talkPaint(pid()); return; }
+  if (d.talksort) { D.talkSort = d.talksort; document.querySelectorAll('[data-talksort]').forEach(b => b.setAttribute('aria-pressed', String(b.dataset.talksort === d.talksort))); talkPaint(pid()); return; }
   if (d.talkhide) { const [cid, h] = d.talkhide.split('|'); talkHide(cid, h === '1').then(id => { toast(h === '1' ? 'Hidden.' : 'Restored.'); talkLoad(id, true); }).catch(er => toast(talkErr(er))); return; }
   if (d.talkretry) { talkLoad(d.talkretry, true); talkPaint(d.talkretry); return; }
   if (d.watch) { toggleWatch(d.watch); return; }
@@ -5869,7 +5971,11 @@ document.addEventListener('click', e => {
   if (d.modtab) { D.modTab = d.modtab; render(); return; }
   if (d.modact) { const [act, cid] = d.modact.split('|'); if (act === 'reload') modLoad(); else modAct(act, cid); render(); }
 });
-document.addEventListener('submit', e => { const f = e.target.closest?.('form[data-talkform]'); if (!f) return; e.preventDefault(); talkPost(f); });
+document.addEventListener('submit', e => {
+  const f = e.target.closest?.('form[data-talkform],form[data-talkrepform]'); if (!f) return; e.preventDefault();
+  if (f.dataset.talkrepform) { const cid = f.dataset.talkrepform, w = D.talkRepWhy; if (w?.cid === cid) talkReport(f.closest('[data-talk-thread]')?.dataset.talkThread || D.pp?.id, cid, w.why, f.querySelector('textarea')?.value.trim() || ''); return; }
+  talkPost(f);
+});
 document.addEventListener('keydown', e => {
   const t = e.target; if (!t.dataset?.talkin || e.key !== 'Enter' || e.shiftKey || e.isComposing) return;
   e.preventDefault(); t.form?.requestSubmit();
@@ -5882,7 +5988,12 @@ document.addEventListener('input', e => {
 document.addEventListener('focusin', e => { const t = e.target.closest?.('[data-talkin],[data-talkhandle]'); D.talkFocus = t ? { k: t.dataset.talkin || 'handle', s: t.selectionStart, e: t.selectionEnd } : null; });
 // left the box for somewhere else (not a repaint that replaced it): stop bringing focus back
 document.addEventListener('focusout', e => { const t = e.target; if (!t.closest?.('[data-talkin],[data-talkhandle]')) return; setTimeout(() => { if (t.isConnected && !document.activeElement?.closest?.('[data-talkin],[data-talkhandle]')) D.talkFocus = null; }, 0); });
-document.addEventListener('visibilitychange', () => { if (!document.hidden && acct.user) alertsLoad(); });
+document.addEventListener('visibilitychange', () => {
+  if (document.hidden) return;
+  if (acct.user) alertsLoad();
+  // back on the tab: any discussion on screen picks up new comments (talkLoad skips one fetched in the last minute)
+  if (talkNet()) new Set([...document.querySelectorAll('[data-talk-thread]')].map(el => el.dataset.talkThread)).forEach(id => talkLoad(id));
+});
 
 /* Players: find anyone, or browse a position ranked on this week's projection or on rest-of-season value (posRanks). */
 function viewPool() {
@@ -6044,7 +6155,7 @@ function viewCompare() {
     verdict = `<div class="card pick"><div class="pick-head"><span class="label">Benny’s Pick</span><span class="pill n">Only one plays</span></div>
       <div class="pick-main"><div class="pick-who">${playerIdentity(w.u, { size: 'lg', name: `Start ${esc(w.u.name)}`, nameCls: 'pick-name', subCls: 'small muted', line: `over ${esc(l.u.name)} · ${posLabel(w.pos)} · ${w.T || 'FA'}` })}</div>
         <div class="pick-stat"><span class="num">${f1(w.mean)}</span><span class="small muted">projected pts</span></div></div>
-      <ul class="pick-why"><li>${esc(`${l.u.name} won’t play this week: ${why}`)}</li>${/^(questionable|doubtful)/i.test(w.inj || '') ? `<li>${esc(`${w.u.name} is ${w.inj.toLowerCase()} too, so check the news before kickoff`)}</li>` : ''}</ul></div>`;
+      <ul class="pick-why"><li>${esc(`${l.u.name} won’t play this week: ${why}`)}</li>${/^(questionable|doubtful)/i.test(w.inj || '') ? `<li>${newsLinked(esc(`${w.u.name} is ${w.inj.toLowerCase()} too, so check the news before kickoff`), w.id)}</li>` : ''}</ul></div>`;
   }
   else if (A && Bp) {
     // counted once per pair; "picked" is a pair the user chose, as opposed to the one Start / Sit opens on
@@ -6059,7 +6170,7 @@ function viewCompare() {
         <div class="pick-stat"><span class="num">${edge >= 0.05 ? '+' : ''}${f1(edge)}</span><span class="small muted">projected pts edge</span></div></div>
       <div class="meter" aria-label="${esc(A.u.name)} ${pct(pA)}, ${esc(Bp.u.name)} ${pct(1 - pA)}"><span style="width:${pA * 100}%"></span></div>
       <div class="small muted pick-odds">${pw < 0.55 ? 'Too close to call on projections alone; Benny leans this way. Check late injury news, or use Safe or Boom on the Lineup tab to break the tie. ' : ''}Model estimate of the chance to outscore: ${esc(shortName(A.id))} ${pct(pA)}, ${esc(shortName(Bp.id))} ${pct(1 - pA)}. ${calibNote()}</div>
-      ${why.length ? `<ul class="pick-why">${why.map(x => `<li>${esc(x)}</li>`).join('')}</ul>` : ''}
+      ${why.length ? `<ul class="pick-why">${why.map(x => `<li>${newsLinked(esc(x), w.id)}</li>`).join('')}</ul>` : ''}
       ${classicCallNote(A, Bp, w) ? `<div class="small muted">${esc(classicCallNote(A, Bp, w))}</div>` : ''}
       ${gnote ? `<div class="pick-note">${esc(gnote)}</div>` : ''}
       ${modelNote()}</div>`;

@@ -928,6 +928,73 @@ test('discussion: without the community tables nothing shows (no tab, no section
     if (/class="talkn"|data-talk-thread/.test(lin)) return 'no counts or section on the lineup';
   } finally { D.talkOff = false; st.tab = was[0]; D.pp = was[1]; D.talkN.clear(); }
 });
+test('discussion: a deleted first comment stays as “[deleted]” while it has replies; cards and counts skip it', () => {
+  setup(); const D = ev('D'), gibbs = idOf('Jahmyr Gibbs');
+  try {
+    const rows = talkFixture(gibbs), r1 = rows.find(c => c.id === 'r1');
+    Object.assign(r1, { body: '', author_id: null, profiles: null, deleted_at: new Date().toISOString() });
+    rows.push({ ...rows[1], id: 'r0', body: '', author_id: null, profiles: null, deleted_at: new Date().toISOString() });   // no replies left
+    const h = ev('talkThreadHTML')(gibbs);
+    if (!/class="cmt gone"><div class="cmt-body small muted">\[deleted\]/.test(h)) return 'the placeholder';
+    if (!h.includes('reply one') || h.includes('Oldest thread')) return 'its replies stay, its text doesn’t';
+    if ((h.match(/\[deleted\]/g) || []).length !== 1) return 'a placeholder with no replies isn’t shown';
+    if (/\[deleted\]/.test(ev('talkThreadHTML')(gibbs, { limit: 3, compact: true }))) return 'cards skip it';
+    if (ev('talkVisible')(rows) !== 5) return 'counts skip it: ' + ev('talkVisible')(rows);
+  } finally { D.talk.clear(); D.talkN.clear(); D.rx.clear(); }
+});
+test('discussion: web addresses in comments become safe links, and nothing else does', () => {
+  const tb = ev('talkBody'), a = s => (tb(s).match(/<a\b[^>]*>/g) || []);
+  let h = tb('see https://example.com/a?b=1&c=2. Nice');
+  if (!h.includes('<a href="https://example.com/a?b=1&amp;c=2" target="_blank" rel="nofollow ugc noopener">example.com/a?b=1&amp;c=2</a>. Nice')) return 'an https link, without the full stop: ' + h;
+  if (!/href="https:\/\/www\.x\.com\/"/.test(tb('at www.x.com'))) return 'www. gets https';
+  for (const bad of ['javascript:alert(1)', 'data:text/html,<script>x<\/script>', 'ftp://x.com/f', 'JaVaScRiPt://x.com%0aalert(1)'])
+    if (a(bad).length) return 'not a link: ' + bad;
+  h = tb('https://x.com/"onmouseover="alert(1)');
+  if (a('https://x.com/"onmouseover="alert(1)').some(t => /onmouseover/.test(t)) || /"onmouseover/.test(h)) return 'a quote ends the address: ' + h;
+  if (!tb('<b>hi</b> https://a.co').startsWith('&lt;b&gt;hi&lt;/b&gt; <a ')) return 'the rest is escaped';
+  if (a('https://a.co https://b.co').length !== 2) return 'two links';
+  if (!/>example\.com\/[a-z]+…<\/a>/.test(tb('https://example.com/' + 'a'.repeat(80)))) return 'a long address is shortened on screen';
+});
+test('discussion: Top sorts by reactions and replies; Newest marks where the week changes', () => {
+  setup(); const D = ev('D'), st = ev('state'), was = [st.tab, D.pp, D.talkSort], gibbs = idOf('Jahmyr Gibbs');
+  try {
+    const rows = talkFixture(gibbs); rows.find(c => c.id === 'r1').week = D.week - 1;
+    st.tab = 'player'; D.pp = { id: gibbs, tab: 'talk' };
+    let h = ev('viewPlayer')();
+    if (!/data-talksort="new" aria-pressed="true"/.test(h) || !/data-talksort="top"/.test(h)) return 'the sort toggle on his Discussion tab';
+    if ((h.match(/class="cweek label"/g) || []).length !== 2 || !h.includes(`Week ${D.week - 1}`)) return 'a divider for each week, newest first';
+    D.talkSort = 'top'; h = ev('talkThreadHTML')(gibbs);
+    const order = ['Oldest thread', 'Newest', 'Middle'].map(x => h.indexOf(x));   // 3 replies (6) > 4 reactions (4) > nothing
+    if (order.some(i => i < 0) || order[0] > order[1] || order[1] > order[2]) return 'top order: ' + order;
+    if (/cweek/.test(h)) return 'no week dividers in Top';
+    D.pp = { id: gibbs, tab: 'overview' }; if (/data-talksort/.test(ev('viewPlayer')())) return 'no toggle on the overview card';
+  } finally { st.tab = was[0]; D.pp = was[1]; D.talkSort = was[2]; D.talk.clear(); D.talkN.clear(); D.rx.clear(); setup(); }
+});
+test('discussion: reporting asks why, then takes an optional note for the moderator', () => {
+  setup(); const D = ev('D'), acct = ev('acct'), gibbs = idOf('Jahmyr Gibbs'), was = [acct.user, D.talkRep, D.talkRepWhy];
+  try {
+    talkFixture(gibbs); acct.user = { id: 'u-me' };
+    D.talkRep = 'r2'; let h = ev('talkThreadHTML')(gibbs);
+    if (!/data-talkwhy="r2\|spam"/.test(h) || /data-talkrepform/.test(h)) return 'the reasons first';
+    D.talkRepWhy = { cid: 'r2', why: 'spam' }; h = ev('talkThreadHTML')(gibbs);
+    if (!/data-talkwhy="r2\|spam" aria-pressed="true"/.test(h)) return 'the chosen reason is marked';
+    if (!/<form class="talk-in reply" data-talkrepform="r2">/.test(h) || !/maxlength="300" data-talkin="rep:r2"/.test(h) || !/Send report/.test(h)) return 'then the note and Send';
+  } finally { [acct.user, D.talkRep, D.talkRepWhy] = was; D.talk.clear(); D.talkN.clear(); D.rx.clear(); }
+});
+test('advice that says to check the news links to that player’s News tab, in the same words', () => {
+  setup(); const D = ev('D'), st = ev('state');
+  if (!ev('newsLinked')('He’s out, so check the news first.', '4046').includes('so <a href="#player/4046/news">check the news</a> first.')) return 'the link';
+  const q = Object.values(D.M).find(r => r.status === 'ok' && !r.locked && /^questionable/i.test(r.inj || '') && r.mean > 3);
+  const l = Object.values(D.M).find(r => r.status === 'ok' && !r.locked && !r.inj && r.pos === q.pos && r.mean < q.mean - 2);
+  const was = st.compare; st.compare = [q.id, l.id]; const html = ev('viewCompare')(); st.compare = was;
+  const pages = { 'Start/Sit': html, Waivers: ev('viewWaivers')() };
+  let seen = 0;
+  for (const [k, h] of Object.entries(pages)) {
+    const all = (h.match(/check the news/g) || []).length, linked = (h.match(/<a href="#player\/[^"/]+\/news">check the news<\/a>/g) || []).length;
+    if (all !== linked) return `${k}: ${all - linked} not linked`; seen += all;
+  }
+  return seen > 0 || 'no advice to check the news in the fixture';
+});
 test('watching: a player’s news reaches the alerts, the watchlist syncs, and Players can list who you watch', () => {
   setup(); const D = ev('D'), st = ev('state'), gibbs = idOf('Jahmyr Gibbs'), far = idOf('Brandon Aubrey'), was = [st.watch, st.alertsSeen, D.news, D.alertsSince, st.tab];
   const now = Date.now(), it = (id, ids, m) => ({ id, t: new Date(now - m * 60000).toISOString(), k: 'injury', ids, names: ids.map(() => 'X'), title: id, src: 'Benny’s Picks' });

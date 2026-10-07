@@ -48,3 +48,27 @@ jobs:
           python3 -m py_compile scripts/extract_snapshot.py scripts/calibrate.py scripts/player_ids.py scripts/audit.py scripts/weekly_pages.py scripts/model/*.py
           node --check sw.js
           python3 scripts/calibrate.py --selfcheck
+
+  # the discussion's rules live in the database (supabase/community.sql): run it against a real Postgres and probe it as
+  # a visitor, signed-in people, a moderator and a banned account (tests/test_community_sql.py)
+  database:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    services:
+      postgres:
+        image: postgres:15
+        env:
+          POSTGRES_PASSWORD: postgres
+        ports: ["5432:5432"]
+        options: --health-cmd pg_isready --health-interval 5s --health-timeout 5s --health-retries 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Test the discussion's database rules
+        env:
+          PG_DSN: postgresql://postgres:postgres@localhost:5432/postgres
+        run: |
+          pip install -q "psycopg[binary]" pytest
+          python -m pytest tests/test_community_sql.py -q

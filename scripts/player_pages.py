@@ -54,6 +54,7 @@ CSS = """<style>
 .news ul { list-style: none; margin: 0; padding: 0; border: 1px solid var(--line); border-radius: 10px; background: var(--surface); }
 .news li { padding: 10px 16px; border-bottom: 1px solid var(--line); } .news li:last-child { border-bottom: 0; }
 .news li b { display: block; }
+.talk[hidden] { display: none; }
 .dir { columns: 3 220px; gap: 24px; } .dir a { display: block; padding: 2px 0; }
 .dir h3 { margin: 10px 0 2px; font-size: 13px; text-transform: uppercase; letter-spacing: .06em; color: var(--muted); break-after: avoid; }
 </style>"""
@@ -99,6 +100,31 @@ def game_table(h, season):
             + f'<th class="hide-s">Snaps</th></tr></thead><tbody>{trs}</tbody></table></div>')
 
 
+_cloud = []
+
+
+def cloud():
+    """The app's accounts backend (CLOUD in index.html: project URL and publishable key), or None without one. The pages
+    ask it for their comment count; a page carries the count and a link only, never the comments, so what people post
+    isn't served to search engines from here."""
+    if not _cloud:
+        with open(os.path.join(ROOT, "index.html"), encoding="utf-8") as f:
+            m = re.search(r"const CLOUD = \{ url: '([^']*)', key: '([^']*)' \}", f.read())
+        if not m:
+            print("player_pages.py: no CLOUD in index.html, so no comment counts", file=sys.stderr)
+        _cloud.append(m.groups() if m and all(m.groups()) else None)
+    return _cloud[0]
+
+
+def talk_script(sid):
+    c = cloud()
+    if not c:
+        return ""
+    return (f'fetch({json.dumps(c[0] + "/rest/v1/discussion_counts?select=n&player_id=eq." + sid)},{{headers:{{apikey:{json.dumps(c[1])}}}}})'
+            f'.then(r=>r.ok?r.json():null).then(j=>{{const n=j&&j[0]&&j[0].n;if(!n)return;'
+            f'document.getElementById("talk-n").textContent=n+(n===1?" comment":" comments");document.getElementById("talk").hidden=false}}).catch(()=>{{}});')
+
+
 def player_page(sid, h, info, slug, season):
     name, pos, team = h["name"], h["pos"], info[2] if info else None
     espn = info[3] if info else None
@@ -121,6 +147,7 @@ def player_page(sid, h, info, slug, season):
             f'<div class="now" id="now" hidden><span>Week <span id="now-w"></span> projection</span><b id="now-p"></b><span class="small muted">PPR points · likely <span id="now-r"></span> · '
             f'<a href="/#player/{esc(sid)}">why, and how he fits your lineup</a></span></div>',
             '<section class="news" id="news" hidden><h2>Latest news</h2><ul id="news-l"></ul></section>',
+            *([f'<p class="talk" id="talk" hidden><a href="/#player/{esc(sid)}/talk">💬 <span id="talk-n"></span>: join the discussion →</a></p>'] if cloud() else []),
             f'<h2 id="seasons">Fantasy stats by season</h2>{season_table(h)}']
     logs = [s for s in (season, season - 1) if h["games"].get(str(s))]
     for s in logs:
@@ -140,7 +167,9 @@ def player_page(sid, h, info, slug, season):
               f'const l=document.getElementById("news-l");for(const i of it.slice(0,5)){{const li=document.createElement("li"),b=document.createElement((i.url||"").startsWith("https://")?"a":"b");'
               f'b.textContent=i.title;if(b.tagName==="A"){{b.href=i.url;b.rel="noopener";b.style.fontWeight="600";b.style.display="block"}}const m=document.createElement("span");m.className="small muted";'
               f'm.textContent=[i.sub,i.src,new Date(i.t).toLocaleDateString([],{{month:"short",day:"numeric"}})].filter(Boolean).join(" · ");li.append(b,m);l.append(li)}}'
-              f'document.getElementById("news").hidden=false}}).catch(()=>{{}})</script>')
+              f'document.getElementById("news").hidden=false}}).catch(()=>{{}});'
+              # how many comments he has (the comments themselves stay in the app)
+              + talk_script(sid) + '</script>')
     top = f"{best['season']} {pos}{best['rank']}" if best else f"{season} {pos}{last['rank']}"
     return page(None, {}, f"{name} Fantasy Stats, Game Log & Projections | Benny’s Picks",
                 f"{name} ({pos}, {team or 'FA'}) fantasy football stats: season-by-season PPR points and finishes ({top}), game logs, and this week’s projection.",
