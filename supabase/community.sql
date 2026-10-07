@@ -481,12 +481,16 @@ grant execute on function public.profile_by_handle(text) to anon, authenticated;
 -- below (security definer: nobody can insert one, so nobody can notify someone about a comment that doesn't mention
 -- them). A person sees only their own rows. At most 5 different names count in a comment; the author is skipped, and so
 -- is a name nobody has.
+-- user_id points at auth.users, not profiles: a table with keys to both comments and profiles is a second path between
+-- them, and the API then refuses every comments?select=…profiles(handle) as ambiguous (PGRST201), older pages included.
 create table if not exists public.mentions (
   comment_id uuid not null references public.comments (id) on delete cascade,
-  user_id uuid not null references public.profiles (user_id) on delete cascade,
+  user_id uuid not null references auth.users (id) on delete cascade,
   created_at timestamptz not null default now(),
   primary key (comment_id, user_id)
 );
+alter table public.mentions drop constraint if exists mentions_user_id_fkey;
+alter table public.mentions add constraint mentions_user_id_fkey foreign key (user_id) references auth.users (id) on delete cascade;
 create index if not exists mentions_user_idx on public.mentions (user_id, created_at desc);
 alter table public.mentions enable row level security;
 drop policy if exists "read own mentions" on public.mentions;

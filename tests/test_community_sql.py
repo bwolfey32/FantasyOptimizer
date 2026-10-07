@@ -134,6 +134,15 @@ def test_no_privileges_beyond_what_the_page_uses(db):
         db.refused(db.person(), f"select * from {t}")
 
 
+def test_one_path_from_comments_to_profiles(db):
+    # The page embeds profiles(handle) in comment reads. A table with keys to both is a second path, and the API then
+    # refuses those reads as ambiguous (PGRST201); mentions did that once.
+    both = db.sql("""select c.conrelid::regclass::text from pg_constraint c join pg_constraint p using (conrelid)
+                     where c.contype = 'f' and p.contype = 'f' and c.confrelid = 'public.comments'::regclass
+                       and p.confrelid = 'public.profiles'::regclass and c.conrelid <> 'public.comments'::regclass""")
+    assert both == []
+
+
 # ---------- profiles ----------
 
 def test_profiles(db):

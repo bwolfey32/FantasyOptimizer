@@ -5655,7 +5655,7 @@ async function saveName() {
 }
 
 /* A player's comments, newest first, with each author's name and the reactions. Refetched when over a minute old. */
-const TALK_COLS = 'id,player_id,parent_id,author_id,body,season,week,hidden_at,hidden_reason,deleted_at,created_at,profiles(handle)';
+const TALK_COLS = 'id,player_id,parent_id,author_id,body,season,week,hidden_at,hidden_reason,deleted_at,created_at,profiles!comments_author_id_fkey(handle)';
 // what the counts count: not hidden, and not a "[deleted]" placeholder kept for its replies
 const talkVisible = rows => rows.filter(c => !c.hidden_at && !c.deleted_at).length;
 function talkLoad(id, force) {
@@ -6058,7 +6058,7 @@ async function alertsLoad() {
     try { const a = await sbRest('rpc/my_alerts', { method: 'POST', body: { since } }); acct.replies = a?.replies || []; acct.mentions = a?.mentions || []; acct.rxAlerts = a?.reactions || []; }
     catch (e) {
       if (e?.code !== 'PGRST202') throw e;
-      acct.replies = await sbRest('rpc/my_replies?select=id,player_id,parent_id,author_id,body,created_at,profiles(handle)', { method: 'POST', body: { since } }) || []; acct.mentions = []; acct.rxAlerts = [];
+      acct.replies = await sbRest('rpc/my_replies?select=id,player_id,parent_id,author_id,body,created_at,profiles!comments_author_id_fkey(handle)', { method: 'POST', body: { since } }) || []; acct.mentions = []; acct.rxAlerts = [];
     }
   } catch (e) { talkMissing(e); }
   renderBell();
@@ -6101,7 +6101,7 @@ function alertsPanel() {
 const MOD_TABS = [['reports', 'Reports'], ['hidden', 'Hidden'], ['bans', 'Bans'], ['log', 'Log']];
 async function modLoad() {
   D.mod = { st: 'loading' };
-  const cols = 'id,player_id,parent_id,author_id,body,hidden_at,hidden_reason,deleted_at,created_at,profiles(handle)';
+  const cols = 'id,player_id,parent_id,author_id,body,hidden_at,hidden_reason,deleted_at,created_at,profiles!comments_author_id_fkey(handle)';
   try {
     const [reps, hid, bans, log] = await Promise.all([
       sbRest('reports?select=id,target_id,reason,note,created_at&resolved_at=is.null&order=created_at.desc&limit=300'),
