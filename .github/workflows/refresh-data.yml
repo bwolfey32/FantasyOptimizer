@@ -50,7 +50,7 @@ jobs:
       - name: Trained projections
         run: |
           pip install -q -r scripts/model/requirements.txt
-          python3 scripts/model/predict.py || echo "Trained projections kept from the last run"
+          python3 scripts/model/predict.py 2> >(tee -a "$RUNNER_TEMP/warnings.log" >&2) || echo "Trained projections kept from the last run"
 
       # checks the frozen forecasts of finished weeks against what players scored; a failure here never blocks the snapshot
       - name: Check past forecasts against results
@@ -69,7 +69,7 @@ jobs:
       # pages search engines read (players/<slug>/); rebuilt at most once a day, and a failure keeps the old ones
       - name: Update player pages
         run: |
-          python3 scripts/model/player_history.py || echo "Player history kept from the last run"
+          python3 scripts/model/player_history.py 2> >(tee -a "$RUNNER_TEMP/warnings.log" >&2) || echo "Player history kept from the last run"
           python3 scripts/player_pages.py || echo "Player pages kept from the last run"
 
       # the weekly pages search engines read (waiver wire, rankings, defenses, weather) and sitemap.xml, from the new
@@ -91,3 +91,10 @@ jobs:
           # pushes made with the workflow token don't start a Pages build on their own
           curl -sS -X POST -H "Authorization: Bearer $GH_TOKEN" -H "Accept: application/vnd.github+json" \
             "https://api.github.com/repos/${{ github.repository }}/pages/builds"
+
+      # the steps above keep last run's files when they fail, so the site keeps working; this fails the run (and GitHub
+      # emails the owner) when that has left something stale: trained projections not for this week, player history
+      # over two days old, player pages missing. An nflverse file served from an old cached copy is a warning.
+      - name: Check data health
+        if: always()
+        run: python3 scripts/health.py --warnings "$RUNNER_TEMP/warnings.log" --summary "$GITHUB_STEP_SUMMARY"

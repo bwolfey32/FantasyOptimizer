@@ -7,6 +7,7 @@ change).
 """
 import csv
 import os
+import sys
 import time
 import urllib.request
 
@@ -28,15 +29,34 @@ FILES = {
 }
 
 
+# other addresses for a file, tried in order when its FILES address fails: nflverse moves release files now and then
+# (the schedule's release copy went missing in October 2026; nfldata keeps the same file)
+MIRRORS = {
+    "games.csv": ["https://raw.githubusercontent.com/nflverse/nfldata/master/data/games.csv"],
+}
+
+
 def path(name, url, max_age=None):
-    """The cached file's path, downloading it first if it's missing (or older than max_age hours)."""
+    """The cached file's path, downloading it first if it's missing (or older than max_age hours). Each address is
+    tried in turn (url, then MIRRORS); when none answers, an older cached copy is kept, with a warning on stderr, and
+    only a file never downloaded raises."""
     os.makedirs(CACHE, exist_ok=True)
     p = os.path.join(CACHE, name)
     stale = max_age is not None and os.path.exists(p) and time.time() - os.path.getmtime(p) > max_age * 3600
     if not os.path.exists(p) or stale:
-        tmp = p + ".part"
-        urllib.request.urlretrieve(url, tmp)
-        os.replace(tmp, p)
+        tmp, err = p + ".part", None
+        for u in [url, *MIRRORS.get(name, [])]:
+            try:
+                urllib.request.urlretrieve(u, tmp)
+                os.replace(tmp, p)
+                return p
+            except Exception as e:  # noqa: BLE001 (a moved file, a network error: try the next address)
+                err = e
+                print(f"nflverse: {name} from {u} failed ({e})", file=sys.stderr)
+        if not os.path.exists(p):
+            raise err
+        age = (time.time() - os.path.getmtime(p)) / 3600
+        print(f"WARNING nflverse: no address answered for {name}; using the cached copy from {age:.0f} hours ago", file=sys.stderr)
     return p
 
 
