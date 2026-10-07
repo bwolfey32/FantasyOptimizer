@@ -10,7 +10,8 @@ site's own model, then writes:
                                       is for the bundle's week)
   weekly/defense-rankings/index.html  D/STs to play, and fantasy points each defense allows by position
   weekly/weather/index.html           every game's stadium and kickoff forecast, and the players it moves
-  sitemap.xml
+  sitemap.xml                         these pages, and every player page in players/slugs.json (scripts/player_pages.py)
+Player names link to their pages on the static site (/players/<slug>/) when they have one.
 The addresses stay the same every week; the week in the titles changes. The data refresh runs this after each new
 snapshot (.github/workflows/refresh-data.yml). Exits 1 when the page's data doesn't come back; the old pages are kept.
 Needs Chrome or Chromium (set CHROME to its path if it isn't found).
@@ -96,13 +97,34 @@ def opp_txt(p):
     return "Bye" if not p.get("opp") else f"{'vs' if p.get('home') else '@'} {p['opp']}"
 
 
-def page(slug, d, title, desc, h1, intro, body, cta):
-    """One weekly page: the site's look (light and dark), header, the page's sections, a link into the app, footer."""
-    path = f"/weekly/{slug}/" if slug else "/weekly/"
-    updated = when(d["createdAt"])
-    nav = "".join(f'<a href="/weekly/{s}/"{" aria-current=page" if s == slug else ""}>{n}</a>' for s, n in PAGES)
-    ld = {"@context": "https://schema.org", "@type": "WebPage", "name": h1, "description": desc, "url": SITE + path,
-          "dateModified": d["createdAt"], "isPartOf": {"@type": "WebSite", "name": "Benny’s Picks", "url": SITE + "/"}}
+def load_slugs():
+    """Sleeper id -> the player's page on the static site (players/slugs.json, written by scripts/player_pages.py)."""
+    try:
+        with open(os.path.join(ROOT, "players", "slugs.json"), encoding="utf-8") as f:
+            return json.load(f).get("s", {})
+    except (OSError, ValueError):
+        return {}
+
+
+SLUGS = {}
+
+
+def pname(r):
+    """A player's name in a table: a link to his page when he has one."""
+    slug = SLUGS.get(str(r.get("id")))
+    return f'<a href="/players/{slug}/" style="color:inherit">{esc(r["name"])}</a>' if slug else esc(r["name"])
+
+
+def page(slug, d, title, desc, h1, intro, body, cta, path=None, ld=None, image=None, head=""):
+    """One page of the static site: the site's look (light and dark), header, the page's sections, a link into the app,
+    footer. The weekly pages by slug; player pages (scripts/player_pages.py) give their own path, JSON-LD and image, and no
+    update time when d has none."""
+    path = path or (f"/weekly/{slug}/" if slug else "/weekly/")
+    updated = when(d.get("createdAt"))
+    nav = "".join(f'<a href="/weekly/{s}/"{" aria-current=page" if s == slug else ""}>{n}</a>' for s, n in PAGES) \
+        + f'<a href="/players/"{" aria-current=page" if path.startswith("/players/") else ""}>Players</a>'
+    ld = ld or {"@context": "https://schema.org", "@type": "WebPage", "name": h1, "description": desc, "url": SITE + path,
+                "dateModified": d.get("createdAt"), "isPartOf": {"@type": "WebSite", "name": "Benny’s Picks", "url": SITE + "/"}}
     return f"""<!doctype html>
 <html lang="en">
 <meta charset="utf-8">
@@ -116,13 +138,13 @@ def page(slug, d, title, desc, h1, intro, body, cta):
 <meta property="og:title" content="{esc(title)}">
 <meta property="og:description" content="{esc(desc)}">
 <meta property="og:url" content="{SITE}{path}">
-<meta property="og:image" content="{SITE}/assets/social-preview.jpg">
+<meta property="og:image" content="{image or SITE + '/assets/social-preview.jpg'}">
 <meta name="twitter:card" content="summary_large_image">
 <link rel="icon" href="/assets/favicon.ico" sizes="any">
 <link rel="apple-touch-icon" href="/assets/apple-touch-icon.png?v=2">
 <link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;600&family=Saira+Condensed:wght@600;700&display=swap">
-<script type="application/ld+json">{json.dumps(ld, ensure_ascii=False)}</script>
+<script type="application/ld+json">{json.dumps(ld, ensure_ascii=False)}</script>{head}
 <style>
 :root {{ --bg: #eef2ee; --surface: #fff; --surface-2: #e3e9e4; --ink: #13201a; --muted: #4a5850; --line: #cfd8d1; --accent: #075b37; --good: #1b7a4b; --bad: #b23a30; --warn: #a8670f; --gold: #8a6510; }}
 @media (prefers-color-scheme: dark) {{ :root {{ --bg: #0e1512; --surface: #151e1a; --surface-2: #1c2722; --ink: #e4ebe6; --muted: #a9b7af; --line: #29352f; --accent: #4fc38e; --good: #4fc38e; --bad: #f07a6e; --warn: #e3b052; --gold: #e2bb52; color-scheme: dark; }} }}
@@ -171,7 +193,7 @@ footer a {{ color: var(--muted); }}
 <main style="display:flex;flex-direction:column;gap:14px">
 <h1>{esc(h1)}</h1>
 <p class="intro">{intro}</p>
-<p class="small muted" style="margin:0">Updated {esc(updated)}. Projections refresh every few hours from Sleeper, ESPN and Open-Meteo.</p>
+{f'<p class="small muted" style="margin:0">Updated {esc(updated)}. Projections refresh every few hours from Sleeper, ESPN and Open-Meteo.</p>' if updated else ''}
 {body}
 <div class="cta"><span>{cta[0]}</span><a class="app" href="/{cta[1]}">{esc(cta[2])}</a></div>
 </main>
@@ -186,7 +208,7 @@ def rankings_page(d):
     body.append('<div class="jump">' + "".join(f'<a href="#{p.lower()}">{lab(p)}</a>' for p in d["rankings"]) + "</div>")
     for p, rows in d["rankings"].items():
         trs = "".join(
-            f'<tr><td class="n">{i + 1}</td><td class="l"><strong>{esc(r["name"])}</strong> <span class="muted small">{esc(r["team"]) if p != "DEF" else ""}</span>'
+            f'<tr><td class="n">{i + 1}</td><td class="l"><strong>{pname(r)}</strong> <span class="muted small">{esc(r["team"]) if p != "DEF" else ""}</span>'
             f'{" " + " ".join(pill(r)) if pill(r) else ""}</td>'
             f'<td class="l">{esc(opp_txt(r))}</td><td><span class="g g-{r["grade"][0]}">{esc(r["grade"])}</span></td>'
             f'<td><strong>{r["proj"]:.1f}</strong></td><td class="hide-s muted">{r["lo"]:.1f}–{r["hi"]:.1f}</td></tr>'
@@ -230,7 +252,7 @@ def waiver_page(d):
                            f'<span class="wk{" up" if (s["m"] or 0) >= 4 else " down" if (s["m"] or 0) <= -4 else ""}" title="Matchup {"+" if s["m"] >= 0 else "−"}{abs(s["m"]):.0f}%">{s["w"]} {"" if s["home"] else "@"}{esc(s["opp"] or "")}</span>'
                            if s["m"] is not None else f'<span class="wk">{s["w"]}</span>' for s in r["sched"])
         trs = "".join(
-            f'<tr><td class="n">{i + 1}</td><td class="l"><strong>{esc(r["name"])}</strong> <span class="muted small">{esc(r["team"]) if p != "DEF" else ""}</span>'
+            f'<tr><td class="n">{i + 1}</td><td class="l"><strong>{pname(r)}</strong> <span class="muted small">{esc(r["team"]) if p != "DEF" else ""}</span>'
             f'{("<div class=small>" + esc(cap("; ".join(r["notes"]))) + "</div>") if r["notes"] else ""}</td>'
             f'<td>{"&lt;1" if r["own"] < 1 else round(r["own"])}%</td><td>{r["ppg"]:.1f}</td><td><strong>{r["next"]:.1f}</strong></td><td class="l hide-s">{sched(r)}</td></tr>'
             for i, r in enumerate(rows))
@@ -319,6 +341,10 @@ def hub_page(d):
 def sitemap(d):
     day = (d["createdAt"] or datetime.now(timezone.utc).isoformat())[:10]
     urls = [("/", None, "daily"), ("/weekly/", day, "daily")] + [(f"/weekly/{s}/", day, "daily") for s, _ in PAGES] + [("/privacy.html", None, "yearly"), ("/terms.html", None, "yearly"), ("/about.html", None, "yearly"), ("/contact.html", None, "yearly")]
+    # the player pages that exist (a slug is kept for a player whose page was later left out)
+    pages = sorted(s for s in set(SLUGS.values()) if os.path.exists(os.path.join(ROOT, "players", s, "index.html")))
+    if pages:
+        urls += [("/players/", None, "weekly")] + [(f"/players/{s}/", None, "weekly") for s in pages]
     rows = "".join(f"  <url><loc>{SITE}{u}</loc>{f'<lastmod>{m}</lastmod>' if m else ''}<changefreq>{c}</changefreq></url>\n" for u, m, c in urls)
     return f'<?xml version="1.0" encoding="UTF-8"?>\n<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n{rows}</urlset>\n'
 
@@ -328,6 +354,7 @@ def main():
     ap.add_argument("--fixture", default="snapshot.json")
     ap.add_argument("--out", default=ROOT)
     a = ap.parse_args()
+    SLUGS.update(load_slugs())
     d = collect(with_trained(a.fixture))
     if not d["rankings"].get("WR") or not d["games"]:
         sys.exit("The weekly pages' data came back thin; keeping the old pages.")

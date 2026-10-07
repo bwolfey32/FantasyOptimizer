@@ -64,6 +64,7 @@ th.sort { cursor: pointer; user-select: none; }
 th.sort[aria-sort] { color: var(--ink); }
 td.name { white-space: normal; min-width: 150px; }
 td.name small { color: var(--muted); }
+td.name a.plink { color: inherit; text-decoration: none; } td.name a.plink:hover { text-decoration: underline; }
 .pos { font-size: 11px; font-weight: 600; padding: 1px 5px; border-radius: 4px; border: 1px solid var(--line); margin-right: 5px; }
 .err { padding: 24px; text-align: center; color: var(--muted); }
 @media (max-width: 560px) { h1 { font-size: 28px; } .tile b { font-size: 30px; } }
@@ -374,7 +375,7 @@ function viewWeek() {
     H('span', {}, `Week ${W.week} · ${total} players · built ${W.made.slice(0, 16).replace('T', ' ')} UTC. “Wk +1…+3” is the trained far-model value for later weeks; a blank is a bye. A player tagged Out shows his number if he plays.`)),
     H('div', { class: 'scroll' }, H('table', {}, H('thead', {}, H('tr', {}, cols.map(th))),
       H('tbody', {}, rows.map(r => { const d = val(r, 'delta'); return H('tr', {},
-        H('td', { class: 'name' }, H('span', { class: 'pos' }, r[c.pos]), r[c.name], H('small', {}, ` ${r[c.team]}${r[c.opp] ? ' vs ' + r[c.opp] : ''}${r[c.inj] ? ' · ' + r[c.inj] : ''}`)),
+        H('td', { class: 'name' }, H('span', { class: 'pos' }, r[c.pos]), H('a', { href: `./#player/${encodeURIComponent(r[c.id])}`, class: 'plink' }, r[c.name]), H('small', {}, ` ${r[c.team]}${r[c.opp] ? ' vs ' + r[c.opp] : ''}${r[c.inj] ? ' · ' + r[c.inj] : ''}`)),
         H('td', { class: 'best' }, f1(r[c.trained])), H('td', { style: 'text-align:left' }, rangeCell(r)),
         H('td', {}, r[c.classic] == null ? '–' : f1(r[c.classic])), H('td', {}, r[c.sleeper] == null ? '–' : f1(r[c.sleeper])),
         H('td', { class: d != null && Math.abs(d) >= 2 ? 'best' : '' }, d == null ? '–' : sgn(d, f1)),

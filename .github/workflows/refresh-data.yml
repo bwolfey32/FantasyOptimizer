@@ -65,6 +65,13 @@ jobs:
       - name: Update player ids
         run: python3 scripts/player_ids.py player-ids.json || echo "Player ids kept from the last run"
 
+      # every QB/RB/WR/TE's seasons and game logs since 2013 for the player pages (players/data/), and the static player
+      # pages search engines read (players/<slug>/); rebuilt at most once a day, and a failure keeps the old ones
+      - name: Update player pages
+        run: |
+          python3 scripts/model/player_history.py || echo "Player history kept from the last run"
+          python3 scripts/player_pages.py || echo "Player pages kept from the last run"
+
       # the weekly pages search engines read (waiver wire, rankings, defenses, weather) and sitemap.xml, from the new
       # snapshot through the site's own model; a failure keeps last run's pages
       - name: Write the weekly pages
@@ -76,7 +83,7 @@ jobs:
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898583+github-actions[bot]@users.noreply.github.com"
-          for p in snapshot.json forecasts calibration.json player-ids.json share-players.json weekly sitemap.xml model; do if [ -e "$p" ]; then git add "$p"; fi; done
+          for p in snapshot.json forecasts calibration.json player-ids.json share-players.json players weekly sitemap.xml model; do if [ -e "$p" ]; then git add "$p"; fi; done
           if git diff --cached --quiet; then echo "No changes"; exit 0; fi
           git commit -m "Refresh data snapshot"
           git pull --rebase --autostash

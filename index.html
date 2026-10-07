@@ -138,7 +138,7 @@ a { color: var(--accent); }
 .btn.danger { color: var(--bad); }
 
 /* Tabs */
-/* the six main tabs sit in a solid green band, so they read as navigation rather than another row of buttons;
+/* the four main tabs sit in a solid green band, so they read as navigation rather than another row of buttons;
    light labels, the current tab a lighter raised pill, and a short white underline under each label */
 .tabs { display: flex; gap: 4px; padding: 6px; border-radius: 12px; background: linear-gradient(160deg, #0a6b41, #054a2c); box-shadow: 0 2px 8px rgba(0, 0, 0, .15); }
 .tabs .navlink { position: relative; flex: 1 1 0; display: grid; place-items: center; min-height: 46px; padding: 8px 14px 10px; border-radius: 8px; text-decoration: none; font-family: var(--font-display); font-size: 18px; font-weight: 600; text-transform: uppercase; letter-spacing: .03em; line-height: 1.1; color: rgba(255, 255, 255, .78); white-space: nowrap; text-align: center; }
@@ -329,8 +329,8 @@ body.welcome.wsign #acctBtn .acct-txt { position: static; width: auto; height: a
 @media (max-width: 600px) { .hist th, .hist td { padding: 6px 6px; } .hist .hdet > td { padding: 4px 4px 10px; } }
 /* phones: the same band as a 3 x 2 grid */
 @media (max-width: 600px) {
-  .tabs { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); }
-  .tabs .navlink { min-height: 42px; padding: 6px 4px 8px; letter-spacing: .02em; }
+  .tabs { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); }
+  .tabs .navlink { min-height: 42px; padding: 6px 2px 8px; letter-spacing: .02em; font-size: 16px; }
 }
 
 /* Team context bar (every page) */
@@ -525,6 +525,43 @@ html { scroll-padding-top: calc(var(--stick-h, 0px) + 8px); }
 .chip.up { background: color-mix(in srgb, var(--good) 14%, transparent); color: var(--good); }
 .chip.down { background: color-mix(in srgb, var(--bad) 13%, transparent); color: var(--bad); }
 
+/* Links to a player's page (plink): the name keeps its own color and underlines on hover, the picture is a plain link */
+a.plink { color: inherit; text-decoration: none; }
+a.plink:hover, a.plink:focus-visible { text-decoration: underline; text-decoration-color: var(--accent); text-underline-offset: 3px; }
+a.plink.pimg-a { flex: none; display: block; line-height: 0; border-radius: 50%; }
+a.plink.pimg-a:hover .pimg { box-shadow: 0 0 0 2px var(--accent); }
+a.more-link, a.plink.more-link { color: var(--accent); font-weight: 600; }
+/* the row of pages in a section (My Team, Research), under the main tabs */
+.subtabs { display: flex; flex-wrap: wrap; }
+.subtabs:empty { display: none; }
+.subtabs .seg { max-width: 100%; overflow-x: auto; }
+.subtabs .seg a { white-space: nowrap; }
+/* Player page */
+.player .back-link { align-self: flex-start; text-decoration: none; font-weight: 600; }
+.phead { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 12px 16px; padding: 16px; }
+.phead-main { display: flex; align-items: center; gap: 16px; min-width: 0; }
+.phead .pimg { --pimg: 88px; }
+.phead-txt { display: flex; flex-direction: column; gap: 4px; min-width: 0; }
+.phead h2 { margin: 0; font-size: 30px; line-height: 1.05; }
+.phead .psub { font-size: 14px; }
+.ptags { display: flex; flex-wrap: wrap; gap: 6px 10px; align-items: center; }
+.ptabs { align-self: flex-start; max-width: 100%; overflow-x: auto; }
+.ptabs a { white-space: nowrap; }
+.pweek { padding: 14px 16px; display: flex; flex-direction: column; gap: 10px; }
+.pweek .summary .grade { display: inline-grid; width: 40px; height: 34px; font-size: 22px; }
+.pcall { display: flex; flex-direction: column; gap: 2px; padding: 10px 12px; border-radius: 8px; background: color-mix(in srgb, var(--accent) 7%, var(--surface-2)); font-size: 14.5px; }
+.detail.pdetail { padding: 14px 16px; }
+.pnext { padding: 12px 16px; display: flex; flex-direction: column; gap: 8px; }
+table.glog tr.miss td { color: var(--muted); font-style: italic; }
+table.glog tfoot td { font-weight: 600; border-top: 2px solid var(--line); border-bottom: 0; }
+table.glog tr.now td { background: color-mix(in srgb, var(--accent) 6%, transparent); }
+table.glog .pid { min-width: 170px; }
+.ppgbar { display: inline-block; min-width: 64px; padding: 1px 6px; border-radius: 4px; background: linear-gradient(90deg, color-mix(in srgb, var(--accent) 22%, transparent) var(--w), transparent var(--w)); }
+@media (max-width: 600px) {
+  .detail.pdetail { padding: 12px; }
+  .phead .pimg { --pimg: 64px; }
+  .phead h2 { font-size: 24px; }
+}
 /* Detail */
 .detail { padding: 4px 14px 16px 80px; display: grid; grid-template-columns: minmax(0, 1.4fr) minmax(0, 1fr); gap: 20px; }
 .factors { display: flex; flex-direction: column; gap: 9px; }
@@ -797,6 +834,7 @@ button, .btn, [role="button"], [role="tab"], nav, nav a, summary { -webkit-touch
   </header>
   <div class="freshp card" id="fresh" hidden></div>
   <nav class="tabs" id="tabs" aria-label="Main"></nav>
+  <nav class="subtabs" id="subtabs" aria-label="Pages in this section"></nav>
   <div id="stickSentinel" aria-hidden="true"></div>
   <div class="stick" id="stick">
     <section class="teampin" id="teampin" aria-label="Your team and week"></section>
@@ -953,13 +991,13 @@ const SELFTEST = location.hash === '#selftest';
 /* ---------- this browser's storage ----------
    Every key is STORE_PREFIX + a name ("bp:v1:state"), and STORE_SCHEMA_KEY holds the layout's version, so a later
    change can move keys in a migration step on load. Version 1 moved the old "fo1:" keys under the prefix and dropped
-   the old data caches (fetched again on demand).
+   the old data caches (fetched again on demand). Version 2 dropped the wk2/wk3 week caches for wk4.
    Storage can be full (QuotaExceededError) or blocked (private browsing, cookies off, an embedded frame): the data caches
    (STORE_CACHES, all fetchable again) go first, and a write that still doesn't fit, or any write when storage is
    blocked, is kept in memory so the page works for this visit. Nothing here crashes the page. The sign-in session is
    Supabase's own (sb-...-auth-token) and stays as Supabase writes it. */
-const STORE_PREFIX = 'bp:v1:', STORE_SCHEMA = 1, STORE_SCHEMA_KEY = 'bp:schema';
-const STORE_CACHES = /^(sched|wk2|wk3|prior2|split|idp|ppg4|ret|pids|coach|geo):/;
+const STORE_PREFIX = 'bp:v1:', STORE_SCHEMA = 2, STORE_SCHEMA_KEY = 'bp:schema';
+const STORE_CACHES = /^(sched|wk2|wk3|wk4|prior2|split|idp|ppg4|ret|pids|coach|geo):/;
 const storeKeys = ls => Array.from({ length: ls.length }, (_, i) => ls.key(i)).filter(k => k != null);
 const isQuotaErr = e => !!e && (e.name === 'QuotaExceededError' || e.name === 'NS_ERROR_DOM_QUOTA_REACHED' || e.code === 22 || e.code === 1014);
 function migrateStore(ls) {
@@ -976,6 +1014,8 @@ function migrateStore(ls) {
       try { ls.setItem(STORE_PREFIX + name, val); } catch { try { ls.setItem(k, val); } catch {} return false; }
     }
   }
+  // version 2: weeks are kept as wk4 (with touchdowns, for the player pages' game logs); the older copies go
+  if (v < 2) for (const k of storeKeys(ls).filter(k => /^bp:v1:wk[23]:/.test(k))) ls.removeItem(k);
   try { ls.setItem(STORE_SCHEMA_KEY, String(STORE_SCHEMA)); } catch {}
   return true;
 }
@@ -1083,7 +1123,7 @@ function loadState() {
 }
 let state = loadState();
 const save = () => { stashTeam(); stampChanges(); store.set('state', state); queuePush(); };
-const D = { loading: true, progress: 0, errors: [], open: new Set(), lg: {}, U: new Map(), proj: {}, H: {}, tg: {}, rec: {}, prior: {}, cur: {}, B: {}, L: {}, ranks: {}, M: {}, imgBad: new Set(), coaches: null, espnTeams: null, defSort: ['fpaWR', -1], teamOpen: null, resetArm: false };
+const D = { loading: true, progress: 0, errors: [], open: new Set(), phist: new Map(), scrollOf: {}, lg: {}, U: new Map(), proj: {}, H: {}, tg: {}, rec: {}, prior: {}, cur: {}, B: {}, L: {}, ranks: {}, M: {}, imgBad: new Set(), coaches: null, espnTeams: null, defSort: ['fpaWR', -1], teamOpen: null, resetArm: false };
 
 /* ---------- accounts and sync ----------
    Signing in is optional. This browser's copy (state) stays the working copy; a signed-in account keeps a mirror of
@@ -1518,7 +1558,8 @@ function compactWeek(rows) {
     if (pos === 'DEF') { const T = fixAbbr(r.team || r.player_id); if (!TEAMS[T]) continue; Dd.push([T, fixAbbr(r.opponent), s.fan_pts_allow_qb||0, s.fan_pts_allow_rb||0, s.fan_pts_allow_wr||0, s.fan_pts_allow_te||0, s.fan_pts_allow_k||0, s.fan_pts_allow_def||0, s.sack||0, s.pts_allow||0, s.yds_allow||0, +(s.pts_ppr||0).toFixed(2)]); continue; }
     if (!POS.includes(pos)) continue;
     P.push([r.player_id, pos, fixAbbr(r.team), fixAbbr(r.opponent), +(s.pts_ppr||0).toFixed(2), s.pass_att||0, s.pass_yd||0, s.pass_sack||0, s.rush_att||0, s.rush_yd||0, s.rec_tgt||0, s.rec_yd||0, nameOf(r), s.rec||0,
-      s.off_snp ?? null, s.tm_off_snp ?? null]);   // snaps last: rows saved before they were kept just end earlier
+      s.off_snp ?? null, s.tm_off_snp ?? null,   // snaps, then the box score's scoring plays: rows saved before either was kept just end earlier
+      s.pass_cmp || 0, s.pass_td || 0, s.pass_int || 0, s.rush_td || 0, s.rec_td || 0, s.fum_lost || 0]);
   }
   return { P, D: Dd };
 }
@@ -1774,7 +1815,7 @@ async function gatherLive(err) {
   const pProj = T(fetchJSON(API.proj(season, week)).catch(e => { err('Sleeper projections', e); return []; }));
   const weekPs = [];
   for (let w = 1; w <= histMax; w++) {
-    const key = `wk3:${season}:${w}`, cached = w <= completedThrough ? store.get(key) : null;
+    const key = `wk4:${season}:${w}`, cached = w <= completedThrough ? store.get(key) : null;
     weekPs.push(cached ? Promise.resolve(cached) : T(fetchJSON(API.wk(season, w)).then(rows => { const c = compactWeek(rows); if (w <= completedThrough && c.D.length) store.set(key, c); return c; }).catch(e => { err('Sleeper stats week ' + w, e); return { P: [], D: [] }; })));
   }
   const pActual = week <= (past ? 18 : detWeek) ? T(fetchJSON(API.wk(season, week)).then(compactWeek).catch(() => ({ P: [], D: [] }))) : Promise.resolve({ P: [], D: [] });
@@ -3613,7 +3654,7 @@ function moveRange(m) {
   </tbody></table></details>`;
 }
 function bestMoveCard(m, weeks, H, ownTxt, near) {
-  if (!m) return `<div class="card wbest"><span class="label">Best move</span><div class="wb-none">${near ? `<strong>Hold.</strong> No move clears Benny’s bar. The closest, add ${esc(D.U.get(near.f).name)}${near.d ? `, drop ${esc(D.U.get(near.d).name)}` : ''}, gains +${f1(near.hz)} over ${near.H} week${near.H > 1 ? 's' : ''}, less than projections typically miss by.` : 'Your roster is already the best Benny can build from these free agents. Check back after this week’s games.'}</div></div>`;
+  if (!m) return `<div class="card wbest"><span class="label">Best move</span><div class="wb-none">${near ? `<strong>Hold.</strong> No move clears Benny’s bar. The closest, add ${plink(near.f, esc(D.U.get(near.f).name))}${near.d ? `, drop ${plink(near.d, esc(D.U.get(near.d).name))}` : ''}, gains +${f1(near.hz)} over ${near.H} week${near.H > 1 ? 's' : ''}, less than projections typically miss by.` : 'Your roster is already the best Benny can build from these free agents. Check back after this week’s games.'}</div></div>`;
   const side = (kind, id) => `<div class="wb-side"><span class="wb-kind ${kind}">${kind === 'add' ? 'Add' : 'Drop'}</span>${playerIdentity(D.U.get(id), { size: 'lg', nameCls: 'wb-name', subCls: 'small muted', sub: kind === 'add' ? ' · ' + ownTxt(id) : '' })}</div>`;
   return `<div class="card wbest"><div class="row-head"><span class="label">Best move</span><button type="button" class="btn sm" data-act="sharemove">Share</button></div>
     <div class="wb-row">${side('add', m.f)}${m.d ? side('drop', m.d) : `<div class="wb-side"><span class="wb-kind keep">No drop</span><span class="small muted">You have an open roster spot</span></div>`}
@@ -3723,7 +3764,7 @@ function hiddenTxt(rest) {
    that skips to the next one. */
 function weakSpotCard(pl, weeks, H) {
   const ws = weakSpot(); if (!ws) return '';
-  const P = posLabel(ws.P), mn = ws.mine ? esc(D.U.get(ws.mine).name) : '';
+  const P = posLabel(ws.P), mn = ws.mine ? plink(ws.mine, esc(D.U.get(ws.mine).name)) : '';
   const rows = ws.picks.map((p, i) => { const av = availTxt(p.id); return `<li class="mv"><span class="mv-n num">${i + 1}</span>
     <div class="mv-body">${pl(p.id)}${av ? `<span class="small muted">${av[0].toUpperCase() + av.slice(1)}</span>` : ''}${schedStrip(p.id, weeks, H)}</div>
     <div class="mv-side">${p.gain > 0.5 ? `<span class="mv-gain num">+${f1(p.gain)}/wk</span>` : `<span class="small muted">Not an upgrade yet</span>`}<button type="button" class="btn sm" data-taken="${esc(p.id)}" title="Already on a team in your league: skip to the next one">Taken? Skip</button></div></li>`; }).join('');
@@ -3751,10 +3792,10 @@ function waiversBody() {
     const st = n.rows.filter(r => r.starter).map(r => R.VS[r.id]?.[0] ?? 0), mine = st.length ? Math.min(...st) : 0;
     if (top && R.VS[top][0] > mine + 0.5) return '';
     const fix = n.P === 'K' || n.P === 'DEF' ? 'Stream one week to week when a matchup is better.' : 'Target one by trade.';
-    return `<div class="small"><strong>No free agent beats your ${P}s</strong>${top ? ` (best: ${esc(D.U.get(top).name)}, ${f1(R.VS[top][0])} pts a week${st.length ? ` vs your ${f1(mine)}` : ''})` : ''}. ${fix}</div>`;
+    return `<div class="small"><strong>No free agent beats your ${P}s</strong>${top ? ` (best: ${plink(top, esc(D.U.get(top).name))}, ${f1(R.VS[top][0])} pts a week${st.length ? ` vs your ${f1(mine)}` : ''})` : ''}. ${fix}</div>`;
   };
   const needCards = needs.list.map(n => `<div class="need"><div class="row-head"><h3>${n.P === 'DEF' ? 'D/ST' : n.P}</h3><span class="pill ${levelCls[n.level]}">${n.level}</span></div>
-    ${n.rows.length ? n.rows.map(r => `<div class="small ${r.starter ? '' : 'muted'}">${esc(D.U.get(r.id).name)} <span class="muted">${r.away ? (returnWeek(r.id) > 18 ? 'out for season' : 'out until wk ' + returnWeek(r.id)) : (n.P === 'DEF' ? 'DST' : n.P) + (r.rank || '?')}</span></div>`).join('') : '<div class="small muted">Nobody at this position</div>'}
+    ${n.rows.length ? n.rows.map(r => `<div class="small ${r.starter ? '' : 'muted'}">${plink(r.id, esc(D.U.get(r.id).name))} <span class="muted">${r.away ? (returnWeek(r.id) > 18 ? 'out for season' : 'out until wk ' + returnWeek(r.id)) : (n.P === 'DEF' ? 'DST' : n.P) + (r.rank || '?')}</span></div>`).join('') : '<div class="small muted">Nobody at this position</div>'}
     ${noFix(n)}
     <div class="small muted">${n.sched ? `Schedule: <strong class="${n.sched === 'Easy' ? 'trend-up' : n.sched === 'Hard' ? 'trend-down' : ''}">${n.sched}</strong>` : ''}${n.byes.length ? ` · Bye: ${esc(n.byes.join(', '))}` : ''}</div></div>`).join('');
   // free: the best move and the next one; Pro: all of them
@@ -3767,7 +3808,7 @@ function waiversBody() {
       <div class="mwhy small">${m.hold ? '<span class="pill o">Keep yours</span> ' : m.marginal ? '<span class="pill m">Marginal: holding is fine</span> ' : m.longBet ? '<span class="pill q">Long-term bet</span> ' : ''}${esc(m.whyText)}. <button type="button" class="btn sm" data-taken="${esc(m.f)}">Taken in my league</button>${moveRange(m)}</div></div>`;
   }).join('') + (moves.length > shownMoves.length ? `<div class="item lock-row">${lockLine(hiddenTxt(moves.slice(shownMoves.length)))}</div>` : '')
     : `<div class="item" style="padding:14px"><span class="muted">No free agent improves your lineup over ${hLab}. Try a longer window or a higher ownership limit.</span></div>`;
-  const posBest = POS.map(p => { const top = R.byH.filter(id => D.U.get(id).pos === p).slice(0, 4); return top.map(id => `<tr><td><strong>${esc(D.U.get(id).name)}</strong> <span class="small muted">${p} · ${D.U.get(id).team}</span></td><td>${ownTxt(id)}</td><td>${f1(rosBase(id))}</td><td>${f1(R.sumH(id))}</td><td class="l">${schedStrip(id, weeks, Math.min(H, 6))}</td><td><button type="button" class="btn sm" data-taken="${esc(id)}">Taken</button></td></tr>`).join(''); }).join('');
+  const posBest = POS.map(p => { const top = R.byH.filter(id => D.U.get(id).pos === p).slice(0, 4); return top.map(id => `<tr><td><strong>${plink(id, esc(D.U.get(id).name))}</strong> <span class="small muted">${p} · ${D.U.get(id).team}</span></td><td>${ownTxt(id)}</td><td>${f1(rosBase(id))}</td><td>${f1(R.sumH(id))}</td><td class="l">${schedStrip(id, weeks, Math.min(H, 6))}</td><td><button type="button" class="btn sm" data-taken="${esc(id)}">Taken</button></td></tr>`).join(''); }).join('');
   const stashCard = R.stashes.length ? `<div class="row-head"><h2>Injured players you’re holding</h2><span class="small muted">Players set to Keep are never suggested as drops. Startable players who’ll be back start on Keep.</span></div>
   <div class="card list">${[...R.stashes].sort((a, b) => b.keep - a.keep || a.rank - b.rank).map(s => {
     const u = D.U.get(s.id), auto = autoReturnWeek(s.id), set = rwOverride(s.id), w0 = D.season === D.detSeason ? D.detWeek : D.week;
@@ -4121,14 +4162,26 @@ function renderFresh() {
 }
 setInterval(renderStatus, 60000);
 /* ---------- navigation ----------
-   Six destinations, each with its own address (#lineup, #start-sit, #waivers, #roster, #research, #settings), so Back,
-   refresh and shared links land on the same screen. Research has three subpages.
-   A visitor with no team yet can use every page that doesn't need one (Start / Sit for any two players, Research,
-   Settings, Pro); Lineup, Waivers and Roster show the welcome, which asks for a team. */
-const NAV = [['lineup', 'Lineup'], ['compare', 'Start / Sit'], ['waivers', 'Waivers'], ['players', 'Roster'], ['defenses', 'Research'], ['settings', 'Settings']];
-const HASH = { lineup: 'lineup', compare: 'start-sit', waivers: 'waivers', players: 'roster', defenses: 'research', teams: 'research-teams', weather: 'research-weather', settings: 'settings', pro: 'pro' };
+   Four groups: My Team (Lineup, Start / Sit, Waivers, Roster), Players (search and rankings, and each player's page),
+   Research (Defenses, Teams & schemes, Weather) and Settings. Every page has its own address (#lineup, #start-sit,
+   #waivers, #roster, #players, #player/<id>, #research, #settings...), so Back, refresh and shared links land on the same
+   screen; a group's pages show as a row under the main tabs (SUBNAV).
+   A visitor with no team yet can use every page that doesn't need one (Start / Sit for any two players, Players,
+   Research, Settings, Pro); Lineup, Waivers and Roster show the welcome, which asks for a team. */
+const NAV = [['lineup', 'My Team'], ['pool', 'Players'], ['defenses', 'Research'], ['settings', 'Settings']];
+const SUBNAV = { lineup: [['lineup', 'Lineup'], ['compare', 'Start / Sit'], ['waivers', 'Waivers'], ['players', 'Roster']],
+  defenses: [['defenses', 'Defenses'], ['teams', 'Teams & schemes'], ['weather', 'Weather']] };
+const HASH = { lineup: 'lineup', compare: 'start-sit', waivers: 'waivers', players: 'roster', pool: 'players', defenses: 'research', teams: 'research-teams', weather: 'research-weather', settings: 'settings', pro: 'pro' };
 const TAB_OF = Object.fromEntries(Object.entries(HASH).map(([k, v]) => [v, k]));
-const navOf = tab => tab === 'teams' || tab === 'weather' ? 'defenses' : tab;
+const NAV_OF = { compare: 'lineup', waivers: 'lineup', players: 'lineup', player: 'pool', teams: 'defenses', weather: 'defenses' };
+const navOf = tab => NAV_OF[tab] || tab;
+/* An address: a page (TAB_OF), or a player's page, #player/<id> or #player/<id>/<tab> (PTABS). Null for anything else. */
+function parseHash(h = location.hash.slice(1)) {
+  const m = /^player\/([^/]+)(?:\/(\w+))?$/.exec(h);
+  if (m) { let id; try { id = decodeURIComponent(m[1]); } catch { return null; } return { tab: 'player', id, ptab: PTABS.some(t => t[0] === m[2]) ? m[2] : 'overview' }; }
+  const tab = TAB_OF[h]; return tab ? { tab } : null;
+}
+function applyRoute(p) { state.tab = p.tab; if (p.tab === 'player') D.pp = { id: p.id, tab: p.ptab }; }
 const TEAM_TABS = new Set(['lineup', 'waivers', 'players']);
 const showWelcome = () => needsTeam() && TEAM_TABS.has(state.tab);
 /* Where a new page starts: the top, or, with the bar pinned, just where it pins, so the new page begins under it */
@@ -4145,14 +4198,24 @@ function pinBar() {
 function go(tab, opts = {}) {
   if (!HASH[tab]) return;
   D.flash = opts.keepFlash ? D.flash : null;
-  if (location.hash.slice(1) !== HASH[tab]) { D.navScroll = opts.scroll !== false; location.hash = HASH[tab]; return; }   // hashchange renders
-  state.tab = tab; save(); render(); if (opts.scroll !== false) window.scrollTo(0, navTop()); runAfter();
+  if (location.hash.slice(1) !== HASH[tab]) { D.navScroll = opts.scroll !== false; D.fwdNav = true; location.hash = HASH[tab]; return; }   // hashchange renders
+  D.fwdNav = false; state.tab = tab; save(); render(); if (opts.scroll !== false) window.scrollTo(0, navTop()); runAfter();
 }
+/* Back to a page (the browser's Back or Forward, not a link or tab) returns to where it was scrolled: from a player's
+   page back to the waiver card or lineup row his name was on. A link or tab starts the new page at the top; a player's
+   own tabs stay where they are. */
 window.addEventListener('hashchange', () => {
-  const tab = TAB_OF[location.hash.slice(1)]; if (!tab) return;
-  track('screen_viewed', { screen: HASH[tab], has_team: !needsTeam() });
-  if (needsTeam() && tab !== 'pro') D.intent = INTENT_TABS.has(tab) ? tab : null;   // before there's a team: where setup lands (INTENT_TABS)
-  state.tab = tab; save(); render(); if (D.navScroll !== false) window.scrollTo(0, navTop()); D.navScroll = true; runAfter();
+  const p = parseHash(); if (!p) return;
+  const fwd = D.fwdNav, h = location.hash.slice(1), samePlayer = p.tab === 'player' && state.tab === 'player' && D.pp?.id === p.id; D.fwdNav = false;
+  if (D.curHash != null) D.scrollOf[D.curHash] = scrollY;
+  D.curHash = h;
+  track('screen_viewed', { screen: p.tab === 'player' ? 'player' : HASH[p.tab], has_team: !needsTeam() });
+  if (needsTeam() && p.tab !== 'pro') D.intent = INTENT_TABS.has(p.tab) ? p.tab : null;   // before there's a team: where setup lands (INTENT_TABS)
+  if (p.tab === 'player' && state.tab !== 'player') D.pfrom = state.tab;
+  applyRoute(p); save(); render();
+  if (!fwd && !samePlayer && D.scrollOf[h] != null) window.scrollTo(0, D.scrollOf[h]);
+  else if (D.navScroll !== false && !samePlayer) window.scrollTo(0, navTop());
+  D.navScroll = true; runAfter();
 });
 // a one-shot step to run after the next page renders (scroll to a team, highlight the best move)
 function runAfter() { const f = D.after; D.after = null; if (f) setTimeout(f, 30); }
@@ -4165,8 +4228,9 @@ function render() {
   if (!needsTeam() && !D.flow) D.intent = null;   // set up some other way (a synced account, say): the link's destination no longer applies
   document.body.classList.toggle('welcome', welcome);
   document.body.classList.toggle('wsign', welcome && acct.on && !acct.user);   // the header's Sign in stands in for the welcome's own link
-  const nav = navOf(state.tab);
+  const nav = navOf(state.tab), sub = SUBNAV[nav];
   $('#tabs').innerHTML = NAV.map(([k, l]) => `<a href="#${HASH[k]}" class="navlink" data-tab="${k}" ${nav === k ? 'aria-current="page"' : ''}>${l}</a>`).join('');
+  $('#subtabs').innerHTML = sub ? `<div class="seg sub" role="group" aria-label="${NAV.find(n => n[0] === nav)[1]}">${sub.map(([k, l]) => `<a href="#${HASH[k]}" data-tab="${k}" ${state.tab === k ? 'aria-current="page"' : ''}>${esc(l)}</a>`).join('')}</div>` : '';
   if (welcome) {
     for (const s of ['#teampin', '#teamctx', '#panels', '#brief', '#msgs']) $(s).innerHTML = '';
     renderStatus(); renderAcct(); renderAd();
@@ -4190,7 +4254,7 @@ function render() {
   if (D.failed) { renderBrief(); main.innerHTML = `<div class="card panel"><h2>Couldn’t load this week’s data</h2><p style="margin:0">Sleeper and ESPN didn’t respond. Check your connection and press Refresh projections.</p></div>`; return; }
   if (D.loading) { renderBrief(); main.innerHTML = `<div class="card loading"><h3>Loading week ${D.week || ''}</h3><div class="small">Projections, stats and schedules. Past seasons are saved after your first visit.</div><div class="bar"><span id="lbar" style="width:${Math.round(D.progress * 100)}%"></span></div></div>`; return; }
   renderBrief();
-  main.innerHTML = ({ lineup: viewLineup, compare: viewCompare, waivers: viewWaivers, defenses: viewResearch, teams: viewResearch, players: viewPlayers, settings: viewSettings, weather: viewResearch, pro: viewPro })[state.tab]();
+  main.innerHTML = ({ lineup: viewLineup, compare: viewCompare, waivers: viewWaivers, defenses: viewResearch, teams: viewResearch, players: viewPlayers, pool: viewPool, player: viewPlayer, settings: viewSettings, weather: viewResearch, pro: viewPro })[state.tab]();
 }
 // an injury designation after "is": "on IR", "suspended", "out"
 const injWords = inj => /^ir/i.test(inj || '') ? 'on IR' : /^pup/i.test(inj || '') ? 'on the PUP list' : /^sus/i.test(inj || '') ? 'suspended' : /^na/i.test(inj || '') ? 'not with the team' : (inj || 'out').toLowerCase();
@@ -4263,16 +4327,18 @@ document.addEventListener('error', e => {
 }, true);
 /* PlayerIdentity: picture, name, and a "POS · TEAM" line, wherever Benny asks you to decide on a player. `sub` follows
    the team on that line (pills, notes), `after` adds lines below it, `size` is 'sm' or 'lg'; `name`, `line`, `nameCls`
-   and `subCls` reword or restyle a card's headline. Spans only, so it fits inside the lineup's row buttons. */
-function playerIdentity(u, { sub = '', after = '', size = '', name, line, nameCls = 'pname', subCls = 'psub' } = {}) {
-  return `<span class="pid${size ? ' ' + size : ''}">${playerImg(u)}<span class="pid-txt"><span class="${nameCls}">${name ?? esc(u.name)}</span><span class="${subCls}">${line ?? `${posLabel(u.pos)} · ${u.team || 'FA'}${sub}`}</span>${after}</span></span>`;
+   and `subCls` reword or restyle a card's headline. The picture and name open the player's page (plink); `link: false`
+   inside a button (the lineup's rows, search suggestions), where a link can't go: spans only then. */
+function playerIdentity(u, { sub = '', after = '', size = '', name, line, nameCls = 'pname', subCls = 'psub', link = true } = {}) {
+  const L = link && u?.id, nm = name ?? esc(u.name);
+  return `<span class="pid${size ? ' ' + size : ''}">${L ? plink(u.id, playerImg(u), 'pimg-a', true) : playerImg(u)}<span class="pid-txt">${L ? plink(u.id, nm, nameCls) : `<span class="${nameCls}">${nm}</span>`}<span class="${subCls}">${line ?? `${posLabel(u.pos)} · ${u.team || 'FA'}${sub}`}</span>${after}</span></span>`;
 }
 function playerRow(r, slotLabel, starting) {
   const open = D.open.has(r.id);
   const reason = r.status === 'bye' ? '<span class="pill m">Bye</span>' : r.status === 'out' ? '<span class="pill o">Unavailable</span>' : '';
   return `<div class="item"><button type="button" class="prow" data-expand="${esc(r.id)}" aria-expanded="${open}">
     <span class="slot ${starting ? '' : 'bench'}">${esc(slotLabel)}</span>
-    <span class="pwho">${playerIdentity(r.u, { sub: ` ${injPill(r)} ${reason} ${r.override != null ? '<span class="pill n">Override</span>' : ''} ${espnNote(r, starting)}` })}</span>
+    <span class="pwho">${playerIdentity(r.u, { link: false, sub: ` ${injPill(r)} ${reason} ${r.override != null ? '<span class="pill n">Override</span>' : ''} ${espnNote(r, starting)}` })}</span>
     ${matchCell(r)}
     <span class="grade g-${r.grade}" title="${esc(gradeTip(r))}">${r.grade}</span>
     <span class="proj num">${r.status === 'bye' ? '—' : f1(r.mean)}</span>
@@ -4390,24 +4456,36 @@ function lineupSD(rs) {
 function baselineLine(r) {
   return `<div class="small muted">Baseline ${f1(r.base)}${r.projPart > 0 && r.share > 0 ? `: ${f1(r.projPart)} from Sleeper’s projection, which already counts this matchup, and ${f1(r.base - r.projPart)} from his scoring average` : r.projPart > 0 ? ', Sleeper’s projection, which already counts this matchup' : ', his scoring average'}. Matchup strength ${spct(r.mult - 1)}${r.share > 0 ? `, applied to the scoring-average part: ${spct(r.eff)} overall` : ', already in the projection'}${r.override != null ? `; your override sets it to ${f1(r.override)}` : ''}.</div>`;
 }
-function detailBlock(r) {
-  const h = r.h, why = topReasons(r), cmp = r.status === 'bye' ? '' : modelCompare(r.id, { head: 'Three models, this week', boxed: true, extra: baselineLine(r) });
-  return `<div class="detail"><div class="section">
-    <h3 class="dh">Why ${f1(r.mean)} points</h3>
-    ${r.role || r.doubt ? `<div class="small"><strong>${esc(r.role ? roleText(r.role) : doubtText(r.doubt))}.</strong></div>` : ''}
+/* What builds his number, in plain lines: role or doubt, play mix, a teammate's absence, a role change, his volume,
+   then the baseline (unless the three-models box carries it: inBox) and the strongest matchup reasons. */
+function whyLines(r, inBox) {
+  const why = topReasons(r);
+  return `${r.role || r.doubt ? `<div class="small"><strong>${esc(r.role ? roleText(r.role) : doubtText(r.doubt))}.</strong></div>` : ''}
     ${r.mix ? `<div class="small"><strong>${esc(playText(r))}.</strong></div>` : ''}
     ${r.mateBump ? `<div class="small"><strong>${esc(mateText(r))}.</strong></div>` : ''}
     ${r.rc ? `<div class="small"><strong>${esc(rcText(r.rc, r.T))}.</strong></div>` : ''}
     ${oppText(r) ? `<div class="small"><strong>Opportunity:</strong> ${esc(oppText(r))}.</div>` : ''}
-    ${r.status === 'bye' ? '<div class="small muted">Bye week.</div>' : `${cmp ? '' : baselineLine(r)}
-    ${why.length ? `<ul class="reasons">${why.map(x => `<li class="${x.up ? 'up' : 'down'}"><span class="rv">${spct(x.pct)}</span> ${esc(x.text)}</li>`).join('')}</ul>` : '<div class="small muted">No matchup factor moves him much this week.</div>'}`}
+    ${r.status === 'bye' ? '<div class="small muted">Bye week.</div>' : `${inBox ? '' : baselineLine(r)}
+    ${why.length ? `<ul class="reasons">${why.map(x => `<li class="${x.up ? 'up' : 'down'}"><span class="rv">${spct(x.pct)}</span> ${esc(x.text)}</li>`).join('')}</ul>` : '<div class="small muted">No matchup factor moves him much this week.</div>'}`}`;
+}
+// Pro: every matchup factor, the math and the coaching matchup; free: the line that says what Pro adds
+function proDetails(r) {
+  const h = r.h;
+  return !isPro() ? `<div style="grid-column:1/-1">${lockLine('Every matchup factor, the math and the coaching matchup')}</div>` : `<details class="more"><summary>All matchup factors and the math</summary><div class="section">${factorList(r)}${r.scheme ? `<div class="scheme"><strong>Scheme:</strong> ${esc(r.scheme)}</div>` : ''}
+  <div class="math">Sleeper projection ${f1(r.projPts)} · season avg ${f1(h?.avg)} → ${f1(r.projPart)} from the projection + ${f1(r.base - r.projPart)} from the average × matchup ${r.mult.toFixed(2)} = <strong>${f1(r.model)}</strong>${r.override != null ? ` · your override ${f1(r.override)}` : ''}${h?.n ? ` · weekly scores: ${h.pts.map(x => x.toFixed(1)).join(', ')}` : ''}</div>
+  </div></details>
+  <details class="more"><summary>Coaching and scheme matchup</summary><div class="section">${schemeBlock(r)}</div></details>`;
+}
+function detailBlock(r) {
+  const cmp = r.status === 'bye' ? '' : modelCompare(r.id, { head: 'Three models, this week', boxed: true, extra: baselineLine(r) });
+  return `<div class="detail"><div class="section">
+    <h3 class="dh">Why ${f1(r.mean)} points</h3>
+    ${whyLines(r, !!cmp)}
+    <div class="small">${plink(r.id, 'Player page: game log, history and stats →', 'more-link')}</div>
   </div>
   <div class="section">${cmp}${probTiles(r)}${modelNote()}</div>
   ${researchLinks(r)}
-  ${!isPro() ? `<div style="grid-column:1/-1">${lockLine('Every matchup factor, the math and the coaching matchup')}</div>` : `<details class="more"><summary>All matchup factors and the math</summary><div class="section">${factorList(r)}${r.scheme ? `<div class="scheme"><strong>Scheme:</strong> ${esc(r.scheme)}</div>` : ''}
-  <div class="math">Sleeper projection ${f1(r.projPts)} · season avg ${f1(h?.avg)} → ${f1(r.projPart)} from the projection + ${f1(r.base - r.projPart)} from the average × matchup ${r.mult.toFixed(2)} = <strong>${f1(r.model)}</strong>${r.override != null ? ` · your override ${f1(r.override)}` : ''}${h?.n ? ` · weekly scores: ${h.pts.map(x => x.toFixed(1)).join(', ')}` : ''}</div>
-  </div></details>
-  <details class="more"><summary>Coaching and scheme matchup</summary><div class="section">${schemeBlock(r)}</div></details>`}
+  ${proDetails(r)}
   <div class="ovr" style="grid-column:1/-1"><label for="ov-${esc(r.id)}">Override projection</label><input class="inp" id="ov-${esc(r.id)}" type="number" step="0.1" data-ovr="${esc(r.id)}" value="${r.override ?? ''}" placeholder="${f1(r.model)}">${r.override != null ? `<button type="button" class="btn sm" data-clearovr="${esc(r.id)}">Clear</button>` : ''}</div>
   </div>`;
 }
@@ -4898,7 +4976,7 @@ function acMatches(q) {
   return out.sort((a, b) => b[0] - a[0]).slice(0, 8).map(x => x[1]);
 }
 // each player search box: its suggestion list, and what picking a suggestion does
-const AC_BOX = { addq: ['acList', 'roster'], mq: ['mqList', 'manual'], cmp0: ['cmpList0', 'cmp0'], cmp1: ['cmpList1', 'cmp1'] };
+const AC_BOX = { addq: ['acList', 'roster'], mq: ['mqList', 'manual'], cmp0: ['cmpList0', 'cmp0'], cmp1: ['cmpList1', 'cmp1'], pq: ['pqList', 'open'] };
 const isCmpBox = id => id === 'cmp0' || id === 'cmp1';
 // Start / Sit: an empty box lists your roster (best projection first, minus the other side's player); with no team yet,
 // this week's top projections at the other player's position (every position when that side is empty)
@@ -4914,9 +4992,9 @@ function renderAc(inputId) {
   const items = browse ? cmpRoster(+inputId[3]) : cmp ? acMatches(q).filter(u => D.M[u.id]) : acMatches(q), have = new Set(mode === 'manual' ? D.flow?.manual || [] : state.roster);
   D.ac = { input: inputId, items, idx: Math.max(0, Math.min(D.ac?.input === inputId ? D.ac.idx : 0, items.length - 1)) };
   const open = cmp || q.length >= 2; list.hidden = !open; inp.setAttribute('aria-expanded', String(open));
-  const tag = on => cmp ? (on ? '<span class="ac-tag on">On roster</span>' : '') : `<span class="ac-tag ${on ? 'on' : ''}">${on ? 'On roster' : 'Add'}</span>`;
+  const tag = on => cmp || mode === 'open' ? (on ? '<span class="ac-tag on">On roster</span>' : '') : `<span class="ac-tag ${on ? 'on' : ''}">${on ? 'On roster' : 'Add'}</span>`;
   list.innerHTML = (browse ? `<div class="ac-head small muted" role="presentation">${state.roster.length ? 'Your players' : 'Top projections this week'} · type to search everyone</div>` : '')
-    + (items.length ? items.map((u, i) => { const r = D.M[u.id], on = have.has(u.id); return `<button type="button" role="option" class="ac-item" data-acadd="${esc(u.id)}" data-acmode="${mode}" aria-selected="${i === D.ac.idx}"><span class="ac-main">${playerIdentity(u, { size: 'sm', sub: `${r && r.status !== 'bye' ? ` · ${f1(r.mean)} proj` : r?.status === 'bye' ? ' · bye' : ''}${u.inj ? ' · ' + esc(u.inj) : ''}` })}</span>${tag(on)}</button>`; }).join('')
+    + (items.length ? items.map((u, i) => { const r = D.M[u.id], on = have.has(u.id); return `<button type="button" role="option" class="ac-item" data-acadd="${esc(u.id)}" data-acmode="${mode}" aria-selected="${i === D.ac.idx}"><span class="ac-main">${playerIdentity(u, { size: 'sm', link: false, sub: `${r && r.status !== 'bye' ? ` · ${f1(r.mean)} proj` : r?.status === 'bye' ? ' · bye' : ''}${u.inj ? ' · ' + esc(u.inj) : ''}` })}</span>${tag(on)}</button>`; }).join('')
     : `<div class="ac-empty small muted">${q ? `No player matches “${esc(q)}”.` : 'Type a name to search.'}</div>`);
 }
 /* A pasted name that didn't match counts as found once you pick the player it names, so its "Not found" note doesn't
@@ -4931,6 +5009,7 @@ function resolveMiss(u) {
 }
 function acPick(id, mode) {
   const u = D.U.get(id); if (!u) return;
+  if (mode === 'open') { D.pq = ''; D.fwdNav = true; location.hash = playerHash(id); return; }
   if (mode === 'cmp0' || mode === 'cmp1') {   // keep the other side as shown, even when it was Benny's default pick
     const c = (D.cmpShown || state.compare).slice(); c[+mode[3]] = id; state.compare = c; save(); render(); return;
   }
@@ -5017,6 +5096,262 @@ function refreshPlayers() {
   $('#teampin').innerHTML = teamPin(); $('#teamctx').innerHTML = teamActions(); renderBrief();
 }
 
+/* ---------- Players and player pages ----------
+   #players: search anyone, and this week's or rest-of-season rankings by position. #player/<id>[/<tab>]: everything
+   Benny knows about one player, opened from every name and picture on the site (playerIdentity, plink).
+   This season's games come from the data bundle (D.inp.weeks: compactWeek rows); earlier seasons, for QBs, RBs, WRs and
+   TEs, from players/data/<id>.json (scripts/model/player_history.py: nflverse box scores since 2013), fetched the first
+   time a page needs them. Their points are PPR with the catches alongside, so fmtPts puts them in this team's scoring. */
+const PTABS = [['overview', 'Overview'], ['games', 'Game log'], ['history', 'History'], ['stats', 'Stats']];
+const HIST_POS = new Set(['QB', 'RB', 'WR', 'TE']);
+const playerHash = (id, tab) => `player/${encodeURIComponent(id)}${tab && tab !== 'overview' ? '/' + tab : ''}`;
+// a link to a player's page around any markup; `deco` for a second link to the same page (his picture next to his name)
+const plink = (id, inner, cls = '', deco = false) => `<a href="#${playerHash(id)}" class="plink${cls ? ' ' + cls : ''}"${deco ? ' tabindex="-1" aria-hidden="true"' : ''}>${inner}</a>`;
+/* His past seasons: {st: 'loading' | 'ok' | 'none', d}. Kickers and D/STs have none; a missing file (a rookie, a player
+   nflverse doesn't list) is 'none' too, never an error. */
+function pHist(id) {
+  let e = D.phist.get(id); if (e) return e;
+  const u = D.U.get(id);
+  e = u && !HIST_POS.has(u.pos) ? { st: 'none' } : { st: 'loading' }; D.phist.set(id, e);
+  if (e.st === 'loading') fetchJSON(`players/data/${encodeURIComponent(id)}.json`, 15000)
+    .then(j => { if (j?.v === 1) { e.st = 'ok'; e.d = j; } else e.st = 'none'; }).catch(() => { e.st = 'none'; })
+    .finally(() => { if (state.tab === 'player' && D.pp?.id === id) render(); });
+  return e;
+}
+const rowObj = (cols, row) => Object.fromEntries(cols.map((c, i) => [c, row[i]]));
+/* His games this season from the bundle, one object per game with the history file's names (gcols); a D/ST's carries
+   its points and yards allowed and sacks instead. Rows saved before touchdowns were kept have them as null. This week's
+   game counts once it's final. */
+function seasonGames(id) {
+  const out = [], inp = D.inp; if (!inp) return out;
+  const add = (wk, w) => {
+    for (const p of wk.P) if (p[0] === id) {
+      const t = D.teamWk?.[p[2]]?.[w - 1];
+      out.push({ week: w, team: p[2], opp: p[3], ppr: p[4], patt: p[5], pyd: p[6], car: p[8], ryd: p[9], tgt: p[10], recyd: p[11], rec: p[13],
+        snp: p[15] > 0 && p[14] != null ? p[14] / p[15] : null, cmp: p[16] ?? null, ptd: p[17] ?? null, int: p[18] ?? null, rtd: p[19] ?? null,
+        rectd: p[20] ?? null, fum: p[21] ?? null, tmTgt: t?.tgt ?? null, tmCar: t?.ra ?? null });
+      return;
+    }
+    for (const d of wk.D) if (d[0] === id) { out.push({ week: w, team: d[0], opp: d[1], ppr: d[11], sack: d[8], pa: d[9], ya: d[10] }); return; }
+  };
+  inp.weeks.forEach((wk, i) => add(wk, i + 1));
+  if (D.M[id]?.game?.state === 'post' && inp.actual && !out.some(g => g.week === D.week)) add(inp.actual, D.week);
+  return out;
+}
+const gPts = (g, pos) => pos === 'DEF' ? g.ppr : fmtPts(g.ppr, g.rec, pos);
+// a season's totals from its games: null for a stat any game is missing (older saved rows have no touchdowns)
+const SUM_KEYS = ['ppr', 'rec', 'tgt', 'car', 'patt', 'cmp', 'pyd', 'ptd', 'int', 'ryd', 'rtd', 'recyd', 'rectd', 'fum'];
+function sumGames(gs) {
+  const t = { gp: gs.length };
+  for (const k of SUM_KEYS) t[k] = gs.some(g => g[k] == null) ? null : gs.reduce((s, g) => s + g[k], 0);
+  const sn = gs.map(g => g.snp).filter(ok), tt = gs.reduce((s, g) => s + (g.tmTgt || 0), 0), tc = gs.reduce((s, g) => s + (g.tmCar || 0), 0);
+  t.snp = sn.length ? mean(sn) : null; t.tsh = tt ? t.tgt / tt : null; t.csh = tc ? t.car / tc : null;
+  return t;
+}
+// his finish at the position this season so far, on total points in this team's scoring
+function seasonRank(id, pos) {
+  const tot = k => (D.H[k]?.pts || []).reduce((a, b) => a + b, 0), mine = tot(id); if (!mine) return null;
+  let n = 1; for (const k in D.H) if (k !== id && D.U.get(k)?.pos === pos && tot(k) > mine) n++;
+  return n;
+}
+// his rank at the position on this week's projections, among players expected to play
+function weekRank(r) {
+  if (!r || r.status !== 'ok') return null;
+  let n = 1; for (const x of Object.values(D.M)) if (x.pos === r.pos && x.status === 'ok' && x.mean > r.mean) n++;
+  return n;
+}
+const byeOf = T => T ? Array.from({ length: 18 }, (_, i) => i + 1).find(w => schedOpp(T, w).bye) : null;
+const ownLine = id => D.own.has(id) ? `${D.own.get(id) < 1 ? '<1' : Math.round(D.own.get(id))}% owned` : '';
+// where he stands for this team: yours, taken or free in a synced Sleeper league, or nothing to say
+function pStatus(id) {
+  if (state.roster.includes(id)) return ['n', 'On your roster'];
+  if (state.sleeper?.rostered) return state.sleeper.rostered.includes(id) ? ['m', 'Rostered in your league'] : ['q', 'Free agent in your league'];
+  return null;
+}
+/* Benny's call on him for this team: where he plays in Benny's lineup, a waiver move he's part of, or what to know. */
+function pCall(id, r) {
+  if (!state.roster.length) return `Set up your team to see where he fits: Benny compares him with your players. <a href="#lineup" data-tab="lineup">Add your team</a>`;
+  const nm = r?.u ? esc(r.u.name) : 'He';
+  if (state.roster.includes(id)) {
+    if (!r) return 'On your roster, with no projection this week.';
+    const { starters } = optimize(), s = starters.find(x => x.r?.id === id);
+    if (s) return `<strong>Start him.</strong> ${nm} is in Benny’s lineup at ${esc(s.slot.label || s.slot.k)} this week. <a href="#lineup" data-tab="lineup">See your lineup</a>`;
+    if (r.status !== 'ok') return `<strong>On your bench:</strong> ${esc(outText(r))}.`;
+    const ahead = starters.filter(x => x.r && x.slot.elig.includes(r.pos)).sort((a, b) => a.r.mean - b.r.mean)[0];
+    return `<strong>On your bench.</strong>${ahead ? ` Benny starts ${plink(ahead.r.id, esc(ahead.r.u.name))} (${f1(ahead.r.mean)}) at ${esc(ahead.slot.label || ahead.slot.k)} ahead of him. <a href="#start-sit" data-decide="${esc(ahead.r.id)}|${esc(id)}">Compare them</a>` : ''}`;
+  }
+  let R = null; try { R = computeWaivers(); } catch { /* no waiver results for this roster */ }
+  const m = R?.moves?.find(x => x.f === id);
+  if (m && !m.marginal) return `<strong>Benny’s waiver pick:</strong> add ${nm}${m.d ? `, drop ${plink(m.d, esc(D.U.get(m.d).name))}` : ''}, for +${f1(m.hz)} expected lineup points over the next ${m.H} week${m.H > 1 ? 's' : ''}. <a href="#waivers" data-tab="waivers">See Waivers</a>`;
+  if (R?.pool?.includes(id)) return `Available, but he wouldn’t improve your lineup right now${m ? ` (+${f1(m.hz)} over ${m.H} week${m.H > 1 ? 's' : ''}, too little to be worth a move)` : ''}.`;
+  return `Not available to you${ownLine(id) ? `: ${ownLine(id)} across ESPN leagues` : ''}.`;
+}
+// a stat cell: whole numbers as they are, a missing stat as a dash
+const statTxt = x => ok(x) ? (Number.isInteger(x) ? String(x) : x.toFixed(1)) : '—';
+const GL_COLS = {
+  QB: [['cmpAtt', 'Cmp/Att'], ['pyd', 'Pass yds'], ['ptd', 'Pass TD'], ['int', 'INT'], ['car', 'Car'], ['ryd', 'Rush yds'], ['rtd', 'Rush TD']],
+  RB: [['car', 'Car'], ['ryd', 'Rush yds'], ['rtd', 'Rush TD'], ['tgt', 'Tgt'], ['rec', 'Rec'], ['recyd', 'Rec yds'], ['rectd', 'Rec TD']],
+  WR: [['tgt', 'Tgt'], ['rec', 'Rec'], ['recyd', 'Rec yds'], ['rectd', 'Rec TD'], ['car', 'Car'], ['ryd', 'Rush yds']],
+  K: [], DEF: [['pa', 'Pts allowed'], ['ya', 'Yds allowed'], ['sack', 'Sacks']],
+};
+GL_COLS.TE = GL_COLS.WR;
+const statCell = (g, k) => k === 'cmpAtt' ? `${statTxt(g.cmp)}/${statTxt(g.patt)}` : statTxt(g[k]);
+/* A game log table: week, opponent, points, the position's stats, snap share. `miss` rows are weeks he didn't play;
+   `total` adds a season line. */
+function gameTable(gs, pos, { total = false, link = '' } = {}) {
+  const cols = GL_COLS[pos] || [], snaps = pos !== 'K' && pos !== 'DEF', n = 3 + cols.length + (snaps ? 1 : 0);
+  const body = gs.map(g => g.miss ? `<tr class="miss"><td>${g.week}</td><td class="l" colspan="${n - 1}">${esc(g.miss)}</td></tr>`
+    : `<tr><td>${g.week}</td><td class="l">${esc(g.opp || '')}</td><td><strong>${f1(gPts(g, pos))}</strong></td>${cols.map(([k]) => `<td>${statCell(g, k)}</td>`).join('')}${snaps ? `<td>${ok(g.snp) ? pct(g.snp) : '—'}</td>` : ''}</tr>`).join('');
+  const played = gs.filter(g => !g.miss), t = total && played.length ? sumGames(played) : null;
+  const foot = t ? `<tfoot><tr><td class="l" colspan="2">${played.length} game${played.length === 1 ? '' : 's'}</td><td><strong>${f1(played.reduce((s, g) => s + gPts(g, pos), 0))}</strong></td>${cols.map(([k]) => `<td>${k === 'cmpAtt' ? `${statTxt(t.cmp)}/${statTxt(t.patt)}` : statTxt(pos === 'DEF' ? played.reduce((s, g) => s + (g[k] || 0), 0) : t[k])}</td>`).join('')}${snaps ? `<td>${ok(t.snp) ? pct(t.snp) : '—'}</td>` : ''}</tr></tfoot>` : '';
+  return `<div class="tscroll"><table class="glog"><thead><tr><th>Wk</th><th class="l">Opp</th><th>Pts</th>${cols.map(([, l]) => `<th>${l}</th>`).join('')}${snaps ? '<th>Snaps</th>' : ''}</tr></thead><tbody>${body || `<tr><td class="l" colspan="${n}">No games.</td></tr>`}</tbody>${foot}</table></div>${link}`;
+}
+// this season's games with the weeks he missed marked: his team's bye, or a game his team played without him
+function withMissed(gs, T) {
+  const last = Math.max(D.inp?.weeks.length || 0, ...gs.map(g => g.week)), by = new Map(gs.map(g => [g.week, g])), out = [];
+  for (let w = 1; w <= last; w++) out.push(by.get(w) || { week: w, miss: T && schedOpp(T, w).bye ? 'Bye week' : 'Did not play' });
+  return out;
+}
+function pOverview(id, u, r, H) {
+  const out = [];
+  if (r) {
+    const wr = weekRank(r), cmp = r.status === 'bye' ? '' : modelCompare(r.id, { head: 'Three models, this week', boxed: true, extra: baselineLine(r) });
+    out.push(`<div class="card pweek"><div class="row-head"><h3>Week ${D.week}</h3>${matchCell(r, true)}</div>
+      <div class="summary">
+        <div><span class="label">Projection</span><span class="big num">${r.status === 'bye' ? 'Bye' : r.status === 'out' ? 'Out' : f1(r.mean)}</span><span class="small muted">${r.status === 'ok' ? `${fmtName()} pts · likely ${f1(r.floor)}–${f1(r.ceil)}` : r.status === 'out' ? `${f1(r.mean)} when he plays` : esc(outText(r))}</span></div>
+        <div><span class="label">Benny’s rank</span><span class="big num">${wr ? posLabel(r.pos) + wr : '—'}</span><span class="small muted">at ${posLabel(r.pos)} this week</span></div>
+        <div><span class="label">Matchup</span><span class="big num"><span class="grade g-${r.grade}" title="${esc(gradeTip(r))}">${r.grade}</span></span><span class="small muted">${r.status === 'bye' ? 'bye week' : `${spct(r.mult - 1)} for his matchup`}</span></div>
+        ${r.locked && ok(r.actual) ? `<div><span class="label">${r.game?.state === 'post' ? 'Scored' : 'Scored so far'}</span><span class="big num">${f1(r.actual)}</span><span class="small muted">${esc(r.game?.short || '')}</span></div>` : ''}
+      </div>
+      ${r.game && !r.locked && r.status !== 'bye' ? `<div class="small">${wxLine(r.game)}</div>` : ''}
+      <div class="pcall"><span class="label">Benny’s call</span><div>${pCall(id, r)}</div></div></div>`);
+    if (r.status !== 'bye') out.push(`<div class="card"><div class="detail pdetail"><div class="section"><h3 class="dh">Why ${f1(r.mean)} points${r.status === 'out' ? ' when he plays' : ''}</h3>${whyLines(r, !!cmp)}</div>
+      <div class="section">${cmp}${probTiles(r)}${modelNote()}</div>${researchLinks(r)}${proDetails(r)}</div></div>`);
+  } else out.push(`<div class="card panel small">No projection for week ${D.week}: ${u.team ? 'Sleeper doesn’t project him this week' : 'he isn’t on an NFL team right now'}.</div>`);
+  if (r && u.team && D.week < 18) {
+    const weeks = Array.from({ length: Math.min(4, 18 - D.week) }, (_, i) => D.week + 1 + i);
+    out.push(`<div class="card pnext"><div class="row-head"><h3>Coming up</h3><span class="small muted">Rest-of-season value ${f1(rosBase(id))} pts a game</span></div>${schedStrip(id, weeks, weeks.length)}<div class="small muted">Green is an easier matchup for a ${posLabel(u.pos)}, red a harder one.</div></div>`);
+  }
+  const gs = seasonGames(id);
+  if (gs.length) {
+    const t = sumGames(gs), pts = gs.reduce((s, g) => s + gPts(g, u.pos), 0), rk = seasonRank(id, u.pos);
+    out.push(`<div class="row-head"><h2>${D.season} so far</h2><span class="small muted">${gs.length} game${gs.length === 1 ? '' : 's'} · ${f1(pts / gs.length)} pts a game${rk ? ` · ${posLabel(u.pos)}${rk} in total points` : ''}${ok(t.snp) ? ` · ${pct(t.snp)} of snaps` : ''}</span></div>
+      ${gameTable(gs.slice(-5).reverse(), u.pos, { link: `<div class="small">${plinkTab(id, 'games', 'Full game log →')}</div>` })}`);
+  }
+  if (H.st === 'ok') {
+    const last = H.d.seasons.map(x => rowObj(H.d.scols, x)).filter(x => x.season !== D.season).pop();
+    if (last) out.push(`<div class="small muted">${last.season}: ${last.gp} games, ${f1(fmtPts(last.ppr, last.rec, u.pos) / Math.max(1, last.gp))} pts a game, finished ${posLabel(u.pos)}${last.rank}. ${plinkTab(id, 'history', 'Every season →')}</div>`);
+  }
+  return out.join('');
+}
+const plinkTab = (id, tab, text) => `<a href="#${playerHash(id, tab)}" class="more-link">${esc(text)}</a>`;
+function pGames(id, u, H) {
+  const cur = seasonGames(id), seasons = [];
+  if (cur.length || D.M[id]) seasons.push(String(D.season));
+  if (H.st === 'ok') for (const s of Object.keys(H.d.games).sort().reverse()) if (+s !== D.season) seasons.push(s);
+  if (!seasons.length) return `<div class="card panel small muted">${H.st === 'loading' ? 'Loading his games…' : 'No games on record.'}</div>`;
+  const sel = seasons.includes(D.pseason) ? D.pseason : seasons[0];
+  const gs = +sel === D.season ? withMissed(cur, u.team) : H.d.games[sel].map(row => rowObj(H.d.gcols, row));
+  const pick = seasons.length > 1 ? `<label class="small muted" for="pseason">Season</label><select class="sel" id="pseason">${seasons.map(s => `<option ${s === sel ? 'selected' : ''}>${s}</option>`).join('')}</select>` : '';
+  return `<div class="row-head"><h2>${sel} game log</h2><span class="toolbar">${pick}</span></div>
+    ${gameTable(gs, u.pos, { total: true })}
+    <div class="small muted">Points in ${fmtName(true)} scoring${+sel === D.season ? '' : ' (from nflverse box scores)'}.${u.pos === 'K' || u.pos === 'DEF' ? '' : ' Snaps: his share of his team’s offensive snaps.'}${H.st === 'loading' ? ' Loading past seasons…' : ''}</div>`;
+}
+const HS_COLS = {
+  QB: [['cmpAtt', 'Cmp/Att'], ['pyd', 'Pass yds'], ['ptd', 'Pass TD'], ['int', 'INT'], ['ryd', 'Rush yds'], ['rtd', 'Rush TD']],
+  RB: [['car', 'Car'], ['ryd', 'Rush yds'], ['rtd', 'Rush TD'], ['rec', 'Rec'], ['recyd', 'Rec yds'], ['rectd', 'Rec TD']],
+  WR: [['tgt', 'Tgt'], ['rec', 'Rec'], ['recyd', 'Rec yds'], ['rectd', 'Rec TD']],
+};
+HS_COLS.TE = HS_COLS.WR;
+// his seasons, oldest first: the history file's, with this season from the bundle in place of the file's (fresher)
+function pSeasons(id, u, H) {
+  const rows = H.st === 'ok' ? H.d.seasons.map(x => rowObj(H.d.scols, x)).filter(x => x.season !== D.season) : [];
+  const gs = seasonGames(id);
+  if (gs.length) rows.push({ season: D.season, team: [...new Set(gs.map(g => g.team))].join('/'), ...sumGames(gs), rank: seasonRank(id, u.pos), now: true });
+  return rows;
+}
+function pHistory(id, u, H) {
+  const rows = pSeasons(id, u, H), cols = HS_COLS[u.pos] || [];
+  if (!rows.length) return `<div class="card panel small muted">${H.st === 'loading' ? 'Loading his seasons…' : 'No seasons on record.'}</div>`;
+  const best = Math.max(...rows.map(x => fmtPts(x.ppr, x.rec, u.pos) / Math.max(1, x.gp)));
+  const body = rows.slice().reverse().map(x => { const pts = fmtPts(x.ppr, x.rec, u.pos), ppg = pts / Math.max(1, x.gp);
+    return `<tr${x.now ? ' class="now"' : ''}><td>${x.season}${x.now ? ' <span class="small muted">so far</span>' : ''}</td><td class="l">${esc(x.team)}</td><td>${x.gp}</td><td><strong>${f1(pts)}</strong></td>
+      <td><span class="ppgbar" style="--w:${(ppg / best * 100).toFixed(0)}%">${f1(ppg)}</span></td><td>${x.rank ? posLabel(u.pos) + x.rank : '—'}</td>${cols.map(([k]) => `<td>${statCell(x, k)}</td>`).join('')}</tr>`; }).join('');
+  return `<div class="row-head"><h2>Season by season</h2><span class="small muted">Finish: his rank at ${posLabel(u.pos)} by total points (past seasons ranked in PPR)</span></div>
+    <div class="tscroll"><table class="glog hist"><thead><tr><th>Season</th><th class="l">Team</th><th>GP</th><th>Pts</th><th>Pts/g</th><th>Finish</th>${cols.map(([, l]) => `<th>${l}</th>`).join('')}</tr></thead><tbody>${body}</tbody></table></div>
+    <div class="small muted">Points in ${fmtName(true)} scoring. Seasons before ${D.season} from nflverse box scores, regular season only.${H.st === 'loading' ? ' Loading past seasons…' : ''}</div>`;
+}
+const rate = (a, b) => ok(a) && b > 0 ? a / b : null;
+function pStats(id, u, H) {
+  const rows = pSeasons(id, u, H); if (!rows.length) return `<div class="card panel small muted">${H.st === 'loading' ? 'Loading his seasons…' : 'No seasons on record.'}</div>`;
+  const qb = u.pos === 'QB';
+  const cols = qb ? [['Snaps', x => pct(x.snp)], ['Cmp%', x => pct(rate(x.cmp, x.patt))], ['Yds/att', x => f1(rate(x.pyd, x.patt))], ['TD%', x => pct(rate(x.ptd, x.patt))], ['INT%', x => pct(rate(x.int, x.patt))], ['Rush yds/g', x => f1(rate(x.ryd, x.gp))]]
+    : [['Snaps', x => pct(x.snp)], ['Tgt share', x => pct(x.tsh)], ['Carry share', x => pct(x.csh)], ['Tgt/g', x => f1(rate(x.tgt, x.gp))], ['Catch rate', x => pct(rate(x.rec, x.tgt))], ['Yds/tgt', x => f1(rate(x.recyd, x.tgt))], ['Yds/car', x => x.car >= 10 ? f1(rate(x.ryd, x.car)) : '—']];
+  const body = rows.slice().reverse().map(x => `<tr${x.now ? ' class="now"' : ''}><td>${x.season}</td>${cols.map(([, f]) => `<td>${f(x)}</td>`).join('')}</tr>`).join('');
+  // this season: his last three games against the whole season, the quickest read on a changing role
+  const gs = seasonGames(id); let form = '';
+  if (gs.length >= 4) {
+    const all = sumGames(gs), l3 = sumGames(gs.slice(-3)), ppg = g => g.reduce((s, x) => s + gPts(x, u.pos), 0) / g.length;
+    const line = [['Pts/g', f1(ppg(gs.slice(-3))), f1(ppg(gs))], ['Snaps', pct(l3.snp), pct(all.snp)]]
+      .concat(qb ? [['Pass att/g', f1(l3.patt / 3), f1(all.patt / gs.length)], ['Rush att/g', f1(l3.car / 3), f1(all.car / gs.length)]]
+        : [['Tgt/g', f1(l3.tgt / 3), f1(all.tgt / gs.length)], ['Car/g', f1(l3.car / 3), f1(all.car / gs.length)], ['Tgt share', pct(l3.tsh), pct(all.tsh)]]);
+    form = `<div class="row-head"><h2>Recent form</h2><span class="small muted">His last 3 games against all ${gs.length} this season</span></div>
+      <div class="tscroll"><table class="glog"><thead><tr><th class="l"></th><th>Last 3</th><th>${D.season}</th></tr></thead><tbody>${line.map(([k, a, b]) => `<tr><td class="l">${k}</td><td><strong>${a}</strong></td><td>${b}</td></tr>`).join('')}</tbody></table></div>`;
+  }
+  return `${form}<div class="row-head"><h2>Usage and efficiency</h2><span class="small muted">${qb ? 'Per pass attempt, and rushing per game' : 'Shares of his team’s targets and carries in the games he played'}</span></div>
+    <div class="tscroll"><table class="glog"><thead><tr><th>Season</th>${cols.map(([l]) => `<th>${l}</th>`).join('')}</tr></thead><tbody>${body}</tbody></table></div>
+    <div class="small muted">Snaps: his average share of his team’s offensive snaps (counts start in 2013).</div>`;
+}
+function viewPlayer() {
+  const id = D.pp?.id, H = pHist(id), r = D.M[id];
+  let u = D.U.get(id);
+  if (!u && H.st === 'ok') u = { id, name: H.d.name, pos: H.d.pos, team: null, inj: null, espnId: D.pids?.[id]?.[0] || null };
+  if (!u) return H.st === 'loading' ? `<div class="card loading"><h3>Loading player</h3></div>`
+    : `<div class="card panel"><h2>Player not found</h2><p style="margin:0">Benny has no player with that address. <a href="#players" data-tab="pool">Search players</a></p></div>`;
+  const tabs = PTABS.filter(([k]) => k === 'overview' || k === 'games' || HIST_POS.has(u.pos)), tab = tabs.some(t => t[0] === D.pp.tab) ? D.pp.tab : 'overview';
+  trackOnce(`pv:${id}:${tab}`, 'player_page_viewed', { pos: u.pos, tab, from: D.pfrom || null });
+  const bye = byeOf(u.team), st = pStatus(id), canEdit = !needsTeam() && !state.sleeper, other = r ? exampleCall(id)[1] : null;
+  const head = `<div class="card phead"><div class="phead-main">${playerImg(u)}<div class="phead-txt"><h2>${esc(u.name)}</h2>
+      <div class="psub">${posLabel(u.pos)} · ${u.team ? esc(TEAM_CITY[u.team] ? `${TEAM_CITY[u.team]} ${TEAMS[u.team][1]}` : u.team) : 'Free agent'}${bye ? ` · bye week ${bye}` : ''} ${r ? injPill(r) : u.inj ? `<span class="pill q">${esc(u.inj)}</span>` : ''}</div>
+      <div class="ptags">${st ? `<span class="pill ${st[0]}">${st[1]}</span>` : ''}${ownLine(id) ? `<span class="small muted">${ownLine(id)} across ESPN leagues</span>` : ''}</div></div></div>
+    <div class="toolbar">${r && other ? `<button type="button" class="btn sm" data-decide="${esc(id)}|${esc(other)}">Compare in Start / Sit</button>` : ''}${canEdit && r ? (state.roster.includes(id) ? `<button type="button" class="btn sm" data-remove="${esc(id)}">Remove from roster</button>` : `<button type="button" class="btn sm primary" data-add="${esc(id)}">Add to roster</button>`) : ''}<button type="button" class="btn sm" data-act="shareplayer">Share</button></div></div>`;
+  const seg = `<nav class="seg sub ptabs" aria-label="${esc(u.name)}">${tabs.map(([k, l]) => `<a href="#${playerHash(id, k)}" ${k === tab ? 'aria-current="page"' : ''}>${l}</a>`).join('')}</nav>`;
+  const body = tab === 'games' ? pGames(id, u, H) : tab === 'history' ? pHistory(id, u, H) : tab === 'stats' ? pStats(id, u, H) : pOverview(id, u, r, H);
+  const from = D.pfrom && D.pfrom !== 'player' ? ([...NAV, ...Object.values(SUBNAV).flat()].find(n => n[0] === D.pfrom)?.[1] || null) : null;
+  return `<div class="section player">${from ? `<a href="#${HASH[D.pfrom]}" class="small back-link" data-act="pback">← Back to ${esc(from)}</a>` : ''}${head}${seg}${body}</div>`;
+}
+/* Share a player's page: his page on the static site (players/<slug>/, which has a preview for chat apps) when he has
+   one, or this page's address. */
+async function sharePlayer() {
+  const id = D.pp?.id, u = D.U.get(id) || (D.phist.get(id)?.d ? { name: D.phist.get(id).d.name } : null); if (!u) return;
+  if (!D.slugs) D.slugs = await fetchJSON('players/slugs.json', 10000).then(j => j?.s || {}).catch(() => ({}));
+  const slug = D.slugs[id], url = slug ? `https://bennyspicks.us/players/${slug}/` : `https://bennyspicks.us/#${playerHash(id)}`;
+  await shareOut(`${u.name}: projection, game log and history on Benny’s Picks.`, url, how => track('result_shared', { kind: 'player', how, pos: u.pos || null }));
+}
+/* Players: find anyone, or browse a position ranked on this week's projection or on rest-of-season value (posRanks). */
+function viewPool() {
+  const P = POS.includes(D.poolPos) ? D.poolPos : 'QB', mode = D.poolMode === 'ros' ? 'ros' : 'week';
+  let list;
+  if (mode === 'ros') { const rk = posRanks(P); list = [...rk.keys()].map(id => D.M[id]).filter(Boolean); }
+  else list = Object.values(D.M).filter(r => r.pos === P && r.status === 'ok' && r.mean > 0).sort((a, b) => b.mean - a.mean);
+  const total = list.length; if (!D.poolAll) list = list.slice(0, 50);
+  const stat = id => { const s = pStatus(id); return s ? `<span class="pill ${s[0]}">${s[0] === 'n' ? 'Yours' : s[0] === 'm' ? 'Taken' : 'Free agent'}</span>` : ''; };
+  const rows = list.map((r, i) => `<tr><td>${i + 1}</td><td class="l">${playerIdentity(r.u, { size: 'sm', sub: ` ${injPill(r)}` })}</td>
+    <td class="l">${r.status === 'bye' ? '<span class="muted">Bye</span>' : r.O ? `${D.tg[r.T]?.home ? 'vs' : '@'} ${esc(r.O)}` : ''}</td>
+    ${mode === 'ros' ? `<td><strong>${f1(rosBase(r.id))}</strong></td><td>${r.status === 'bye' ? '—' : f1(r.mean)}</td>` : `<td><strong>${f1(r.mean)}</strong></td><td class="muted">${f1(r.floor)}–${f1(r.ceil)}</td>`}
+    <td>${D.own.has(r.id) ? Math.round(D.own.get(r.id)) + '%' : '—'}</td><td class="l">${stat(r.id)}</td></tr>`).join('');
+  return `<div class="section">
+  <div class="row-head"><h2>Players <span class="hsub">Every name opens his page: projection, game log, history</span></h2><a class="small" href="players/">Player directory</a></div>
+  <div class="addbox card"><label class="label" for="pq">Find any player</label>
+    <div class="ac"><input class="inp" id="pq" type="search" autocomplete="off" placeholder="Name or NFL team, e.g. Bijan or KC" role="combobox" aria-expanded="false" aria-controls="pqList" aria-autocomplete="list" value="${esc(D.pq || '')}"><div class="ac-list" id="pqList" role="listbox" hidden></div></div></div>
+  <div class="toolbar"><div class="seg" role="group" aria-label="Position">${POS.map(p => `<button type="button" data-poolpos="${p}" aria-pressed="${p === P}">${posLabel(p)}</button>`).join('')}</div>
+    <div class="seg" role="group" aria-label="Rank on"><button type="button" data-poolmode="week" aria-pressed="${mode === 'week'}">Week ${D.week}</button><button type="button" data-poolmode="ros" aria-pressed="${mode === 'ros'}">Rest of season</button></div></div>
+  <div class="tscroll"><table class="glog pool"><thead><tr><th>#</th><th class="l">Player</th><th class="l">Opp</th>${mode === 'ros' ? '<th title="Rest-of-season value: points a game, before each week’s matchup">ROS pts/g</th><th>Week ' + D.week + '</th>' : `<th>Proj</th><th title="Middle half of outcomes">Likely range</th>`}<th title="Share of ESPN leagues that roster him">Owned</th><th class="l"></th></tr></thead>
+    <tbody>${rows || `<tr><td class="l" colspan="7">No ${posLabel(P)}s with numbers this week.</td></tr>`}</tbody></table></div>
+  ${total > list.length ? `<div class="toolbar"><button type="button" class="btn sm" data-act="poolmore">Show all ${total}</button></div>` : ''}
+  <div class="small muted">${mode === 'ros' ? 'Rest of season: Benny’s value per game from here on, the same for every opponent; each week’s matchup moves it up or down.' : `Week ${D.week} projections in ${fmtName(true)} scoring, for players expected to play.`}</div></div>`;
+}
+
 /* ---------- Lineup and Research ---------- */
 function viewLineup() {
   if (!state.roster.length) return `<div class="card panel empty"><h2>${esc(curTeam().name)} has no players yet</h2><p style="margin:0">Bring in your roster to see Benny’s lineup.</p>
@@ -5025,8 +5360,7 @@ function viewLineup() {
 }
 function viewResearch() {
   const sub = state.tab === 'teams' || state.tab === 'weather' ? state.tab : 'defenses';
-  return `<div class="section"><div class="seg sub" role="group" aria-label="Research"><a href="#research" data-tab="defenses" ${sub === 'defenses' ? 'aria-current="page"' : ''}>Defenses</a><a href="#research-teams" data-tab="teams" ${sub === 'teams' ? 'aria-current="page"' : ''}>Teams &amp; schemes</a><a href="#research-weather" data-tab="weather" ${sub === 'weather' ? 'aria-current="page"' : ''}>Weather</a></div>
-    ${sub === 'teams' ? viewTeams() : sub === 'weather' ? viewWeather() : viewDefenses()}</div>`;
+  return `<div class="section">${sub === 'teams' ? viewTeams() : sub === 'weather' ? viewWeather() : viewDefenses()}</div>`;
 }
 /* Every game this week: where it's played, roof or open air, the forecast for kickoff, and how it moves the players on
    the selected team. */
@@ -5369,7 +5703,10 @@ function viewSettings() {
 
 /* ---------- events ---------- */
 document.addEventListener('click', e => {
-  const t = e.target.closest('[data-model],[data-tab],[data-expand],[data-add],[data-remove],[data-strategy],[data-act],[data-sort],[data-team],[data-fteam],[data-clearovr],[data-wh],[data-wsrc],[data-taken],[data-keepmode],[data-decide],[data-brief],[data-wrank],[data-acadd],[data-mrem],[data-flowmethod],[data-espnmode],[data-rview],[data-research],[data-hweek],[data-dc],[data-colmv],[data-started]'); if (!t) return;
+  if (e.target.closest('a[href^="#"]')) D.fwdNav = true;   // a link: the next page starts at the top (hashchange)
+  const t = e.target.closest('[data-poolpos],[data-poolmode],[data-model],[data-tab],[data-expand],[data-add],[data-remove],[data-strategy],[data-act],[data-sort],[data-team],[data-fteam],[data-clearovr],[data-wh],[data-wsrc],[data-taken],[data-keepmode],[data-decide],[data-brief],[data-wrank],[data-acadd],[data-mrem],[data-flowmethod],[data-espnmode],[data-rview],[data-research],[data-hweek],[data-dc],[data-colmv],[data-started]'); if (!t) return;
+  if (t.dataset.poolpos) { D.poolPos = t.dataset.poolpos; D.poolAll = false; render(); return; }
+  if (t.dataset.poolmode) { D.poolMode = t.dataset.poolmode; render(); return; }
   if (t.dataset.model) { state.settings.model = t.dataset.model; track('model_changed', { model: t.dataset.model }); save(); D.wCache = null; computeAll(); render(); return; }
   if (t.dataset.dc) { D.dcOpen = D.dcOpen === t.dataset.dc ? null : t.dataset.dc; render(); return; }
   if (t.dataset.colmv) { const [k, d] = t.dataset.colmv.split('|'), c = defCols(), i = c.order.indexOf(k), j = i + +d; if (i < 0 || j < 0 || j >= c.order.length) return; [c.order[i], c.order[j]] = [c.order[j], c.order[i]]; saveDefCols(c); render(); $(`[data-colmv="${k}|${d}"]:not([disabled])`)?.focus(); return; }
@@ -5406,6 +5743,9 @@ document.addEventListener('click', e => {
     const r = $(`[data-team="${T}"]`); if (r) scrollBy(0, r.getBoundingClientRect().top - y0); return;
   }
   const a = t.dataset.act;
+  if (a === 'pback') { e.preventDefault(); D.fwdNav = false; history.back(); return; }
+  if (a === 'poolmore') { D.poolAll = true; render(); return; }
+  if (a === 'shareplayer') { sharePlayer(); return; }
   if (a === 'reload') { for (let s = 0; s < 4; s++) store.del('coach:' + ((D.season || 0) - s)); load({ manual: true }); }
   else if (a === 'sharemove') shareMove();
   else if (a === 'sharecall') shareCall();
@@ -5532,6 +5872,7 @@ document.addEventListener('input', e => {
   const t = e.target;
   if (t.id === 'wOwn') { const o = $('#wOwn-v'); if (o) o.textContent = t.value + '%'; return; }
   if (t.id === 'addq') { D.addq = t.value; renderAc('addq'); return; }
+  if (t.id === 'pq') { D.pq = t.value; if (D.ac) D.ac.idx = 0; renderAc('pq'); return; }
   if (t.id === 'mq' || isCmpBox(t.id)) { if (D.ac) D.ac.idx = 0; renderAc(t.id); return; }
   if (t.dataset.draft) { D.drafts[t.dataset.draft] = t.value; return; }
   if (t.id === 'slQuery') { D.sl = D.sl || {}; D.sl.q = t.value; return; }
@@ -5543,6 +5884,7 @@ document.addEventListener('input', e => {
 document.addEventListener('change', e => {
   const t = e.target;
   if (t.dataset.colon) { const c = defCols(), k = t.dataset.colon; t.checked ? c.hide.delete(k) : c.hide.add(k); saveDefCols(c); render(); $(`[data-colon="${k}"]`)?.focus(); return; }
+  if (t.id === 'pseason') { D.pseason = t.value; render(); return; }
   if (t.id === 'weekSel') { state.settings.week = +t.value; if (state.settings.week === D.detWeek && D.season === D.detSeason) state.settings.week = null; save(); D.open.clear(); load({ fresh: true }); return; }
   if (t.dataset.iosel) { const s = D.ioSkip || (D.ioSkip = new Set()); t.checked ? s.delete(t.dataset.iosel) : s.add(t.dataset.iosel); D.ioOutMsg = ''; render(); return; }
   if (t.id === 'ioReplace') { D.ioReplace = t.checked; return; }
@@ -5688,7 +6030,9 @@ acctBoot();
     q.delete('league');
     try { history.replaceState(null, '', u.pathname + u.search + u.hash); } catch {}
   } }
-{ const tab = TAB_OF[location.hash.slice(1)]; if (tab && needsTeam() && INTENT_TABS.has(tab)) D.intent = tab; if (tab) state.tab = tab; else if (location.hash !== '#export' && !SELFTEST && HASH[state.tab]) { try { history.replaceState(null, '', '#' + HASH[state.tab]); } catch {} } }
+{ const p = parseHash(); if (p && needsTeam() && INTENT_TABS.has(p.tab)) D.intent = p.tab; if (state.tab === 'player' && !p) state.tab = 'pool';   // a player's page needs its address
+  if (p) applyRoute(p); else if (location.hash !== '#export' && !SELFTEST && HASH[state.tab]) { try { history.replaceState(null, '', '#' + HASH[state.tab]); } catch {} }
+  D.curHash = location.hash.slice(1); }
 render();
 if (!SELFTEST && location.hash !== '#export') loadPlayerIds();
 load();

@@ -708,8 +708,15 @@ test('storage: old fo1: keys move under bp:v1:, old data caches are dropped, the
   const s = ev('makeStore')(ls);
   if (s.get('state')?.roster?.[0] !== '4046' || s.get('hist')?.a !== 1) return 'values not carried over: ' + JSON.stringify([...ls._m]);
   if ([...ls._m.keys()].some(k => k.startsWith('fo1:')) || ls._m.has('bp:v1:wk2:2026:1')) return 'old keys left: ' + [...ls._m.keys()].join(', ');
-  if (ls.getItem('bp:schema') !== '1' || ls.getItem('sb-x-auth-token') !== 'tok' || ls.getItem('ph_x') !== '1') return 'schema or others: ' + JSON.stringify([...ls._m]);
+  if (ls.getItem('bp:schema') !== String(ev('STORE_SCHEMA')) || ls.getItem('sb-x-auth-token') !== 'tok' || ls.getItem('ph_x') !== '1') return 'schema or others: ' + JSON.stringify([...ls._m]);
   ev('makeStore')(ls); return ls.getItem('bp:v1:state') === '{"roster":["4046"]}' || 'second run changed state';
+});
+test('storage: version 2 drops the wk2/wk3 week caches (weeks are kept as wk4, with touchdowns) and keeps the rest', () => {
+  const ls = fakeStorage({ 'bp:schema': '1', 'bp:v1:state': '{"roster":["4046"]}', 'bp:v1:wk3:2026:1': '[1]', 'bp:v1:wk2:2025:4': '[2]', 'bp:v1:wk4:2026:1': '[3]', 'bp:v1:sched:2026': '[4]' });
+  ev('makeStore')(ls);
+  if (ls._m.has('bp:v1:wk3:2026:1') || ls._m.has('bp:v1:wk2:2025:4')) return 'old week caches left: ' + [...ls._m.keys()].join(', ');
+  if (!ls._m.has('bp:v1:wk4:2026:1') || !ls._m.has('bp:v1:sched:2026') || !ls._m.has('bp:v1:state')) return 'other keys dropped: ' + [...ls._m.keys()].join(', ');
+  return ls.getItem('bp:schema') === '2' || 'schema not recorded';
 });
 test('storage: when it’s full, data caches go first; a write that still doesn’t fit is kept in memory for this visit', () => {
   const ls = fakeStorage({ 'bp:schema': '1', 'bp:v1:wk2:2026:1': 'x'.repeat(400) }, { quota: 500 }), s = ev('makeStore')(ls);
@@ -763,6 +770,88 @@ test('availability is labeled only when free agents are estimated from roster %'
   if (!/availability (low|medium|high): on \d+% of ESPN rosters/.test(m.whyText)) return 'own mode: ' + m.whyText;
   setup(st => { st.waivers.horizon = 4; st.waivers.source = 'list'; st.waivers.faList = [m.f]; }); const L = ev('computeWaivers')().moves.find(x => x.f === m.f);
   return !L || !/availability/.test(L.whyText) || 'list mode: ' + L.whyText;
+});
+test('player pages: addresses for each player and tab; the old addresses still land where they did', () => {
+  const ph = ev('parseHash'), hash = ev('playerHash');
+  const a = ph('player/4046/games'); if (a?.tab !== 'player' || a.id !== '4046' || a.ptab !== 'games') return 'player tab: ' + JSON.stringify(a);
+  if (ph('player/4046').ptab !== 'overview' || ph('player/4046/nonsense').ptab !== 'overview') return 'an unknown tab should be the overview';
+  if (ph('player/PIT').id !== 'PIT') return 'a D/ST id';
+  if (ph(hash('4046', 'history')).ptab !== 'history' || hash('4046', 'overview') !== 'player/4046') return 'playerHash round trip';
+  const old = { lineup: 'lineup', 'start-sit': 'compare', waivers: 'waivers', roster: 'players', research: 'defenses', 'research-teams': 'teams', 'research-weather': 'weather', settings: 'settings', pro: 'pro', players: 'pool' };
+  for (const [h, t] of Object.entries(old)) if (ph(h)?.tab !== t) return `#${h} should open ${t}, got ${JSON.stringify(ph(h))}`;
+  if (ph('export') !== null || ph('') !== null) return 'non-page addresses should be null';
+  const nav = ev('navOf'); if (nav('compare') !== 'lineup' || nav('players') !== 'lineup' || nav('player') !== 'pool' || nav('weather') !== 'defenses') return 'nav groups';
+});
+test('player pages: names and pictures link to the player page everywhere, but never inside a button', () => {
+  setup(); const gibbs = idOf('Jahmyr Gibbs'), st = ev('state'), D = ev('D');
+  const lin = ev('viewLineup')(), wv = ev('viewWaivers')(), ros = (D.rview = 'mine', ev('viewPlayers')()), pool = ev('viewPool')();
+  st.compare = [gibbs, idOf('James Cook')]; const ss = ev('viewCompare')();
+  for (const [k, h] of Object.entries({ waivers: wv, roster: ros, startsit: ss, players: pool })) if (!/<a href="#player\/[^"]+" class="plink/.test(h)) return `no player links on ${k}`;
+  if (!ros.includes(`href="#player/${gibbs}"`)) return 'the roster list should link Gibbs';
+  for (const [k, h] of Object.entries({ lineup: lin, waivers: wv, roster: ros, startsit: ss })) {
+    const bad = [...h.matchAll(/<button\b[^>]*>([\s\S]*?)<\/button>/g)].find(m => /<a\b/.test(m[1]));
+    if (bad) return `a link inside a button on ${k}: ${bad[0].slice(0, 160)}`;
+  }
+  D.open.add(gibbs); const open = ev('viewLineup')(); D.open.delete(gibbs);
+  if (!open.includes(`href="#player/${gibbs}"`)) return 'an expanded lineup player should link his page';
+});
+test('player pages: this season’s games come from the bundle, with the weeks he missed marked', () => {
+  setup(); const D = ev('D'), sg = ev('seasonGames'), gibbs = idOf('Jahmyr Gibbs');
+  const gs = sg(gibbs), h = D.H[gibbs];
+  if (gs.length !== h.n) return `games ${gs.length} vs history ${h.n}`;
+  if (!gs.every(g => ok(g.ppr) && g.opp && g.team)) return 'a game without points or opponent';
+  const pts = gs.map(g => ev('gPts')(g, 'RB')); if (pts.some((x, i) => Math.abs(x - h.pts[i]) > 1e-9)) return 'points differ from his scoring history';
+  const t = ev('sumGames')(gs); if (t.gp !== gs.length || !(t.car > 0)) return 'season totals: ' + JSON.stringify(t);
+  // rows saved before touchdowns were kept say nothing about them, rather than zero
+  if (gs.every(g => g.rtd == null) && t.rtd !== null) return 'missing touchdowns should total as unknown';
+  const out = sg('PIT'); if (!out.length || !out.every(g => ok(g.pa))) return 'D/ST games should carry points allowed';
+  const wm = ev('withMissed')(gs.slice(1), D.U.get(gibbs).team); if (wm[0].miss == null || wm.length !== Math.max(D.inp.weeks.length, gs.at(-1).week)) return 'a missed week should be marked: ' + JSON.stringify(wm[0]);
+  function ok(x) { return x != null && isFinite(x); }
+});
+test('player pages: every tab renders for each position, with and without past seasons', () => {
+  setup(); const D = ev('D'), st = ev('state'), was = [st.tab, D.pp];
+  const fake = id => ({ st: 'ok', d: { v: 1, id, name: D.U.get(id).name, pos: D.U.get(id).pos, scols: ['season', 'team', 'gp', 'ppr', 'rec', 'tgt', 'car', 'patt', 'cmp', 'pyd', 'ptd', 'int', 'ryd', 'rtd', 'recyd', 'rectd', 'fum', 'snp', 'tsh', 'csh', 'rank'],
+    seasons: [[2024, 'DET', 17, 300.5, 50, 60, 250, 0, 0, 0, 0, 0, 1400, 16, 400, 2, 1, 0.6, 0.12, 0.6, 3], [2025, 'DET', 16, 280, 40, 50, 240, 0, 0, 0, 0, 0, 1200, 12, 350, 3, 0, 0.62, 0.11, 0.58, 5]],
+    gcols: ['week', 'team', 'opp', 'ppr', 'rec', 'tgt', 'car', 'patt', 'cmp', 'pyd', 'ptd', 'int', 'ryd', 'rtd', 'recyd', 'rectd', 'fum', 'snp'], games: { 2025: [[1, 'DET', 'GB', 20.1, 3, 4, 15, 0, 0, 0, 0, 0, 90, 1, 21, 0, 0, 0.6]] } } });
+  try {
+    const gibbs = idOf('Jahmyr Gibbs'), goff = idOf('Jared Goff');
+    D.phist.set(gibbs, fake(gibbs)); D.phist.set(goff, { st: 'none' });
+    for (const id of [gibbs, goff, idOf('Brandon Aubrey'), 'PIT']) for (const tab of ['overview', 'games', 'history', 'stats']) {
+      st.tab = 'player'; D.pp = { id, tab }; D.pseason = null;
+      const h = ev('viewPlayer')();
+      if (!h.includes(ev('esc')(D.U.get(id).name))) return `${id} ${tab}: no name`;
+      if (/undefined|NaN|\[object/.test(h.replace(/<[^>]+>/g, ' '))) return `${id} ${tab}: shows undefined or NaN: ` + (/.{60}(undefined|NaN|\[object).{60}/.exec(h.replace(/<[^>]+>/g, ' ')) || [''])[0];
+      const hasHist = /aria-current="page">History/.test(h) || h.includes('>History</a>');
+      if ((id === 'PIT' || id === idOf('Brandon Aubrey')) && hasHist) return 'K and D/ST pages have no History tab';
+    }
+    st.tab = 'player'; D.pp = { id: gibbs, tab: 'history' }; let h = ev('viewPlayer')();
+    if (!h.includes('2024') || !h.includes('RB3')) return 'history should list past seasons with the finish';
+    D.pp = { id: gibbs, tab: 'games' }; D.pseason = '2025'; h = ev('viewPlayer')();
+    if (!h.includes('2025 game log') || !h.includes('GB')) return 'a past season’s game log';
+    st.scoring = 'std'; ev('syncScoring')(); ev('computeAll')(); D.pp = { id: gibbs, tab: 'history' }; h = ev('viewPlayer')();
+    if (!h.includes('250.5')) return 'past seasons should be re-scored for standard scoring (300.5 - 50 catches)';
+    D.pp = { id: 'nobody-here', tab: 'overview' }; D.phist.set('nobody-here', { st: 'none' });
+    if (!ev('viewPlayer')().includes('Player not found')) return 'an unknown id should say so';
+  } finally { st.tab = was[0]; D.pp = was[1]; D.pseason = null; setup(); }
+});
+test('player pages: Benny’s call says where a rostered player plays, and a waiver pick links Waivers', () => {
+  setup(); const pc = ev('pCall'), D = ev('D'), { starters, bench } = ev('optimize')();
+  const s = starters.find(x => x.r && x.r.status === 'ok'), b = bench.find(r => r.status === 'ok');
+  if (!/Start him/.test(pc(s.r.id, s.r))) return 'a starter: ' + pc(s.r.id, s.r);
+  if (b && !/On your bench/.test(pc(b.id, b))) return 'a bench player: ' + pc(b.id, b);
+  const R = ev('computeWaivers')(), m = R.moves.find(x => !x.marginal);
+  if (m && !/waiver pick/.test(pc(m.f, D.M[m.f]))) return 'the best pickup: ' + pc(m.f, D.M[m.f]);
+  const st = ev('state'), ros = st.roster; st.roster = [];
+  try { if (!/Set up your team/.test(pc(s.r.id, s.r))) return 'no team: ' + pc(s.r.id, s.r); } finally { st.roster = ros; }
+});
+test('players: rankings by position for this week and the rest of the season, and the search opens a page', () => {
+  setup(); const D = ev('D'); D.poolPos = 'WR'; D.poolMode = 'week'; D.poolAll = false;
+  let h = ev('viewPool')(); const rows = (h.match(/<tr><td>\d+<\/td>/g) || []).length;
+  if (rows < 20 || rows > 50) return 'week rows: ' + rows;
+  const projs = [...h.matchAll(/<td><strong>([\d.]+)<\/strong><\/td>/g)].map(m => +m[1]); if (projs.some((x, i) => i && x > projs[i - 1])) return 'week ranking out of order';
+  D.poolMode = 'ros'; h = ev('viewPool')(); if (!/ROS pts\/g/.test(h)) return 'rest-of-season columns';
+  D.poolMode = 'week'; D.poolPos = 'DEF'; h = ev('viewPool')(); if (!h.includes('href="#player/PIT"') && !/D\/ST/.test(h)) return 'D/ST rankings';
+  if (ev('AC_BOX').pq?.[1] !== 'open') return 'the Players search should open pages';
 });
 test('player pictures: headshot by ESPN id, team logo for a D/ST, silhouette when missing or broken', () => {
   setup(); const D = ev('D'), img = ev('getPlayerImage'), gibbs = D.U.get(idOf('Jahmyr Gibbs')), pit = D.U.get('PIT');

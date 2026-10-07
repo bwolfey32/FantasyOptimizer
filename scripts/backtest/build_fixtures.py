@@ -166,7 +166,8 @@ def compact_week(rows):
             continue
         P.append([r.get("player_id"), pos, fix_abbr(r.get("team")), fix_abbr(r.get("opponent")), js_round(num(s, "pts_ppr"), 2),
                   num(s, "pass_att"), num(s, "pass_yd"), num(s, "pass_sack"), num(s, "rush_att"), num(s, "rush_yd"),
-                  num(s, "rec_tgt"), num(s, "rec_yd"), name_of(r), num(s, "rec"), s.get("off_snp"), s.get("tm_off_snp")])
+                  num(s, "rec_tgt"), num(s, "rec_yd"), name_of(r), num(s, "rec"), s.get("off_snp"), s.get("tm_off_snp"),
+                  num(s, "pass_cmp"), num(s, "pass_td"), num(s, "pass_int"), num(s, "rush_td"), num(s, "rec_td"), num(s, "fum_lost")])
     return {"P": P, "D": Dd}
 
 
