@@ -178,8 +178,8 @@ a { color: var(--accent); }
   .top .acct-grp { grid-column: 2; grid-row: 1; }
   .top .acct-grp .btn { padding: 6px 10px; }
   .top #status { grid-column: 1; grid-row: 2; justify-self: start; margin-right: 0; }
-  .top [data-act="reload"] { grid-column: 2; grid-row: 2; justify-self: end; }
-  .top .bell { grid-column: 2; grid-row: 3; justify-self: end; padding: 6px 9px; }
+  .top [data-act="reload"] { grid-column: 1; grid-row: 3; justify-self: start; }
+  .top .bell { grid-column: 2; grid-row: 2; justify-self: end; padding: 6px 9px; }
   .brand { gap: 10px; }
   .brand .logo { width: 44px; height: 44px; }
   .tagline { font-size: 10.5px; letter-spacing: .1em; }
@@ -5557,10 +5557,19 @@ function newsItemHTML(it, { self = null } = {}) {
     <div class="ntitle">${title}</div>${it.sub ? `<div class="small muted">${esc(it.sub)}</div>` : ''}${who ? `<div class="nwho">${who}</div>` : ''}${talkOn() ? `<div class="cmt-acts">${rxBarHTML('n:' + it.id, true)}</div>` : ''}</li>`;
 }
 const NEWS_FOOT = `<div class="small muted">Injury, team and depth-chart items are Benny’s, from Sleeper’s injury tags and rosters and nflverse depth charts. Midweek injury tags follow practice reports and firm up on Friday. Headlines link to the story on ESPN. Updated every 3 hours.</div>`;
+/* His injury tag as the page has it (Sleeper, live) when his newest injury item doesn't say it yet: the tag changed
+   after news.py's last check, or before the news began (an injury item's id is inj-<id>-<status>-<minute>). */
+function pNewsTagNote(id, u, items) {
+  if (!u.inj) return '';
+  const last = items.find(i => i.k === 'injury');
+  if (last && last.id.startsWith(`inj-${id}-${u.inj}-`)) return '';
+  const at = Date.parse(D.news?.d?.updated || '');
+  return `Sleeper lists ${esc(u.name)} as ${esc(INJ_WORDS[u.inj] || u.inj.toLowerCase())}. Benny’s news picks up a change in his injury tag when it checks, every 3 hours${at ? ` (last check ${ago(at)})` : ''}, so a tag newer than that shows up here after the next check.`;
+}
 function pNewsTab(id, u) {
-  const nw = playerNews(id);
-  if (!nw.items.length) return `<div class="card panel small muted">${nw.st === 'loading' ? 'Loading news…' : `No news about ${esc(u.name)} yet. Injury, team and depth-chart changes, and ESPN headlines that name him, show up here.`}</div>`;
-  return `<div class="row-head"><h2>News</h2><span class="small muted">${nw.items.length} item${nw.items.length === 1 ? '' : 's'}</span></div><ul class="nlist card">${nw.items.map(i => newsItemHTML(i, { self: id })).join('')}</ul>${NEWS_FOOT}`;
+  const nw = playerNews(id), note = nw.st === 'loading' ? '' : pNewsTagNote(id, u, nw.items);
+  if (!nw.items.length) return `<div class="card panel small muted">${nw.st === 'loading' ? 'Loading news…' : `${note ? note + ' ' : ''}No news about ${esc(u.name)} yet. Injury, team and depth-chart changes, and ESPN headlines that name him, show up here.`}</div>`;
+  return `<div class="row-head"><h2>News</h2><span class="small muted">${nw.items.length} item${nw.items.length === 1 ? '' : 's'}</span></div>${note ? `<div class="card panel small muted">${note}</div>` : ''}<ul class="nlist card">${nw.items.map(i => newsItemHTML(i, { self: id })).join('')}</ul>${NEWS_FOOT}`;
 }
 /* Research → News: everything in the feed, by kind and by whose news it is (your team, or a position), with Sleeper's
    most-added and most-dropped players of the last day alongside. */
