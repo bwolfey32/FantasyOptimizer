@@ -7,6 +7,8 @@
 -- signed-in account can post. So the database, not the page, enforces every rule: who may write what (row-level
 -- security), which columns may change (column grants), how much (the cap triggers) and what a row may hold (checks).
 -- The page only decides which buttons to show.
+-- Each table grants exactly what the page uses rather than relying on the project's default privileges, which differ
+-- between projects (one made with "automatically expose new tables" off grants nothing), and takes back the rest.
 
 begin;
 
@@ -60,8 +62,10 @@ create policy "own profile insert" on public.profiles for insert to authenticate
 drop policy if exists "own profile update" on public.profiles;
 create policy "own profile update" on public.profiles for update to authenticated
   using ((select auth.uid()) = user_id) with check ((select auth.uid()) = user_id and not (select public.is_banned()));
-revoke insert, update, delete on public.profiles from anon;
-revoke update on public.profiles from authenticated;
+revoke insert, update, delete, truncate, references, trigger on public.profiles from anon;
+revoke update, delete, truncate, references, trigger on public.profiles from authenticated;
+grant select on public.profiles to anon, authenticated;
+grant insert on public.profiles to authenticated;
 grant update (handle) on public.profiles to authenticated;
 
 -- ---------- Comments ----------
@@ -152,8 +156,10 @@ create policy "moderators hide" on public.comments for update to authenticated
   using ((select public.is_admin())) with check ((select public.is_admin()));
 -- a policy says which rows; the grant says which columns: without it the moderator policy would also allow rewriting
 -- a comment's text or author
-revoke insert, update, delete on public.comments from anon;
-revoke update on public.comments from authenticated;
+revoke insert, update, delete, truncate, references, trigger on public.comments from anon;
+revoke update, truncate, references, trigger on public.comments from authenticated;
+grant select on public.comments to anon, authenticated;
+grant insert, delete on public.comments to authenticated;
 grant update (hidden_at, hidden_reason) on public.comments to authenticated;
 
 -- ---------- Reactions ----------
@@ -192,8 +198,10 @@ create policy "react as yourself" on public.reactions for insert to authenticate
   with check ((select auth.uid()) = user_id and not (select public.is_banned()));
 drop policy if exists "remove own reaction" on public.reactions;
 create policy "remove own reaction" on public.reactions for delete to authenticated using ((select auth.uid()) = user_id);
-revoke insert, update, delete on public.reactions from anon;
-revoke update on public.reactions from authenticated;
+revoke insert, update, delete, truncate, references, trigger on public.reactions from anon;
+revoke update, truncate, references, trigger on public.reactions from authenticated;
+grant select on public.reactions to anon, authenticated;
+grant insert, delete on public.reactions to authenticated;
 
 -- ---------- Reports ----------
 -- Anyone signed in can report a comment once while the report is open; moderators see and resolve them. No foreign key
@@ -234,7 +242,8 @@ drop policy if exists "moderators resolve" on public.reports;
 create policy "moderators resolve" on public.reports for update to authenticated
   using ((select public.is_admin())) with check ((select public.is_admin()));
 revoke all on public.reports from anon;
-revoke update, delete on public.reports from authenticated;
+revoke update, delete, truncate, references, trigger on public.reports from authenticated;
+grant select, insert on public.reports to authenticated;
 grant update (resolved_at, resolved_by) on public.reports to authenticated;
 
 -- ---------- Reading helpers ----------

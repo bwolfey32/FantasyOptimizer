@@ -5571,9 +5571,15 @@ async function rxLoad(keys, force) {
   for (const k of want) if (!D.rx.has(k)) D.rx.set(k, { c: {}, mine: null });
   const add = (k, r) => { const x = fresh.get(k); if (!x) return; x.c[r.emoji] = (x.c[r.emoji] || 0) + 1; if (me && r.user_id === me) x.mine = r.emoji; };
   const cs = want.filter(k => k[0] === 'c').map(k => k.slice(2)), ns = want.filter(k => k[0] === 'n').map(k => k.slice(2));
+  // the API returns at most 1000 rows a request (Supabase's default "Max rows"): a full page may be cut short, so ask again in halves
+  const get = async (col, ids) => {
+    const rows = await sbRest(`reactions?select=${col},emoji,user_id&${col}=in.${encodeURIComponent(inList(ids))}&limit=1000`) || [];
+    if (rows.length < 1000 || ids.length < 2) return rows;
+    const h = ids.length >> 1; return [...await get(col, ids.slice(0, h)), ...await get(col, ids.slice(h))];
+  };
   try {
-    for (let i = 0; i < cs.length; i += 80) for (const r of await sbRest(`reactions?select=comment_id,emoji,user_id&comment_id=in.${encodeURIComponent(inList(cs.slice(i, i + 80)))}&limit=5000`) || []) add('c:' + r.comment_id, r);
-    for (let i = 0; i < ns.length; i += 60) for (const r of await sbRest(`reactions?select=news_id,emoji,user_id&news_id=in.${encodeURIComponent(inList(ns.slice(i, i + 60)))}&limit=5000`) || []) add('n:' + r.news_id, r);
+    for (let i = 0; i < cs.length; i += 40) for (const r of await get('comment_id', cs.slice(i, i + 40))) add('c:' + r.comment_id, r);
+    for (let i = 0; i < ns.length; i += 40) for (const r of await get('news_id', ns.slice(i, i + 40))) add('n:' + r.news_id, r);
     for (const [k, v] of fresh) D.rx.set(k, v);
   } catch (e) { talkMissing(e); }
 }
@@ -5839,7 +5845,8 @@ async function modAct(act, cid) {
     if (act === 'hide') { const pid = await talkHide(cid, true); await dismiss(); D.talk.delete(pid); toast('Hidden.'); }
     else if (act === 'restore') { const pid = await talkHide(cid, false); D.talk.delete(pid); toast('Restored.'); }
     else if (act === 'dismiss') { await dismiss(); toast('Reports dismissed.'); }
-    else if (act === 'del') { await dismiss(); const r = await sbRest(`comments?id=eq.${cid}&select=id,player_id`, { method: 'DELETE', prefer: 'return=representation' }); if (!r?.length) throw Object.assign(new Error(), { code: '42501' }); D.talk.delete(r[0].player_id); toast('Deleted.'); }
+    // delete first: if the database refuses, the reports stay open
+    else if (act === 'del') { const r = await sbRest(`comments?id=eq.${cid}&select=id,player_id`, { method: 'DELETE', prefer: 'return=representation' }); if (!r?.length) throw Object.assign(new Error(), { code: '42501' }); await dismiss(); D.talk.delete(r[0].player_id); toast('Deleted.'); }
   } catch (e) { toast(talkErr(e)); }
   modLoad();
 }

@@ -75,7 +75,37 @@ What the database enforces, whatever the page sends:
 - At most 5 comments a minute and 60 a day per account, 500 reactions a day, and 30 reports a day.
 - Reports are visible only to the person who filed them and to moderators, and nobody can delete one.
 
-**Checking it:** with two accounts, post, reply and react. Report a comment from the second account, then hide and restore it from **Open moderation** as the first. A request with only the publishable key, such as `curl "https://<ref>.supabase.co/rest/v1/comments?select=*" -H "apikey: sb_publishable_…"`, must not return hidden comments, and `.../rest/v1/reports?select=*` must return nothing.
+**Check the database from a terminal.** These checks send exactly what the page sends, so a wrong answer here is a hole whatever the page shows. In Git Bash, set the two values from `CLOUD` in `index.html`:
+
+```sh
+URL=https://<ref>.supabase.co; KEY=sb_publishable_…
+H=(-H "apikey: $KEY" -H "Content-Type: application/json")
+```
+
+As a visitor (the publishable key and nothing else, the way the page reads):
+
+| Request | Expect |
+| --- | --- |
+| `curl -s "$URL/rest/v1/comments?select=id,body,profiles(handle)&limit=3" "${H[@]}"` | `[]` or comments with a `profiles` object: the key works without an `Authorization` header, and the author's name comes along |
+| `curl -s "$URL/rest/v1/comments?select=id&hidden_at=not.is.null" "${H[@]}"` | `[]`, always |
+| `curl -s "$URL/rest/v1/reports?select=*" "${H[@]}"` (and the same for `admins` and `bans`) | an error (`42501` permission denied), never rows |
+| `curl -s -X POST "$URL/rest/v1/rpc/is_admin" "${H[@]}" -d '{}'` | `false`, bare |
+| `curl -s -X POST "$URL/rest/v1/rpc/my_replies" "${H[@]}" -d '{"since":"2026-01-01T00:00:00Z"}'` | an error (`42501`) |
+| `curl -s -X POST "$URL/rest/v1/comments" "${H[@]}" -d '{"player_id":"4046","author_id":"00000000-0000-0000-0000-000000000000","body":"x"}'` | an error (`42501`) |
+
+Signed in: on the site, open the browser console and run `copy((await acct.sb.auth.getSession()).data.session.access_token)`, then `TOK=<paste>; A=(-H "Authorization: Bearer $TOK")`. Use an account that has posted (its user id is `ME`, and `CID` is a comment by someone else):
+
+| Request | Expect |
+| --- | --- |
+| `curl -s -X PATCH "$URL/rest/v1/comments?id=eq.<your comment id>" "${H[@]}" "${A[@]}" -d '{"body":"edited"}'` | an error (`42501`): nobody can edit text |
+| `curl -s -X DELETE "$URL/rest/v1/comments?id=eq.$CID&select=id" "${H[@]}" "${A[@]}" -H "Prefer: return=representation"` | `[]`: someone else's comment is untouched |
+| the same `rpc/is_admin` call with `"${A[@]}"`, as the moderator | `true`, bare |
+| as the moderator, `curl -s -X PATCH "$URL/rest/v1/comments?id=eq.$CID&select=id" "${H[@]}" "${A[@]}" -H "Prefer: return=representation" -d '{"hidden_at":"2026-10-07T00:00:00Z"}'` | the row's id, as `[{"id":…}]`; then restore it with `{"hidden_at":null}` |
+| post the same reaction twice: `curl -s -X POST "$URL/rest/v1/reactions" "${H[@]}" "${A[@]}" -d '{"comment_id":"'$CID'","user_id":"'$ME'","emoji":"👍"}'` | the second one fails with `23505` |
+
+Also check **Project Settings → Data API → Max rows**. The page expects the default of 1000 or more.
+
+**Then with two accounts in two browsers:** post, reply and react. The reply shows in the other account's bell (🔔). Report a comment from the second account, then hide it from **Open moderation** as the first (its replies hide with it) and restore it. Post six comments within a minute to see the limit message. Signed out, the Discussion tab reads without loading `supabase.js` (network panel) and **Sign in to comment** opens sign-in.
 
 # Setting up Pro payments (Stripe)
 
