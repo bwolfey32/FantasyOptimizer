@@ -155,6 +155,52 @@ def test_profiles(db):
     assert db.one(None, "select count(*) from profiles where user_id = %s", (a,)) == 1
 
 
+def test_renaming(db):
+    a = db.person(profile=False)
+    db.as_(a, "insert into profiles (user_id, handle) values (auth.uid(), 'first_' || substr(md5(auth.uid()::text), 1, 6))")
+    h = db.one(a, "select handle from profiles where user_id = auth.uid()")
+    assert db.one(None, "select handle_changed_at is null from profiles where user_id = %s", (a,))   # the first name is free
+    # a change of letter case only is free, and doesn't start the clock
+    db.as_(a, "update profiles set handle = %s where user_id = auth.uid()", (h.upper(),))
+    assert db.one(None, "select handle_changed_at is null from profiles where user_id = %s", (a,))
+    new = "second_" + a.replace("-", "")[:6]
+    db.as_(a, "update profiles set handle = %s where user_id = auth.uid()", (new,))
+    assert db.one(None, "select handle from profiles where user_id = %s", (a,)) == new
+    assert db.one(None, "select handle_changed_at > now() - interval '1 minute' from profiles where user_id = %s", (a,))
+    # a second change inside 30 days is refused, with the date
+    e = db.refused(a, "update profiles set handle = %s where user_id = auth.uid()", ("third_" + a.replace("-", "")[:6],), says="You can change your username again on")
+    assert e.sqlstate == "23514"
+    # the page can't write the clock, and a case-only change still works inside the window
+    db.refused(a, "update profiles set handle_changed_at = null where user_id = auth.uid()")
+    db.as_(a, "update profiles set handle = %s where user_id = auth.uid()", (new.upper(),))
+    # 30 days on, it works again
+    db.sql("update profiles set handle_changed_at = now() - interval '31 days' where user_id = %s", (a,))
+    db.as_(a, "update profiles set handle = %s where user_id = auth.uid()", ("third_" + a.replace("-", "")[:6],))
+    # the blocked-word check still applies to a rename
+    db.sql("insert into blocked_terms (term) values ('zzbadzz') on conflict do nothing")
+    db.sql("update profiles set handle_changed_at = null where user_id = %s", (a,))
+    db.refused(a, "update profiles set handle = 'xx_zzbadzz_xx' where user_id = auth.uid()")
+    db.sql("delete from blocked_terms where term = 'zzbadzz'")
+
+
+def test_profile_by_handle(db):
+    a, b = db.person(), db.person(profile=False)
+    db.as_(b, "insert into profiles (user_id, handle) values (auth.uid(), 'ab_' || substr(md5(auth.uid()::text), 1, 6))")
+    hb = db.one(b, "select handle from profiles where user_id = auth.uid()")
+    ha = db.one(a, "select handle from profiles where user_id = auth.uid()")
+    c1, c2, c3 = db.post(a, "visible"), db.post(a, "will be hidden"), db.post(a, "will be deleted")
+    db.sql("update comments set hidden_at = now() where id = %s", (c2,))
+    db.sql("delete from comments where id = %s", (c3,))
+    for who in (None, a, b):   # anyone can ask
+        r = db.as_(who, "select user_id, handle, n_comments from profile_by_handle(%s)", (ha.upper(),))   # ignoring case
+        assert len(r) == 1 and str(r[0][0]) == a and r[0][1] == ha and r[0][2] == 1
+    assert db.as_(None, "select * from profile_by_handle('nobody_here')") == []
+    # an underscore is not a wildcard: "ab_xxxxxx" must not match "abcxxxxxx"
+    assert db.as_(None, "select * from profile_by_handle(%s)", (hb.replace("_", "%"),)) == []
+    assert db.as_(None, "select * from profile_by_handle(%s)", (hb.replace("_", "c"),)) == []
+    assert len(db.as_(None, "select * from profile_by_handle(%s)", (hb,))) == 1
+
+
 # ---------- posting ----------
 
 def test_posting(db):

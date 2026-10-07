@@ -59,7 +59,7 @@ If you sign in, the site also keeps a copy in its database so every device you s
 
 Only you and the site's owner can read them. **Sign out** removes them from that browser but keeps them in your account. **Delete account** erases everything.
 
-Comments are the exception: each player's discussion is public, and a comment shows the username you choose when you sign in (or before your first post, if you skip it then), never your email. Deleting your account deletes your comments and reactions (a comment others replied to stays as “[deleted]”, with no text or name).
+Comments are the exception: each player's discussion is public, and a comment shows the username you choose when you sign in (or before your first post, if you skip it then), never your email; each username has a page (`#u/username`) listing their comments, and it can be changed once every 30 days. Deleting your account deletes your comments and reactions (a comment others replied to stays as “[deleted]”, with no text or name).
 
 If you buy Pro, Stripe handles the payment; Benny's Picks never sees your card and stores only your plan and its end date. Free users see ads: Benny's own promotions, and Google ads once AdSense is set up. The details are in the [privacy policy](privacy.html) and [terms](terms.html).
 

@@ -136,10 +136,21 @@ grant insert on public.profiles to authenticated;
 grant update (handle) on public.profiles to authenticated;
 
 -- A name can't contain a blocked word anywhere (names run words together, like bad_guy). created_at is the server's
--- clock, whatever the page sent.
+-- clock, whatever the page sent. The first name is free; after that a name can change once every 30 days (a change of
+-- letter case only is always free). handle_changed_at is the trigger's own: no grant lets the page write it.
+alter table public.profiles add column if not exists handle_changed_at timestamptz;
 create or replace function public.profiles_before_write() returns trigger language plpgsql security definer set search_path = '' as $$
 begin
-  if tg_op = 'INSERT' then new.created_at := now(); end if;
+  if tg_op = 'INSERT' then new.created_at := now(); new.handle_changed_at := null;
+  else
+    new.created_at := old.created_at; new.handle_changed_at := old.handle_changed_at;
+    if lower(new.handle) <> lower(old.handle) then
+      if old.handle_changed_at is not null and old.handle_changed_at > now() - interval '30 days' then
+        raise exception 'You can change your username again on %', to_char(old.handle_changed_at + interval '30 days', 'FMMon FMDD, YYYY') using errcode = 'check_violation';
+      end if;
+      new.handle_changed_at := now();
+    end if;
+  end if;
   if exists (select 1 from public.blocked_terms b where position(replace(b.term, ' ', '') in lower(new.handle)) > 0) then
     raise exception 'That name isn''t available. Try another.' using errcode = 'check_violation';
   end if;
@@ -453,6 +464,17 @@ begin
 end $$;
 revoke all on function public.delete_comment(uuid) from public, anon;
 grant execute on function public.delete_comment(uuid) to authenticated;
+
+-- A profile page: one person by username, matched whole and ignoring case (a LIKE would treat _ as a wildcard), with how
+-- many comments of theirs are showing. Security definer so the count doesn't depend on who asks.
+create or replace function public.profile_by_handle(h text) returns table (user_id uuid, handle text, created_at timestamptz, n_comments int)
+  language sql stable security definer set search_path = '' as $$
+  select p.user_id, p.handle, p.created_at,
+    (select count(*)::int from public.comments c where c.author_id = p.user_id and c.hidden_at is null and c.deleted_at is null)
+  from public.profiles p where lower(p.handle) = lower(h) limit 1
+$$;
+revoke all on function public.profile_by_handle(text) from public;
+grant execute on function public.profile_by_handle(text) to anon, authenticated;
 
 commit;
 notify pgrst, 'reload schema';

@@ -572,6 +572,12 @@ a.more-link, a.plink.more-link { color: var(--accent); font-weight: 600; }
 .cmt-body a { color: var(--accent); overflow-wrap: anywhere; }
 .cweek { margin: 10px 0 2px; color: var(--muted); }
 .talk .row-head .talksort { margin: 0; }
+a.uname { color: inherit; text-decoration: none; }
+a.uname:hover, a.uname:focus-visible { text-decoration: underline; text-decoration-color: var(--accent); text-underline-offset: 3px; }
+.profile .back-link { align-self: flex-start; text-decoration: none; font-weight: 600; }
+.profile .phead-txt h2 { overflow-wrap: anywhere; }
+.pcmt { padding: 10px 0; border-top: 1px solid var(--line); display: flex; flex-direction: column; gap: 4px; }
+.pcmt:first-of-type { border-top: 0; }
 .cmt-head { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 8px; font-size: 14px; }
 .cmt-body { white-space: pre-wrap; overflow-wrap: anywhere; line-height: 1.45; }
 .clamp { display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; }
@@ -1228,7 +1234,7 @@ function loadState() {
 }
 let state = loadState();
 const save = () => { stashTeam(); stampChanges(); store.set('state', state); queuePush(); };
-const D = { loading: true, progress: 0, errors: [], open: new Set(), phist: new Map(), pnews: new Map(), talk: new Map(), talkN: new Map(), rx: new Map(), cntQ: new Set(), rxQ: new Set(), talkMore: new Set(), scrollOf: {}, lg: {}, U: new Map(), proj: {}, H: {}, tg: {}, rec: {}, prior: {}, cur: {}, B: {}, L: {}, ranks: {}, M: {}, imgBad: new Set(), coaches: null, espnTeams: null, defSort: ['fpaWR', -1], teamOpen: null, resetArm: false };
+const D = { loading: true, progress: 0, errors: [], open: new Set(), phist: new Map(), pnews: new Map(), talk: new Map(), user: new Map(), talkN: new Map(), rx: new Map(), cntQ: new Set(), rxQ: new Set(), talkMore: new Set(), scrollOf: {}, lg: {}, U: new Map(), proj: {}, H: {}, tg: {}, rec: {}, prior: {}, cur: {}, B: {}, L: {}, ranks: {}, M: {}, imgBad: new Set(), coaches: null, espnTeams: null, defSort: ['fpaWR', -1], teamOpen: null, resetArm: false };
 
 /* ---------- accounts and sync ----------
    Signing in is optional. This browser's copy (state) stays the working copy; a signed-in account keeps a mirror of
@@ -4282,15 +4288,16 @@ const SUBNAV = { lineup: [['lineup', 'Lineup'], ['compare', 'Start / Sit'], ['wa
   defenses: [['defenses', 'Defenses'], ['news', 'News'], ['teams', 'Teams & schemes'], ['weather', 'Weather']] };
 const HASH = { lineup: 'lineup', compare: 'start-sit', waivers: 'waivers', players: 'roster', pool: 'players', defenses: 'research', teams: 'research-teams', weather: 'research-weather', news: 'research-news', settings: 'settings', pro: 'pro', mod: 'mod' };
 const TAB_OF = Object.fromEntries(Object.entries(HASH).map(([k, v]) => [v, k]));
-const NAV_OF = { compare: 'lineup', waivers: 'lineup', players: 'lineup', player: 'pool', teams: 'defenses', weather: 'defenses', news: 'defenses', mod: 'settings' };
+const NAV_OF = { compare: 'lineup', waivers: 'lineup', players: 'lineup', player: 'pool', user: 'pool', teams: 'defenses', weather: 'defenses', news: 'defenses', mod: 'settings' };
 const navOf = tab => NAV_OF[tab] || tab;
 /* An address: a page (TAB_OF), or a player's page, #player/<id> or #player/<id>/<tab> (PTABS). Null for anything else. */
 function parseHash(h = location.hash.slice(1)) {
   const m = /^player\/([^/]+)(?:\/(\w+))?$/.exec(h);
   if (m) { let id; try { id = decodeURIComponent(m[1]); } catch { return null; } return { tab: 'player', id, ptab: PTABS.some(t => t[0] === m[2]) ? m[2] : 'overview' }; }
+  const u = /^u\/([A-Za-z0-9_]{3,20})$/.exec(h); if (u) return { tab: 'user', handle: u[1] };   // a person's page, #u/<username>
   const tab = TAB_OF[h]; return tab ? { tab } : null;
 }
-function applyRoute(p) { state.tab = p.tab; if (p.tab === 'player') D.pp = { id: p.id, tab: p.ptab }; }
+function applyRoute(p) { state.tab = p.tab; if (p.tab === 'player') D.pp = { id: p.id, tab: p.ptab }; else if (p.tab === 'user') D.up = { handle: p.handle }; }
 const TEAM_TABS = new Set(['lineup', 'waivers', 'players']);
 const showWelcome = () => needsTeam() && TEAM_TABS.has(state.tab);
 /* Where a new page starts: the top, or, with the bar pinned, just where it pins, so the new page begins under it */
@@ -4318,9 +4325,10 @@ window.addEventListener('hashchange', () => {
   const fwd = D.fwdNav, h = location.hash.slice(1), samePlayer = p.tab === 'player' && state.tab === 'player' && D.pp?.id === p.id; D.fwdNav = false;
   if (D.curHash != null) D.scrollOf[D.curHash] = scrollY;
   D.curHash = h;
-  track('screen_viewed', { screen: p.tab === 'player' ? 'player' : HASH[p.tab], has_team: !needsTeam() });
+  track('screen_viewed', { screen: p.tab === 'player' ? 'player' : p.tab === 'user' ? 'profile' : HASH[p.tab], has_team: !needsTeam() });
   if (needsTeam() && p.tab !== 'pro') D.intent = INTENT_TABS.has(p.tab) ? p.tab : null;   // before there's a team: where setup lands (INTENT_TABS)
   if (p.tab === 'player' && state.tab !== 'player') D.pfrom = state.tab;
+  if (p.tab === 'user') D.ufrom = true;   // reached from inside the app: the page can offer a way back
   applyRoute(p); save(); render();
   if (!fwd && !samePlayer && D.scrollOf[h] != null) window.scrollTo(0, D.scrollOf[h]);
   else if (D.navScroll !== false && !samePlayer) window.scrollTo(0, navTop());
@@ -4363,7 +4371,7 @@ function render() {
   if (D.failed) { renderBrief(); main.innerHTML = `<div class="card panel"><h2>Couldn’t load this week’s data</h2><p style="margin:0">Sleeper and ESPN didn’t respond. Check your connection and press Refresh projections.</p></div>`; fxSync(false); return; }
   if (D.loading) { renderBrief(); main.innerHTML = `<div class="card loading"><h3>Loading week ${D.week || ''}</h3><div class="small">Projections, stats and schedules. Past seasons are saved after your first visit.</div><div class="bar"><span id="lbar" style="width:${Math.round(D.progress * 100)}%"></span></div></div>`; fxSync(false); return; }
   renderBrief();
-  main.innerHTML = ({ lineup: viewLineup, compare: viewCompare, waivers: viewWaivers, defenses: viewResearch, teams: viewResearch, news: viewResearch, players: viewPlayers, pool: viewPool, player: viewPlayer, settings: viewSettings, weather: viewResearch, pro: viewPro, mod: viewMod })[state.tab]();
+  main.innerHTML = ({ lineup: viewLineup, compare: viewCompare, waivers: viewWaivers, defenses: viewResearch, teams: viewResearch, news: viewResearch, players: viewPlayers, pool: viewPool, player: viewPlayer, user: viewUser, settings: viewSettings, weather: viewResearch, pro: viewPro, mod: viewMod })[state.tab]();
   talkAfterRender(); fxSync(false);
 }
 // an injury designation after "is": "on IR", "suspended", "out"
@@ -4772,12 +4780,12 @@ function accountPanel() {
       <p class="small muted" style="margin:0">Keep both adds this browser’s teams to your account, and a Sleeper or ESPN team on both counts once. The other two choices replace the teams on one side.</p></div>`;
   }
   // just signed in (or asked from the line below) and no username yet: the name their comments will carry
-  if (acct.user && acct.nameStep) return `<div class="card panel acct"><div class="row-head"><h2>Choose your username</h2></div>
-    <p style="margin:0">It shows on your comments and reactions in place of your email. Use 3 to 20 letters, numbers or underscores.</p>
+  if (acct.user && acct.nameStep) { const ren = !!acct.profile; return `<div class="card panel acct"><div class="row-head"><h2>${ren ? 'Change your username' : 'Choose your username'}</h2></div>
+    <p style="margin:0">${ren ? 'Your comments and reactions will show the new name. You can change it once every 30 days. ' : 'It shows on your comments and reactions in place of your email. '}Use 3 to 20 letters, numbers or underscores.</p>
     ${msg}<div class="field"><label class="label" for="acctHandle">Username</label><div class="acct-form"><input class="inp" id="acctHandle" maxlength="20" autocomplete="nickname" autocapitalize="off" spellcheck="false" value="${esc(D.drafts.handle || '')}" placeholder="Letters, numbers, _"><button type="button" class="btn primary" data-act="namesave">Save</button></div></div>
-    <div class="toolbar small"><button type="button" class="linkbtn" data-act="nameskip">Not now</button><span class="muted">You can choose one later, before your first comment.</span></div></div>`;
+    <div class="toolbar small"><button type="button" class="linkbtn" data-act="nameskip">${ren ? 'Cancel' : 'Not now'}</button>${ren ? '' : '<span class="muted">You can choose one later, before your first comment.</span>'}</div></div>`; }
   const uname = !talkOn() || acct.profile === undefined ? ''
-    : acct.profile ? `<p class="small" style="margin:0">Username: <strong>${esc(acct.profile.handle)}</strong></p>`
+    : acct.profile ? `<p class="small" style="margin:0">Username: <strong>${esc(acct.profile.handle)}</strong> · <button type="button" class="linkbtn" data-act="namepick">Change</button> · <a href="#u/${esc(acct.profile.handle)}" data-act="myprofile">My comments →</a></p>`
     : `<p class="small" style="margin:0">No username yet. <button type="button" class="linkbtn" data-act="namepick">Choose one →</button></p>`;
   if (acct.user) return `<div class="card panel acct"><div class="row-head"><h2>Account <span class="hsub ph-mask">${esc(acct.user.email || '')}</span></h2>${close}</div>
     <p style="margin:0">Your teams, settings and Benny’s weekly lineups sync to this account. Sign in with the same email on your phone or computer to see them there. <span id="acctSync" class="muted">${esc(syncText())}</span></p>
@@ -5608,15 +5616,32 @@ async function claimHandle(raw) {
   try { const [p] = await sbRest('profiles?select=handle', { method: 'POST', body: { user_id: acct.user.id, handle: h }, prefer: 'return=representation' }); acct.profile = p; return p; }
   catch (e) { throw new Error(e.code === '23505' ? `“${h}” is taken. Try another.` : e.code === '23514' ? 'That username isn’t available. Try another.' : talkErr(e)); }
 }
-// the Account panel's username step: save it, then close the panel; a refusal stays in the panel
+/* Change the username (the database allows one change every 30 days, and says when the next is). Comments point at the
+   profile, so every comment of theirs shows the new name. */
+async function renameHandle(raw) {
+  const h = String(raw || '').trim();
+  if (!/^[A-Za-z0-9_]{3,20}$/.test(h)) throw new Error('A username is 3 to 20 letters, numbers or underscores.');
+  if (h === acct.profile?.handle) throw new Error('That’s already your username.');
+  let rows;
+  try { rows = await sbRest(`profiles?user_id=eq.${acct.user.id}&select=handle`, { method: 'PATCH', body: { handle: h }, prefer: 'return=representation' }); }
+  catch (e) { throw new Error(e.code === '23505' ? `“${h}” is taken. Try another.` : e.code === '23514' ? (/^You can change/.test(e.message) ? e.message : 'That username isn’t available. Try another.') : talkErr(e)); }
+  if (!rows?.[0]) throw new Error('Your account can’t do that.');
+  return (acct.profile = rows[0]);
+}
+// the Account panel's username step: save it (or change it), then close the panel; a refusal stays in the panel
 async function saveName() {
   if (acct.nameBusy || !acct.user) return;
-  const h = $('#acctHandle')?.value ?? D.drafts.handle, where = acct.nameStep || 'account';
+  const h = $('#acctHandle')?.value ?? D.drafts.handle, where = acct.nameStep || 'account', was = acct.profile?.handle;
   acct.nameBusy = true; acct.msg = ['info', 'Saving…']; render();
   try {
-    const p = await claimHandle(h);
+    const p = was ? await renameHandle(h) : await claimHandle(h);
     acct.nameStep = false; acct.msg = null; D.acctOpen = false; D.drafts.handle = '';
-    track('username_set', { where }); render(); toast(`You’re ${p.handle}. That’s the name on your comments.`);
+    if (was) {
+      D.talk.clear(); D.user.clear();   // every cached comment and profile carries the old name
+      if (state.tab === 'user' && D.up?.handle.toLowerCase() === was.toLowerCase()) { D.up = { handle: p.handle }; try { history.replaceState(null, '', '#u/' + p.handle); D.curHash = 'u/' + p.handle; } catch { /* keep the address */ } }
+      track('handle_changed'); toast(`You’re now ${p.handle}.`);
+    } else { track('username_set', { where }); toast(`You’re ${p.handle}. That’s the name on your comments.`); }
+    render();
   } catch (e) { acct.msg = ['err', e.message]; render(); deskFocus('#acctHandle', true); }
   finally { acct.nameBusy = false; }
 }
@@ -5683,6 +5708,8 @@ async function react(key, emoji) {
 }
 
 const talkWho = c => esc(c.profiles?.handle || 'someone');
+// the name on a comment: a link to that person's page (#u/<username>)
+const talkWhoLink = c => c.profiles?.handle ? `<a class="uname" href="#u/${esc(c.profiles.handle)}">${esc(c.profiles.handle)}</a>` : 'someone';
 const talkCountTxt = id => { const n = D.talkN.get(id)?.n; return n ? `· ${n}` : ''; };
 /* A comment's text: escaped, with web addresses as links. Only http(s) addresses that parse become links; search engines
    are told not to credit them (ugc, nofollow), and a long one is shortened on screen. */
@@ -5714,7 +5741,7 @@ function commentHTML(c, { id, compact = false, nReplies = 0 } = {}) {
       <div class="talk-in-row"><span class="small muted">Only moderators see reports.</span><button type="button" class="btn sm" data-talkrep="${esc(c.id)}">Cancel</button><button type="submit" class="btn sm primary">Send report</button></div></form>` : ''}` : '';
   const wk = c.week ? `<span class="pill m" title="Posted in week ${c.week}${c.season ? ` of ${c.season}` : ''}">Wk ${c.week}${c.season && c.season !== D.season ? ` ’${String(c.season).slice(2)}` : ''}</span>` : '';
   return `<article class="cmt${c.parent_id ? ' reply' : ''}${c.hidden_at ? ' is-hidden' : ''}">
-    <div class="cmt-head"><strong>${talkWho(c)}</strong>${wk}<span class="small muted">${at ? `<time datetime="${esc(c.created_at)}" title="${esc(new Date(at).toLocaleString())}">${ago(at)}</time>` : ''}</span>${c.hidden_at ? `<span class="pill o">${c.hidden_reason === '__parent' ? 'Hidden with its thread' : c.hidden_reason === 'banned' ? 'Hidden: account banned' : 'Hidden'}</span>` : ''}</div>
+    <div class="cmt-head"><strong>${talkWhoLink(c)}</strong>${wk}<span class="small muted">${at ? `<time datetime="${esc(c.created_at)}" title="${esc(new Date(at).toLocaleString())}">${ago(at)}</time>` : ''}</span>${c.hidden_at ? `<span class="pill o">${c.hidden_reason === '__parent' ? 'Hidden with its thread' : c.hidden_reason === 'banned' ? 'Hidden: account banned' : 'Hidden'}</span>` : ''}</div>
     <div class="cmt-body${compact ? ' clamp' : ''}">${talkBody(c.body)}</div>
     <div class="cmt-acts">${rxBarHTML('c:' + c.id)}${acts.join('')}</div>${why}</article>`;
 }
@@ -5883,6 +5910,43 @@ function talkRefocus() {
   if (el) { el.focus({ preventScroll: true }); try { el.setSelectionRange(f.s, f.e); } catch { /* not a text box */ } }
 }
 function talkAfterRender() { if (talkNet()) { cntFlush(); rxFlush(); } if (state.tab === 'pool') talkHot(); talkRefocus(); }
+
+/* A person's page, #u/<username>: member since, how many comments are showing, and their latest 50 (hidden and deleted ones
+   left out). Their own page has the way to change the username. */
+function userLoad(handle) {
+  if (!talkNet()) return;
+  const k = handle.toLowerCase(), e = D.user.get(k);
+  if (e && (e.st === 'loading' || Date.now() - e.at < 60000)) return;
+  const cur = e || { st: 'loading', p: null, rows: [], at: 0 }; if (!e) D.user.set(k, cur); else if (cur.st === 'err') cur.st = 'loading';
+  cur.at = Date.now();
+  sbRest('rpc/profile_by_handle', { method: 'POST', body: { h: handle } })
+    .then(async r => {
+      cur.p = r?.[0] || null; cur.rows = [];
+      if (cur.p) cur.rows = await sbRest(`comments?author_id=eq.${cur.p.user_id}&hidden_at=is.null&deleted_at=is.null&select=id,player_id,parent_id,body,season,week,created_at&order=created_at.desc&limit=50`) || [];
+      cur.st = 'ok'; cur.at = Date.now();
+    })
+    .catch(e => { if (!talkMissing(e)) cur.st = cur.p ? 'ok' : 'err'; })
+    .finally(() => { if (state.tab === 'user' && D.up?.handle.toLowerCase() === k) render(); });
+}
+function viewUser() {
+  const h = D.up?.handle || '', k = h.toLowerCase();
+  const back = D.ufrom ? `<a href="#" class="small back-link" data-act="pback">← Back</a>` : '';
+  if (!talkOn()) return `<div class="section profile">${back}<div class="card panel"><h2>${esc(h)}</h2><p class="small muted" style="margin:0">Profiles aren’t available right now.</p></div></div>`;
+  userLoad(h);
+  const e = D.user.get(k);
+  if (!e || (e.st === 'loading' && !e.p)) return `<div class="card loading"><h3>Loading profile</h3></div>`;
+  if (e.st === 'err') return `<div class="section profile">${back}<div class="card panel"><h2>${esc(h)}</h2><p class="small muted" style="margin:0">Couldn’t load this profile. Check your connection and try again.</p></div></div>`;
+  if (!e.p) return `<div class="section profile">${back}<div class="card panel"><h2>No such user</h2><p style="margin:0">Nobody has the username “${esc(h)}”. <a href="#players" data-tab="pool">Search players</a></p></div></div>`;
+  const own = !!acct.user && e.p.user_id === acct.user.id, since = Date.parse(e.p.created_at);
+  trackOnce('pf:' + k, 'profile_viewed', { own });
+  const rows = e.rows.map(c => { const id = c.player_id, nm = D.U.get(id)?.name || 'a player', at = Date.parse(c.created_at);
+    return `<article class="pcmt"><div class="cmt-head">${c.parent_id ? 'Replied in ' : ''}<strong>${plink(id, esc(nm))}</strong>${c.week ? `<span class="pill m" title="Posted in week ${c.week}${c.season ? ` of ${c.season}` : ''}">Wk ${c.week}${c.season && c.season !== D.season ? ` ’${String(c.season).slice(2)}` : ''}</span>` : ''}<span class="small muted">${at ? `<time datetime="${esc(c.created_at)}">${ago(at)}</time>` : ''}</span></div>
+      <div class="cmt-body">${talkBody(c.body)}</div><div class="small"><a class="more-link" href="#${playerHash(id, 'talk')}">See the discussion →</a></div></article>`; }).join('');
+  return `<div class="section profile">${back}<div class="card phead"><div class="phead-main"><div class="phead-txt"><h2>${esc(e.p.handle)}</h2>
+      <div class="psub small muted">${since ? `Member since ${esc(new Date(since).toLocaleDateString([], { month: 'long', year: 'numeric' }))} · ` : ''}${e.p.n_comments} comment${e.p.n_comments === 1 ? '' : 's'}</div></div></div>
+    ${own ? `<div class="toolbar"><button type="button" class="btn sm" data-act="namepick">Change username</button></div>` : ''}</div>
+    <div class="card panel"><h3 style="margin:0">Latest comments</h3>${rows || `<p class="small muted" style="margin:0">${own ? 'You haven’t commented yet. Find a player and add your take.' : 'No comments yet.'}</p>`}${e.rows.length >= 50 ? `<p class="small muted" style="margin:0">Showing the latest 50.</p>` : ''}</div></div>`;
+}
 
 /* Watching a player: his news joins your players' in the alerts. Kept with the shared settings, so it syncs. */
 const watching = id => (state.watch || []).includes(id);
@@ -6539,7 +6603,8 @@ document.addEventListener('click', e => {
   else if (a === 'acctchoice') resolveChoice(t.dataset.how);
   else if (a === 'namesave') saveName();
   else if (a === 'nameskip') { acct.nameStep = false; acct.msg = null; D.acctOpen = false; track('username_skipped'); render(); }
-  else if (a === 'namepick') { acct.nameStep = 'account'; acct.msg = null; render(); deskFocus('#acctHandle'); }
+  else if (a === 'namepick') { acct.nameStep = 'account'; acct.msg = null; D.acctOpen = true; D.drafts.handle = acct.profile?.handle || ''; render(); revealPanel($('.acct')); deskFocus('#acctHandle'); }
+  else if (a === 'myprofile') { D.acctOpen = false; render(); }
   else if (a === 'acctsync') { acct.msg = null; pull().then(() => acct.ready && push()).then(pullHist); }
   else if (a === 'acctout') signOut();
   else if (a === 'acctdel') {
@@ -6777,7 +6842,7 @@ acctBoot();
     q.delete('league');
     try { history.replaceState(null, '', u.pathname + u.search + u.hash); } catch {}
   } }
-{ const p = parseHash(); if (p && needsTeam() && INTENT_TABS.has(p.tab)) D.intent = p.tab; if (state.tab === 'player' && !p) state.tab = 'pool';   // a player's page needs its address
+{ const p = parseHash(); if (p && needsTeam() && INTENT_TABS.has(p.tab)) D.intent = p.tab; if ((state.tab === 'player' || state.tab === 'user') && !p) state.tab = 'pool';   // a player's page needs its address
   if (p) applyRoute(p); else if (location.hash !== '#export' && !SELFTEST && HASH[state.tab]) { try { history.replaceState(null, '', '#' + HASH[state.tab]); } catch {} }
   D.curHash = location.hash.slice(1); }
 render();

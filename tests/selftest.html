@@ -941,10 +941,43 @@ test('account: the username step after sign-in, and the username line in the Acc
     acct.choice = null; acct.nameStep = false; h = ev('accountPanel')();
     if (/acctHandle/.test(h) || !/No username yet/.test(h) || !/data-act="namepick"/.test(h)) return 'no username: offers to choose one';
     acct.profile = { handle: 'benfan' }; h = ev('accountPanel')();
-    if (!/Username: <strong>benfan<\/strong>/.test(h) || /namepick/.test(h)) return 'with a username: shows it';
+    if (!/Username: <strong>benfan<\/strong>/.test(h) || /Choose one/.test(h) || !/data-act="namepick">Change</.test(h) || !/href="#u\/benfan"/.test(h)) return 'with a username: shows it, with Change and My comments';
+    acct.nameStep = 'account'; h = ev('accountPanel')();
+    if (!/Change your username/.test(h) || !/once every 30 days/.test(h) || !/>Cancel</.test(h)) return 'renaming: its own heading, the 30-day note and Cancel';
+    acct.nameStep = false;
     acct.profile = undefined; h = ev('accountPanel')();
     if (/Username:|No username yet/.test(h)) return 'not looked up yet: says nothing';
   } finally { [acct.on, acct.user, acct.profile, acct.nameStep, acct.choice, acct.msg] = was; }
+});
+test('profiles: #u/<username> parses, shows the person and their comments from the cache, and an unknown name says so', () => {
+  setup(); const D = ev('D'), st = ev('state'), was = [st.tab, D.up], gibbs = idOf('Jahmyr Gibbs');
+  try {
+    const p = ev('parseHash')('u/Benfan_1'); if (p?.tab !== 'user' || p.handle !== 'Benfan_1') return 'parseHash reads #u/<username>';
+    if (ev('parseHash')('u/ab') || ev('parseHash')('u/has space')) return 'a bad username is no route';
+    const at = new Date(Date.now() - 3600e3).toISOString();
+    D.user.set('benfan_1', { st: 'ok', at: Date.now(), p: { user_id: 'u-1', handle: 'Benfan_1', created_at: '2026-09-01T00:00:00Z', n_comments: 2 },
+      rows: [{ id: 'c1', player_id: gibbs, parent_id: null, body: 'Start <b>him</b> https://example.com/x', season: D.season, week: D.week, created_at: at },
+        { id: 'c2', player_id: gibbs, parent_id: 'c1', body: 'a reply', season: D.season, week: D.week, created_at: at }] });
+    st.tab = 'user'; D.up = { handle: 'benfan_1' }; let h = ev('viewUser')();
+    if (!/<h2>Benfan_1<\/h2>/.test(h) || !/2 comments/.test(h) || !/Member since/.test(h)) return 'the header: name, count, member since';
+    if (!h.includes(`href="#player/${gibbs}"`) || !h.includes(`href="#player/${gibbs}/talk"`)) return 'each comment links to the player and the thread';
+    if (h.includes('<b>') || !h.includes('&lt;b&gt;him') || !/rel="nofollow ugc noopener"/.test(h)) return 'comment text is escaped, links are marked';
+    if (!/Replied in/.test(h)) return 'a reply says so';
+    if (/Change username/.test(h)) return 'someone else’s page has no rename button';
+    const acct = ev('acct'), wasU = acct.user; acct.user = { id: 'u-1' };
+    try { if (!/data-act="namepick">Change username/.test(ev('viewUser')())) return 'your own page has the rename button'; } finally { acct.user = wasU; }
+    D.user.set('nobody_x', { st: 'ok', at: Date.now(), p: null, rows: [] }); D.up = { handle: 'nobody_x' };
+    if (!/No such user/.test(ev('viewUser')())) return 'an unknown username';
+  } finally { st.tab = was[0]; D.up = was[1]; D.user.clear(); }
+});
+test('profiles: a comment’s author links to their page; a “[deleted]” placeholder has no name or link', () => {
+  setup(); const D = ev('D'), gibbs = idOf('Jahmyr Gibbs');
+  try {
+    const rows = talkFixture(gibbs); let h = ev('commentHTML')(rows[0], { id: gibbs });
+    if (!/<a class="uname" href="#u\/carol">carol<\/a>/.test(h)) return 'the name is a link';
+    h = ev('commentHTML')({ id: 'x', player_id: gibbs, deleted_at: new Date().toISOString(), created_at: new Date().toISOString(), body: '' }, { id: gibbs });
+    if (/uname|href="#u\//.test(h) || !/\[deleted\]/.test(h)) return 'a placeholder has no name';
+  } finally { D.talk.clear(); D.talkN.clear(); D.rx.clear(); }
 });
 test('discussion: without the community tables nothing shows (no tab, no section, no counts)', () => {
   setup(); const D = ev('D'), st = ev('state'), was = [st.tab, D.pp], gibbs = idOf('Jahmyr Gibbs');

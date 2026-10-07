@@ -72,7 +72,7 @@ The comments on player pages and cards, the reactions and the reports use the ta
 5. **Whenever `community.sql` changes,** run it again. It upgrades the tables in place and keeps every comment.
 
 What the database enforces, whatever the page sends:
-- You can post only as yourself, and only once you have a username (`profiles.handle`: 3 to 20 letters, digits or underscores, unique ignoring case).
+- You can post only as yourself, and only once you have a username (`profiles.handle`: 3 to 20 letters, digits or underscores, unique ignoring case). A username can change once every 30 days (`profiles.handle_changed_at`, written only by the database; a change of letter case is free). `profile_by_handle` looks a person up for their `#u/username` page.
 - Nobody can edit a comment's text. Moderators can change only `hidden_at` and `hidden_reason`; hiding a thread's first comment hides its replies too, and restoring it brings them back.
 - Deleting a thread's first comment after other people replied leaves a "[deleted]" placeholder, with no text and no author, so their replies stay. The same happens when an account is deleted. A moderator who deletes the placeholder removes the whole thread.
 - Per account:
