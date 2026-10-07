@@ -1136,6 +1136,44 @@ test('polls: Start/Sit asks who you’d start; the split shows after your vote (
     setup(s2 => { s2.roster = []; s2.compare = [null, null]; }); if (/data-sspoll/.test(ev('viewCompare')())) return 'no poll on the example call';
   } finally { [acct.on, acct.user, D.ssOff, D.ssEdit] = was; D.ss.clear(); st.compare = [null, null]; setup(); }
 });
+test('polls: a shared poll link opens the poll as a dialog over the page; Skip, Escape and the backdrop give the page back; sign-in steps aside for the account form', () => {
+  setup(); const D = ev('D'), st = ev('state'), acct = ev('acct'), doc = W.document, render = ev('render'), was = [acct.on, acct.user, D.ssOff, st.tab, D.acctOpen];
+  const q = Object.values(D.M).filter(r => r.status === 'ok' && !r.locked && r.pos === 'WR').sort((x, y) => y.mean - x.mean);
+  if (q.length < 2) return 'two pregame WRs in the fixture';
+  const [x, y] = [q[0], q[1]], lo = x.id < y.id ? x.id : y.id, hi = x.id < y.id ? y.id : x.id, key = ev('ssKey')(lo, hi);
+  const host = () => doc.getElementById('pollModal'), open = () => !host().hidden, show = () => { D.sharedPoll = true; st.tab = 'compare'; st.compare = [x.id, y.id]; render(); };
+  const shut = (how, label) => {
+    how(); if (open() || D.sharedPoll || D.pollArgs) return `${label}: the dialog closes and the link's poll is spent`;
+    if (doc.body.classList.contains('modal-open') || doc.querySelector('[inert]')) return `${label}: the page is usable again`;
+    if (!doc.querySelector('#main [data-sspoll]')) return `${label}: the poll is still in the page`;
+  };
+  try {
+    acct.on = true; acct.user = { id: 'u-me' }; D.ssOff = false; D.ss.clear(); D.acctOpen = false;
+    D.ss.set(key, { st: 'ok', n: [4, 2], mine: null, at: Date.now() });   // no network in the self-test: a tally for the poll to show
+    D.sharedPoll = false; st.tab = 'compare'; st.compare = [x.id, y.id]; render();
+    if (open()) return 'a plain Start / Sit page has no dialog';
+    show();
+    const dlg = host().querySelector('[role="dialog"][aria-modal="true"]');
+    if (!open() || !dlg || !dlg.querySelector('[data-sspoll]') || host().querySelectorAll('[data-act="ssvote"]').length !== 2) return 'a shared poll link opens the poll in a dialog with a button for each player';
+    if (!doc.body.classList.contains('modal-open') || !doc.getElementById('main').closest('[inert]')) return 'the page behind is locked while it is open';
+    if (doc.getElementById('pmFoot').textContent !== 'Skip for now') return 'before a vote: Skip for now';
+    D.ss.set(key, { st: 'ok', n: [3, 1], mine: lo, at: Date.now() }); ev('ssPaint')(key);
+    if (doc.getElementById('pmFoot').textContent !== 'Continue' || !/Your pick/.test(host().textContent)) return 'after a vote: the split, then Continue';
+    let bad = shut(() => host().querySelector('#pmFoot').click(), 'Continue'); if (bad) return bad;
+    show(); bad = shut(() => doc.dispatchEvent(new W.KeyboardEvent('keydown', { key: 'Escape', bubbles: true })), 'Escape'); if (bad) return bad;
+    show(); bad = shut(() => host().querySelector('.modal-back').click(), 'the backdrop'); if (bad) return bad;
+    // signed out: Sign in to vote closes the dialog and opens the account form in the page
+    acct.user = null; D.ss.clear(); show();
+    const si = host().querySelector('[data-talksignin]'); if (!si) return 'signed out: the dialog offers Sign in to vote';
+    si.click(); if (open() || !D.acctOpen || doc.querySelector('[inert]')) return 'Sign in to vote closes the dialog and opens the account form';
+    // no poll on offer: no dialog, and the plain shared-call note is all that's left
+    D.acctOpen = false; D.ssOff = true; show();
+    if (open() || !/A shared start\/sit call/.test(doc.getElementById('main').textContent)) return 'without the poll in the database: no dialog, the shared-call note instead';
+  } finally {
+    D.sharedPoll = false; [acct.on, acct.user, D.ssOff, st.tab, D.acctOpen] = was; D.ss.clear(); st.compare = [null, null];
+    ev('hidePollModal')(); setup(); render();
+  }
+});
 test('discussion: Top sorts by reactions and replies; Newest marks where the week changes', () => {
   setup(); const D = ev('D'), st = ev('state'), was = [st.tab, D.pp, D.talkSort], gibbs = idOf('Jahmyr Gibbs');
   try {

@@ -590,6 +590,31 @@ a.uname:hover, a.uname:focus-visible { text-decoration: underline; text-decorati
 .poll-bar { grid-column: 1 / -1; height: 8px; border-radius: 4px; background: var(--surface-2); overflow: hidden; }
 .poll-bar span { display: block; height: 100%; background: var(--accent); }
 .poll-row.mine .poll-bar span { background: var(--good); }
+/* a shared poll link opens the poll over the page (syncPollModal): a centered card, a sheet from the bottom on a phone */
+body.modal-open { overflow: hidden; }
+body.modal-open .toast { z-index: 80; }
+.modal-back { position: fixed; inset: 0; z-index: 70; display: grid; place-items: center; padding: 16px; overflow-y: auto; background: color-mix(in srgb, var(--ink) 70%, transparent); }
+.modal-back[hidden] { display: none; }
+.modal { position: relative; width: min(440px, 100%); display: flex; flex-direction: column; gap: 12px; padding: 20px; border: 1px solid var(--line); border-radius: var(--radius); background: var(--surface); box-shadow: 0 24px 60px rgba(0, 0, 0, .35); }
+.modal:focus { outline: none; }
+.modal h2 { margin: 0; padding-right: 36px; }
+.modal p { margin: 0; }
+.modal .poll { padding: 0; border: 0; background: none; box-shadow: none; }
+.modal .poll .pick-head .label { display: none; }   /* the dialog's own title says it */
+.modal .poll .pick-head .pick-share { margin-left: auto; }
+.modal .poll-btns .btn { min-height: 52px; }
+.modal-x { position: absolute; top: 10px; right: 10px; width: 36px; height: 36px; border: 0; border-radius: 50%; background: transparent; color: var(--ink); font-size: 24px; line-height: 1; cursor: pointer; }
+.modal-x:hover { background: var(--surface-2); }
+@media (max-width: 680px) {
+  .modal-back { place-items: end center; padding: 0; }
+  .modal { width: 100%; border-radius: var(--radius) var(--radius) 0 0; border-width: 1px 0 0; padding: 20px 16px calc(16px + env(safe-area-inset-bottom, 0px)); }
+}
+@media (prefers-reduced-motion: no-preference) {
+  .modal-back { animation: modal-fade .18s ease-out; }
+  .modal { animation: modal-rise .22s ease-out; }
+  @keyframes modal-fade { from { opacity: 0; } }
+  @keyframes modal-rise { from { opacity: 0; transform: translateY(16px); } }
+}
 .pcmt { padding: 10px 0; border-top: 1px solid var(--line); display: flex; flex-direction: column; gap: 4px; }
 .pcmt:first-of-type { border-top: 0; }
 .cmt-head { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 8px; font-size: 14px; }
@@ -938,6 +963,7 @@ button, .btn, [role="button"], [role="tab"], nav, nav a, summary { -webkit-touch
   .stick { background: color-mix(in srgb, var(--bg) 78%, transparent); -webkit-backdrop-filter: blur(12px) saturate(1.4); backdrop-filter: blur(12px) saturate(1.4); }
   .toast { background: color-mix(in srgb, var(--ink) 86%, transparent); -webkit-backdrop-filter: blur(10px); backdrop-filter: blur(10px); }
   .updbar { background: color-mix(in srgb, #075b37 88%, transparent); -webkit-backdrop-filter: blur(10px); backdrop-filter: blur(10px); }
+  .modal-back { background: color-mix(in srgb, var(--ink) 38%, transparent); -webkit-backdrop-filter: blur(10px); backdrop-filter: blur(10px); }
 }
 </style>
 
@@ -973,6 +999,7 @@ button, .btn, [role="button"], [role="tab"], nav, nav a, summary { -webkit-touch
   <footer class="foot small muted"><span>© 2026 Benny’s Picks</span><a href="weekly/waiver-wire/">Waiver wire</a><a href="weekly/rankings/">Rankings</a><a href="weekly/defense-rankings/">Defense rankings</a><a href="weekly/weather/">NFL weather</a><a href="privacy.html">Privacy</a><a href="terms.html">Terms</a><a href="about.html">About</a><a href="contact.html">Contact</a><a href="#pro" data-tab="pro">Pro</a></footer>
   <div class="toast" id="toast" role="status" aria-live="polite" hidden></div>
 </div>
+<div id="pollModal" hidden></div>
 
 <script>
 'use strict';
@@ -4372,6 +4399,7 @@ function weekOptions() {
 function render() {
   // no team yet, on a page that needs one: the welcome takes the page, under the main tabs
   const welcome = D.welcome = showWelcome();
+  D.pollArgs = null;   // viewCompare sets it again when a shared poll is on offer (syncPollModal)
   if (!needsTeam() && !D.flow) D.intent = null;   // set up some other way (a synced account, say): the link's destination no longer applies
   document.body.classList.toggle('welcome', welcome);
   document.body.classList.toggle('wsign', welcome && acct.on && !acct.user);   // the header's Sign in stands in for the welcome's own link
@@ -4381,7 +4409,7 @@ function render() {
   if (welcome) {
     for (const s of ['#teampin', '#teamctx', '#panels', '#brief', '#msgs']) $(s).innerHTML = '';
     renderStatus(); renderAcct(); renderAd();
-    $('#main').innerHTML = viewWelcome(); fxSync(true); return;
+    $('#main').innerHTML = viewWelcome(); fxSync(true); syncPollModal(); return;
   }
   const pb = $('#proBtn'); if (pb) { pb.hidden = !acct.on; pb.textContent = isPro() ? 'Pro ✓' : 'Go Pro'; pb.classList.toggle('is-pro', isPro()); pb.setAttribute('aria-pressed', String(state.tab === 'pro')); }
   renderStatus(); renderAcct(); renderAd();
@@ -4398,11 +4426,11 @@ function render() {
   if (!D.loading && !D.snapshot && D.errors.some(e => /projections|schedule/i.test(e))) msgs.push(`<div class="banner err"><strong>Some of this week’s data didn’t load.</strong> Picks may be incomplete. Press Refresh to try again.</div>`);
   $('#msgs').innerHTML = msgs.join('');
   const main = $('#main');
-  if (D.failed) { renderBrief(); main.innerHTML = `<div class="card panel"><h2>Couldn’t load this week’s data</h2><p style="margin:0">Sleeper and ESPN didn’t respond. Check your connection and press Refresh projections.</p></div>`; fxSync(false); return; }
-  if (D.loading) { renderBrief(); main.innerHTML = `<div class="card loading"><h3>Loading week ${D.week || ''}</h3><div class="small">Projections, stats and schedules. Past seasons are saved after your first visit.</div><div class="bar"><span id="lbar" style="width:${Math.round(D.progress * 100)}%"></span></div></div>`; fxSync(false); return; }
+  if (D.failed) { renderBrief(); main.innerHTML = `<div class="card panel"><h2>Couldn’t load this week’s data</h2><p style="margin:0">Sleeper and ESPN didn’t respond. Check your connection and press Refresh projections.</p></div>`; fxSync(false); syncPollModal(); return; }
+  if (D.loading) { renderBrief(); main.innerHTML = `<div class="card loading"><h3>Loading week ${D.week || ''}</h3><div class="small">Projections, stats and schedules. Past seasons are saved after your first visit.</div><div class="bar"><span id="lbar" style="width:${Math.round(D.progress * 100)}%"></span></div></div>`; fxSync(false); syncPollModal(); return; }
   renderBrief();
   main.innerHTML = ({ lineup: viewLineup, compare: viewCompare, waivers: viewWaivers, defenses: viewResearch, teams: viewResearch, news: viewResearch, players: viewPlayers, pool: viewPool, player: viewPlayer, user: viewUser, settings: viewSettings, weather: viewResearch, pro: viewPro, mod: viewMod })[state.tab]();
-  talkAfterRender(); fxSync(false);
+  talkAfterRender(); fxSync(false); syncPollModal();
 }
 // an injury designation after "is": "on IR", "suspended", "out"
 const injWords = inj => /^ir/i.test(inj || '') ? 'on IR' : /^pup/i.test(inj || '') ? 'on the PUP list' : /^sus/i.test(inj || '') ? 'suspended' : /^na/i.test(inj || '') ? 'not with the team' : (inj || 'out').toLowerCase();
@@ -6066,6 +6094,7 @@ function pollHTML(lo, hi, w, first) {
 }
 function ssPaint(k) {
   document.querySelectorAll(`[data-sspoll="${qv(k)}"]`).forEach(el => { if (D.ssOff) el.remove(); else el.innerHTML = ssInner(el.dataset.lo, el.dataset.hi, el.dataset.w, el.dataset.first); });
+  pmFoot();
 }
 async function ssVote(k, pick, w) {
   if (!acct.user) return talkSignIn();
@@ -6086,6 +6115,41 @@ async function ssVote(k, pick, w) {
     e.mine = prev; e.n = before; toast(ssMissing(x) ? 'Polls aren’t available right now.' : talkErr(x));
   } finally { e.busy = false; ssPaint(k); ssLoad(lo, hi, true); }
 }
+
+/* A shared poll link (poll=1) opens the poll over the page, and the page stays behind it until the poll is voted on or
+   dismissed. The dialog is built once per poll; its card carries data-sspoll, so ssPaint keeps it current like the one in
+   the page. viewCompare sets D.pollArgs when the poll is on offer, so no poll, no dialog. */
+let pmFrom = null;
+const pmPage = () => [...document.querySelectorAll('.wrap > :not(#toast)')];
+function pmFoot() { const el = $('#pmFoot'), p = D.pollArgs; if (el && p) el.textContent = D.ss.get(ssKey(p.lo, p.hi))?.mine || !acct.on ? 'Continue' : 'Skip for now'; }
+function syncPollModal() {
+  const host = $('#pollModal'), p = D.pollArgs;
+  if (!(D.sharedPoll && p && state.tab === 'compare')) { if (!host.hidden) hidePollModal(); return; }
+  const k = ssKey(p.lo, p.hi); if (!host.hidden && host.dataset.k === k) return;
+  pmFrom = document.activeElement; host.dataset.k = k;
+  const nm = id => `<strong>${esc(D.U.get(id)?.name || id)}</strong>`, [one, two] = p.first === p.hi ? [p.hi, p.lo] : [p.lo, p.hi];   // signed out there are no vote buttons to name them
+  host.innerHTML = `<div class="modal-back"><div class="modal" role="dialog" aria-modal="true" aria-labelledby="pmT" tabindex="-1">
+    <button type="button" class="modal-x" data-act="pollclose" aria-label="Close">×</button>
+    <div><h2 id="pmT">Who would you start?</h2><p class="muted">${nm(one)} or ${nm(two)}? Someone shared this poll with you.</p></div>
+    <div class="card poll" data-sspoll="${esc(k)}" data-lo="${esc(p.lo)}" data-hi="${esc(p.hi)}" data-w="${esc(p.w)}" data-first="${esc(p.first)}">${ssInner(p.lo, p.hi, p.w, p.first)}</div>
+    <button type="button" class="btn primary" id="pmFoot" data-act="pollclose"></button></div></div>`;
+  host.hidden = false; document.body.classList.add('modal-open'); pmPage().forEach(el => { el.inert = true; }); pmFoot();
+  (host.querySelector('.poll-btns .btn') || host.querySelector('.modal')).focus({ preventScroll: true });
+  track('shared_poll_shown', { has_team: !needsTeam() });
+}
+function hidePollModal() {
+  const host = $('#pollModal'); host.hidden = true; host.innerHTML = ''; delete host.dataset.k;
+  document.body.classList.remove('modal-open'); pmPage().forEach(el => { el.inert = false; });
+}
+// done with it (a vote, a skip, Escape, the backdrop) or off to sign in (scroll false); either way the page is theirs again
+function closePollModal(scroll = true) {
+  const p = D.pollArgs, voted = !!(p && D.ss.get(ssKey(p.lo, p.hi))?.mine), from = pmFrom; pmFrom = null;
+  D.sharedPoll = false; D.pollArgs = null; hidePollModal(); render();
+  if (scroll) $('[data-sspoll]')?.scrollIntoView({ block: 'center' }); else from?.isConnected && from.focus?.({ preventScroll: true });
+  track('shared_poll_dismissed', { voted });
+}
+$('#pollModal').addEventListener('click', e => { if (e.target.classList.contains('modal-back')) closePollModal(); });
+document.addEventListener('keydown', e => { if (e.key === 'Escape' && !$('#pollModal').hidden) { e.preventDefault(); closePollModal(); } });
 
 /* Watching a player: his news joins your players' in the alerts. Kept with the shared settings, so it syncs. */
 const watching = id => (state.watch || []).includes(id);
@@ -6236,7 +6300,7 @@ document.addEventListener('click', e => {
   const d = t.dataset, pid = () => t.closest('[data-talk-thread]')?.dataset.talkThread || D.pp?.id;
   if (d.react) { const [k, em] = d.react.split('|'); react(k, em); return; }
   if (d.rxpick) { const was = D.rxPick; D.rxPick = was === d.rxpick ? null : d.rxpick; if (was && was !== d.rxpick) rxPaint(was); rxPaint(d.rxpick); return; }
-  if (d.talksignin !== undefined) { talkSignIn(); return; }
+  if (d.talksignin !== undefined) { if (t.closest('#pollModal')) closePollModal(false); talkSignIn(); return; }   // the sign-in form is in the page, so the poll steps aside for it
   if (d.talkreply) { if (!acct.user) return talkSignIn(); const id = pid(); D.replyTo = D.replyTo === d.talkreply ? null : d.talkreply; D.talkFocus = D.replyTo ? { k: 'r:' + D.replyTo, s: 0, e: 0 } : null; talkPaint(id); return; }
   if (d.talkmore) { D.talkMore.add(d.talkmore); talkPaint(pid()); return; }
   if (d.talkshare) { shareComment(pid(), d.talkshare); return; }
@@ -6456,7 +6520,10 @@ function viewCompare() {
       ${classicCallNote(A, Bp, w) ? `<div class="small muted">${esc(classicCallNote(A, Bp, w))}</div>` : ''}
       ${gnote ? `<div class="pick-note">${esc(gnote)}</div>` : ''}
       ${modelNote()}</div>`;
-    if (!example) { const [lo, hi] = a < b ? [a, b] : [b, a]; verdict += pollHTML(lo, hi, w.id, a); }
+    if (!example) {
+      const [lo, hi] = a < b ? [a, b] : [b, a], poll = pollHTML(lo, hi, w.id, a); verdict += poll;
+      if (poll && D.sharedPoll && state.compare[0] === a && state.compare[1] === b) D.pollArgs = { lo, hi, w: w.id, first: a };   // a shared poll link: syncPollModal opens it over the page
+    }
   }
   const dec = reviewDecisions(), decShown = isPro() ? dec : dec.slice(0, 1), decMore = dec.length - decShown.length;
   const decBar = example && A && Bp ? `<div class="banner info small">An example close call: two ${esc(posLabel(A.pos))}s with nearly the same projection this week. Pick any two players above.</div>`
@@ -6468,9 +6535,7 @@ function viewCompare() {
     ${why.length ? `<ul class="reasons">${why.map(x => `<li class="${x.up ? 'up' : 'down'}"><span class="rv">${spct(x.pct)}</span> ${esc(x.text)}</li>`).join('')}</ul>` : ''}
     ${isPro() ? `<details class="more"><summary>All factors</summary>${factorList(r)}${r.scheme ? `<div class="scheme"><strong>Scheme:</strong> ${esc(r.scheme)}</div>` : ''}</details>
     <details class="more"><summary>Coaching and scheme matchup</summary>${schemeBlock(r)}</details>` : lockLine('Every matchup factor and the coaching matchup')}</div>`; };
-  const sharedNote = D.sharedPoll && A && Bp && state.compare[0] === a && state.compare[1] === b
-    ? `<div class="banner info small exban"><span><strong>Someone asked who you’d start.</strong> Vote below to see what everyone else thinks.</span><button type="button" class="btn sm" data-act="sharedcallx">Dismiss</button></div>`
-    : D.sharedCall && A && Bp && state.compare[0] === a && state.compare[1] === b
+  const sharedNote = (D.sharedCall || (D.sharedPoll && !D.pollArgs)) && A && Bp && state.compare[0] === a && state.compare[1] === b
     ? `<div class="banner info small exban"><span><strong>A shared start/sit call.</strong> Benny’s numbers here are live and in ${esc(fmtName(true))} scoring, so they can differ from when it was shared.</span><button type="button" class="btn sm" data-act="sharedcallx">Dismiss</button></div>` : '';
   return `<div class="section">${sharedNote}${decBar}<div class="cmp"><div class="field"><label class="label" for="cmp0">Player A</label>${pick(0, A)}</div><div class="field"><label class="label" for="cmp1">Player B</label>${pick(1, Bp)}</div></div>${verdict}<h2>Side by side</h2><div class="cmp">${col(A)}${col(Bp)}</div></div>`;
 }
@@ -6761,6 +6826,7 @@ document.addEventListener('click', e => {
   else if (a === 'nameskip') { acct.nameStep = false; acct.msg = null; D.acctOpen = false; track('username_skipped'); render(); }
   else if (a === 'namepick') { acct.nameStep = 'account'; acct.msg = null; D.acctOpen = true; D.drafts.handle = acct.profile?.handle || ''; render(); revealPanel($('.acct')); deskFocus('#acctHandle'); }
   else if (a === 'myprofile') { D.acctOpen = false; render(); }
+  else if (a === 'pollclose') closePollModal();
   else if (a === 'ssvote') ssVote(t.dataset.ss, t.dataset.pick, t.dataset.w);
   else if (a === 'ssedit') { D.ssEdit = t.dataset.ss; ssPaint(t.dataset.ss); }
   else if (a === 'ssretry') { const [, , lo, hi] = t.dataset.ss.split('|'); ssLoad(lo, hi, true); }
@@ -6978,7 +7044,7 @@ acctBoot();
 { const u = new URL(location.href), q = u.searchParams, idOk = s => /^[\w-]{1,12}$/.test(s || '') && !(s in {});   // not "constructor" and the like
   if (q.has('start') || q.has('sit')) {
     if (idOk(q.get('start')) && idOk(q.get('sit'))) { state.compare = [q.get('start'), q.get('sit')]; D.sharedCall = true; track('shared_call_opened', { has_team: !needsTeam() });
-      if (q.get('poll') === '1') { D.sharedCall = false; D.sharedPoll = true; D.after = () => $('[data-sspoll]')?.scrollIntoView({ block: 'center' }); track('shared_poll_opened', { has_team: !needsTeam() }); } }
+      if (q.get('poll') === '1') { D.sharedCall = false; D.sharedPoll = true; track('shared_poll_opened', { has_team: !needsTeam() }); } }
     q.delete('start'); q.delete('sit'); q.delete('poll');
     try { history.replaceState(null, '', u.pathname + u.search + u.hash); } catch {}
   } }
