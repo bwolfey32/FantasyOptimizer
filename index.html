@@ -572,6 +572,7 @@ a.more-link, a.plink.more-link { color: var(--accent); font-weight: 600; }
 .cmt-body a { color: var(--accent); overflow-wrap: anywhere; }
 .cweek { margin: 10px 0 2px; color: var(--muted); }
 .talk .row-head .talksort { margin: 0; }
+a.mention { font-weight: 600; }
 a.uname { color: inherit; text-decoration: none; }
 a.uname:hover, a.uname:focus-visible { text-decoration: underline; text-decoration-color: var(--accent); text-underline-offset: 3px; }
 .profile .back-link { align-self: flex-start; text-decoration: none; font-weight: 600; }
@@ -5597,7 +5598,7 @@ const talkErr = e => e?.code === 'timeout' || e instanceof TypeError ? 'Couldn�
 function talkSignIn() { D.alertsOpen = false; if (!acct.on) return; if (!D.acctOpen) { D.acctOpen = true; acct.msg = ['info', 'Sign in to join the discussion. It’s free.']; } render(); window.scrollTo(0, 0); deskFocus('#acctEmail'); }
 // after sign-in or sign-out: their username and whether they moderate, and every cache that depends on who's asking
 function talkMe() {
-  acct.profile = undefined; acct.admin = false; acct.replies = []; D.talk.clear(); D.rx.clear(); D.mod = null;
+  acct.profile = undefined; acct.admin = false; acct.replies = []; acct.mentions = []; acct.rxAlerts = []; D.talk.clear(); D.rx.clear(); D.mod = null;
   if (!acct.user || !talkNet()) return (acct.meP = Promise.resolve());
   // kept so a fresh sign-in can wait for the username lookup (signedInDone) without asking twice
   return (acct.meP = (async () => {
@@ -5714,6 +5715,14 @@ const talkCountTxt = id => { const n = D.talkN.get(id)?.n; return n ? `· ${n}` 
 /* A comment's text: escaped, with web addresses as links. Only http(s) addresses that parse become links; search engines
    are told not to credit them (ugc, nofollow), and a long one is shortened on screen. */
 const TALK_URL = /\b(?:https?:\/\/|www\.)[^\s<>"']+/gi;
+/* @username in a comment's plain text links to that person's page (#u/name). A name is 3 to 20 letters, digits or underscores
+   and doesn't follow a letter, digit, underscore or @ (so an email address isn't one); the database notifies the same names. */
+const TALK_AT = /(^|[^A-Za-z0-9_@])@([A-Za-z0-9_]{3,20})(?![A-Za-z0-9_])/g;
+function talkText(t) {
+  let out = '', i = 0;
+  for (const m of t.matchAll(TALK_AT)) { const at = m.index + m[1].length; out += esc(t.slice(i, at)) + `<a class="mention" href="#u/${m[2]}">@${m[2]}</a>`; i = at + 1 + m[2].length; }
+  return out + esc(t.slice(i));
+}
 function talkBody(s) {
   s = String(s ?? ''); let out = '', i = 0;
   for (const m of s.matchAll(TALK_URL)) {
@@ -5721,10 +5730,10 @@ function talkBody(s) {
     let u = null; try { u = new URL(/^www\./i.test(raw) ? 'https://' + raw : raw); } catch { /* not an address */ }
     if (!u || !/^https?:$/.test(u.protocol)) continue;
     const shown = raw.replace(/^https?:\/\//i, '');
-    out += esc(s.slice(i, m.index)) + `<a href="${esc(u.href)}" target="_blank" rel="nofollow ugc noopener">${esc(shown.length > 40 ? shown.slice(0, 39) + '…' : shown)}</a>`;
+    out += talkText(s.slice(i, m.index)) + `<a href="${esc(u.href)}" target="_blank" rel="nofollow ugc noopener">${esc(shown.length > 40 ? shown.slice(0, 39) + '…' : shown)}</a>`;
     i = m.index + raw.length;
   }
-  return out + esc(s.slice(i));
+  return out + talkText(s.slice(i));
 }
 function commentHTML(c, { id, compact = false, nReplies = 0 } = {}) {
   // deleted by its author after others replied: kept as a placeholder so the replies still read in context
@@ -5785,7 +5794,7 @@ function composerHTML(id, { compact = false } = {}) {
   const k = 'p:' + id, need = acct.profile === null, nm = esc(D.U.get(id)?.name || 'him');
   return `<form class="talk-in" data-talkform="${esc(id)}">${need ? `<div class="talk-handle"><label class="small" for="th-${esc(id)}">Choose a username</label><input class="inp" id="th-${esc(id)}" data-talkhandle maxlength="20" autocomplete="nickname" placeholder="Letters, numbers, _" value="${esc(D.drafts.handle || '')}"></div>` : ''}
     <textarea class="inp" rows="${compact ? 1 : 2}" maxlength="1000" data-talkin="${esc(k)}" aria-label="Comment about ${nm}" placeholder="${compact ? 'Add a comment' : `What’s your take on ${nm}?`}">${esc(D.drafts[k] || '')}</textarea>
-    <div class="talk-in-row"><span class="small muted">${need ? 'Pick a username once; it shows on everything you post.' : acct.profile ? `Posting as <strong>${esc(acct.profile.handle)}</strong>` : ''}</span><span class="small talk-msg" data-talk-msg="${esc(k)}" role="status"></span><button type="submit" class="btn sm primary">Post</button></div></form>`;
+    <div class="talk-in-row"><span class="small muted">${need ? 'Pick a username once; it shows on everything you post.' : acct.profile ? `Posting as <strong>${esc(acct.profile.handle)}</strong> · @username notifies someone` : ''}</span><span class="small talk-msg" data-talk-msg="${esc(k)}" role="status"></span><button type="submit" class="btn sm primary">Post</button></div></form>`;
 }
 /* The discussion block: on his page (no limit, whole threads) and on cards (the newest two, compact). Starts loading
    his comments if they aren't loaded. */
@@ -5965,13 +5974,20 @@ function alertItems() {
   const since = alertsSince(), ids = new Set([...(state.watch || []), ...state.roster]), wk = Date.now() - 7 * 864e5;
   const news = (D.news?.d?.items || []).filter(i => { const t = Date.parse(i.t); return t > since && t > wk && i.ids?.some(id => ids.has(id)); });
   const reps = (acct.replies || []).filter(c => Date.parse(c.created_at) > since);
-  return { news, reps, n: news.length + reps.length };
+  const ments = (acct.mentions || []).filter(c => Date.parse(c.created_at) > since), rxs = (acct.rxAlerts || []).filter(g => Date.parse(g.last_at) > since);
+  return { news, reps, ments, rxs, n: news.length + reps.length + ments.length + rxs.length };
 }
 async function alertsLoad() {
-  if (!acct.user || !talkNet()) { acct.replies = []; return renderBell(); }
+  if (!acct.user || !talkNet()) { acct.replies = []; acct.mentions = []; acct.rxAlerts = []; return renderBell(); }
   const since = new Date(Math.max(state.alertsSeen || 0, Date.now() - 14 * 864e5)).toISOString();
-  try { acct.replies = await sbRest('rpc/my_replies?select=id,player_id,parent_id,author_id,body,created_at,profiles(handle)', { method: 'POST', body: { since } }) || []; }
-  catch (e) { talkMissing(e); }
+  try {
+    // replies, mentions and reactions in one request; a database from before my_alerts gives just the replies
+    try { const a = await sbRest('rpc/my_alerts', { method: 'POST', body: { since } }); acct.replies = a?.replies || []; acct.mentions = a?.mentions || []; acct.rxAlerts = a?.reactions || []; }
+    catch (e) {
+      if (e?.code !== 'PGRST202') throw e;
+      acct.replies = await sbRest('rpc/my_replies?select=id,player_id,parent_id,author_id,body,created_at,profiles(handle)', { method: 'POST', body: { since } }) || []; acct.mentions = []; acct.rxAlerts = [];
+    }
+  } catch (e) { talkMissing(e); }
   renderBell();
 }
 function renderBell() {
@@ -5986,17 +6002,22 @@ function renderBell() {
 }
 function toggleAlerts() {
   if (D.alertsOpen) { D.alertsOpen = false; D.alertsSince = null; }
-  else { D.alertsSince = alertsSince(); D.alertsOpen = true; D.acctOpen = false; state.alertsSeen = Date.now(); save(); track('alerts_opened', { n: alertItems().n }); }
+  else { D.alertsSince = alertsSince(); D.alertsOpen = true; D.acctOpen = false; state.alertsSeen = Date.now(); save(); { const al = alertItems(); track('alerts_opened', { n: al.n, replies: al.reps.length, mentions: al.ments.length, reactions: al.rxs.length }); } }
   render(); if (D.alertsOpen) $('#panels .alerts')?.focus();
 }
 function alertsPanel() {
-  const { news, reps } = alertItems(), W = (state.watch || []).length;
-  const items = [...reps.map(c => ({ t: c.created_at, h: `<li class="nitem"><div class="nmeta"><span class="pill n">Reply</span><span class="small muted">${ago(Date.parse(c.created_at))}</span></div>
+  const { news, reps, ments, rxs } = alertItems(), W = (state.watch || []).length, pname = id => esc(D.U.get(id)?.name || 'player');
+  const items = [...ments.map(c => ({ t: c.created_at, h: `<li class="nitem"><div class="nmeta"><span class="pill n">Mention</span><span class="small muted">${ago(Date.parse(c.created_at))}</span></div>
+      <div class="ntitle"><a href="#${playerHash(c.player_id, 'talk')}">${talkWho(c)} mentioned you in the ${pname(c.player_id)} discussion</a></div><div class="small muted clamp">${esc(c.body)}</div></li>` })),
+    ...rxs.map(g => { const em = Object.entries(g.emoji || {}).sort((a, b) => b[1] - a[1] || (a[0] < b[0] ? -1 : 1)), n = em.reduce((t, x) => t + x[1], 0);
+      return { t: g.last_at, h: `<li class="nitem"><div class="nmeta"><span class="pill m">Reactions</span><span class="small muted">${ago(Date.parse(g.last_at))}</span></div>
+      <div class="ntitle"><a href="#${playerHash(g.player_id, 'talk')}">${n} reaction${n === 1 ? '' : 's'} ${em.map(x => x[0]).join('')} on your comment about ${pname(g.player_id)}</a></div><div class="small muted clamp">${esc(g.snippet || '')}</div></li>` }; }),
+    ...reps.map(c => ({ t: c.created_at, h: `<li class="nitem"><div class="nmeta"><span class="pill n">Reply</span><span class="small muted">${ago(Date.parse(c.created_at))}</span></div>
       <div class="ntitle"><a href="#${playerHash(c.player_id, 'talk')}">${talkWho(c)} replied in the ${esc(D.U.get(c.player_id)?.name || 'player')} discussion</a></div><div class="small muted clamp">${esc(c.body)}</div></li>` })),
     ...news.map(i => ({ t: i.t, h: newsItemHTML(i) }))].sort((a, b) => a.t < b.t ? 1 : -1);
   return `<div class="card panel alerts" tabindex="-1" role="region" aria-label="Alerts"><div class="row-head"><h2>Alerts</h2><button type="button" class="btn sm" data-bell>Close</button></div>
     ${items.length ? `<ul class="nlist">${items.map(x => x.h).join('')}</ul>` : `<p class="small muted" style="margin:0">Nothing new since you last looked.</p>`}
-    <p class="small muted" style="margin:0">News about the players on ${esc(curTeam()?.name || 'your team')}${W ? ` and the ${W} player${W === 1 ? '' : 's'} you watch` : ''}${acct.user ? ', and replies in discussions you’ve joined' : ''}. ${W ? '' : 'Watch any player from his page to add his news. '}${!acct.user && acct.on && talkOn() ? 'Sign in to hear about replies to your comments.' : ''}</p></div>`;
+    <p class="small muted" style="margin:0">News about the players on ${esc(curTeam()?.name || 'your team')}${W ? ` and the ${W} player${W === 1 ? '' : 's'} you watch` : ''}${acct.user ? ', and replies, @mentions and reactions on your comments' : ''}. ${W ? '' : 'Watch any player from his page to add his news. '}${!acct.user && acct.on && talkOn() ? 'Sign in to hear about replies to your comments.' : ''}</p></div>`;
 }
 
 /* #mod, for moderators (the database refuses everyone else whatever this page shows):

@@ -1016,6 +1016,40 @@ test('discussion: web addresses in comments become safe links, and nothing else 
   if (a('https://a.co https://b.co').length !== 2) return 'two links';
   if (!/>example\.com\/[a-z]+…<\/a>/.test(tb('https://example.com/' + 'a'.repeat(80)))) return 'a long address is shortened on screen';
 });
+test('mentions: @username links to that profile; emails, long runs and other people’s URLs don’t; everything stays escaped', () => {
+  const tb = ev('talkBody');
+  let h = tb('hey @Benfan_1, nice take. (@bob_22) and @al');
+  if (!h.includes('<a class="mention" href="#u/Benfan_1">@Benfan_1</a>, nice') || !h.includes('(<a class="mention" href="#u/bob_22">@bob_22</a>)')) return 'two names link: ' + h;
+  if (h.includes('href="#u/al"')) return 'a name under 3 characters is not a mention';
+  if (/href="#u\//.test(tb('mail me at x@example.com or a@@bob_22 or @' + 'a'.repeat(21)))) return 'an email, a double @ and a name over 20 characters are not mentions';
+  h = tb('@bob_22 see https://x.com/@carol_9 and www.y.com/@dave_9 <b>@eve_9</b>');
+  if ((h.match(/class="mention"/g) || []).length !== 2 || !h.includes('@eve_9</a>') || !h.startsWith('<a class="mention" href="#u/bob_22">')) return 'only names in plain text link: ' + h;
+  if (h.includes('<b>') || !h.includes('&lt;b&gt;')) return 'markup stays escaped';
+  if (!/@username notifies someone/.test((() => { const acct = ev('acct'), was = [acct.on, acct.user, acct.profile]; try { acct.on = true; acct.user = { id: 'u-me' }; acct.profile = { handle: 'me_1' }; return ev('composerHTML')(idOf('Jahmyr Gibbs')); } finally { [acct.on, acct.user, acct.profile] = was; } })())) return 'the composer says @username notifies someone';
+});
+test('bell: mentions and reactions to your comments join replies and news, and fall back to replies alone', () => {
+  setup(); const acct = ev('acct'), D = ev('D'), st = ev('state'), gibbs = idOf('Jahmyr Gibbs'), nm = D.U.get(gibbs).name;
+  const was = [acct.user, acct.replies, acct.mentions, acct.rxAlerts, st.alertsSeen, D.alertsSince, D.news, st.watch];
+  try {
+    const t = m => new Date(Date.now() - m * 60000).toISOString();
+    acct.user = { id: 'u-me' }; st.alertsSeen = Date.now() - 864e5; D.alertsSince = null; D.news = { st: 'ok', at: Date.now(), d: { items: [] } }; st.watch = [];
+    acct.replies = [{ id: 'r1', player_id: gibbs, body: 'a reply', created_at: t(5), profiles: { handle: 'bob_1' } }];
+    acct.mentions = [{ id: 'm1', player_id: gibbs, body: 'hey @me <b>x</b>', created_at: t(4), profiles: { handle: 'carol_2' } }];
+    acct.rxAlerts = [{ comment_id: 'c1', player_id: gibbs, snippet: 'my <i>take</i>', emoji: { '👍': 1, '🔥': 2 }, last_at: t(3) }];
+    if (ev('alertItems')().n !== 3) return 'three alerts: ' + ev('alertItems')().n;
+    const h = ev('alertsPanel')();
+    if (!h.includes(`carol_2 mentioned you in the ${nm} discussion`) || !/class="pill n">Mention</.test(h)) return 'the mention';
+    if (!h.includes(`3 reactions 🔥👍 on your comment about ${nm}`) || !/class="pill m">Reactions</.test(h)) return 'the reactions, most used first';
+    if (!h.includes(`bob_1 replied in the ${nm} discussion`)) return 'the reply';
+    if (h.includes('<b>') || h.includes('<i>')) return 'text is escaped';
+    if (!h.includes(`href="#player/${gibbs}/talk"`)) return 'each links to the discussion';
+    acct.rxAlerts = [{ comment_id: 'c1', player_id: gibbs, snippet: 'x', emoji: { '🤔': 1 }, last_at: t(3) }];
+    if (!ev('alertsPanel')().includes('1 reaction 🤔 on your comment')) return 'one reaction, singular';
+    acct.mentions = []; acct.rxAlerts = []; if (ev('alertItems')().n !== 1) return 'a database without my_alerts: just the replies';
+    st.alertsSeen = Date.now(); D.alertsSince = null; acct.mentions = [{ id: 'm0', player_id: gibbs, body: 'old', created_at: t(60), profiles: { handle: 'x_y' } }];
+    if (ev('alertItems')().ments.length) return 'nothing older than the last time the bell was opened';
+  } finally { [acct.user, acct.replies, acct.mentions, acct.rxAlerts, st.alertsSeen, D.alertsSince, D.news, st.watch] = was; }
+});
 test('discussion: Top sorts by reactions and replies; Newest marks where the week changes', () => {
   setup(); const D = ev('D'), st = ev('state'), was = [st.tab, D.pp, D.talkSort], gibbs = idOf('Jahmyr Gibbs');
   try {

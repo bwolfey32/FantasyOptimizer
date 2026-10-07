@@ -124,7 +124,7 @@ def db(server, request):
 # ---------- privileges ----------
 
 def test_no_privileges_beyond_what_the_page_uses(db):
-    for t in ("profiles", "comments", "reactions", "reports", "admins", "bans", "mod_log", "blocked_terms"):
+    for t in ("profiles", "comments", "reactions", "reports", "admins", "bans", "mod_log", "blocked_terms", "mentions"):
         for r in ("anon", "authenticated"):
             for p in ("TRUNCATE", "TRIGGER", "REFERENCES"):
                 assert not db.sql("select has_table_privilege(%s, %s, %s)", (r, "public." + t, p))[0][0], f"{r} {p} {t}"
@@ -233,6 +233,71 @@ def test_counts_and_my_replies(db):
     assert db.one(a, "select count(*) from my_replies(now() - interval '1 hour')") == 1
     assert db.one(b, "select count(*) from my_replies(now() - interval '1 hour')") == 1
     db.refused(None, "select * from my_replies(now())")
+
+
+def handle(db, uid):
+    return db.one(None, "select handle from profiles where user_id = %s", (uid,))
+
+
+def test_mentions(db):
+    a, b, c, d = db.person(), db.person(), db.person(), db.person()
+    ha, hb, hc = handle(db, a), handle(db, b), handle(db, c)
+    cid = db.post(a, f"@{hb} and @{hc.upper()} and me @{ha} and @nobody_here_x and mail x@{hb}.com")
+    got = {str(r[0]) for r in db.sql("select user_id from mentions where comment_id = %s", (cid,))}
+    assert got == {b, c}, got                        # names ignoring case; not the author, an unknown name or an email
+    # private to the person mentioned
+    assert db.as_(b, "select count(*) from mentions")[0][0] == 1
+    assert db.as_(c, "select user_id from mentions where comment_id = %s", (cid,)) == [(uuid.UUID(c),)]
+    assert db.as_(d, "select * from mentions") == [] and db.as_(None, "select 1") == [(1,)]
+    db.refused(None, "select * from mentions")
+    db.refused(a, "insert into mentions (comment_id, user_id) values (%s, %s)", (cid, d))   # only the trigger writes
+    db.refused(b, "delete from mentions")
+    # at most 5 different names, and a name only once
+    ps = [db.person() for _ in range(7)]
+    body = " ".join(f"@{handle(db, x)}" for x in ps) + f" @{handle(db, ps[0])}"
+    cid2 = db.post(a, body)
+    assert db.sql("select count(*) from mentions where comment_id = %s", (cid2,))[0][0] == 5
+    # the end of a longer word isn't a name, and a name that runs on is not a shorter one
+    cid3 = db.post(a, f"@{hb}x @{hb[:5]} (@{hb}) a@{hb}")
+    assert {str(r[0]) for r in db.sql("select user_id from mentions where comment_id = %s", (cid3,))} == {b}   # only "(@name)"
+    # deleting the comment, or the person, removes the rows
+    db.sql("delete from comments where id = %s", (cid,))
+    assert db.sql("select count(*) from mentions where comment_id = %s", (cid,))[0][0] == 0
+
+
+def test_my_alerts(db):
+    a, b, c = db.person(), db.person(), db.person()
+    ha, hb = handle(db, a), handle(db, b)
+    mine = db.post(a, "my take", player="4046")
+    reply = db.post(b, "plain reply", player="4046", parent=mine)
+    both = db.post(b, f"reply that mentions @{ha}", player="4046", parent=mine)
+    ment = db.post(b, f"hey @{ha}, elsewhere", player="9999")
+    other = db.post(c, "not about a", player="4046")
+    db.as_(b, "insert into reactions (comment_id, user_id, emoji) values (%s, auth.uid(), '🔥')", (mine,))
+    db.as_(c, "insert into reactions (comment_id, user_id, emoji) values (%s, auth.uid(), '🔥')", (mine,))
+    db.as_(c, "insert into reactions (comment_id, user_id, emoji) values (%s, auth.uid(), '👍')", (other,))
+    db.as_(a, "insert into reactions (comment_id, user_id, emoji) values (%s, auth.uid(), '🔥')", (mine,))   # my own: not an alert
+    al = db.one(a, "select my_alerts(now() - interval '1 hour')")
+    assert {x["id"] for x in al["replies"]} == {reply}                 # the reply that mentions me is listed once, as a mention
+    assert {x["id"] for x in al["mentions"]} == {both, ment}
+    m = next(x for x in al["mentions"] if x["id"] == ment)
+    assert m["player_id"] == "9999" and m["profiles"]["handle"] == hb and m["body"].startswith("hey")
+    assert len(al["reactions"]) == 1 and al["reactions"][0]["comment_id"] == mine
+    assert al["reactions"][0]["emoji"] == {"🔥": 2} and al["reactions"][0]["player_id"] == "4046" and al["reactions"][0]["snippet"] == "my take"
+    # a time in the future finds nothing; hidden and deleted comments drop out
+    none = db.one(a, "select my_alerts(now() + interval '1 hour')")
+    assert none == {"replies": [], "mentions": [], "reactions": []}
+    db.sql("update comments set hidden_at = now() where id = %s", (ment,))
+    db.sql("update comments set hidden_at = now() where id = %s", (mine,))
+    al = db.one(a, "select my_alerts(now() - interval '1 hour')")
+    assert al["mentions"] == [] and al["replies"] == []                # hiding my comment hides its replies too; the other mention was hidden
+    assert al["reactions"] == []                                       # reactions on a hidden comment of mine
+    # the other people see only their own
+    assert db.one(c, "select my_alerts(now() - interval '1 hour')")["mentions"] == []
+    db.refused(None, "select my_alerts(now())")
+    # the older call still works for pages that haven't updated
+    db.sql("update comments set hidden_at = null, hidden_reason = null where id in (%s, %s)", (mine, reply))
+    assert db.one(a, "select count(*) from my_replies(now() - interval '1 hour')") == 2   # reply and both
 
 
 def test_rate_limit(db):

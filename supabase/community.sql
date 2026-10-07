@@ -476,5 +476,71 @@ $$;
 revoke all on function public.profile_by_handle(text) from public;
 grant execute on function public.profile_by_handle(text) to anon, authenticated;
 
+-- ---------- Mentions and the alerts bell ----------
+-- Writing @name in a comment notifies that person: a row per comment and person mentioned, written only by the trigger
+-- below (security definer: nobody can insert one, so nobody can notify someone about a comment that doesn't mention
+-- them). A person sees only their own rows. At most 5 different names count in a comment; the author is skipped, and so
+-- is a name nobody has.
+create table if not exists public.mentions (
+  comment_id uuid not null references public.comments (id) on delete cascade,
+  user_id uuid not null references public.profiles (user_id) on delete cascade,
+  created_at timestamptz not null default now(),
+  primary key (comment_id, user_id)
+);
+create index if not exists mentions_user_idx on public.mentions (user_id, created_at desc);
+alter table public.mentions enable row level security;
+drop policy if exists "read own mentions" on public.mentions;
+create policy "read own mentions" on public.mentions for select to authenticated using ((select auth.uid()) = user_id);
+revoke all on public.mentions from anon, authenticated;
+grant select on public.mentions to authenticated;
+
+-- A name is @ then 3 to 20 letters, digits or underscores, not following a letter, digit, underscore or another @ (so
+-- an email address isn't a mention).
+create or replace function public.comments_after_insert() returns trigger language plpgsql security definer set search_path = '' as $$
+begin
+  insert into public.mentions (comment_id, user_id)
+    select new.id, p.user_id from public.profiles p
+    where lower(p.handle) in (
+      select lower(t.m[1]) from regexp_matches(new.body, '(?:^|[^A-Za-z0-9_@])@([A-Za-z0-9_]{3,20})(?![A-Za-z0-9_])', 'g') with ordinality as t(m, n)
+      group by lower(t.m[1]) order by min(t.n) limit 5)
+      and p.user_id <> new.author_id
+    on conflict do nothing;
+  return null;
+end $$;
+drop trigger if exists comments_mention on public.comments;
+create trigger comments_mention after insert on public.comments for each row execute function public.comments_after_insert();
+
+-- Everything for the bell in one request, since a time: replies in threads you've posted in, comments that mention you
+-- (a reply that also mentions you is listed once, as a mention), and reactions to your comments, grouped by comment.
+-- Hidden and deleted comments are left out. Runs as the caller, so it sees only what they may read.
+create or replace function public.my_alerts(since timestamptz) returns jsonb language sql stable security invoker set search_path = '' as $$
+  select jsonb_build_object(
+    'replies', coalesce((select jsonb_agg(x.j order by x.at desc) from (
+        select c.created_at as at, jsonb_build_object('id', c.id, 'player_id', c.player_id, 'parent_id', c.parent_id, 'author_id', c.author_id, 'body', c.body,
+          'created_at', c.created_at, 'profiles', jsonb_build_object('handle', p.handle)) as j
+        from public.comments c left join public.profiles p on p.user_id = c.author_id
+        where c.parent_id in (select coalesce(m.parent_id, m.id) from public.comments m where m.author_id = (select auth.uid()))
+          and c.author_id <> (select auth.uid()) and c.created_at > since and c.hidden_at is null and c.deleted_at is null
+          and c.id not in (select n.comment_id from public.mentions n where n.user_id = (select auth.uid()))
+        order by c.created_at desc limit 50) x), '[]'::jsonb),
+    'mentions', coalesce((select jsonb_agg(x.j order by x.at desc) from (
+        select c.created_at as at, jsonb_build_object('id', c.id, 'player_id', c.player_id, 'parent_id', c.parent_id, 'author_id', c.author_id, 'body', c.body,
+          'created_at', c.created_at, 'profiles', jsonb_build_object('handle', p.handle)) as j
+        from public.mentions n join public.comments c on c.id = n.comment_id left join public.profiles p on p.user_id = c.author_id
+        where n.user_id = (select auth.uid()) and c.created_at > since and c.hidden_at is null and c.deleted_at is null
+        order by c.created_at desc limit 50) x), '[]'::jsonb),
+    'reactions', coalesce((select jsonb_agg(x.j order by x.at desc) from (
+        select max(g.last_at) as at, jsonb_build_object('comment_id', g.comment_id, 'player_id', g.player_id, 'snippet', g.snippet,
+          'emoji', jsonb_object_agg(g.emoji, g.n), 'last_at', max(g.last_at)) as j
+        from (select r.comment_id, c.player_id, left(c.body, 80) as snippet, r.emoji, count(*)::int as n, max(r.created_at) as last_at
+              from public.reactions r join public.comments c on c.id = r.comment_id
+              where c.author_id = (select auth.uid()) and r.user_id <> (select auth.uid()) and r.created_at > since
+                and c.hidden_at is null and c.deleted_at is null
+              group by r.comment_id, c.player_id, c.body, r.emoji) g
+        group by g.comment_id, g.player_id, g.snippet order by max(g.last_at) desc limit 50) x), '[]'::jsonb))
+$$;
+revoke all on function public.my_alerts(timestamptz) from public, anon;
+grant execute on function public.my_alerts(timestamptz) to authenticated;
+
 commit;
 notify pgrst, 'reload schema';
