@@ -577,6 +577,13 @@ a.uname { color: inherit; text-decoration: none; }
 a.uname:hover, a.uname:focus-visible { text-decoration: underline; text-decoration-color: var(--accent); text-underline-offset: 3px; }
 .profile .back-link { align-self: flex-start; text-decoration: none; font-weight: 600; }
 .profile .phead-txt h2 { overflow-wrap: anywhere; }
+.poll { display: flex; flex-direction: column; gap: 8px; }
+.poll-btns { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+.poll-btns .btn { white-space: normal; }
+.poll-row { display: grid; grid-template-columns: 1fr auto; gap: 2px 8px; align-items: baseline; }
+.poll-bar { grid-column: 1 / -1; height: 8px; border-radius: 4px; background: var(--surface-2); overflow: hidden; }
+.poll-bar span { display: block; height: 100%; background: var(--accent); }
+.poll-row.mine .poll-bar span { background: var(--good); }
 .pcmt { padding: 10px 0; border-top: 1px solid var(--line); display: flex; flex-direction: column; gap: 4px; }
 .pcmt:first-of-type { border-top: 0; }
 .cmt-head { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 8px; font-size: 14px; }
@@ -1235,7 +1242,7 @@ function loadState() {
 }
 let state = loadState();
 const save = () => { stashTeam(); stampChanges(); store.set('state', state); queuePush(); };
-const D = { loading: true, progress: 0, errors: [], open: new Set(), phist: new Map(), pnews: new Map(), talk: new Map(), user: new Map(), talkN: new Map(), rx: new Map(), cntQ: new Set(), rxQ: new Set(), talkMore: new Set(), scrollOf: {}, lg: {}, U: new Map(), proj: {}, H: {}, tg: {}, rec: {}, prior: {}, cur: {}, B: {}, L: {}, ranks: {}, M: {}, imgBad: new Set(), coaches: null, espnTeams: null, defSort: ['fpaWR', -1], teamOpen: null, resetArm: false };
+const D = { loading: true, progress: 0, errors: [], open: new Set(), phist: new Map(), pnews: new Map(), talk: new Map(), user: new Map(), ss: new Map(), talkN: new Map(), rx: new Map(), cntQ: new Set(), rxQ: new Set(), talkMore: new Set(), scrollOf: {}, lg: {}, U: new Map(), proj: {}, H: {}, tg: {}, rec: {}, prior: {}, cur: {}, B: {}, L: {}, ranks: {}, M: {}, imgBad: new Set(), coaches: null, espnTeams: null, defSort: ['fpaWR', -1], teamOpen: null, resetArm: false };
 
 /* ---------- accounts and sync ----------
    Signing in is optional. This browser's copy (state) stays the working copy; a signed-in account keeps a mirror of
@@ -5598,7 +5605,7 @@ const talkErr = e => e?.code === 'timeout' || e instanceof TypeError ? 'Couldn�
 function talkSignIn() { D.alertsOpen = false; if (!acct.on) return; if (!D.acctOpen) { D.acctOpen = true; acct.msg = ['info', 'Sign in to join the discussion. It’s free.']; } render(); window.scrollTo(0, 0); deskFocus('#acctEmail'); }
 // after sign-in or sign-out: their username and whether they moderate, and every cache that depends on who's asking
 function talkMe() {
-  acct.profile = undefined; acct.admin = false; acct.replies = []; acct.mentions = []; acct.rxAlerts = []; D.talk.clear(); D.rx.clear(); D.mod = null;
+  acct.profile = undefined; acct.admin = false; acct.replies = []; acct.mentions = []; acct.rxAlerts = []; D.ss.clear(); D.talk.clear(); D.rx.clear(); D.mod = null;
   if (!acct.user || !talkNet()) return (acct.meP = Promise.resolve());
   // kept so a fresh sign-in can wait for the username lookup (signedInDone) without asking twice
   return (acct.meP = (async () => {
@@ -5955,6 +5962,72 @@ function viewUser() {
       <div class="psub small muted">${since ? `Member since ${esc(new Date(since).toLocaleDateString([], { month: 'long', year: 'numeric' }))} · ` : ''}${e.p.n_comments} comment${e.p.n_comments === 1 ? '' : 's'}</div></div></div>
     ${own ? `<div class="toolbar"><button type="button" class="btn sm" data-act="namepick">Change username</button></div>` : ''}</div>
     <div class="card panel"><h3 style="margin:0">Latest comments</h3>${rows || `<p class="small muted" style="margin:0">${own ? 'You haven’t commented yet. Find a player and add your take.' : 'No comments yet.'}</p>`}${e.rows.length >= 50 ? `<p class="small muted" style="margin:0">Showing the latest 50.</p>` : ''}</div></div>`;
+}
+
+/* Start/Sit poll: "Who would you start?" under Benny's Pick. One vote per person per pair and week (changeable until a game
+   starts, when the Start/Sit page stops offering the call). The split shows once you've voted, or to anyone when there are at
+   least 5 votes. A pair is keyed by its two ids in plain < order, the order the database stores it in. */
+const SS_MIN = 5;
+const ssKey = (lo, hi) => `${D.season}|${D.week}|${lo}|${hi}`;
+// a database from before the polls (community.sql not re-run): no poll anywhere this visit, and the rest keeps working
+function ssMissing(e) { if (e?.status === 404 || /^(PGRST20[25]|42P01|42883)$/.test(e?.code || '')) { D.ssOff = true; return true; } return false; }
+function ssLoad(lo, hi, force) {
+  if (!talkNet() || D.ssOff) return;
+  const k = ssKey(lo, hi), e = D.ss.get(k);
+  if (e && !force && (e.st === 'loading' || Date.now() - e.at < 60000)) return;
+  const cur = e || { st: 'loading', n: [0, 0], mine: null, at: 0 }; if (!e) D.ss.set(k, cur); else if (cur.st === 'err') cur.st = 'loading';
+  cur.at = Date.now();
+  const me = acct.user?.id, q = `season=eq.${D.season}&week=eq.${D.week}&a=eq.${encodeURIComponent(lo)}&b=eq.${encodeURIComponent(hi)}`;
+  Promise.all([sbRest('rpc/ss_tally', { method: 'POST', body: { season: D.season, week: D.week, a: lo, b: hi } }), me ? sbRest(`ss_votes?select=pick&${q}&user_id=eq.${me}`) : null])
+    .then(([t, m]) => { if (!cur.busy) { cur.n = [t?.[0]?.n_a || 0, t?.[0]?.n_b || 0]; cur.mine = m?.[0]?.pick || null; } cur.st = 'ok'; cur.at = Date.now(); })
+    .catch(e => { if (!ssMissing(e)) cur.st = cur.st === 'ok' ? 'ok' : 'err'; })
+    .finally(() => ssPaint(k));
+}
+function ssInner(lo, hi, w) {
+  const e = D.ss.get(ssKey(lo, hi)), nm = id => esc(D.U.get(id)?.name || id), k = esc(ssKey(lo, hi));
+  const total = e ? e.n[0] + e.n[1] : 0, head = `<div class="pick-head"><span class="label">Who would you start?</span>${total ? `<span class="small muted">${total} vote${total === 1 ? '' : 's'}</span>` : ''}</div>`;
+  const buttons = pressed => `<div class="poll-btns">${[lo, hi].map(id => `<button type="button" class="btn" data-act="ssvote" data-ss="${k}" data-pick="${esc(id)}" data-w="${esc(w)}" aria-pressed="${pressed === id}">${nm(id)}</button>`).join('')}</div>`;
+  const split = () => {
+    const pctOf = i => total ? Math.round(e.n[i] / total * 100) : 0, major = e.n[0] > e.n[1] ? lo : e.n[1] > e.n[0] ? hi : null;
+    const line = major === null ? 'The crowd is split evenly.' : major === w ? 'The crowd agrees with Benny.' : `The crowd sides with ${nm(major)}.`;
+    return `<div class="poll-split">${[lo, hi].map((id, i) => `<div class="poll-row${e.mine === id ? ' mine' : ''}"><span>${nm(id)}${e.mine === id ? ' <span class="pill n">Your pick</span>' : ''}</span><span class="num">${pctOf(i)}%</span><span class="poll-bar" aria-hidden="true"><span style="width:${pctOf(i)}%"></span></span></div>`).join('')}</div>
+      <div class="small muted">${line}</div>`;
+  };
+  if (!acct.user) {
+    if (!acct.on) return `${head}<div class="small muted">Sign-in is turned off here, so polls are read-only.</div>`;
+    return `${head}${e && total >= SS_MIN ? split() : ''}<div class="talk-in out"><button type="button" class="btn sm" data-talksignin>Sign in to vote</button><span class="small muted">${e && total >= SS_MIN ? '' : 'The split shows once enough people have voted. '}Voting takes a free account.</span></div>`;
+  }
+  if (!e || (e.st === 'loading' && !e.mine)) return `${head}<div class="small muted">Loading…</div>`;
+  if (e.st === 'err' && !e.mine) return `${head}<div class="small muted">Couldn’t load the poll. <button type="button" class="linkbtn" data-act="ssretry" data-ss="${k}">Try again</button></div>`;
+  if (!e.mine || D.ssEdit === ssKey(lo, hi)) return `${head}${buttons(e.mine)}<div class="small muted">${e.mine ? 'Pick again to change your vote.' : 'Vote to see what everyone else thinks.'}</div>`;
+  return `${head}${split()}<div><button type="button" class="linkbtn" data-act="ssedit" data-ss="${k}">Change my vote</button></div>`;
+}
+function pollHTML(lo, hi, w) {
+  if (!talkOn() || D.ssOff) return '';
+  ssLoad(lo, hi);
+  return `<div class="card poll" data-sspoll="${esc(ssKey(lo, hi))}" data-lo="${esc(lo)}" data-hi="${esc(hi)}" data-w="${esc(w)}">${ssInner(lo, hi, w)}</div>`;
+}
+function ssPaint(k) {
+  document.querySelectorAll(`[data-sspoll="${qv(k)}"]`).forEach(el => { if (D.ssOff) el.remove(); else el.innerHTML = ssInner(el.dataset.lo, el.dataset.hi, el.dataset.w); });
+}
+async function ssVote(k, pick, w) {
+  if (!acct.user) return talkSignIn();
+  const [season, week, lo, hi] = k.split('|'), e = D.ss.get(k); if (!e || e.busy || ![lo, hi].includes(pick)) return;
+  if (e.mine === pick) { D.ssEdit = null; return ssPaint(k); }
+  const prev = e.mine, before = e.n.slice();
+  e.busy = true; D.ssEdit = null;
+  if (prev) e.n[prev === lo ? 0 : 1]--;
+  e.n[pick === lo ? 0 : 1]++; e.mine = pick; ssPaint(k);
+  const q = `season=eq.${season}&week=eq.${week}&a=eq.${encodeURIComponent(lo)}&b=eq.${encodeURIComponent(hi)}&user_id=eq.${acct.user.id}`;
+  const change = () => sbRest(`ss_votes?${q}`, { method: 'PATCH', body: { pick }, prefer: 'return=minimal' });
+  try {
+    if (prev) await change();
+    else { try { await sbRest('ss_votes', { method: 'POST', body: { season: +season, week: +week, a: lo, b: hi, pick, user_id: acct.user.id }, prefer: 'return=minimal' }); }
+      catch (x) { if (x?.code === '23505') await change(); else throw x; } }   // voted from another device since this page loaded
+    track('ss_voted', { agrees_with_benny: pick === w, changed: !!prev });
+  } catch (x) {
+    e.mine = prev; e.n = before; toast(ssMissing(x) ? 'Polls aren’t available right now.' : talkErr(x));
+  } finally { e.busy = false; ssPaint(k); ssLoad(lo, hi, true); }
 }
 
 /* Watching a player: his news joins your players' in the alerts. Kept with the shared settings, so it syncs. */
@@ -6325,6 +6398,7 @@ function viewCompare() {
       ${classicCallNote(A, Bp, w) ? `<div class="small muted">${esc(classicCallNote(A, Bp, w))}</div>` : ''}
       ${gnote ? `<div class="pick-note">${esc(gnote)}</div>` : ''}
       ${modelNote()}</div>`;
+    if (!example) { const [lo, hi] = a < b ? [a, b] : [b, a]; verdict += pollHTML(lo, hi, w.id); }
   }
   const dec = reviewDecisions(), decShown = isPro() ? dec : dec.slice(0, 1), decMore = dec.length - decShown.length;
   const decBar = example && A && Bp ? `<div class="banner info small">An example close call: two ${esc(posLabel(A.pos))}s with nearly the same projection this week. Pick any two players above.</div>`
@@ -6626,6 +6700,9 @@ document.addEventListener('click', e => {
   else if (a === 'nameskip') { acct.nameStep = false; acct.msg = null; D.acctOpen = false; track('username_skipped'); render(); }
   else if (a === 'namepick') { acct.nameStep = 'account'; acct.msg = null; D.acctOpen = true; D.drafts.handle = acct.profile?.handle || ''; render(); revealPanel($('.acct')); deskFocus('#acctHandle'); }
   else if (a === 'myprofile') { D.acctOpen = false; render(); }
+  else if (a === 'ssvote') ssVote(t.dataset.ss, t.dataset.pick, t.dataset.w);
+  else if (a === 'ssedit') { D.ssEdit = t.dataset.ss; ssPaint(t.dataset.ss); }
+  else if (a === 'ssretry') { const [, , lo, hi] = t.dataset.ss.split('|'); ssLoad(lo, hi, true); }
   else if (a === 'acctsync') { acct.msg = null; pull().then(() => acct.ready && push()).then(pullHist); }
   else if (a === 'acctout') signOut();
   else if (a === 'acctdel') {

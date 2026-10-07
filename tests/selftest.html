@@ -1050,6 +1050,40 @@ test('bell: mentions and reactions to your comments join replies and news, and f
     if (ev('alertItems')().ments.length) return 'nothing older than the last time the bell was opened';
   } finally { [acct.user, acct.replies, acct.mentions, acct.rxAlerts, st.alertsSeen, D.alertsSince, D.news, st.watch] = was; }
 });
+test('polls: Start/Sit asks who you’d start; the split shows after your vote (or to anyone from 5 votes); not when the call is off', () => {
+  setup(); const D = ev('D'), st = ev('state'), acct = ev('acct'), was = [acct.on, acct.user, D.ssOff, D.ssEdit];
+  const q = Object.values(D.M).filter(r => r.status === 'ok' && !r.locked && r.pos === 'WR').sort((x, y) => y.mean - x.mean);
+  if (q.length < 2) return 'two pregame WRs in the fixture';
+  const [x, y] = [q[0], q[1]], lo = x.id < y.id ? x.id : y.id, hi = x.id < y.id ? y.id : x.id, key = ev('ssKey')(lo, hi), poll = h => (h.match(/<div class="card poll"[\s\S]*?<\/div>\s*(?=<div class="card|<h2>)/) || [''])[0];
+  try {
+    st.compare = [x.id, y.id]; acct.on = true; acct.user = null; D.ssOff = false; D.ss.clear();
+    if (key !== `${D.season}|${D.week}|${lo}|${hi}`) return 'the key is the season, week and the two ids in < order';
+    let h = ev('viewCompare')();
+    if (!/Who would you start\?/.test(h) || !/Sign in to vote/.test(h) || /poll-row/.test(h)) return 'signed out, no votes yet: invites a sign-in, no split';
+    D.ss.set(key, { st: 'ok', n: [2, 2], mine: null, at: Date.now() }); h = ev('viewCompare')();
+    if (/poll-row/.test(h)) return 'signed out with 4 votes: still no split';
+    D.ss.set(key, { st: 'ok', n: [4, 2], mine: null, at: Date.now() }); h = ev('viewCompare')();
+    if ((h.match(/class="poll-row/g) || []).length !== 2 || !/67%/.test(h) || !/33%/.test(h) || !/6 votes/.test(h)) return 'signed out with 6 votes: the split';
+    acct.user = { id: 'u-me' };
+    D.ss.set(key, { st: 'ok', n: [4, 2], mine: null, at: Date.now() }); h = ev('viewCompare')();
+    if (!/data-act="ssvote"/.test(h) || /poll-row/.test(h) || (h.match(/data-act="ssvote"/g) || []).length !== 2) return 'signed in, not voted: two buttons and no split';
+    if (!h.includes(`data-pick="${lo}"`) || !h.includes(`data-pick="${hi}"`)) return 'a button for each player';
+    const w = D.call.w;
+    D.ss.set(key, { st: 'ok', n: [3, 1], mine: lo, at: Date.now() }); h = ev('viewCompare')();
+    if (!/Your pick/.test(h) || !/75%/.test(h) || !/Change my vote/.test(h) || /data-act="ssvote"/.test(h)) return 'voted: the split, your pick, a way to change';
+    if (lo === w ? !/The crowd agrees with Benny/.test(h) : !/The crowd sides with/.test(h)) return 'the crowd line, with the 3-1 side being ' + lo;
+    D.ss.set(key, { st: 'ok', n: [2, 2], mine: lo, at: Date.now() }); if (!/split evenly/.test(ev('viewCompare')())) return 'a tie';
+    D.ssEdit = key; h = ev('viewCompare')(); D.ssEdit = null;
+    if ((h.match(/data-act="ssvote"/g) || []).length !== 2 || !/aria-pressed="true"/.test(poll(h))) return 'changing: the buttons again, your pick pressed';
+    D.ss.set(key, { st: 'loading', n: [0, 0], mine: null, at: Date.now() }); if (!/Loading…/.test(ev('viewCompare')())) return 'loading';
+    if (ev('viewCompare')().includes('Who would you start?') === false) return 'poll present while loading';
+    // not offered when there's no call to make, no discussion backend, or the poll isn't in the database
+    D.ssOff = true; if (/data-sspoll/.test(ev('viewCompare')())) return 'no poll when the database lacks it'; D.ssOff = false;
+    x.locked = true; try { h = ev('viewCompare')(); if (/data-sspoll/.test(h) || !/Game started/.test(h)) return 'no poll once a game has started'; } finally { x.locked = false; }
+    st.compare = [null, null];
+    setup(s2 => { s2.roster = []; s2.compare = [null, null]; }); if (/data-sspoll/.test(ev('viewCompare')())) return 'no poll on the example call';
+  } finally { [acct.on, acct.user, D.ssOff, D.ssEdit] = was; D.ss.clear(); st.compare = [null, null]; setup(); }
+});
 test('discussion: Top sorts by reactions and replies; Newest marks where the week changes', () => {
   setup(); const D = ev('D'), st = ev('state'), was = [st.tab, D.pp, D.talkSort], gibbs = idOf('Jahmyr Gibbs');
   try {

@@ -542,5 +542,56 @@ $$;
 revoke all on function public.my_alerts(timestamptz) from public, anon;
 grant execute on function public.my_alerts(timestamptz) to authenticated;
 
+-- ---------- Start/Sit polls ----------
+-- "Who would you start?" on a Start/Sit pair, one vote per person per pair and week, changeable. A pair is stored one way
+-- (a sorts before b in plain code-unit order, the same as comparing two strings with < in the page), so the pair "A or B"
+-- and "B or A" are one poll. You can read only your own votes; ss_tally gives the totals and nothing else, so who voted for
+-- what is never public. 200 new votes a day per account.
+create table if not exists public.ss_votes (
+  season int not null check (season between 2019 and 2100),
+  week int not null check (week between 1 and 22),
+  a text not null check (a ~ '^[A-Za-z0-9]{1,8}$'),
+  b text not null check (b ~ '^[A-Za-z0-9]{1,8}$'),
+  pick text not null,
+  user_id uuid not null default auth.uid() references auth.users (id) on delete cascade,
+  created_at timestamptz not null default now(),
+  primary key (season, week, a, b, user_id),
+  constraint ss_votes_order check (a collate "C" < b collate "C"),
+  constraint ss_votes_pick check (pick = a or pick = b)
+);
+create index if not exists ss_votes_user_idx on public.ss_votes (user_id, created_at desc);
+alter table public.ss_votes enable row level security;
+drop policy if exists "read own votes" on public.ss_votes;
+create policy "read own votes" on public.ss_votes for select to authenticated using ((select auth.uid()) = user_id);
+drop policy if exists "vote as yourself" on public.ss_votes;
+create policy "vote as yourself" on public.ss_votes for insert to authenticated
+  with check ((select auth.uid()) = user_id and not (select public.is_banned()));
+drop policy if exists "change own vote" on public.ss_votes;
+create policy "change own vote" on public.ss_votes for update to authenticated
+  using ((select auth.uid()) = user_id) with check ((select auth.uid()) = user_id and not (select public.is_banned()));
+revoke all on public.ss_votes from anon, authenticated;
+grant select, insert on public.ss_votes to authenticated;
+grant update (pick) on public.ss_votes to authenticated;
+
+create or replace function public.ss_votes_before_insert() returns trigger language plpgsql security definer set search_path = '' as $$
+begin
+  new.created_at := now();
+  if (select count(*) from public.ss_votes v where v.user_id = new.user_id and v.created_at > now() - interval '1 day') >= 200 then
+    raise exception 'That''s the limit of 200 new votes a day' using errcode = 'check_violation';
+  end if;
+  return new;
+end $$;
+drop trigger if exists ss_votes_insert on public.ss_votes;
+create trigger ss_votes_insert before insert on public.ss_votes for each row execute function public.ss_votes_before_insert();
+
+-- The totals for one pair (a before b, as stored). Security definer, since nobody can read the votes themselves.
+create or replace function public.ss_tally(season int, week int, a text, b text) returns table (n_a int, n_b int)
+  language sql stable security definer set search_path = '' as $$
+  select (count(*) filter (where v.pick = ss_tally.a))::int, (count(*) filter (where v.pick = ss_tally.b))::int
+  from public.ss_votes v where v.season = ss_tally.season and v.week = ss_tally.week and v.a = ss_tally.a and v.b = ss_tally.b
+$$;
+revoke all on function public.ss_tally(int, int, text, text) from public;
+grant execute on function public.ss_tally(int, int, text, text) to anon, authenticated;
+
 commit;
 notify pgrst, 'reload schema';

@@ -124,7 +124,7 @@ def db(server, request):
 # ---------- privileges ----------
 
 def test_no_privileges_beyond_what_the_page_uses(db):
-    for t in ("profiles", "comments", "reactions", "reports", "admins", "bans", "mod_log", "blocked_terms", "mentions"):
+    for t in ("profiles", "comments", "reactions", "reports", "admins", "bans", "mod_log", "blocked_terms", "mentions", "ss_votes"):
         for r in ("anon", "authenticated"):
             for p in ("TRUNCATE", "TRIGGER", "REFERENCES"):
                 assert not db.sql("select has_table_privilege(%s, %s, %s)", (r, "public." + t, p))[0][0], f"{r} {p} {t}"
@@ -439,6 +439,45 @@ def test_deleting_an_account(db):
     assert db.row(root)[0] == "" and db.row(root)[1] is None
     assert db.row(theirs) is not None and db.row(other) is not None
     assert db.row(mine) is None and db.row(lone) is None
+
+
+def test_start_sit_votes(db):
+    a, b, c, x = db.person(), db.person(), db.person(), db.person(banned=True)
+    ins = "insert into ss_votes (season, week, a, b, pick, user_id) values (2026, 5, %s, %s, %s, auth.uid())"
+    db.as_(a, ins, ("4046", "6794", "6794"))
+    db.as_(b, ins, ("4046", "6794", "4046"))
+    db.as_(c, ins, ("4046", "6794", "4046"))
+    assert db.as_(None, "select n_a, n_b from ss_tally(2026, 5, '4046', '6794')") == [(2, 1)]      # anyone can ask; counts only
+    assert db.as_(None, "select n_a, n_b from ss_tally(2026, 6, '4046', '6794')") == [(0, 0)]
+    db.refused(None, "select * from ss_votes")
+    assert db.as_(a, "select pick from ss_votes") == [("6794",)]                                  # only your own
+    db.refused(a, ins, ("6794", "4046", "4046"))             # a pair is stored one way (a before b)
+    db.refused(a, ins, ("4046", "6794", "1111"))             # the pick is one of the two
+    db.refused(a, ins, ("4046", "6794", "4046"))             # one vote per pair and week
+    db.refused(a, "insert into ss_votes (season, week, a, b, pick, user_id) values (2026, 0, 'A1', 'B1', 'A1', auth.uid())")   # week range
+    db.refused(a, "insert into ss_votes (season, week, a, b, pick, user_id) values (2026, 5, 'A 1', 'B1', 'B1', auth.uid())")   # id characters
+    db.refused(a, "insert into ss_votes (season, week, a, b, pick, user_id) values (2026, 5, 'A1', 'B1', 'A1', %s)", (b,))      # someone else's
+    db.refused(x, ins, ("DAL", "PHI", "DAL"))                # banned
+    db.refused(None, ins, ("DAL", "PHI", "DAL"))
+    # change a vote: only the pick, only your own
+    assert db.as_(a, "update ss_votes set pick = '4046' where a = '4046' and b = '6794' returning pick") == [("4046",)]
+    assert db.as_(None, "select n_a, n_b from ss_tally(2026, 5, '4046', '6794')") == [(3, 0)]
+    db.refused(a, "update ss_votes set pick = '1111' where a = '4046'")
+    db.refused(a, "update ss_votes set week = 6 where a = '4046'")
+    db.refused(a, "update ss_votes set user_id = %s where a = '4046'", (c,))
+    assert db.as_(b, "update ss_votes set pick = '6794' where user_id = %s returning pick", (a,)) == []
+    db.refused(a, "delete from ss_votes")
+    # ordering is plain code-unit order, the same as comparing two strings with < in the page
+    db.as_(a, ins, ("DAL", "PHI", "PHI"))
+    db.as_(a, ins, ("1111", "DAL", "1111"))
+    # the daily cap (changing a vote doesn't count)
+    d = db.person()
+    db.sql("insert into ss_votes (season, week, a, b, pick, user_id) select 2026, 1 + mod(i, 22), 'P' || lpad(i::text, 4, '0'), 'Q0001', 'Q0001', %s from generate_series(1, 200) i", (d,))
+    db.refused(d, ins, ("DAL", "PHI", "DAL"), says="200 new votes")
+    db.as_(d, "update ss_votes set pick = a where a = 'P0001'")
+    # an account's votes go with the account
+    db.sql("delete from auth.users where id = %s", (d,))
+    assert db.sql("select count(*) from ss_votes where user_id = %s", (d,))[0][0] == 0
 
 
 # ---------- moderation log and bans ----------
