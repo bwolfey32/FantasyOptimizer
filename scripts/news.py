@@ -8,21 +8,25 @@ Run by .github/workflows/refresh-data.yml every 3 hours, after snapshot.json and
   team     a team change in share-players.json (player_ids.py, refreshed about daily): signed, released, joined
   depth    a skill player moving onto or off the top of his team's depth chart (nflverse's daily depth charts)
   trend    Sleeper's most-added players in the last 24 hours (a list in the feed, and an item when one enters the top 10)
-  article  ESPN's NFL news, kept when it tags a player Benny knows: headline, time and link
+  article  ESPN's NFL news, kept when it tags a player Benny knows (or its headline names one in full): headline, time
+           and link. Its tag says whether the headline is injury or team news, so it also shows under those filters.
 Every source compares with the last run (news/state.json). A source's first run only records what it sees, so the feed
-starts empty instead of announcing every injury already on the report. Slow sources (depth charts, trending) run at most
-every 20 hours.
+starts empty instead of announcing every injury already on the report. Depth charts run at most every 20 hours.
+Injury tags are guarded: a snapshot no newer than the last one read (snap_at) is skipped, so an old file can't report
+changes backwards, and a run where most tags vanish at once is taken for a bad read from Sleeper and skipped too.
 
 news/feed.json: {"v": 1, "updated", "items": [...14 days, newest first, at most 400], "trend": {"add": [[id, count]],
   "drop": [...], "at"}}
 news/players/<sleeperId>.json: {"v": 1, "id", "items": [...his last 50, any age]}
-An item: {"id", "t", "k", "ids", "names", "title", "sub", "src", "url", "note"}. id is stable (an item is never written
-twice); k is injury | team | depth | trend | article; note is left null for a later "what it means" line.
+An item: {"id", "t", "k", "ids", "names", "title", "sub", "src", "url", "note"}, and "tag" on articles. id is stable (an
+item is never written twice); k is injury | team | depth | trend | article; tag is injury | team | null; note is left
+null for a later "what it means" line.
 """
 import argparse
 import gzip
 import json
 import os
+import re
 import sys
 import time
 import urllib.request
@@ -31,7 +35,7 @@ from datetime import datetime, timedelta, timezone
 ROOT = os.path.abspath(os.path.join(os.path.dirname(os.path.abspath(__file__)), ".."))
 ESPN_NEWS = "https://site.api.espn.com/apis/site/v2/sports/football/nfl/news?limit=50"
 TRENDING = "https://api.sleeper.app/v1/players/nfl/trending/{kind}?lookback_hours=24&limit=25"
-SLOW_HOURS = 20          # depth charts and trending: Sleeper asks for gentle use, and charts change about daily
+SLOW_HOURS = 20          # depth charts: nflverse publishes them about daily
 FEED_DAYS, FEED_MAX, PLAYER_MAX, SEEN_MAX = 14, 400, 50, 4000
 REL = 2.0                # a player matters once he's projected (or scored last season) this many points a game
 SKILL = {"QB", "RB", "WR", "TE"}
@@ -39,6 +43,7 @@ STARTER = {"QB": 1, "RB": 1, "TE": 1, "WR": 3}   # the depth-chart spots that co
 INJ_LABEL = {"IR": "on injured reserve", "PUP": "on the PUP list", "NA": "inactive", "Sus": "suspended",
              "COV": "on the COVID list", "DNR": "not reporting"}
 SRC = "Benny's Picks"
+MASS_CLEAR = 40, 0.25    # injury tags: from at least this many relevant tagged players to under this share of them is a bad read
 
 
 def iso(dt):
@@ -70,23 +75,29 @@ def relevance(st, rows, prev_ppg):
 def injury_events(st, rows, rel, now):
     """A status change for a player on this week's projections. Players who drop off the projections keep their last
     status, so a waived player isn't reported healthy. The state keeps only tagged players (inj) and everyone seen
-    (inj_seen), so a healthy player newly tagged is news but a player seen for the first time isn't."""
-    t, day, out = iso(now), now.strftime("%Y-%m-%d"), []
+    (inj_seen), so a healthy player newly tagged is news but a player seen for the first time isn't. An id carries the
+    minute, so a status that goes back and forth in a day is reported each time."""
+    t, stamp, out = iso(now), now.strftime("%Y%m%d%H%M"), []
     seed = "inj" not in st
     prev, known = st.get("inj", {}), set(st.get("inj_seen", []))
+    cur = dict(prev)
+    for r in rows:
+        cur[r[0]] = r[4] or None
+    was_n = sum(1 for k, v in prev.items() if v and rel.get(k, 0) >= REL)
+    now_n = sum(1 for k, v in cur.items() if v and rel.get(k, 0) >= REL)
+    if not seed and was_n >= MASS_CLEAR[0] and now_n < was_n * MASS_CLEAR[1]:
+        warn(f"injury tags skipped: {was_n} relevant players were tagged, {now_n} are now (a bad read from Sleeper?)")
+        return []
     for r in rows:
         sid, name, s = r[0], r[1], r[4] or None
         was = prev.get(sid)
         if seed or sid not in known or was == s or rel.get(sid, 0) < REL:
             continue
         if s is None:
-            out.append(item("injury", f"inj-{sid}-ok-{day}", t, [(sid, name)], f"{name} off the injury report", f"was {inj_text(was)}"))
+            out.append(item("injury", f"inj-{sid}-ok-{stamp}", t, [(sid, name)], f"{name} off the injury report", f"was {inj_text(was)}"))
         else:
-            out.append(item("injury", f"inj-{sid}-{s}-{day}", t, [(sid, name)], f"{name} {'listed' if s in ('Questionable', 'Doubtful', 'Out') else 'now'} {inj_text(s)}",
+            out.append(item("injury", f"inj-{sid}-{s}-{stamp}", t, [(sid, name)], f"{name} {'listed' if s in ('Questionable', 'Doubtful', 'Out') else 'now'} {inj_text(s)}",
                             f"was {inj_text(was)}" if was else "new on the injury report"))
-    cur = dict(prev)
-    for r in rows:
-        cur[r[0]] = r[4] or None
     st["inj"] = {k: v for k, v in cur.items() if v}
     st["inj_seen"] = sorted(known | {r[0] for r in rows})
     return out
@@ -177,16 +188,47 @@ def trend_events(st, adds, names, now):
 ROUNDUP = 4   # an article tagging more players than this is a roundup: it goes to the players its headline names
 
 
-def named(headline, name):
-    """Whether a headline names him: his last name (or full name) as a word."""
-    h = f" {headline.lower()} ".replace("'s ", " ").replace("’s ", " ")
-    parts = [x for x in name.lower().replace(".", "").split() if x not in ("jr", "sr", "ii", "iii", "iv")]
-    return bool(parts) and (f" {' '.join(parts)} " in h or f" {parts[-1]} " in h)
+SUFFIX = ("jr", "sr", "ii", "iii", "iv", "v")
 
 
-def article_items(articles, espn2sid, names):
+def words(text):
+    """Lower case, possessives and punctuation gone (apostrophes and hyphens inside a name kept), spaced at both ends."""
+    t = (text or "").lower().replace("’", "'").replace(".", "")
+    t = re.sub(r"'s\b", " ", t)
+    return " " + " ".join(re.sub(r"[^a-z0-9'\-]+", " ", t).split()) + " "
+
+
+def full_name(name):
+    return " ".join(x for x in words(name).split() if x not in SUFFIX)
+
+
+def named(headline, name, last=True):
+    """Whether a headline names him: his full name (or, with last, his last name) as words."""
+    h, parts = words(headline), full_name(name).split()
+    return bool(parts) and (f" {' '.join(parts)} " in h or last and f" {parts[-1]} " in h)
+
+
+# what a headline is about, beyond being a headline: an injury, or a team move (an injury wins when it's both)
+TAGS = [("injury", re.compile(r"injur|surger|sprain|strain|fractur|concussion|\btorn\b|\b(acl|mcl|achilles|hamstring|ankle|knee|groin)\b"
+                              r"|ruled out|\bout for\b|injured reserve|day-to-day|\b(doubtful|questionable)\b|limited in practice"
+                              r"|\bmiss(es|ed|ing)?\b.*\b(games?|weeks?|practice|time|season)\b", re.I)),
+        ("team", re.compile(r"\b(re-?)?sign(s|ed|ing)?\b|\b(release[sd]?|waive[sd]?|trade[sd]?|acquire[sd]?|claim(s|ed)?|cuts?)\b"
+                            r"|practice squad|free agen", re.I))]
+IR_WORD = re.compile(r"\bIR\b")   # capitals only: "ir" inside a word is no injury
+
+
+def headline_tag(headline):
+    """injury or team when a headline is that kind of news, or None."""
+    if IR_WORD.search(headline or ""):
+        return "injury"
+    return next((k for k, rx in TAGS if rx.search(headline or "")), None)
+
+
+def article_items(articles, espn2sid, names, named_pool=None):
     """ESPN headlines that tag a player Benny knows: headline, time and link; the story stays on ESPN. A roundup that
-    tags many players is kept for the players its headline names, or for none (it still shows in the feed)."""
+    tags many players is kept for the players its headline names, or for none (it still shows in the feed). ESPN's tags
+    miss players a headline names, so anyone in named_pool ({sid: name}: players who matter, with a name no one else
+    has) whose full name is in the headline is added."""
     out = []
     for a in articles:
         ids = []
@@ -197,17 +239,33 @@ def article_items(articles, espn2sid, names):
             if sid and sid not in ids:
                 ids.append(sid)
         url = ((a.get("links") or {}).get("web") or {}).get("href")
-        if not ids or not a.get("headline") or not url or a.get("premium"):
+        if not a.get("headline") or not url or a.get("premium"):
             continue
+        tagged = bool(ids)
         if len(ids) > ROUNDUP:
             ids = [s for s in ids if named(a["headline"], names.get(s, ""))]
+        ids += [s for s, nm in (named_pool or {}).items() if s not in ids and named(a["headline"], nm, last=False)]
+        if not tagged and not ids:
+            continue
         t = a.get("published") or a.get("lastModified")
         try:
             t = iso(datetime.fromisoformat(t.replace("Z", "+00:00")).astimezone(timezone.utc))
         except (AttributeError, ValueError):
             continue
-        out.append(item("article", f"espn-{a.get('id')}", t, [(s, names.get(s, s)) for s in ids], a["headline"].strip(), None, "ESPN", url))
+        it = item("article", f"espn-{a.get('id')}", t, [(s, names.get(s, s)) for s in ids], a["headline"].strip(), None, "ESPN", url)
+        it["tag"] = headline_tag(it["title"])
+        out.append(it)
     return out
+
+
+def headline_pool(share, rel):
+    """The players a headline can name without ESPN tagging him: QBs, RBs, WRs and TEs who matter, whose full name is
+    his alone among Sleeper's players."""
+    count = {}
+    for v in share.values():
+        count[full_name(v[0])] = count.get(full_name(v[0]), 0) + 1
+    return {sid: v[0] for sid, v in share.items()
+            if v[1] in SKILL and rel.get(sid, 0) >= REL and len(full_name(v[0]).split()) > 1 and count[full_name(v[0])] == 1}
 
 
 def merge(old, new, now, days=FEED_DAYS, cap=FEED_MAX):
@@ -302,7 +360,15 @@ def main():
     rel = relevance(st, snap["proj"], snap.get("prevPPG"))
     st["rel"] = rel
 
-    new = injury_events(st, snap["proj"], rel, now)
+    # a snapshot no newer than the last one read (a revert, a local run on an old file) would report changes backwards
+    snap_at = snap.get("createdAt") or ""
+    if snap_at and st.get("snap_at") and snap_at <= st["snap_at"]:
+        warn(f"injury tags skipped: snapshot {snap_at} is no newer than the last one read ({st['snap_at']})")
+        new = []
+    else:
+        new = injury_events(st, snap["proj"], rel, now)
+        if snap_at:
+            st["snap_at"] = snap_at
     if share:
         new += team_events(st, share, rel, now)
     trend = feed.get("trend")
@@ -320,17 +386,17 @@ def main():
                     st["slow"]["depth"] = iso(now)
             except Exception as e:  # noqa: BLE001 (a moved or reshaped file: skip this source this run)
                 warn(f"depth charts skipped ({e.__class__.__name__}: {e})")
-        if slow_due(st, "trend", now):
-            try:
-                adds = [(x["player_id"], int(x["count"])) for x in fetch_json(TRENDING.format(kind="add"))]
-                drops = [(x["player_id"], int(x["count"])) for x in fetch_json(TRENDING.format(kind="drop"))]
-                new += trend_events(st, adds, names, now)
-                trend = {"add": [list(x) for x in adds], "drop": [list(x) for x in drops], "at": iso(now)}
-                st["slow"]["trend"] = iso(now)
-            except Exception as e:  # noqa: BLE001
-                warn(f"Sleeper trending skipped ({e.__class__.__name__}: {e})")
+        # every run, so the sidebar's "last 24 hours" is never most of a day old (two calls each 3 hours)
         try:
-            arts = article_items(fetch_json(ESPN_NEWS).get("articles", []), espn2sid, names)
+            adds = [(x["player_id"], int(x["count"])) for x in fetch_json(TRENDING.format(kind="add"))]
+            drops = [(x["player_id"], int(x["count"])) for x in fetch_json(TRENDING.format(kind="drop"))]
+            new += trend_events(st, adds, names, now)
+            trend = {"add": [list(x) for x in adds], "drop": [list(x) for x in drops], "at": iso(now)}
+            st["slow"].pop("trend", None)
+        except Exception as e:  # noqa: BLE001
+            warn(f"Sleeper trending skipped ({e.__class__.__name__}: {e})")
+        try:
+            arts = article_items(fetch_json(ESPN_NEWS).get("articles", []), espn2sid, names, headline_pool(share, rel))
             # the first run takes the headlines as they are (they're news either way); later runs add the new ones
             new += arts
         except Exception as e:  # noqa: BLE001
@@ -338,7 +404,11 @@ def main():
 
     new = fresh(new, st.get("seen", []))
     st["seen"] = (st.get("seen", []) + [i["id"] for i in new])[-SEEN_MAX:]
-    items = merge(feed.get("items", []), new, now)
+    old = feed.get("items", [])
+    for i in old:   # headlines written before tags were, or by an older classifier
+        if i.get("k") == "article":
+            i["tag"] = headline_tag(i.get("title"))
+    items = merge(old, new, now)
     changed = write(os.path.join(a.out, "feed.json"), {"v": 1, "updated": iso(now), "items": items, "trend": trend or {"add": [], "drop": [], "at": None}})
 
     by_player = {}

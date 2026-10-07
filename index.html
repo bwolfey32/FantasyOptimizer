@@ -626,6 +626,9 @@ a.talkn[hidden] { display: none; }
 .nlist.card { padding: 4px 16px; }
 .nitem { display: flex; flex-direction: column; gap: 3px; padding: 12px 0; border-bottom: 1px solid var(--line); }
 .nitem:last-child { border-bottom: 0; }
+.nmore { padding: 10px 0; border-bottom: 1px solid var(--line); }
+.nmore:last-child { border-bottom: 0; }
+.nstale { color: var(--bad); }
 .nmeta { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
 .ntitle { font-weight: 600; line-height: 1.35; }
 .ntitle a { color: inherit; }
@@ -5467,9 +5470,12 @@ async function sharePlayer() {
    news/feed.json (scripts/news.py, every 3 hours): the last 14 days of player news, newest first. Benny writes most of
    it from its own data (injury tags, team changes, depth-chart moves, Sleeper's most-added players); ESPN headlines that
    name a player link out to ESPN. news/players/<id>.json: one player's last 50 items. Both load the first time a page
-   needs them; a missing file is no news, never an error. */
+   needs them; a missing file is no news, never an error. A headline's tag (injury or team) files it under that kind too. */
 const NEWS_KIND = { injury: ['Injury', 'o'], team: ['Team', 'n'], depth: ['Depth chart', 'n'], trend: ['Trending', 'q'], article: ['Headline', 'm'] };
 const NEWS_FILTERS = [['all', 'All'], ['injury', 'Injuries'], ['team', 'Moves'], ['depth', 'Depth charts'], ['trend', 'Trending'], ['article', 'Headlines']];
+// one run's items of one kind (a week's injury tags turning over at once) show their first few, then a button for the rest
+const NEWS_BATCH = 5, NEWS_BATCH_OF = { injury: 'injury updates', team: 'team moves', depth: 'depth-chart moves', trend: 'trending players', article: 'headlines' };
+const NEWS_STALE = 8 * 3600e3;   // the feed is written every 3 hours: this much older and a run has been missed
 function newsFile(e, url, done) {
   fetchJSON(url, 15000).then(j => { if (j?.v === 1) { e.st = 'ok'; e.d = j; } else e.st = 'none'; }).catch(() => { e.st = 'none'; }).finally(done);
   return e;
@@ -5482,24 +5488,25 @@ function pNews(id) {
   D.pnews.set(id, e = { st: 'loading' });
   return newsFile(e, `news/players/${encodeURIComponent(id)}.json`, () => { if (state.tab === 'player' && D.pp?.id === id) render(); });
 }
-// one player's news: his file, and anything about him in the feed (either may be the newer copy), once each, newest first
+// one player's news: anything about him in the feed, and his file (older items; the feed's copy wins, since a headline's
+// tag is kept up to date there), once each, newest first
 function playerNews(id) {
   const N = pNews(id), F = newsFeed(), seen = new Set(), items = [];
-  for (const i of [...(N.d?.items || []), ...(F.d?.items || []).filter(i => i.ids?.includes(id))]) if (!seen.has(i.id)) { seen.add(i.id); items.push(i); }
+  for (const i of [...(F.d?.items || []).filter(i => i.ids?.includes(id)), ...(N.d?.items || [])]) if (!seen.has(i.id)) { seen.add(i.id); items.push(i); }
   items.sort((a, b) => b.t < a.t ? -1 : b.t > a.t ? 1 : 0);
   return { st: N.st === 'loading' || F.st === 'loading' ? 'loading' : 'ok', items };
 }
 /* One item: its kind, source and age, the headline (a link to the story for ESPN's), and the players it's about, each a
    link to his page (except `self`, the page it's shown on). */
 function newsItemHTML(it, { self = null } = {}) {
-  const [kl, kc] = NEWS_KIND[it.k] || ['News', 'm'], at = Date.parse(it.t);
+  const [kl, kc] = NEWS_KIND[it.k === 'article' && NEWS_KIND[it.tag] ? it.tag : it.k] || ['News', 'm'], at = Date.parse(it.t);
   const who = (it.ids || []).map((id, i) => [id, D.U.get(id)?.name || it.names?.[i] || id]).filter(([id]) => id !== self).map(([id, nm]) => plink(id, esc(nm), 'nchip')).join('');
   const url = /^https:\/\//.test(it.url || '') ? it.url : null;
   const title = url ? `<a href="${esc(url)}" target="_blank" rel="noopener">${esc(it.title)} <span aria-hidden="true">↗</span></a>` : esc(it.title);
   return `<li class="nitem"><div class="nmeta"><span class="pill ${kc}">${kl}</span><span class="small muted">${esc(it.src || '')}${at ? ` · <time datetime="${esc(it.t)}" title="${esc(new Date(at).toLocaleString())}">${ago(at)}</time>` : ''}</span></div>
     <div class="ntitle">${title}</div>${it.sub ? `<div class="small muted">${esc(it.sub)}</div>` : ''}${who ? `<div class="nwho">${who}</div>` : ''}${talkOn() ? `<div class="cmt-acts">${rxBarHTML('n:' + it.id, true)}</div>` : ''}</li>`;
 }
-const NEWS_FOOT = `<div class="small muted">Injury, team and depth-chart items are Benny’s, from Sleeper’s injury tags and rosters and nflverse depth charts. Headlines link to the story on ESPN. Updated every 3 hours.</div>`;
+const NEWS_FOOT = `<div class="small muted">Injury, team and depth-chart items are Benny’s, from Sleeper’s injury tags and rosters and nflverse depth charts. Midweek injury tags follow practice reports and firm up on Friday. Headlines link to the story on ESPN. Updated every 3 hours.</div>`;
 function pNewsTab(id, u) {
   const nw = playerNews(id);
   if (!nw.items.length) return `<div class="card panel small muted">${nw.st === 'loading' ? 'Loading news…' : `No news about ${esc(u.name)} yet. Injury, team and depth-chart changes, and ESPN headlines that name him, show up here.`}</div>`;
@@ -5513,16 +5520,26 @@ function viewNews() {
   if (F.st !== 'ok') return `<div class="card panel"><h2>News isn’t available right now</h2><p style="margin:0" class="small muted">Benny’s news file didn’t load. Try again in a few minutes.</p></div>`;
   const kind = NEWS_FILTERS.some(f => f[0] === D.newsKind) ? D.newsKind : 'all', mineOk = state.roster.length > 0;
   const who = D.newsWho === 'mine' && mineOk ? 'mine' : POS.includes(D.newsWho) ? D.newsWho : 'all', mine = new Set(state.roster);
-  const hits = F.d.items.filter(i => (kind === 'all' || i.k === kind) && (who === 'all' || (i.ids || []).some(id => who === 'mine' ? mine.has(id) : D.U.get(id)?.pos === who)));
-  const list = D.newsAll ? hits : hits.slice(0, 60);
+  const hits = F.d.items.filter(i => (kind === 'all' || i.k === kind || i.tag === kind) && (who === 'all' || (i.ids || []).some(id => who === 'mine' ? mine.has(id) : D.U.get(id)?.pos === who)));
+  // up to 60 rows (unless Show all), each batch past its first few behind a button
+  const rows = [], open = D.newsOpen || (D.newsOpen = new Set()); let i = 0, shown = 0;
+  while (i < hits.length && (D.newsAll || shown < 60)) {
+    let j = i + 1; const a = hits[i];
+    while (j < hits.length && hits[j].k === a.k && hits[j].t === a.t && hits[j].src === a.src) j++;
+    const key = `${a.t}|${a.k}`, all = j - i <= NEWS_BATCH || open.has(key), grp = hits.slice(i, all ? j : i + NEWS_BATCH);
+    rows.push(...grp.map(it => newsItemHTML(it))); shown += grp.length;
+    if (!all) rows.push(`<li class="nmore"><button type="button" class="btn sm" data-newsgrp="${esc(key)}">Show ${j - i - NEWS_BATCH} more ${NEWS_BATCH_OF[a.k] || 'items'}</button></li>`);
+    i = j;
+  }
+  const upd = Date.parse(F.d.updated), stale = Date.now() - upd > NEWS_STALE, trAt = Date.parse(F.d.trend?.at || '');
   const tr = F.d.trend || {}, tl = (rows, label) => rows?.length ? `<div><h3 class="dh">${label}</h3><ol class="ntrend">${rows.slice(0, 10).map(([id, n]) => `<li>${plink(id, esc(D.U.get(id)?.name || id))}<span class="small muted">${n.toLocaleString()}</span></li>`).join('')}</ol></div>` : '';
-  const trend = tr.add?.length ? `<div class="card ntrends"><div class="row-head"><h3>Trending on Sleeper</h3></div><div class="small muted">Leagues that added or dropped each player in the last 24 hours.</div><div class="ntrend-cols">${tl(tr.add, 'Most added')}${tl(tr.drop, 'Most dropped')}</div></div>` : '';
+  const trend = tr.add?.length ? `<div class="card ntrends"><div class="row-head"><h3>Trending on Sleeper</h3></div><div class="small muted">Leagues that added or dropped each player in the last 24 hours${trAt ? `, as of ${ago(trAt)}` : ''}.</div><div class="ntrend-cols">${tl(tr.add, 'Most added')}${tl(tr.drop, 'Most dropped')}</div></div>` : '';
   const btn = (attr, k, l, on) => `<button type="button" ${attr}="${k}" aria-pressed="${on}">${l}</button>`;
-  return `<div class="row-head"><h2>News <span class="hsub">Injuries, moves, depth charts and headlines, by player</span></h2><span class="small muted">Updated ${ago(Date.parse(F.d.updated))}</span></div>
+  return `<div class="row-head"><h2>News <span class="hsub">Injuries, moves, depth charts and headlines, by player</span></h2><span class="small ${stale ? 'nstale' : 'muted'}">Updated ${ago(upd)}${stale ? '. News may be behind' : ''}</span></div>
   <div class="toolbar nfilters"><div class="seg" role="group" aria-label="Kind of news">${NEWS_FILTERS.map(([k, l]) => btn('data-newskind', k, l, k === kind)).join('')}</div>
     <div class="seg" role="group" aria-label="Whose news">${btn('data-newswho', 'all', 'Everyone', who === 'all')}${mineOk ? btn('data-newswho', 'mine', esc(curTeam()?.name || 'My team'), who === 'mine') : ''}${POS.filter(p => p !== 'K').map(p => btn('data-newswho', p, posLabel(p), who === p)).join('')}</div></div>
-  <div class="nlayout"><div class="nmain">${list.length ? `<ul class="nlist card">${list.map(i => newsItemHTML(i)).join('')}</ul>` : `<div class="card panel small muted">Nothing ${kind === 'all' ? '' : 'of that kind '}in the last two weeks${who === 'all' ? '' : who === 'mine' ? ' about your players' : ` about ${posLabel(who)}s`}.</div>`}
-    ${hits.length > list.length ? `<div class="toolbar"><button type="button" class="btn sm" data-act="newsmore">Show all ${hits.length}</button></div>` : ''}${NEWS_FOOT}</div>${trend}</div>`;
+  <div class="nlayout"><div class="nmain">${rows.length ? `<ul class="nlist card">${rows.join('')}</ul>` : `<div class="card panel small muted">Nothing ${kind === 'all' ? '' : 'of that kind '}in the last two weeks${who === 'all' ? '' : who === 'mine' ? ' about your players' : ` about ${posLabel(who)}s`}.</div>`}
+    ${i < hits.length ? `<div class="toolbar"><button type="button" class="btn sm" data-act="newsmore">Show all ${hits.length}</button></div>` : ''}${NEWS_FOOT}</div>${trend}</div>`;
 }
 
 /* ---------- Discussion ----------
@@ -6422,9 +6439,10 @@ function viewSettings() {
 /* ---------- events ---------- */
 document.addEventListener('click', e => {
   if (e.target.closest('a[href^="#"]')) D.fwdNav = true;   // a link: the next page starts at the top (hashchange)
-  const t = e.target.closest('[data-newskind],[data-newswho],[data-poolpos],[data-poolmode],[data-model],[data-tab],[data-expand],[data-add],[data-remove],[data-strategy],[data-act],[data-sort],[data-team],[data-fteam],[data-clearovr],[data-wh],[data-wsrc],[data-taken],[data-keepmode],[data-decide],[data-brief],[data-wrank],[data-acadd],[data-mrem],[data-flowmethod],[data-espnmode],[data-rview],[data-research],[data-hweek],[data-dc],[data-colmv],[data-started]'); if (!t) return;
+  const t = e.target.closest('[data-newskind],[data-newswho],[data-newsgrp],[data-poolpos],[data-poolmode],[data-model],[data-tab],[data-expand],[data-add],[data-remove],[data-strategy],[data-act],[data-sort],[data-team],[data-fteam],[data-clearovr],[data-wh],[data-wsrc],[data-taken],[data-keepmode],[data-decide],[data-brief],[data-wrank],[data-acadd],[data-mrem],[data-flowmethod],[data-espnmode],[data-rview],[data-research],[data-hweek],[data-dc],[data-colmv],[data-started]'); if (!t) return;
   if (t.dataset.newskind) { D.newsKind = t.dataset.newskind; D.newsAll = false; render(); return; }
   if (t.dataset.newswho) { D.newsWho = t.dataset.newswho; D.newsAll = false; render(); return; }
+  if (t.dataset.newsgrp) { (D.newsOpen || (D.newsOpen = new Set())).add(t.dataset.newsgrp); render(); return; }
   if (t.dataset.poolpos) { D.poolPos = t.dataset.poolpos; D.poolAll = false; render(); return; }
   if (t.dataset.poolmode) { D.poolMode = t.dataset.poolmode; render(); return; }
   if (t.dataset.model) { state.settings.model = t.dataset.model; track('model_changed', { model: t.dataset.model }); save(); D.wCache = null; computeAll(); render(); return; }

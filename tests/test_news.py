@@ -128,3 +128,53 @@ def test_merge_dedup_and_retention():
 def test_seen_ids_never_repeat():
     new = [N.item("injury", "a", N.iso(NOW), [], "a"), N.item("injury", "a", N.iso(NOW), [], "a"), N.item("injury", "b", N.iso(NOW), [], "b")]
     assert [i["id"] for i in N.fresh(new, ["b"])] == ["a"]
+
+
+def test_headline_tags():
+    assert N.headline_tag("Giants' Berrios says he'll undergo season-ending foot surgery") == "injury"
+    assert N.headline_tag("Sources: Ravens QB Lamar Jackson dealing with ankle sprain") == "injury"
+    assert N.headline_tag("What do Ravens have to do if Lamar Jackson misses games?") == "injury"
+    assert N.headline_tag("Source: Seahawks decide not to sign RB Joe Mixon after physical") == "team"
+    assert N.headline_tag("Bills place Cook on IR after signing a backup") == "injury"   # an injury wins
+    assert N.headline_tag("Rest-of-season rankings: Tetairoa McMillan, George Kittle rise while Jalen Hurts slips") is None
+    assert N.headline_tag("Steve Smith Sr.: Bills need to get away from Josh Allen playing hero ball") is None
+
+
+def test_headline_names_add_players():
+    share = {"1": ["D'Andre Swift", "RB", "CHI", 1], "2": ["James Cook", "RB", "BUF", 2], "3": ["Mike Williams", "WR", "NYJ", 3],
+             "4": ["Mike Williams", "WR", None, 4], "5": ["Jaxon Smith-Njigba", "WR", "SEA", 5], "6": ["Bench Guy", "WR", "SEA", 6]}
+    rel = {"1": 12, "2": 15, "3": 8, "4": 8, "5": 15, "6": 0.5}
+    pool = N.headline_pool(share, rel)
+    assert set(pool) == {"1", "2", "5"}           # a shared name, or a player who doesn't matter, is never guessed
+    names = {k: v[0] for k, v in share.items()}
+    out = N.article_items([
+        art(1, "Matchup rankings: Upgrade D'Andre Swift, fade James Cook III", [402]),
+        art(2, "Pickups: Jaxon Smith-Njigba, Mike Williams among names available", []),
+        art(3, "Swift limited in practice", [999]),
+    ], {"402": "2"}, names, pool)
+    by = {i["id"]: i for i in out}
+    assert by["espn-1"]["ids"] == ["2", "1"]      # ESPN's tag, then the name in the headline
+    assert by["espn-2"]["ids"] == ["5"]           # no ESPN tag needed when the headline names him in full
+    assert "espn-3" not in by                     # a last name alone adds no one
+    assert by["espn-1"]["tag"] is None
+
+
+def test_mass_clear_is_a_bad_read():
+    st = {}
+    rel = {str(k): 10 for k in range(60)}
+    N.injury_events(st, [row(str(k), f"P{k}", inj="Out") for k in range(50)] + [row(str(k), f"P{k}") for k in range(50, 60)], rel, NOW)
+    before = dict(st["inj"])
+    out = N.injury_events(st, [row(str(k), f"P{k}", inj="Out" if k < 3 else None) for k in range(60)], rel, LATER)
+    assert out == [] and st["inj"] == before
+    # a week's tags turning over (Out to Questionable) is real news
+    out = N.injury_events(st, [row(str(k), f"P{k}", inj="Questionable" if k < 40 else None) for k in range(60)], rel, LATER)
+    assert len(out) == 50
+
+
+def test_status_back_and_forth_in_a_day():
+    st = {}
+    rel = {"1": 15}
+    N.injury_events(st, [row("1", "A")], rel, NOW)
+    ids = [N.injury_events(st, [row("1", "A", inj=s)], rel, NOW + timedelta(minutes=m))[0]["id"]
+           for s, m in (("Questionable", 10), ("Out", 20), ("Questionable", 30))]
+    assert len(set(ids)) == 3 and len(N.fresh([{"id": x} for x in ids], [])) == 3
