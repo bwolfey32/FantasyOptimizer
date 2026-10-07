@@ -173,13 +173,15 @@ a { color: var(--accent); }
 .acct-grp .gopro { background: color-mix(in srgb, var(--gold) 10%, var(--surface)); }
 /* phones: Pro / Account go top right beside the logo; the data status and Refresh share the row below */
 @media (max-width: 600px) {
-  .top { display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: center; gap: 10px 8px; }
+  .top { display: grid; grid-template-columns: auto minmax(0, 1fr) auto; align-items: center; gap: 10px 8px; }
+  .top .brand { grid-column: 1 / 3; grid-row: 1; }
   .top > .controls { display: contents; }
-  .top .acct-grp { grid-column: 2; grid-row: 1; }
+  .top .acct-grp { grid-column: 3; grid-row: 1; }
   .top .acct-grp .btn { padding: 6px 10px; }
-  .top #status { grid-column: 1; grid-row: 2; justify-self: start; margin-right: 0; }
-  .top [data-act="reload"] { grid-column: 1; grid-row: 3; justify-self: start; }
-  .top .bell { grid-column: 2; grid-row: 2; justify-self: end; padding: 6px 9px; }
+  .top [data-act="reload"] { grid-column: 1; grid-row: 2; justify-self: start; }
+  .top [data-act="reload"] .rl { display: none; }
+  .top #status { grid-column: 2; grid-row: 2; justify-self: start; margin-right: 0; }
+  .top .bell { grid-column: 3; grid-row: 2; justify-self: end; padding: 6px 9px; }
   .brand { gap: 10px; }
   .brand .logo { width: 44px; height: 44px; }
   .tagline { font-size: 10.5px; letter-spacing: .1em; }
@@ -950,7 +952,7 @@ button, .btn, [role="button"], [role="tab"], nav, nav a, summary { -webkit-touch
     </div>
     <div class="controls">
       <button type="button" class="status" id="status" data-act="fresh" aria-expanded="false" aria-controls="fresh" title="When each kind of data was last updated"><i></i><span>Loading…</span></button>
-      <button class="btn" data-act="reload" type="button" title="Get the newest projections, injuries and lines">Refresh projections</button>
+      <button class="btn" data-act="reload" type="button" title="Get the newest projections, injuries and lines">Refresh<span class="rl"> projections</span></button>
       <button class="btn bell" type="button" id="bellBtn" data-bell aria-expanded="false" aria-label="Alerts" title="News about your players and the players you watch, and replies to your comments" hidden><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9"/><path d="M10.3 21a1.94 1.94 0 0 0 3.4 0"/></svg><span class="bell-n" hidden></span></button>
       <span class="acct-grp"><button class="btn gopro" data-tab="pro" type="button" id="proBtn" hidden>Go Pro</button><button class="btn" data-act="account" type="button" id="acctBtn" aria-expanded="false" hidden>Sign in</button></span>
     </div>
