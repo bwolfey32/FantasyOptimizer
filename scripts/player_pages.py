@@ -20,6 +20,7 @@ import os
 import re
 import sys
 import unicodedata
+from urllib.parse import quote
 
 sys.dont_write_bytecode = True
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
@@ -36,6 +37,8 @@ TEAM_NAME = {"ARI": "Arizona Cardinals", "ATL": "Atlanta Falcons", "BAL": "Balti
              "TEN": "Tennessee Titans", "WAS": "Washington Commanders"}
 POS_WORD = {"QB": "quarterback", "RB": "running back", "WR": "wide receiver", "TE": "tight end"}
 HEADSHOT = "https://a.espncdn.com/combiner/i?img=/i/headshots/nfl/players/full/{}.png&w=264&h=192&scale=crop"
+# his card for link previews (1200×630, drawn by share/lib/player.mjs on share.bennyspicks.us), not the small headshot
+PREVIEW = "https://share.bennyspicks.us/pcard?id={}"
 # the stat columns each position's tables show: (key, header)
 SEASON_COLS = {"QB": [("cmpatt", "Cmp/Att"), ("pyd", "Pass yds"), ("ptd", "Pass TD"), ("int", "INT"), ("ryd", "Rush yds"), ("rtd", "Rush TD")],
                "RB": [("car", "Car"), ("ryd", "Rush yds"), ("rtd", "Rush TD"), ("rec", "Rec"), ("recyd", "Rec yds"), ("rectd", "Rec TD")],
@@ -175,7 +178,7 @@ def player_page(sid, h, info, slug, season):
                 f"{name} ({pos}, {team or 'FA'}) fantasy football stats: season-by-season PPR points and finishes ({top}), game logs, and this week’s projection.",
                 f"{name} fantasy stats", intro, "\n".join(body) + script,
                 (f"See {esc(name)}’s projection this week, why, and whether to start him on your team.", f"#player/{sid}", "Open in Benny’s Picks"),
-                path=path, ld=ld, image=HEADSHOT.format(espn) if espn else None, head=CSS)
+                path=path, ld=ld, image=PREVIEW.format(quote(sid, safe="")), head=CSS)
 
 
 def directory_page(entries):

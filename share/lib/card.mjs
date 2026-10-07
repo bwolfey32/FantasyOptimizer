@@ -48,6 +48,17 @@ async function font(family, weight) {
   })().catch(e => { fontCache.delete(k); throw e; }));
   return fontCache.get(k);
 }
+/* Emoji (in comments and reaction counts) as Twemoji pictures, since the fonts have none. Other scripts the fonts lack
+   are left out. */
+const TWEMOJI = 'https://cdn.jsdelivr.net/gh/jdecked/twemoji@15.1.0/assets/svg/';
+const emojiCache = new Map();
+async function extraAsset(code, seg) {
+  if (code !== 'emoji') return [];
+  // Twemoji's file names: the code points in hex, without the variation selector unless it's a joined sequence
+  const cps = [...seg].map(c => c.codePointAt(0)), name = (cps.includes(0x200d) ? cps : cps.filter(c => c !== 0xfe0f)).map(c => c.toString(16)).join('-');
+  if (!emojiCache.has(name)) emojiCache.set(name, dataUrl(TWEMOJI + name + '.svg'));
+  return (await emojiCache.get(name)) || '';
+}
 let wasm = null;
 const resvgReady = () => wasm || (wasm = initWasm(fetch(RESVG_WASM)).catch(e => { wasm = null; throw e; }));
 // an image as a data URL, or null if it doesn't load in time (the card then shows a silhouette)
@@ -79,12 +90,15 @@ export async function renderCard(kicker, body) {
           icon && img(icon, { width: 48, height: 48, borderRadius: 10, marginRight: 14 }),
           el('div', { fontFamily: 'Saira Condensed', fontWeight: 700, fontSize: 32, letterSpacing: 1, color: C.ink }, 'BENNY’S PICKS'))),
       ...[body].flat()));
-  const svg = await satori(card, { width: 1200, height: 630, fonts });
+  const svg = await satori(card, { width: 1200, height: 630, fonts, loadAdditionalAsset: extraAsset });
   return new Resvg(svg, { fitTo: { mode: 'width', value: 1200 } }).render().asPng();
 }
-// a card as the function's response, cached for good (a link never changes); fallbackImage when there's nothing to draw
-export function pngResponse(png) {
-  return new Response(png, { headers: { 'Content-Type': 'image/png', 'Cache-Control': 'public, max-age=31536000, immutable', 'Netlify-CDN-Cache-Control': 'public, durable, s-maxage=31536000' } });
+/* A card as the function's response, cached for good (a move's or a call's link never changes), or for `cdnAge`
+   seconds when what it shows can change (a comment can be hidden or deleted); fallbackImage when there's nothing to draw */
+export function pngResponse(png, cdnAge) {
+  return new Response(png, { headers: { 'Content-Type': 'image/png',
+    'Cache-Control': cdnAge ? 'public, max-age=300' : 'public, max-age=31536000, immutable',
+    'Netlify-CDN-Cache-Control': `public, durable, s-maxage=${cdnAge || 31536000}` } });
 }
 export const fallbackImage = () => Response.redirect(`${SITE}/assets/social-preview.jpg`, 302);
 
@@ -93,8 +107,8 @@ const esc = s => String(s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;'
 export const DEFAULT_TITLE = 'Benny’s Picks — Fantasy Optimizer';
 export const DEFAULT_DESC = 'Free weekly lineup optimizer for Sleeper and ESPN fantasy football: start/sit calls, waiver pickups, league power rankings and matchup breakdowns, with live data.';
 /* The page a share link serves: preview tags for chat apps and social sites (title, description, the card), and a
-   redirect that sends people straight on to `dest` on the site. */
-export function linkPage({ title = DEFAULT_TITLE, desc = DEFAULT_DESC, image = `${SITE}/assets/social-preview.jpg`, alt = 'Benny’s Picks logo', self = `${SITE}/`, dest = `${SITE}/`, cta = 'Open Benny’s Picks, free' }) {
+   redirect that sends people straight on to `dest` on the site. Kept at the CDN for a day, or `cdnAge` seconds. */
+export function linkPage({ title = DEFAULT_TITLE, desc = DEFAULT_DESC, image = `${SITE}/assets/social-preview.jpg`, alt = 'Benny’s Picks logo', self = `${SITE}/`, dest = `${SITE}/`, cta = 'Open Benny’s Picks, free', cdnAge = 86400 }) {
   const html = `<!doctype html><html lang="en"><head><meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>${esc(title)}</title>
@@ -114,5 +128,5 @@ export function linkPage({ title = DEFAULT_TITLE, desc = DEFAULT_DESC, image = `
 </head><body style="background:#0e1512;color:#e4ebe6;font:16px system-ui,sans-serif;padding:24px">
 <p><a href="${esc(dest)}" style="color:#4fc38e;font-weight:600">${esc(cta)}</a></p>
 </body></html>`;
-  return new Response(html, { headers: { 'Content-Type': 'text/html; charset=utf-8', 'Cache-Control': 'public, max-age=300', 'Netlify-CDN-Cache-Control': 'public, durable, s-maxage=86400' } });
+  return new Response(html, { headers: { 'Content-Type': 'text/html; charset=utf-8', 'Cache-Control': 'public, max-age=300', 'Netlify-CDN-Cache-Control': `public, durable, s-maxage=${cdnAge}` } });
 }

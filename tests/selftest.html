@@ -960,7 +960,7 @@ test('profiles: #u/<username> parses, shows the person and their comments from t
         { id: 'c2', player_id: gibbs, parent_id: 'c1', body: 'a reply', season: D.season, week: D.week, created_at: at }] });
     st.tab = 'user'; D.up = { handle: 'benfan_1' }; let h = ev('viewUser')();
     if (!/<h2>Benfan_1<\/h2>/.test(h) || !/2 comments/.test(h) || !/Member since/.test(h)) return 'the header: name, count, member since';
-    if (!h.includes(`href="#player/${gibbs}"`) || !h.includes(`href="#player/${gibbs}/talk"`)) return 'each comment links to the player and the thread';
+    if (!h.includes(`href="#player/${gibbs}"`) || !h.includes(`href="#player/${gibbs}/talk/c1"`)) return 'each comment links to the player and to itself in the thread';
     if (h.includes('<b>') || !h.includes('&lt;b&gt;him') || !/rel="nofollow ugc noopener"/.test(h)) return 'comment text is escaped, links are marked';
     if (!/Replied in/.test(h)) return 'a reply says so';
     if (/Change username/.test(h)) return 'someone else’s page has no rename button';
@@ -969,6 +969,37 @@ test('profiles: #u/<username> parses, shows the person and their comments from t
     D.user.set('nobody_x', { st: 'ok', at: Date.now(), p: null, rows: [] }); D.up = { handle: 'nobody_x' };
     if (!/No such user/.test(ev('viewUser')())) return 'an unknown username';
   } finally { st.tab = was[0]; D.up = was[1]; D.user.clear(); }
+});
+test('discussion: a comment’s own address marks it and opens its thread', () => {
+  setup(); const D = ev('D'), st = ev('state'), was = [st.tab, D.pp, D.jump], gibbs = idOf('Jahmyr Gibbs'), ph = ev('parseHash'), hash = ev('playerHash');
+  const u = '0a0a91dd-b7c1-40da-9e9d-5740327b68ee';
+  try {
+    const p = ph(`player/${gibbs}/talk/${u.toUpperCase()}`); if (p?.ptab !== 'talk' || p.cid !== u) return 'parseHash reads the comment: ' + JSON.stringify(p);
+    if (ph(`player/${gibbs}/talk/nonsense`).cid || ph(`player/${gibbs}/games/${u}`).cid) return 'a bad id, or one on another tab, is ignored';
+    if (ph(`player/${gibbs}/talk/nonsense`).ptab !== 'talk') return 'a bad id still opens the Discussion';
+    if (hash(gibbs, 'talk', u) !== `player/${gibbs}/talk/${u}` || ph(hash(gibbs, 'talk', u)).cid !== u) return 'playerHash round trip';
+    talkFixture(gibbs); st.tab = 'player'; D.pp = { id: gibbs, tab: 'talk', cid: 'k3' }; D.jump = null;
+    const h = ev('viewPlayer')();
+    if (!h.includes('reply three')) return 'a linked reply shows, not behind View more';
+    if (!/class="cmt reply lit" data-cid="k3"/.test(h) || (h.match(/ lit"/g) || []).length !== 1) return 'only the linked comment is marked';
+    if (!/data-cid="r2"/.test(h)) return 'every comment carries its id';
+    if (!ev('talkThreadHTML')(gibbs, { limit: 3, compact: true }).includes(`href="#player/${gibbs}/talk/r1"`)) return 'a card’s reply count links to its thread';
+  } finally { st.tab = was[0]; D.pp = was[1]; D.jump = was[2]; D.talk.clear(); D.talkN.clear(); D.talkMore.clear(); D.rx.clear(); setup(); }
+});
+test('sharing: a comment has Share (not when hidden, deleted or on a card); share links carry the tab or the comment', () => {
+  setup(); const D = ev('D'), gibbs = idOf('Jahmyr Gibbs'), host = ev('SHARE_HOST');
+  try {
+    const rows = talkFixture(gibbs), ch = ev('commentHTML');
+    if (!ch(rows[0], { id: gibbs }).includes('data-talkshare="r3"')) return 'a comment has Share';
+    if (ch(rows[0], { id: gibbs, compact: true }).includes('data-talkshare')) return 'not on a card';
+    if (ch(Object.assign({}, rows[0], { hidden_at: rows[0].created_at }), { id: gibbs }).includes('data-talkshare')) return 'not on a hidden comment';
+    if (ch({ id: 'x', deleted_at: rows[0].created_at, created_at: rows[0].created_at, body: '' }, { id: gibbs }).includes('data-talkshare')) return 'not on “[deleted]”';
+    const pl = ev('sharePlayerLink'), cl = ev('shareCommentLink');
+    if (host) {
+      if (pl(gibbs, 'talk') !== `${host}/p?id=${gibbs}&t=talk` || pl(gibbs, 'overview') !== `${host}/p?id=${gibbs}`) return 'player links: ' + pl(gibbs, 'talk');
+      if (cl(gibbs, 'abc') !== `${host}/c?id=abc&p=${gibbs}`) return 'comment link: ' + cl(gibbs, 'abc');
+    } else if (pl(gibbs, 'talk') !== `https://bennyspicks.us/#player/${gibbs}/talk` || cl(gibbs, 'abc') !== `https://bennyspicks.us/#player/${gibbs}/talk/abc`) return 'plain links';
+  } finally { D.talk.clear(); D.talkN.clear(); D.rx.clear(); }
 });
 test('profiles: a comment’s author links to their page; a “[deleted]” placeholder has no name or link', () => {
   setup(); const D = ev('D'), gibbs = idOf('Jahmyr Gibbs');
@@ -1042,7 +1073,7 @@ test('bell: mentions and reactions to your comments join replies and news, and f
     if (!h.includes(`3 reactions 🔥👍 on your comment about ${nm}`) || !/class="pill m">Reactions</.test(h)) return 'the reactions, most used first';
     if (!h.includes(`bob_1 replied in the ${nm} discussion`)) return 'the reply';
     if (h.includes('<b>') || h.includes('<i>')) return 'text is escaped';
-    if (!h.includes(`href="#player/${gibbs}/talk"`)) return 'each links to the discussion';
+    for (const c of ['r1', 'm1', 'c1']) if (!h.includes(`href="#player/${gibbs}/talk/${c}"`)) return `each links to its comment (${c})`;
     acct.rxAlerts = [{ comment_id: 'c1', player_id: gibbs, snippet: 'x', emoji: { '🤔': 1 }, last_at: t(3) }];
     if (!ev('alertsPanel')().includes('1 reaction 🤔 on your comment')) return 'one reaction, singular';
     acct.mentions = []; acct.rxAlerts = []; if (ev('alertItems')().n !== 1) return 'a database without my_alerts: just the replies';

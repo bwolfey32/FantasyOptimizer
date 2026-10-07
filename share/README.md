@@ -7,15 +7,18 @@ When someone shares from Benny's Picks, the link points here. Chat apps and soci
 | **Best move** (Waivers) | `/w?add=&drop=&wk=&g=&h=&o=&why=` | `/card` | `#waivers`, showing the shared move |
 | **Benny's Pick** (Start / Sit) | `/s?start=&sit=&wk=&e=&p=&f=&why=` | `/scard` | `#start-sit`, on the same two players |
 | **Power rankings** (a Sleeper team's grade card) | `/l?id=&wk=&r=` | `/lcard` | `#lineup`, ranking the league live; a visitor picks their own team from it to set up |
+| **A player's page** (Share on his page; also the preview picture of his static page) | `/p?id=&t=` | `/pcard` | his page, on the tab that was shared (`#player/<id>/<tab>`) |
+| **A comment** (Share under a comment) | `/c?id=&p=` | `/ccard` | the comment in his discussion (`#player/<id>/talk/<comment id>`) |
 
 A link can't put a made-up name on a card:
 
 - Players are looked up by id in the site's `share-players.json`, built daily by `scripts/player_ids.py`. Only the numbers (points, ownership, the edge and the chance to outscore), the scoring and the one-line reason come from a move's or a pick's link.
 - A league's name and team names come from Sleeper's public API (by league id). Only each team's grade (roster id and score) comes from the link.
+- A comment's words, its author's username and its reactions are read from the site's community database (Supabase), as an anonymous visitor with the site's public key (`lib/sb.mjs`, the same as `CLOUD` in `index.html`). A link carries only ids. A hidden or deleted comment can't be read, so it isn't drawn. A player card on the Discussion tab reads his comment count and newest comment the same way.
 
-`lib/card.mjs` holds what every card and link page share (fonts, the resvg engine, the panel and header, the link page itself). `lib/move.mjs`, `lib/call.mjs` and `lib/league.mjs` read their links and draw their cards.
+`lib/card.mjs` holds what every card and link page share (fonts, emoji, the resvg engine, the panel and header, the link page itself). `lib/move.mjs`, `lib/call.mjs`, `lib/league.mjs`, `lib/player.mjs` and `lib/comment.mjs` read their links and draw their cards.
 
-It runs on Netlify because GitHub Pages can't make a page per link, and Supabase's functions serve HTML only as plain text. Netlify's free plan allows commercial sites. Each card is drawn once, then served from Netlify's cache.
+It runs on Netlify because GitHub Pages can't make a page per link, and Supabase's functions serve HTML only as plain text. Netlify's free plan allows commercial sites. Each card is drawn once, then served from Netlify's cache: for good for a move, a call or a league, a day for a player, and an hour for anything showing comments (a moderator can hide one).
 
 ## Setting it up (about 15 minutes, once)
 
@@ -44,6 +47,7 @@ It runs on Netlify because GitHub Pages can't make a page per link, and Supabase
 ## Notes
 
 - `satori` and `@resvg/resvg-wasm` are pinned in `package.json`. The resvg engine loads from jsDelivr at the same version (`RESVG_WASM` in `lib/card.mjs`), so change both together.
+- Emoji (in comments and reaction counts) are Twemoji pictures from jsDelivr, at the version in `TWEMOJI` in `lib/card.mjs`.
 - Fonts (Saira Condensed, IBM Plex Sans) come from Google Fonts. Player headshots and team logos come from ESPN's image server, as on the site.
 - Apps cache a link's preview, often for days. A change to the card shows up only on links shared after it.
 - To try a card on your computer: `npm install` here, then import a function from `netlify/functions/` in Node and call it with a `Request` for its address. It returns the PNG or the page. (`node_modules/` and `package-lock.json` stay out of the repo.)

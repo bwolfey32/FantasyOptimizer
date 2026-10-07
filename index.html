@@ -568,6 +568,8 @@ a.more-link, a.plink.more-link { color: var(--accent); font-weight: 600; }
 .cthread:last-child { border-bottom: 0; }
 .cmt { display: flex; flex-direction: column; gap: 4px; padding: 8px 0; }
 .cmt.is-hidden { opacity: .6; }
+/* the comment a link pointed at (#player/<id>/talk/<comment>) */
+.cmt.lit { margin: 0 -10px; padding: 8px 10px; border-radius: 8px; background: color-mix(in srgb, var(--accent) 10%, transparent); box-shadow: inset 3px 0 0 var(--accent); }
 .cmt.gone { padding: 6px 0; }
 .cmt-body a { color: var(--accent); overflow-wrap: anywhere; }
 .cweek { margin: 10px 0 2px; color: var(--muted); }
@@ -4300,12 +4302,18 @@ const NAV_OF = { compare: 'lineup', waivers: 'lineup', players: 'lineup', player
 const navOf = tab => NAV_OF[tab] || tab;
 /* An address: a page (TAB_OF), or a player's page, #player/<id> or #player/<id>/<tab> (PTABS). Null for anything else. */
 function parseHash(h = location.hash.slice(1)) {
-  const m = /^player\/([^/]+)(?:\/(\w+))?$/.exec(h);
-  if (m) { let id; try { id = decodeURIComponent(m[1]); } catch { return null; } return { tab: 'player', id, ptab: PTABS.some(t => t[0] === m[2]) ? m[2] : 'overview' }; }
+  const m = /^player\/([^/]+)(?:\/(\w+)(?:\/([^/]+))?)?$/.exec(h);
+  if (m) {
+    let id; try { id = decodeURIComponent(m[1]); } catch { return null; }
+    const ptab = PTABS.some(t => t[0] === m[2]) ? m[2] : 'overview';
+    // one comment in his discussion (#player/<id>/talk/<comment id>); anything else after the tab is ignored
+    return { tab: 'player', id, ptab, cid: ptab === 'talk' && UUID_RE.test(m[3] || '') ? m[3].toLowerCase() : null };
+  }
   const u = /^u\/([A-Za-z0-9_]{3,20})$/.exec(h); if (u) return { tab: 'user', handle: u[1] };   // a person's page, #u/<username>
   const tab = TAB_OF[h]; return tab ? { tab } : null;
 }
-function applyRoute(p) { state.tab = p.tab; if (p.tab === 'player') D.pp = { id: p.id, tab: p.ptab }; else if (p.tab === 'user') D.up = { handle: p.handle }; }
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+function applyRoute(p) { state.tab = p.tab; if (p.tab === 'player') { D.pp = { id: p.id, tab: p.ptab, cid: p.cid || null }; D.jump = p.cid || null; } else if (p.tab === 'user') D.up = { handle: p.handle }; }
 const TEAM_TABS = new Set(['lineup', 'waivers', 'players']);
 const showWelcome = () => needsTeam() && TEAM_TABS.has(state.tab);
 /* Where a new page starts: the top, or, with the bar pinned, just where it pins, so the new page begins under it */
@@ -4338,9 +4346,10 @@ window.addEventListener('hashchange', () => {
   if (p.tab === 'player' && state.tab !== 'player') D.pfrom = state.tab;
   if (p.tab === 'user') D.ufrom = true;   // reached from inside the app: the page can offer a way back
   applyRoute(p); save(); render();
+  if (!fwd && D.scrollOf[h] != null) D.jump = null;   // back to a linked comment: where they were, not the comment again
   if (!fwd && !samePlayer && D.scrollOf[h] != null) window.scrollTo(0, D.scrollOf[h]);
   else if (D.navScroll !== false && !samePlayer) window.scrollTo(0, navTop());
-  D.navScroll = true; runAfter();
+  D.navScroll = true; runAfter(); talkJump();
 });
 // a one-shot step to run after the next page renders (scroll to a team, highlight the best move)
 function runAfter() { const f = D.after; D.after = null; if (f) setTimeout(f, 30); }
@@ -5253,7 +5262,8 @@ function refreshPlayers() {
    time a page needs them. Their points are PPR with the catches alongside, so fmtPts puts them in this team's scoring. */
 const PTABS = [['overview', 'Overview'], ['news', 'News'], ['talk', 'Discussion'], ['games', 'Game log'], ['history', 'History'], ['stats', 'Stats']];
 const HIST_POS = new Set(['QB', 'RB', 'WR', 'TE']);
-const playerHash = (id, tab) => `player/${encodeURIComponent(id)}${tab && tab !== 'overview' ? '/' + tab : ''}`;
+// his page's address; with `cid`, one comment in his discussion (talkJump brings it into view)
+const playerHash = (id, tab, cid) => `player/${encodeURIComponent(id)}${cid ? '/talk/' + cid : tab && tab !== 'overview' ? '/' + tab : ''}`;
 // a link to a player's page around any markup; `deco` for a second link to the same page (his picture next to his name)
 const plink = (id, inner, cls = '', deco = false) => `<a href="#${playerHash(id)}" class="plink${cls ? ' ' + cls : ''}"${deco ? ' tabindex="-1" aria-hidden="true"' : ''}>${inner}</a>`;
 // "check the news" in advice (already escaped) opens that player's News tab; the advice itself stays plain text, so
@@ -5475,13 +5485,25 @@ function viewPlayer() {
   const from = D.pfrom && D.pfrom !== 'player' ? ([...NAV, ...Object.values(SUBNAV).flat()].find(n => n[0] === D.pfrom)?.[1] || null) : null;
   return `<div class="section player">${from ? `<a href="#${HASH[D.pfrom]}" class="small back-link" data-act="pback">← Back to ${esc(from)}</a>` : ''}${head}${seg}${body}</div>`;
 }
-/* Share a player's page: his page on the static site (players/<slug>/, which has a preview for chat apps) when he has
-   one, or this page's address. */
+/* Share a player's page, on the tab being looked at. The link goes through share.bennyspicks.us/p, whose preview is his
+   card (on the Discussion tab, with the newest comment), and opens the same tab here. His static page (players/<slug>/)
+   stays the one search engines find. */
+const sharePlayerLink = (id, tab) => SHARE_HOST ? `${SHARE_HOST}/p?${new URLSearchParams(tab === 'overview' ? { id } : { id, t: tab })}` : `https://bennyspicks.us/#${playerHash(id, tab)}`;
 async function sharePlayer() {
   const id = D.pp?.id, u = D.U.get(id) || (D.phist.get(id)?.d ? { name: D.phist.get(id).d.name } : null); if (!u) return;
-  if (!D.slugs) D.slugs = await fetchJSON('players/slugs.json', 10000).then(j => j?.s || {}).catch(() => ({}));
-  const slug = D.slugs[id], url = slug ? `https://bennyspicks.us/players/${slug}/` : `https://bennyspicks.us/#${playerHash(id)}`;
-  await shareOut(`${u.name}: projection, game log and history on Benny’s Picks.`, url, how => track('result_shared', { kind: 'player', how, pos: u.pos || null }));
+  const tab = PTABS.some(t => t[0] === D.pp.tab) ? D.pp.tab : 'overview';
+  const text = tab === 'talk' ? `What’s your take on ${u.name}? Join the discussion on Benny’s Picks.`
+    : tab === 'overview' ? `${u.name}: projection, game log and news on Benny’s Picks.` : `${u.name}: ${PTABS.find(t => t[0] === tab)[1].toLowerCase()} on Benny’s Picks.`;
+  await shareOut(text, sharePlayerLink(id, tab), how => track('result_shared', { kind: 'player', how, pos: u.pos || null, tab }));
+}
+/* Share one comment: a line quoting it and a link to it in his discussion. The link goes through share.bennyspicks.us/c,
+   whose preview card reads the words from the database, so a link can't change them. */
+const shareCommentLink = (id, cid) => SHARE_HOST ? `${SHARE_HOST}/c?${new URLSearchParams({ id: cid, p: id })}` : `https://bennyspicks.us/#${playerHash(id, 'talk', cid)}`;
+async function shareComment(id, cid) {
+  const c = D.talk.get(id)?.rows.find(x => x.id === cid); if (!c || c.hidden_at || c.deleted_at) return;
+  const nm = D.U.get(id)?.name || D.phist.get(id)?.d?.name || 'a player', s = String(c.body || '').replace(/\s+/g, ' ').trim();
+  const text = `${c.profiles?.handle || 'Someone'} on ${nm}: “${s.length > 100 ? s.slice(0, 99).trimEnd() + '…' : s}”`;
+  await shareOut(text, shareCommentLink(id, cid), how => track('result_shared', { kind: 'comment', how, pos: D.U.get(id)?.pos || null }));
 }
 /* ---------- News ----------
    news/feed.json (scripts/news.py, every 3 hours): the last 14 days of player news, newest first. Benny writes most of
@@ -5747,7 +5769,8 @@ function commentHTML(c, { id, compact = false, nReplies = 0 } = {}) {
   if (c.deleted_at) return `<article class="cmt gone"><div class="cmt-body small muted">[deleted]</div>${acct.admin && !compact ? `<div class="cmt-acts"><button type="button" class="linkbtn" data-talkdel="${esc(c.id)}">${D.talkDel === c.id ? 'Delete the whole thread? Yes' : 'Delete the thread'}</button></div>` : ''}</article>`;
   const mine = acct.user && c.author_id === acct.user.id, at = Date.parse(c.created_at), acts = [];
   if (!compact && !c.parent_id && !c.hidden_at) acts.push(`<button type="button" class="linkbtn" data-talkreply="${esc(c.id)}">Reply</button>`);
-  if (compact && nReplies) acts.push(`<a class="linkbtn" href="#${playerHash(id, 'talk')}">${nReplies} repl${nReplies === 1 ? 'y' : 'ies'}</a>`);
+  if (!compact && !c.hidden_at) acts.push(`<button type="button" class="linkbtn" data-talkshare="${esc(c.id)}">Share</button>`);
+  if (compact && nReplies) acts.push(`<a class="linkbtn" href="#${playerHash(id, 'talk', c.id)}">${nReplies} repl${nReplies === 1 ? 'y' : 'ies'}</a>`);
   if (mine) acts.push(`<button type="button" class="linkbtn" data-talkdel="${esc(c.id)}">${D.talkDel === c.id ? 'Delete it? Yes' : 'Delete'}</button>`);
   else if (acct.user) acts.push(`<button type="button" class="linkbtn" data-talkrep="${esc(c.id)}" aria-expanded="${D.talkRep === c.id}">Report</button>`);
   if (acct.admin) acts.push(`<button type="button" class="linkbtn" data-talkhide="${esc(c.id)}|${c.hidden_at ? 0 : 1}">${c.hidden_at ? 'Restore' : 'Hide'}</button>`);
@@ -5756,7 +5779,7 @@ function commentHTML(c, { id, compact = false, nReplies = 0 } = {}) {
     ${rw ? `<form class="talk-in reply" data-talkrepform="${esc(c.id)}"><textarea class="inp" rows="2" maxlength="300" data-talkin="${esc(nk)}" aria-label="A note for the moderator (optional)" placeholder="Anything the moderator should know? (optional)">${esc(D.drafts[nk] || '')}</textarea>
       <div class="talk-in-row"><span class="small muted">Only moderators see reports.</span><button type="button" class="btn sm" data-talkrep="${esc(c.id)}">Cancel</button><button type="submit" class="btn sm primary">Send report</button></div></form>` : ''}` : '';
   const wk = c.week ? `<span class="pill m" title="Posted in week ${c.week}${c.season ? ` of ${c.season}` : ''}">Wk ${c.week}${c.season && c.season !== D.season ? ` ’${String(c.season).slice(2)}` : ''}</span>` : '';
-  return `<article class="cmt${c.parent_id ? ' reply' : ''}${c.hidden_at ? ' is-hidden' : ''}">
+  return `<article class="cmt${c.parent_id ? ' reply' : ''}${c.hidden_at ? ' is-hidden' : ''}${!compact && c.id === D.pp?.cid ? ' lit' : ''}" data-cid="${esc(c.id)}">
     <div class="cmt-head"><strong>${talkWhoLink(c)}</strong>${wk}<span class="small muted">${at ? `<time datetime="${esc(c.created_at)}" title="${esc(new Date(at).toLocaleString())}">${ago(at)}</time>` : ''}</span>${c.hidden_at ? `<span class="pill o">${c.hidden_reason === '__parent' ? 'Hidden with its thread' : c.hidden_reason === 'banned' ? 'Hidden: account banned' : 'Hidden'}</span>` : ''}</div>
     <div class="cmt-body${compact ? ' clamp' : ''}">${talkBody(c.body)}</div>
     <div class="cmt-acts">${rxBarHTML('c:' + c.id)}${acts.join('')}</div>${why}</article>`;
@@ -5778,6 +5801,8 @@ function talkThreadHTML(id, { limit = 0, compact = false } = {}) {
   let roots = e.rows.filter(c => !c.parent_id && (!c.deleted_at || (!compact && kids.has(c.id))));
   if (!roots.length) return `<div class="small muted">No comments yet.${acct.user ? ' Start the discussion.' : ''}</div>`;
   const full = !limit && !compact;
+  // a linked reply (#player/<id>/talk/<comment>) shows with all its thread's replies, not behind "View more"
+  const tgt = full && D.pp?.cid && e.rows.find(c => c.id === D.pp.cid); if (tgt?.parent_id) D.talkMore.add(tgt.parent_id);
   // Top (the Discussion tab only): reactions plus two for each reply, newest first on a tie
   if (full && D.talkSort === 'top') {
     const score = c => Object.values(D.rx.get('c:' + c.id)?.c || {}).reduce((a, b) => a + b, 0) + 2 * (kids.get(c.id)?.length || 0);
@@ -5823,7 +5848,16 @@ function talkPaint(id, compose) {
   document.querySelectorAll(`[data-talk-thread="${qv(id)}"]`).forEach(el => { el.innerHTML = talkThreadHTML(id, { limit: +el.dataset.limit || 0, compact: el.dataset.compact === '1' }); });
   document.querySelectorAll(`[data-talk-n="${qv(id)}"]`).forEach(el => { el.textContent = talkCountTxt(id); });
   if (compose) document.querySelectorAll(`[data-talk-compose="${qv(id)}"]`).forEach(el => { el.innerHTML = composerHTML(id, { compact: el.dataset.compact === '1' }); });
-  chipPaint(id); talkRefocus();
+  chipPaint(id); talkRefocus(); talkJump();
+}
+/* A comment's own address (bell items, profiles, shared links): once his comments are on screen, bring that comment into
+   view, once a visit. It's marked (.lit) for as long as the address names it. */
+function talkJump() {
+  const cid = D.jump; if (!cid) return;
+  if (state.tab !== 'player' || D.pp?.cid !== cid || !talkOn()) { D.jump = null; return; }
+  const el = document.querySelector(`.ptalk [data-cid="${qv(cid)}"]`);
+  if (el) { D.jump = null; el.scrollIntoView({ block: 'center' }); return; }
+  if (D.talk.get(D.pp.id)?.st === 'ok' && document.querySelector('.ptalk')) { D.jump = null; toast('That comment isn’t there any more.'); }
 }
 const talkSay = (key, text) => document.querySelectorAll(`[data-talk-msg="${qv(key)}"]`).forEach(el => { el.textContent = text; });
 async function talkPost(form) {
@@ -5957,7 +5991,7 @@ function viewUser() {
   trackOnce('pf:' + k, 'profile_viewed', { own });
   const rows = e.rows.map(c => { const id = c.player_id, nm = D.U.get(id)?.name || 'a player', at = Date.parse(c.created_at);
     return `<article class="pcmt"><div class="cmt-head">${c.parent_id ? 'Replied in ' : ''}<strong>${plink(id, esc(nm))}</strong>${c.week ? `<span class="pill m" title="Posted in week ${c.week}${c.season ? ` of ${c.season}` : ''}">Wk ${c.week}${c.season && c.season !== D.season ? ` ’${String(c.season).slice(2)}` : ''}</span>` : ''}<span class="small muted">${at ? `<time datetime="${esc(c.created_at)}">${ago(at)}</time>` : ''}</span></div>
-      <div class="cmt-body">${talkBody(c.body)}</div><div class="small"><a class="more-link" href="#${playerHash(id, 'talk')}">See the discussion →</a></div></article>`; }).join('');
+      <div class="cmt-body">${talkBody(c.body)}</div><div class="small"><a class="more-link" href="#${playerHash(id, 'talk', c.id)}">See the discussion →</a></div></article>`; }).join('');
   return `<div class="section profile">${back}<div class="card phead"><div class="phead-main"><div class="phead-txt"><h2>${esc(e.p.handle)}</h2>
       <div class="psub small muted">${since ? `Member since ${esc(new Date(since).toLocaleDateString([], { month: 'long', year: 'numeric' }))} · ` : ''}${e.p.n_comments} comment${e.p.n_comments === 1 ? '' : 's'}</div></div></div>
     ${own ? `<div class="toolbar"><button type="button" class="btn sm" data-act="namepick">Change username</button></div>` : ''}</div>
@@ -6081,12 +6115,12 @@ function toggleAlerts() {
 function alertsPanel() {
   const { news, reps, ments, rxs } = alertItems(), W = (state.watch || []).length, pname = id => esc(D.U.get(id)?.name || 'player');
   const items = [...ments.map(c => ({ t: c.created_at, h: `<li class="nitem"><div class="nmeta"><span class="pill n">Mention</span><span class="small muted">${ago(Date.parse(c.created_at))}</span></div>
-      <div class="ntitle"><a href="#${playerHash(c.player_id, 'talk')}">${talkWho(c)} mentioned you in the ${pname(c.player_id)} discussion</a></div><div class="small muted clamp">${esc(c.body)}</div></li>` })),
+      <div class="ntitle"><a href="#${playerHash(c.player_id, 'talk', c.id)}">${talkWho(c)} mentioned you in the ${pname(c.player_id)} discussion</a></div><div class="small muted clamp">${esc(c.body)}</div></li>` })),
     ...rxs.map(g => { const em = Object.entries(g.emoji || {}).sort((a, b) => b[1] - a[1] || (a[0] < b[0] ? -1 : 1)), n = em.reduce((t, x) => t + x[1], 0);
       return { t: g.last_at, h: `<li class="nitem"><div class="nmeta"><span class="pill m">Reactions</span><span class="small muted">${ago(Date.parse(g.last_at))}</span></div>
-      <div class="ntitle"><a href="#${playerHash(g.player_id, 'talk')}">${n} reaction${n === 1 ? '' : 's'} ${em.map(x => x[0]).join('')} on your comment about ${pname(g.player_id)}</a></div><div class="small muted clamp">${esc(g.snippet || '')}</div></li>` }; }),
+      <div class="ntitle"><a href="#${playerHash(g.player_id, 'talk', g.comment_id)}">${n} reaction${n === 1 ? '' : 's'} ${em.map(x => x[0]).join('')} on your comment about ${pname(g.player_id)}</a></div><div class="small muted clamp">${esc(g.snippet || '')}</div></li>` }; }),
     ...reps.map(c => ({ t: c.created_at, h: `<li class="nitem"><div class="nmeta"><span class="pill n">Reply</span><span class="small muted">${ago(Date.parse(c.created_at))}</span></div>
-      <div class="ntitle"><a href="#${playerHash(c.player_id, 'talk')}">${talkWho(c)} replied in the ${esc(D.U.get(c.player_id)?.name || 'player')} discussion</a></div><div class="small muted clamp">${esc(c.body)}</div></li>` })),
+      <div class="ntitle"><a href="#${playerHash(c.player_id, 'talk', c.id)}">${talkWho(c)} replied in the ${esc(D.U.get(c.player_id)?.name || 'player')} discussion</a></div><div class="small muted clamp">${esc(c.body)}</div></li>` })),
     ...news.map(i => ({ t: i.t, h: newsItemHTML(i) }))].sort((a, b) => a.t < b.t ? 1 : -1);
   return `<div class="card panel alerts" tabindex="-1" role="region" aria-label="Alerts"><div class="row-head"><h2>Alerts</h2><button type="button" class="btn sm" data-bell>Close</button></div>
     ${items.length ? `<ul class="nlist">${items.map(x => x.h).join('')}</ul>` : `<p class="small muted" style="margin:0">Nothing new since you last looked.</p>`}
@@ -6175,13 +6209,14 @@ async function modAct(act, cid) {
 }
 
 document.addEventListener('click', e => {
-  const t = e.target.closest('[data-react],[data-rxpick],[data-talkreply],[data-talkmore],[data-talkdel],[data-talkrep],[data-talkwhy],[data-talkhide],[data-talkretry],[data-talksignin],[data-talksort],[data-watch],[data-bell],[data-modact],[data-modtab]'); if (!t) return;
+  const t = e.target.closest('[data-react],[data-rxpick],[data-talkreply],[data-talkmore],[data-talkdel],[data-talkrep],[data-talkwhy],[data-talkhide],[data-talkretry],[data-talksignin],[data-talksort],[data-talkshare],[data-watch],[data-bell],[data-modact],[data-modtab]'); if (!t) return;
   const d = t.dataset, pid = () => t.closest('[data-talk-thread]')?.dataset.talkThread || D.pp?.id;
   if (d.react) { const [k, em] = d.react.split('|'); react(k, em); return; }
   if (d.rxpick) { const was = D.rxPick; D.rxPick = was === d.rxpick ? null : d.rxpick; if (was && was !== d.rxpick) rxPaint(was); rxPaint(d.rxpick); return; }
   if (d.talksignin !== undefined) { talkSignIn(); return; }
   if (d.talkreply) { if (!acct.user) return talkSignIn(); const id = pid(); D.replyTo = D.replyTo === d.talkreply ? null : d.talkreply; D.talkFocus = D.replyTo ? { k: 'r:' + D.replyTo, s: 0, e: 0 } : null; talkPaint(id); return; }
   if (d.talkmore) { D.talkMore.add(d.talkmore); talkPaint(pid()); return; }
+  if (d.talkshare) { shareComment(pid(), d.talkshare); return; }
   if (d.talkdel) { const id = pid(); if (D.talkDel === d.talkdel) talkDelete(id, d.talkdel); else { D.talkDel = d.talkdel; talkPaint(id); } return; }
   if (d.talkrep) { D.talkRep = D.talkRep === d.talkrep ? null : d.talkrep; D.talkRepWhy = null; talkPaint(pid()); return; }
   // a reason picked: then an optional note, sent with "Send report"
