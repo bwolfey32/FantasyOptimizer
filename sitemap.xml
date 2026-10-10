@@ -1,11 +1,11 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
   <url><loc>https://bennyspicks.us/</loc><changefreq>daily</changefreq></url>
-  <url><loc>https://bennyspicks.us/weekly/</loc><lastmod>2026-10-09</lastmod><changefreq>daily</changefreq></url>
-  <url><loc>https://bennyspicks.us/weekly/waiver-wire/</loc><lastmod>2026-10-09</lastmod><changefreq>daily</changefreq></url>
-  <url><loc>https://bennyspicks.us/weekly/rankings/</loc><lastmod>2026-10-09</lastmod><changefreq>daily</changefreq></url>
-  <url><loc>https://bennyspicks.us/weekly/defense-rankings/</loc><lastmod>2026-10-09</lastmod><changefreq>daily</changefreq></url>
-  <url><loc>https://bennyspicks.us/weekly/weather/</loc><lastmod>2026-10-09</lastmod><changefreq>daily</changefreq></url>
+  <url><loc>https://bennyspicks.us/weekly/</loc><lastmod>2026-10-10</lastmod><changefreq>daily</changefreq></url>
+  <url><loc>https://bennyspicks.us/weekly/waiver-wire/</loc><lastmod>2026-10-10</lastmod><changefreq>daily</changefreq></url>
+  <url><loc>https://bennyspicks.us/weekly/rankings/</loc><lastmod>2026-10-10</lastmod><changefreq>daily</changefreq></url>
+  <url><loc>https://bennyspicks.us/weekly/defense-rankings/</loc><lastmod>2026-10-10</lastmod><changefreq>daily</changefreq></url>
+  <url><loc>https://bennyspicks.us/weekly/weather/</loc><lastmod>2026-10-10</lastmod><changefreq>daily</changefreq></url>
   <url><loc>https://bennyspicks.us/privacy.html</loc><changefreq>yearly</changefreq></url>
   <url><loc>https://bennyspicks.us/terms.html</loc><changefreq>yearly</changefreq></url>
   <url><loc>https://bennyspicks.us/about.html</loc><changefreq>yearly</changefreq></url>
@@ -355,6 +355,7 @@
   <url><loc>https://bennyspicks.us/players/jeremy-mcnichols/</loc><changefreq>weekly</changefreq></url>
   <url><loc>https://bennyspicks.us/players/jeremy-ruckert/</loc><changefreq>weekly</changefreq></url>
   <url><loc>https://bennyspicks.us/players/jerry-jeudy/</loc><changefreq>weekly</changefreq></url>
+  <url><loc>https://bennyspicks.us/players/jeshaun-jones/</loc><changefreq>weekly</changefreq></url>
   <url><loc>https://bennyspicks.us/players/jimmy-horn/</loc><changefreq>weekly</changefreq></url>
   <url><loc>https://bennyspicks.us/players/jj-mccarthy/</loc><changefreq>weekly</changefreq></url>
   <url><loc>https://bennyspicks.us/players/jk-dobbins/</loc><changefreq>weekly</changefreq></url>
@@ -480,6 +481,7 @@
   <url><loc>https://bennyspicks.us/players/malik-willis/</loc><changefreq>weekly</changefreq></url>
   <url><loc>https://bennyspicks.us/players/marcus-mariota/</loc><changefreq>weekly</changefreq></url>
   <url><loc>https://bennyspicks.us/players/mark-andrews/</loc><changefreq>weekly</changefreq></url>
+  <url><loc>https://bennyspicks.us/players/mark-redman/</loc><changefreq>weekly</changefreq></url>
   <url><loc>https://bennyspicks.us/players/marlin-klein/</loc><changefreq>weekly</changefreq></url>
   <url><loc>https://bennyspicks.us/players/marquez-valdes-scantling/</loc><changefreq>weekly</changefreq></url>
   <url><loc>https://bennyspicks.us/players/marquise-brown/</loc><changefreq>weekly</changefreq></url>
