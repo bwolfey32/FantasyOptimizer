@@ -1,11 +1,11 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
   <url><loc>https://bennyspicks.us/</loc><changefreq>daily</changefreq></url>
-  <url><loc>https://bennyspicks.us/weekly/</loc><lastmod>2026-11-13</lastmod><changefreq>daily</changefreq></url>
-  <url><loc>https://bennyspicks.us/weekly/waiver-wire/</loc><lastmod>2026-11-13</lastmod><changefreq>daily</changefreq></url>
-  <url><loc>https://bennyspicks.us/weekly/rankings/</loc><lastmod>2026-11-13</lastmod><changefreq>daily</changefreq></url>
-  <url><loc>https://bennyspicks.us/weekly/defense-rankings/</loc><lastmod>2026-11-13</lastmod><changefreq>daily</changefreq></url>
-  <url><loc>https://bennyspicks.us/weekly/weather/</loc><lastmod>2026-11-13</lastmod><changefreq>daily</changefreq></url>
+  <url><loc>https://bennyspicks.us/weekly/</loc><lastmod>2026-11-14</lastmod><changefreq>daily</changefreq></url>
+  <url><loc>https://bennyspicks.us/weekly/waiver-wire/</loc><lastmod>2026-11-14</lastmod><changefreq>daily</changefreq></url>
+  <url><loc>https://bennyspicks.us/weekly/rankings/</loc><lastmod>2026-11-14</lastmod><changefreq>daily</changefreq></url>
+  <url><loc>https://bennyspicks.us/weekly/defense-rankings/</loc><lastmod>2026-11-14</lastmod><changefreq>daily</changefreq></url>
+  <url><loc>https://bennyspicks.us/weekly/weather/</loc><lastmod>2026-11-14</lastmod><changefreq>daily</changefreq></url>
   <url><loc>https://bennyspicks.us/privacy.html</loc><changefreq>yearly</changefreq></url>
   <url><loc>https://bennyspicks.us/terms.html</loc><changefreq>yearly</changefreq></url>
   <url><loc>https://bennyspicks.us/about.html</loc><changefreq>yearly</changefreq></url>
@@ -310,6 +310,7 @@
   <url><loc>https://bennyspicks.us/players/jacoby-brissett/</loc><changefreq>weekly</changefreq></url>
   <url><loc>https://bennyspicks.us/players/jacory-croskey-merritt/</loc><changefreq>weekly</changefreq></url>
   <url><loc>https://bennyspicks.us/players/jadarian-price/</loc><changefreq>weekly</changefreq></url>
+  <url><loc>https://bennyspicks.us/players/jaden-bradley/</loc><changefreq>weekly</changefreq></url>
   <url><loc>https://bennyspicks.us/players/jahan-dotson/</loc><changefreq>weekly</changefreq></url>
   <url><loc>https://bennyspicks.us/players/jahdae-walker/</loc><changefreq>weekly</changefreq></url>
   <url><loc>https://bennyspicks.us/players/jahmyr-gibbs/</loc><changefreq>weekly</changefreq></url>
