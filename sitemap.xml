@@ -1,11 +1,11 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
   <url><loc>https://bennyspicks.us/</loc><changefreq>daily</changefreq></url>
-  <url><loc>https://bennyspicks.us/weekly/</loc><lastmod>2026-11-15</lastmod><changefreq>daily</changefreq></url>
-  <url><loc>https://bennyspicks.us/weekly/waiver-wire/</loc><lastmod>2026-11-15</lastmod><changefreq>daily</changefreq></url>
-  <url><loc>https://bennyspicks.us/weekly/rankings/</loc><lastmod>2026-11-15</lastmod><changefreq>daily</changefreq></url>
-  <url><loc>https://bennyspicks.us/weekly/defense-rankings/</loc><lastmod>2026-11-15</lastmod><changefreq>daily</changefreq></url>
-  <url><loc>https://bennyspicks.us/weekly/weather/</loc><lastmod>2026-11-15</lastmod><changefreq>daily</changefreq></url>
+  <url><loc>https://bennyspicks.us/weekly/</loc><lastmod>2026-11-16</lastmod><changefreq>daily</changefreq></url>
+  <url><loc>https://bennyspicks.us/weekly/waiver-wire/</loc><lastmod>2026-11-16</lastmod><changefreq>daily</changefreq></url>
+  <url><loc>https://bennyspicks.us/weekly/rankings/</loc><lastmod>2026-11-16</lastmod><changefreq>daily</changefreq></url>
+  <url><loc>https://bennyspicks.us/weekly/defense-rankings/</loc><lastmod>2026-11-16</lastmod><changefreq>daily</changefreq></url>
+  <url><loc>https://bennyspicks.us/weekly/weather/</loc><lastmod>2026-11-16</lastmod><changefreq>daily</changefreq></url>
   <url><loc>https://bennyspicks.us/privacy.html</loc><changefreq>yearly</changefreq></url>
   <url><loc>https://bennyspicks.us/terms.html</loc><changefreq>yearly</changefreq></url>
   <url><loc>https://bennyspicks.us/about.html</loc><changefreq>yearly</changefreq></url>
@@ -75,6 +75,7 @@
   <url><loc>https://bennyspicks.us/players/breece-hall/</loc><changefreq>weekly</changefreq></url>
   <url><loc>https://bennyspicks.us/players/brenden-bates/</loc><changefreq>weekly</changefreq></url>
   <url><loc>https://bennyspicks.us/players/brenen-thompson/</loc><changefreq>weekly</changefreq></url>
+  <url><loc>https://bennyspicks.us/players/brennan-presley/</loc><changefreq>weekly</changefreq></url>
   <url><loc>https://bennyspicks.us/players/brenton-strange/</loc><changefreq>weekly</changefreq></url>
   <url><loc>https://bennyspicks.us/players/brett-rypien/</loc><changefreq>weekly</changefreq></url>
   <url><loc>https://bennyspicks.us/players/brevin-jordan/</loc><changefreq>weekly</changefreq></url>
@@ -94,6 +95,7 @@
   <url><loc>https://bennyspicks.us/players/brycen-tremayne/</loc><changefreq>weekly</changefreq></url>
   <url><loc>https://bennyspicks.us/players/bub-means/</loc><changefreq>weekly</changefreq></url>
   <url><loc>https://bennyspicks.us/players/bucky-irving/</loc><changefreq>weekly</changefreq></url>
+  <url><loc>https://bennyspicks.us/players/cade-klubnik/</loc><changefreq>weekly</changefreq></url>
   <url><loc>https://bennyspicks.us/players/cade-otton/</loc><changefreq>weekly</changefreq></url>
   <url><loc>https://bennyspicks.us/players/cade-stover/</loc><changefreq>weekly</changefreq></url>
   <url><loc>https://bennyspicks.us/players/caleb-douglas/</loc><changefreq>weekly</changefreq></url>
@@ -108,6 +110,7 @@
   <url><loc>https://bennyspicks.us/players/carlos-washington/</loc><changefreq>weekly</changefreq></url>
   <url><loc>https://bennyspicks.us/players/carnell-tate/</loc><changefreq>weekly</changefreq></url>
   <url><loc>https://bennyspicks.us/players/carsen-ryan/</loc><changefreq>weekly</changefreq></url>
+  <url><loc>https://bennyspicks.us/players/carson-beck/</loc><changefreq>weekly</changefreq></url>
   <url><loc>https://bennyspicks.us/players/carson-steele/</loc><changefreq>weekly</changefreq></url>
   <url><loc>https://bennyspicks.us/players/carson-wentz/</loc><changefreq>weekly</changefreq></url>
   <url><loc>https://bennyspicks.us/players/carter-runyon/</loc><changefreq>weekly</changefreq></url>
@@ -468,6 +471,7 @@
   <url><loc>https://bennyspicks.us/players/kolbe-katsis/</loc><changefreq>weekly</changefreq></url>
   <url><loc>https://bennyspicks.us/players/konata-mumpfield/</loc><changefreq>weekly</changefreq></url>
   <url><loc>https://bennyspicks.us/players/kyle-allen/</loc><changefreq>weekly</changefreq></url>
+  <url><loc>https://bennyspicks.us/players/kyle-mccord/</loc><changefreq>weekly</changefreq></url>
   <url><loc>https://bennyspicks.us/players/kyle-monangai/</loc><changefreq>weekly</changefreq></url>
   <url><loc>https://bennyspicks.us/players/kyle-pitts/</loc><changefreq>weekly</changefreq></url>
   <url><loc>https://bennyspicks.us/players/kyle-trask/</loc><changefreq>weekly</changefreq></url>
