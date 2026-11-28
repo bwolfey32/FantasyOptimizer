@@ -1,11 +1,11 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
   <url><loc>https://bennyspicks.us/</loc><changefreq>daily</changefreq></url>
-  <url><loc>https://bennyspicks.us/weekly/</loc><lastmod>2026-11-27</lastmod><changefreq>daily</changefreq></url>
-  <url><loc>https://bennyspicks.us/weekly/waiver-wire/</loc><lastmod>2026-11-27</lastmod><changefreq>daily</changefreq></url>
-  <url><loc>https://bennyspicks.us/weekly/rankings/</loc><lastmod>2026-11-27</lastmod><changefreq>daily</changefreq></url>
-  <url><loc>https://bennyspicks.us/weekly/defense-rankings/</loc><lastmod>2026-11-27</lastmod><changefreq>daily</changefreq></url>
-  <url><loc>https://bennyspicks.us/weekly/weather/</loc><lastmod>2026-11-27</lastmod><changefreq>daily</changefreq></url>
+  <url><loc>https://bennyspicks.us/weekly/</loc><lastmod>2026-11-28</lastmod><changefreq>daily</changefreq></url>
+  <url><loc>https://bennyspicks.us/weekly/waiver-wire/</loc><lastmod>2026-11-28</lastmod><changefreq>daily</changefreq></url>
+  <url><loc>https://bennyspicks.us/weekly/rankings/</loc><lastmod>2026-11-28</lastmod><changefreq>daily</changefreq></url>
+  <url><loc>https://bennyspicks.us/weekly/defense-rankings/</loc><lastmod>2026-11-28</lastmod><changefreq>daily</changefreq></url>
+  <url><loc>https://bennyspicks.us/weekly/weather/</loc><lastmod>2026-11-28</lastmod><changefreq>daily</changefreq></url>
   <url><loc>https://bennyspicks.us/privacy.html</loc><changefreq>yearly</changefreq></url>
   <url><loc>https://bennyspicks.us/terms.html</loc><changefreq>yearly</changefreq></url>
   <url><loc>https://bennyspicks.us/about.html</loc><changefreq>yearly</changefreq></url>
@@ -529,6 +529,7 @@
   <url><loc>https://bennyspicks.us/players/matthew-golden/</loc><changefreq>weekly</changefreq></url>
   <url><loc>https://bennyspicks.us/players/matthew-stafford/</loc><changefreq>weekly</changefreq></url>
   <url><loc>https://bennyspicks.us/players/max-brosmer/</loc><changefreq>weekly</changefreq></url>
+  <url><loc>https://bennyspicks.us/players/max-hurleman/</loc><changefreq>weekly</changefreq></url>
   <url><loc>https://bennyspicks.us/players/max-klare/</loc><changefreq>weekly</changefreq></url>
   <url><loc>https://bennyspicks.us/players/mecole-hardman/</loc><changefreq>weekly</changefreq></url>
   <url><loc>https://bennyspicks.us/players/michael-bandy/</loc><changefreq>weekly</changefreq></url>
